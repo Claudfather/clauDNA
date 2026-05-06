@@ -1,0 +1,76 @@
+# SnowSQL Configuration Template
+# Copy to ~/.snowsql/config and customize with your values
+#
+# IMPORTANT:
+# 1. Use your LOGIN NAME (often email), not your USER NAME
+#    - Login name: what you type to log in (e.g., you@example.com)
+#    - User name: what SELECT CURRENT_USER() returns (e.g., <YOUR_USERNAME>)
+# 2. Use ABSOLUTE PATHS for private_key_path (not ~)
+
+# Default connection using key pair auth
+[connections]
+accountname = YOUR_ACCOUNT_IDENTIFIER
+username = your_login_name@example.com
+private_key_path = /Users/YOUR_USERNAME/.snowflake/rsa_key.p8
+
+# Named connection - Analytics (customize warehouse/role)
+[connections.default]
+accountname = YOUR_ACCOUNT_IDENTIFIER
+username = your_login_name@example.com
+private_key_path = /Users/YOUR_USERNAME/.snowflake/rsa_key.p8
+warehousename = YOUR_WAREHOUSE
+rolename = YOUR_ROLE
+
+# Named connection - DBT (with database/schema)
+[connections.dbt]
+accountname = YOUR_ACCOUNT_IDENTIFIER
+username = your_login_name@example.com
+private_key_path = /Users/YOUR_USERNAME/.snowflake/rsa_key.p8
+warehousename = YOUR_WAREHOUSE
+dbname = YOUR_DATABASE
+schemaname = YOUR_SCHEMA
+rolename = YOUR_ROLE
+
+[options]
+auto_completion = True
+log_file = ~/.snowsql/log
+log_level = INFO
+timing = True
+output_format = psql
+key_bindings = emacs
+repository_base_url = https://sfc-repo.snowflakecomputing.com/snowsql
+
+# =============================================================================
+# SETUP INSTRUCTIONS
+# =============================================================================
+#
+# 1. Generate RSA key pair:
+#
+#    mkdir -p ~/.snowflake
+#    chmod 700 ~/.snowflake
+#    openssl genrsa 2048 | openssl pkcs8 -topk8 -inform PEM -out ~/.snowflake/rsa_key.p8 -nocrypt
+#    chmod 600 ~/.snowflake/rsa_key.p8
+#    openssl rsa -in ~/.snowflake/rsa_key.p8 -pubout -out ~/.snowflake/rsa_key.pub
+#
+# 2. Get your public key content (to give to admin):
+#
+#    cat ~/.snowflake/rsa_key.pub | grep -v "PUBLIC KEY" | tr -d '\n' && echo ""
+#
+# 3. Have admin register your public key:
+#
+#    ALTER USER YOUR_USERNAME SET RSA_PUBLIC_KEY='paste_key_here';
+#
+# 4. Find your account identifier:
+#    - In Snowflake web UI, look at the URL: https://ACCOUNT.snowflakecomputing.com
+#    - Or run: SELECT CURRENT_ACCOUNT();
+#
+# 5. Find your login name vs user name:
+#    - Login name: what you type to log in (often email)
+#    - User name: SELECT CURRENT_USER();
+#    - USE THE LOGIN NAME IN THIS CONFIG
+#
+# 6. Test connection:
+#
+#    snowsql -c default -q "SELECT CURRENT_USER(), CURRENT_ROLE();"
+#
+# =============================================================================
