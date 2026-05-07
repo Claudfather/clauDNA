@@ -35,30 +35,15 @@ Materially smarter Claude Code with one install.
 - clauDNA does not run bots. Claudlobby does.
 - clauDNA does not evaluate skills. Claudosseum does.
 
-## In bounds for autonomous work
+## Current sprint focus
 
-**Standing permissions:**
-- Bug fixes in skill content (logic errors, broken examples, outdated references)
-- Documentation, README, CHANGELOG entries
-- Test additions and coverage improvements
-- Reformatting to match marketplace plugin spec
-- Skill metadata corrections (descriptions, argument hints, categorization)
-
-**Current sprint focus:**
 1. Restructure the repo to match Claude Code marketplace plugin requirements
 2. Audit existing skills for v0.1 inclusion — promote keepers, archive the rest
 3. Ship v0.1 of the marketplace plugin with manual curation
 4. Define the release cadence and changelog format
 5. Establish the input contract from Claudosseum: what does a "promoted skill" look like, and how does it land in clauDNA?
 
-## Requires approval
-
-- Adding a new skill to the canonical set (curated repo — additions are consequential)
-- Removing or demoting an existing skill (disruptive for users on prior versions)
-- Major version bumps and breaking changes
-- Marketplace plugin metadata changes (name, description, author, scope)
-- Changes to the input contract from Claudosseum
-- Anything that introduces a hosted dependency for users
+> Standing permissions and approval gates for agents working in this repo live in [CLAUDE.md § Rules](./CLAUDE.md#rules).
 
 ## Success metrics
 
