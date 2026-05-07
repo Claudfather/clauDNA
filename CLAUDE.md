@@ -5,17 +5,19 @@ Global Claude Code configuration repo. Manages slash commands, agents, hooks, an
 ## Repo Structure
 
 ```
-global/           → Files installed to ~/.claude/ (skills, commands, agents, hooks)
-  skills/         → Skill directories + _shared/ → installed to ~/.claude/skills/
-    _shared/      → Shared orchestration guide (not a skill, no SKILL.md)
-  commands/       → 1 command (clauDNA-sync) → installed to ~/.claude/commands/
-  agents/         → Agent files → installed to ~/.claude/agents/
-  hooks/          → Hook scripts → installed to ~/.claude/hooks/
-  settings.json   → Reference example only (never installed)
-project-template/ → Template for per-project .claude/ setup
-shell/            → Shell aliases (zshrc additions)
-snowflake/        → Snowflake connection config template
-.claude/          → Repo-local commands (like /clauDNA-setup)
+global/                         → Files installed to ~/.claude/ (skills, commands, agents, hooks)
+  skills/                       → Skill directories + _shared/ → installed to ~/.claude/skills/
+    _shared/                    → Shared orchestration guide (not a skill, no SKILL.md)
+  commands/                     → 1 command (clauDNA-sync) → installed to ~/.claude/commands/
+  agents/                       → Agent files → installed to ~/.claude/agents/
+  hooks/                        → Hook scripts → installed to ~/.claude/hooks/
+  settings.json                 → Reference example only (never installed)
+  recommended-permissions.json  → Permission categories offered during setup/sync
+project-template/               → Template for per-project .claude/ setup
+shell/                          → Shell aliases (zshrc additions)
+snowflake/                      → Snowflake connection config template
+.claude/                        → Repo-local commands (like /clauDNA-setup)
+install.sh                      → Fast non-interactive installer (alternative to /clauDNA-setup)
 ```
 
 ## Key Commands

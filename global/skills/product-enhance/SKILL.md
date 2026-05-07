@@ -18,7 +18,7 @@ Parse `$ARGUMENTS` at invocation:
 
 ## When NOT to use
 
-- For net-new feature brainstorming (divergent ideation) → use `/product-brainstorm`
+- For net-new feature brainstorming (divergent ideation) → use `/product-vision`
 - For code quality/tech debt → use `/tech-debt`
 - For security vulnerabilities → use `/security-audit`
 

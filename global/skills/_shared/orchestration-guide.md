@@ -251,7 +251,7 @@ documentation/planning/<subdirectory>/<session_name>_<YYYY-MM-DD>/
 ```
 
 Where `<subdirectory>` varies by skill:
-- product-enhance, product-brainstorm, design-review: `phases/`
+- product-enhance, product-vision, design-review: `phases/`
 - frontend-performance-audit: `performance/`
 - security-audit: `security/`
 - tech-debt: `tech_debt/`
@@ -345,7 +345,7 @@ When `--auto` is set (see orchestration guide Section 10):
 | `/frontend-performance-audit` | ✅ Yes | Requires page/flow in arguments |
 | `/docs-review` | ✅ Yes | Global review mode, auto-fix stale docs |
 | `/access-path-audit` | ✅ Yes | Scan + issue creation, no user input needed |
-| `/product-brainstorm` | ⚠️ Limited | Brainstorming without user input produces generic ideas. Use only with tight scope. |
+| `/product-vision` | ⚠️ Limited | Vision without user input produces generic ideas. Use only with tight scope. |
 | `/design-review` | ❌ No | Requires screenshots, deployed URL, visual judgment |
 | `/session-handoff` | ✅ Yes | Already implemented |
 
@@ -401,7 +401,7 @@ When multiple skills could apply to a task, invoke them in tier order. Process s
 | Tier | Category | Skills | Purpose |
 |------|----------|--------|---------|
 | 1 | **Process** | review-self, investigate-app, verify-completion | Establish approach, verify assumptions, gather evidence, debug |
-| 2 | **Planning** | product-enhance, product-brainstorm, design-review, security-audit, tech-debt, frontend-performance-audit | Analyze what to build, identify gaps, produce design docs |
+| 2 | **Planning** | product-enhance, product-vision, design-review, security-audit, tech-debt, frontend-performance-audit | Analyze what to build, identify gaps, produce design docs |
 | 3 | **Implementation** | implement-plan, review-changes, review-pr, quick-commit, commit-push-pr | Execute plans, review code, commit and ship PRs |
 | 4 | **Deployment & Ops** | railway-deploy, vercel-deploy, modal-deploy, railway-status, vercel-status, modal-status, railway-logs, vercel-logs, modal-logs, dbt, neon-branch, neon-info, neon-query, snowflake-query | Deploy, monitor, query infrastructure |
 
