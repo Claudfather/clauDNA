@@ -235,13 +235,13 @@ The `/worktree` skill manages this interactively if you'd rather not memorize th
 **Fix:**
 1. `SELECT CURRENT_USER();` in a Snowflake session — that's the USER name.
 2. SnowSQL config wants the LOGIN name (often email).
-3. Verify by hand: `snowsql -a ACCOUNT -u "you@example.com" --private-key-path /Users/you/.snowflake/rsa_key.p8 -q "SELECT 1;"`
+3. Verify by hand: `snowsql -a YOUR_ACCOUNT_IDENTIFIER -u "your_login_name@example.com" --private-key-path /Users/YOUR_USERNAME/.snowflake/rsa_key.p8 -q "SELECT 1;"`
 
 ### Snowflake: "No such file" for private key
 
 **Cause:** Using `~` instead of absolute path.
 
-**Fix:** Use `/Users/yourname/.snowflake/rsa_key.p8`, not `~/.snowflake/rsa_key.p8`. SnowSQL does not expand tildes.
+**Fix:** Use `/Users/YOUR_USERNAME/.snowflake/rsa_key.p8`, not `~/.snowflake/rsa_key.p8`. SnowSQL does not expand tildes.
 
 ### Snowflake: a browser opens
 
