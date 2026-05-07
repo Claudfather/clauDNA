@@ -59,3 +59,6 @@ When modifying managed files in `global/`:
 1. Edit the file in `global/` (the source of truth)
 2. Test by running `/clauDNA-setup` to push to local
 3. Update CHANGELOG.md with the change
+4. Before opening a PR, run `python scripts/validate-skills.py` — CI runs the same check and will block merge on violations
+
+When adding or modifying a skill, the binding rules live in [SKILL_CONTRACT.md](./SKILL_CONTRACT.md). The contract is enforced by `scripts/validate-skills.py` and the `validate-skills` GitHub Actions workflow. If you need to relax a rule, update both the contract and the validator together — never one without the other.

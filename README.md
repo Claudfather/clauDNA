@@ -208,6 +208,7 @@ This location is outside `~/.claude/` so Claude Code never discovers backup file
 |------|-------------|
 | [PROJECT_MISSION.md](./PROJECT_MISSION.md) | What clauDNA is, what it's becoming, and where it fits in the Claudfather ecosystem — read this first if you're an agent or contributor trying to understand the project's intent |
 | [CLAUDE.md](./CLAUDE.md) | Operating rules for agents extending clauDNA — sync/install safety, standing permissions, what requires approval |
+| [SKILL_CONTRACT.md](./SKILL_CONTRACT.md) | The binding contract every skill must satisfy. Enforced in CI by `scripts/validate-skills.py` |
 | [SETUP_GUIDE.md](./SETUP_GUIDE.md) | Deep-dive setup companion to this README — Snowflake key-pair auth, configuration hierarchy, troubleshooting |
 | [CLAUDE_MD_TEMPLATE.md](./CLAUDE_MD_TEMPLATE.md) | Template for project-level `CLAUDE.md` files (used by `/init-project`) |
 | [CHANGELOG.md](./CHANGELOG.md) | All notable changes |
