@@ -1,12 +1,12 @@
 ---
 name: init-project
-description: "Use when setting up a new project or adding standard Claude Code configuration (CLAUDE.md, CHANGELOG.md, .claude/) to an existing project."
-allowed-tools: Read(*), Write(*), Edit(*), Glob(*), Grep(*), Bash(git *), Bash(ls *)
+description: "Use when setting up a new project or adding standard Claude Code configuration (CLAUDE.md, CHANGELOG.md, .claude/, documentation/) to an existing project."
+allowed-tools: Read(*), Write(*), Edit(*), Glob(*), Grep(*), Bash(git *), Bash(ls *), Bash(mkdir *)
 ---
 
 # Initialize Project
 
-Set up a project with standard clauDNA configuration: `CLAUDE.md`, `CHANGELOG.md`, and `.claude/lessons.md`. Works for both new repos and existing projects that lack these files.
+Set up a project with standard clauDNA configuration: `CLAUDE.md`, `CHANGELOG.md`, `.claude/lessons.md`, `PROJECT_MISSION.md`, and the `documentation/` planning structure. Works for both new repos and existing projects that lack these files.
 
 ## Procedure
 
@@ -19,6 +19,8 @@ Scan the project root for existing configuration:
 - `CLAUDE.md` — project instructions for Claude Code
 - `CHANGELOG.md` — structured change history
 - `.claude/lessons.md` — project-specific lessons
+- `PROJECT_MISSION.md` — project mission statement
+- `documentation/planning/` — planning structure for skills
 
 Also scan for signals about the project:
 
@@ -36,9 +38,11 @@ Project Assessment
   Git repo:        yes/no
   Tech stack:      [detected from manifest files]
 
-  CLAUDE.md:       ✓ exists / ✗ missing
-  CHANGELOG.md:    ✓ exists / ✗ missing
-  .claude/lessons.md: ✓ exists / ✗ missing
+  CLAUDE.md:            ✓ exists / ✗ missing
+  CHANGELOG.md:         ✓ exists / ✗ missing
+  .claude/lessons.md:   ✓ exists / ✗ missing
+  PROJECT_MISSION.md:   ✓ exists / ✗ missing
+  documentation/:       ✓ exists / ✗ missing
 ═══════════════════════════════════════════════════════
 ```
 
@@ -95,7 +99,41 @@ Create `.claude/lessons.md` with any gotchas from Step 2. If none were provided,
 
 This file will accumulate organically as Claude makes mistakes and gets corrected.
 
-### Step 6: Verify & Confirm
+### Step 6: Create PROJECT_MISSION.md
+
+If `PROJECT_MISSION.md` doesn't exist, create it. Use the project name and description from Step 2:
+
+```markdown
+# [Project Name] — Mission
+
+[One-paragraph mission statement: what this project does, who it's for, what success looks like.]
+```
+
+If the user provided a clear description in Step 2, write a real mission statement. If not, create the stub and note that `/product-vision` will flesh it out. This file anchors `/product-vision` ideation and gives all skills a shared understanding of the project's purpose.
+
+### Step 7: Scaffold documentation/
+
+If `documentation/planning/` doesn't exist, create the standard planning structure. This is the shared directory layout that planning and audit skills write to (see `docs/specs/repo-documentation-standard.md` for the full spec).
+
+Create these directories with `.gitkeep` files:
+
+```
+documentation/
+├── planning/
+│   ├── phases/.gitkeep
+│   ├── tech_debt/.gitkeep
+│   ├── security/.gitkeep
+│   ├── access-paths/.gitkeep
+│   ├── product-vision/.gitkeep
+│   └── investigations/.gitkeep
+└── archive/.gitkeep
+```
+
+If `documentation/` already exists, scan for missing subdirectories and create only what's missing.
+
+Skills like `/tech-debt`, `/security-audit`, `/product-enhance`, and `/product-vision` create their session subdirectories at runtime. This scaffold ensures the category directories are ready.
+
+### Step 8: Verify & Confirm
 
 Show the user what was created:
 
@@ -103,9 +141,11 @@ Show the user what was created:
 Project Initialized
 ═══════════════════════════════════════════════════════
   Created:
-    ✓ CLAUDE.md          (N lines — project instructions)
-    ✓ CHANGELOG.md       (N lines — change history)
-    ✓ .claude/lessons.md (N lines — lessons)
+    ✓ CLAUDE.md              (N lines — project instructions)
+    ✓ CHANGELOG.md           (N lines — change history)
+    ✓ .claude/lessons.md     (N lines — lessons)
+    ✓ PROJECT_MISSION.md     (N lines — mission statement)
+    ✓ documentation/         (planning structure — 7 directories)
 
   Skipped:
     - CLAUDE.md (already exists)
@@ -116,7 +156,7 @@ Ask: **"Want me to commit these files?"**
 
 If yes, stage only the created/modified files and commit with:
 ```
-docs: initialize project configuration (CLAUDE.md, CHANGELOG.md, .claude/)
+docs: initialize project configuration (CLAUDE.md, CHANGELOG.md, .claude/, documentation/)
 ```
 
 ---
