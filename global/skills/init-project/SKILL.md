@@ -126,12 +126,20 @@ documentation/
 │   ├── access-paths/.gitkeep
 │   ├── product-vision/.gitkeep
 │   └── investigations/.gitkeep
+├── decisions/.gitkeep
+├── specs/.gitkeep
+├── guides/.gitkeep
 └── archive/.gitkeep
 ```
 
 If `documentation/` already exists, scan for missing subdirectories and create only what's missing.
 
-Skills like `/tech-debt`, `/security-audit`, `/product-enhance`, and `/product-vision` create their session subdirectories at runtime. This scaffold ensures the category directories are ready.
+**Directory purposes:**
+- `planning/` — skill output from `/tech-debt`, `/security-audit`, `/product-enhance`, `/product-vision`. Session subdirectories created at runtime.
+- `decisions/` — Architecture Decision Records (ADRs). Why we chose X over Y. Permanent, not archived.
+- `specs/` — Technical specifications, API contracts, data schemas. Living docs.
+- `guides/` — Setup guides, onboarding, runbooks. Living docs.
+- `archive/` — Completed planning sessions moved here after all phases merge.
 
 ### Step 8: Verify & Confirm
 
@@ -145,7 +153,7 @@ Project Initialized
     ✓ CHANGELOG.md           (N lines — change history)
     ✓ .claude/lessons.md     (N lines — lessons)
     ✓ PROJECT_MISSION.md     (N lines — mission statement)
-    ✓ documentation/         (planning structure — 7 directories)
+    ✓ documentation/         (10 directories: planning, decisions, specs, guides, archive)
 
   Skipped:
     - CLAUDE.md (already exists)

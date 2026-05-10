@@ -32,11 +32,17 @@ Define the standard documentation structure that clauDNA skills assume exists wi
     │   │   └── <session>_<YYYY-MM-DD>/
     │   └── investigations/                   # Ad-hoc research and debugging docs
     │       └── <topic>_<YYYY-MM-DD>.md
+    ├── decisions/                            # Architecture Decision Records (ADRs)
+    │   └── <NNN>-<slug>.md                   # e.g., 001-use-neon-over-supabase.md
+    ├── specs/                                # Technical specifications, API contracts
+    │   └── <slug>.md
+    ├── guides/                               # Setup guides, onboarding, runbooks
+    │   └── <slug>.md
     └── archive/                              # Completed plans moved here
         └── <session>_<YYYY-MM-DD>/
 ```
 
-Session subdirectories are created by skills at runtime — `/init-project` only scaffolds the category directories.
+Session subdirectories under `planning/` are created by skills at runtime — `/init-project` only scaffolds the category directories.
 
 ## File Conventions
 
@@ -48,6 +54,18 @@ Session subdirectories are created by skills at runtime — `/init-project` only
 | `CHANGELOG.md` | `/init-project` | Keep a Changelog format. `/session-handoff` checks `[Unreleased]` against session commits. |
 | `CLAUDE.md` | `/init-project` | Claude Code project instructions. Static universal sections first (cache efficiency), project-specific below. |
 | `.claude/lessons.md` | `/init-project` | Accumulated corrections and gotchas. Updated by the Self-Improvement Loop. |
+
+### Canonical Documentation Directories
+
+Beyond `planning/`, three directories hold permanent project documentation:
+
+| Directory | Purpose | File naming |
+|-----------|---------|-------------|
+| `decisions/` | Architecture Decision Records — why we chose X over Y. Captured at decision time so future devs don't relitigate. `/adversarial-review` and `/weigh-development-paths` produce decision-grade output that belongs here. | `<NNN>-<slug>.md` — zero-padded sequence number + kebab-case title (e.g., `001-use-neon-over-supabase.md`) |
+| `specs/` | Technical specifications, API contracts, data schemas, interface definitions. Living documents that evolve with the codebase. | `<slug>.md` — kebab-case topic (e.g., `api-endpoints.md`, `data-model.md`) |
+| `guides/` | Setup guides, onboarding docs, operational runbooks, deployment procedures. How-to documentation for humans and bots. | `<slug>.md` — kebab-case topic (e.g., `local-setup.md`, `deploy-production.md`) |
+
+These are not skill output directories — they're manually authored or promoted from skill output when a decision/spec/guide emerges from a planning session.
 
 ### Planning Session Directories
 
@@ -117,12 +135,15 @@ documentation/
 │   ├── access-paths/.gitkeep
 │   ├── product-vision/.gitkeep
 │   └── investigations/.gitkeep
+├── decisions/.gitkeep
+├── specs/.gitkeep
+├── guides/.gitkeep
 └── archive/.gitkeep
 ```
 
 Plus `PROJECT_MISSION.md` at the repo root (stub if user doesn't provide mission context).
 
-Skills create their session subdirectories at runtime — the scaffold just ensures the category directories exist.
+Planning skills create their session subdirectories at runtime — the scaffold ensures category directories are ready. `decisions/`, `specs/`, and `guides/` start empty and accumulate as the project matures.
 
 ## Design Decisions
 
@@ -130,4 +151,6 @@ Skills create their session subdirectories at runtime — the scaffold just ensu
 - **`documentation/` not `docs/`**: `docs/` is commonly used for user-facing documentation (GitHub Pages, API docs). `documentation/` is development-internal — plans, audits, investigations. Keeping them separate avoids conflicts.
 - **`.gitkeep` for empty dirs**: Git doesn't track empty directories. `.gitkeep` is the standard convention to preserve structure. Skills should not fail if the directory doesn't exist (create it), but the scaffold means they usually find it ready.
 - **`investigations/` is freeform**: Unlike the structured planning subdirs, `investigations/` holds ad-hoc markdown — debugging notes, research, decision records. No numbered phases, no status markers. Just `<topic>_<YYYY-MM-DD>.md`.
+- **`decisions/` separate from `planning/`**: Plans capture *what* we're doing; decisions capture *why* we chose this approach. ADRs are permanent reference docs, not ephemeral planning artifacts — they don't get archived.
+- **`specs/` and `guides/` are living docs**: Unlike planning sessions (which have a lifecycle: pending → in progress → complete → archive), specs and guides evolve with the codebase. No status markers, no archival.
 - **`PROJECT_MISSION.md` at root, not in `documentation/`**: It's a project-level identity doc, like `README.md` or `CLAUDE.md`. `/product-vision` reads it to anchor feature ideation. It should be visible at the top level.
