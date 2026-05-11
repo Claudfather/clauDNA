@@ -1,6 +1,6 @@
 # clauDNA
 
-Claude Code plugin pack distributed via the `Claudfather` marketplace. Ships skills, agents, and hooks as a single plugin (`claudna`). Also provides a headless `install.sh` for fleet / CI provisioning where the interactive `/plugin` command isn't available.
+Claude Code plugin pack distributed via the `Claudfather` marketplace. Ships skills, agents, and hooks as a single plugin (`claudna`). Marketplace install is the only supported channel — for headless / CI use, see [SETUP_GUIDE §4](./SETUP_GUIDE.md#4-headless--ci--docker-provisioning) for the declarative-settings + env-var pattern.
 
 ## Repo Structure
 
@@ -11,7 +11,6 @@ Claude Code plugin pack distributed via the `Claudfather` marketplace. Ships ski
 skills/                         → Skill directories (one per skill, plugin auto-discovers)
   _shared/                      → Shared orchestration material referenced by skills (no SKILL.md)
 agents/                         → Agent definition files
-commands/                       → Slash command files (legacy; prefer skills/)
 plugin-hooks/                   → Hook scripts + declarative hook config (renamed from hooks/ to work around Claude Code bug — see CHANGELOG)
   hooks.json                    → Declarative hook wiring (referenced from .claude-plugin/plugin.json; loaded on plugin enable)
   *.sh                          → Hook scripts referenced from hooks.json via ${CLAUDE_PLUGIN_ROOT}/plugin-hooks/
@@ -20,33 +19,28 @@ shell/                          → Aux: zshrc additions (not shipped via plugin
 snowflake/                      → Aux: Snowflake connection config template (not shipped via plugin)
 scripts/
   validate-skills.py            → CI-enforced SKILL_CONTRACT validator (walks skills/)
-  recommended-permissions.json  → Permission categories offered by install.sh
-  settings-reference.json       → Reference settings.json (used by install.sh, never auto-installed)
 .claude/                        → Repo-local settings (permission allowlists for working in this repo)
-install.sh                      → Headless / fleet / CI install path (alternative to /plugin install)
 ```
 
-## Key Install Paths
+## Install Paths
 
-- **Marketplace (preferred, human users):**
+- **Human users (interactive):**
   ```
-  /plugin marketplace add chrisrogers37/claudna
+  /plugin marketplace add Claudfather/clauDNA
   /plugin install claudna@Claudfather
   ```
   Skills are invoked as `/claudna:<skill-name>`.
 
-- **Headless (CI, fleet, Docker images):** clone the repo and run `./install.sh`. Files land directly in `~/.claude/`. Skills are invoked unnamespaced (`/<skill-name>`).
+- **Bots / CI / Docker (declarative):** drop a `settings.json` with `enabledPlugins` + `extraKnownMarketplaces`, set `CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1`, run `claude -p`. Full recipe in [SETUP_GUIDE §4](./SETUP_GUIDE.md#4-headless--ci--docker-provisioning).
 
 ## Rules
 
-### Don't (sync/install safety)
+### Don't
 
-- **Never overwrite `settings.json`** — `~/.claude/settings.json` is user-managed. `install.sh`'s permissions merge only ADDS entries to `permissions.allow` — it never removes entries, never modifies other fields (model, hooks, statusLine), and always requires user confirmation.
-- **Never sync `~/.claude/notes/`** — Personal data (lessons, decisions, patterns). Never pulled back to the repo.
-- **Never sync `~/.claude/docs/`** — Installed once during setup, not managed afterward.
-- **Use Read/Write tools for file operations** — Not shell `cp`. This gives visibility into what changes and avoids permission issues. Exception: backup copies use `cp -r` since they're preservation, not reviewed changes.
-- **Always ask before syncing** — Every file change during sync requires explicit user confirmation.
-- **Always backup before overwriting** — Before any install or sync that modifies files, back up existing managed files to `~/.local/share/clauDNA/backups/<timestamp>/`. This location is outside `~/.claude/` so Claude Code never discovers it.
+- **Never write to `~/.claude/settings.json`** — that's user-managed. Recommended settings tweaks are documented in SETUP_GUIDE for the user to apply manually; the plugin never modifies user settings.
+- **Never touch `~/.claude/notes/`** — personal data (lessons, decisions, patterns).
+- **Never touch `~/.claude/plugins/cache/Claudfather/claudna/<ver>/`** directly — Claude Code manages that directory. Make changes in this repo and bump `version` in `plugin.json` to ship them.
+- **Use Read/Write tools for file operations** — Not shell `cp`. This gives visibility into what changes and avoids permission issues.
 
 ### You may, without asking
 
@@ -67,7 +61,7 @@ install.sh                      → Headless / fleet / CI install path (alternat
 
 ## Working on This Repo
 
-When modifying components inside the plugin tree (`skills/`, `agents/`, `commands/`, `plugin-hooks/`):
+When modifying components inside the plugin tree (`skills/`, `agents/`, `plugin-hooks/`):
 1. Edit the file in place (this repo is the source of truth).
 2. Test by loading the plugin locally: `claude --plugin-dir /Users/chris/Projects/claudna` and invoking the affected skill.
 3. Update `CHANGELOG.md` with the change.
