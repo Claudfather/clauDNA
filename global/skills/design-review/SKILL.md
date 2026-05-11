@@ -101,6 +101,7 @@ Ask: **"Does this match your experience? Anything I missed or got wrong?"**
 
 ### Step 5: Enhancement Proposals
 
+<!-- Enhanced with ideas from https://github.com/garrytan/gstack -->
 
 Propose enhancements scored on Impact, Effort, Risk. Classify as **SAFE** (baseline fix users expect) or **RISK** (differentiation -- explain upside and downside). SAFE first, ranked by impact-to-effort. Reference screenshots, Step 3 intent, code.
 
@@ -139,3 +140,4 @@ Follow the output guide at `~/.claude/skills/_shared/output-guide.md`:
 
 After creating issues, present the batch summary and return issue URLs for audit tracking.
 
+<!-- Enhanced with ideas from https://github.com/garrytan/gstack -->
