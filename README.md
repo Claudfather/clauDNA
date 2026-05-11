@@ -84,7 +84,6 @@ User-invocable slash commands + 1 context-only skill (`notifications`).
 
 | Skill | Description |
 |-------|-------------|
-| `/snowflake-query` | Run SQL against Snowflake via SnowSQL |
 | `/dbt` | dbt build, test, compile, full-refresh |
 | `/neon-query` | Run SQL against Neon PostgreSQL via psql |
 | `/neon-info` | Neon dashboard — connection status, tables, branches |
