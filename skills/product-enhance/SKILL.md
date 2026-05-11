@@ -12,7 +12,7 @@ argument-hint: "[--auto] [--output github|session] [focus-area]"
 
 Parse `$ARGUMENTS` at invocation:
 - `--auto`: Fully non-interactive. Implies `--output github`. Uses triage path, skips discovery/interview. See orchestration guide Section 10.
-- `--output github`: Write enhancement proposals as GitHub Issues. See output guide (`~/.claude/skills/_shared/output-guide.md`).
+- `--output github`: Write enhancement proposals as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
 - Remaining text is the focus area. If provided, use it as scope context in Step 1 instead of asking.
 
@@ -144,7 +144,7 @@ Present a `Product Enhancement Summary`, then direct user to `/claudna:implement
 
 This skill supports `--output github` and `--output session` in addition to the default `docs` target.
 
-Follow the output guide at `~/.claude/skills/_shared/output-guide.md`:
+Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: use the structured issue body format (Section 4), check for duplicates (Section 4.5), apply labels (Section 4.3). Apply `enhancement` label to all issues. Map impact ranking to priority labels.
 - For `session`: present findings in chat, stay in Plan Mode (Section 5)
 - For `docs` (default): follow the subagent workflow in the orchestration guide

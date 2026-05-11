@@ -1,6 +1,6 @@
 # Source Guide
 
-Shared reference for skills that support `--source <target>`. Skills reference this file at `~/.claude/skills/_shared/source-guide.md`.
+Shared reference for skills that support `--source <target>`. Skills reference this file at `skills/_shared/source-guide.md`.
 
 ---
 
@@ -157,13 +157,13 @@ In the skill's Arguments section:
 ```
 - `--source github <number>`: Read a specific GitHub Issue as the implementation plan.
 - `--source github` (no number): Browse all open issues via paginated picker.
-- See source guide (`~/.claude/skills/_shared/source-guide.md`) for details.
+- See source guide (`skills/_shared/source-guide.md`) for details.
 - Default (no flag): Ask for a file path or session directory.
 ```
 
 In the skill's Step 1 (Receive Plan):
 ```
-Parse arguments for `--source` flag. Follow the source guide at `~/.claude/skills/_shared/source-guide.md`:
+Parse arguments for `--source` flag. Follow the source guide at `skills/_shared/source-guide.md`:
 - `--source github <number>`: Fetch issue, validate detail level, proceed
 - `--source github` (no number): Browse mode — list issues, paginated picker, queue selections
 - Default: Ask "Which document should I implement?" and accept a file path or session directory

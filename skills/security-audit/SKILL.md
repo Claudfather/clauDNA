@@ -14,7 +14,7 @@ Scan the codebase for security vulnerabilities, present findings by severity, an
 
 Parse `$ARGUMENTS` at invocation:
 - `--auto`: Fully non-interactive. Implies `--output github`. Scans, creates issues, returns summary. See orchestration guide Section 10.
-- `--output github`: Write findings and remediation plans as GitHub Issues. See output guide (`~/.claude/skills/_shared/output-guide.md`).
+- `--output github`: Write findings and remediation plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
 - Remaining text is the focus area (e.g., `auth`, `api/`, `dependencies`). If provided, scope the scan to that area.
 
@@ -100,7 +100,7 @@ Each doc represents **exactly 1 PR** and must include:
 
 #### Subagent Workflow
 
-Follow Section 9 of the orchestration guide (`~/.claude/skills/_shared/orchestration-guide.md`). Scratch directory: `/tmp/security-audit-<YYYY-MM-DD_HHMMSS>/research/`. Plan agents read research from this directory.
+Follow Section 9 of the orchestration guide (`skills/_shared/orchestration-guide.md`). Scratch directory: `/tmp/security-audit-<YYYY-MM-DD_HHMMSS>/research/`. Plan agents read research from this directory.
 
 **Security-specific rule:** All subagents MUST mask secret values in research files and docs. Show `API_KEY=sk-****` — never the full value.
 
@@ -150,7 +150,7 @@ Then tell the user:
 - **Group related fixes.** One finding per PR creates review fatigue. Group logically.
 - **Skip missing tools gracefully.** If `pip-audit` isn't installed, note it and move on. Don't block the audit.
 - **User gates at every phase transition.** Scan → confirm → plan.
-- **Subagent strategy.** Phase 1 can use Explore agents for deep code analysis (disk-write pattern). Phase 2 uses Plan agents for remediation docs (disk-write pattern). Both patterns defined in `~/.claude/skills/_shared/orchestration-guide.md`. Context never flows through the orchestrator.
+- **Subagent strategy.** Phase 1 can use Explore agents for deep code analysis (disk-write pattern). Phase 2 uses Plan agents for remediation docs (disk-write pattern). Both patterns defined in `skills/_shared/orchestration-guide.md`. Context never flows through the orchestrator.
 - See orchestration guide, Section 10 for shared reminders (one PR per doc, testing, plans-not-code).
 
 ---
@@ -159,7 +159,7 @@ Then tell the user:
 
 This skill supports `--output github` and `--output session` in addition to the default `docs` target.
 
-Follow the output guide at `~/.claude/skills/_shared/output-guide.md`:
+Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: use the structured issue body format (Section 4), check for duplicates (Section 4.5), apply labels (Section 4.3). Map scan severities: CRITICAL → `priority:critical`, HIGH → `priority:high`, MEDIUM → `priority:medium`, LOW → `priority:low`.
 - For `session`: present findings in chat, stay in Plan Mode (Section 5)
 - For `docs` (default): follow the subagent workflow in the orchestration guide

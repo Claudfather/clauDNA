@@ -15,7 +15,7 @@ You are a critical thinker, not an advocate. Your job is to find the weaknesses,
 Parse `$ARGUMENTS` at invocation:
 - **First positional arg:** Path to the plan document. If omitted, prompt for it.
 - `--dispatch`: Multi-reviewer mode — spawn parallel subagents with different review angles (see Phase 3). Without this flag, perform a single consolidated review.
-- `--output github`: Write findings as GitHub Issues. See `~/.claude/skills/_shared/output-guide.md`.
+- `--output github`: Write findings as GitHub Issues. See `skills/_shared/output-guide.md`.
 - `--output session`: Present findings in chat only (default).
 
 ---
@@ -308,7 +308,7 @@ This prevents strawmanning of criticism. Can be invoked as a follow-up: `/claudn
 - **The reviewer should be uncomfortable.** If the review feels easy, you're not challenging hard enough.
 - **Plans survive adversarial review by improving, not by being defended.** The goal is a better plan, not a winning argument.
 - **Dispatch mode is expensive but worth it for major initiatives.** Use single mode for smaller plans; dispatch for anything that will take >1 week to implement or affects multiple systems.
-- Orchestration guide at `~/.claude/skills/_shared/orchestration-guide.md` for subagent patterns.
+- Orchestration guide at `skills/_shared/orchestration-guide.md` for subagent patterns.
 
 ### Methodology Sources
 
