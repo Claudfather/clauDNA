@@ -1,0 +1,15 @@
+{
+  "name": "Claudfather",
+  "owner": {
+    "name": "Chris Rogers"
+  },
+  "description": "Claude Code plugins from the Claudfather ecosystem.",
+  "plugins": [
+    {
+      "name": "claudna",
+      "source": ".",
+      "description": "Curated Claude Code skills, agents, and hooks.",
+      "category": "developer-tools"
+    }
+  ]
+}
