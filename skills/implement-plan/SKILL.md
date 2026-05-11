@@ -49,7 +49,7 @@ Parse the invocation arguments:
 - `--source github` (no number): Browse all open issues via paginated picker — select one or more to implement.
 - Remaining text (or no flag): treated as a file path or session directory.
 - No arguments at all: scan for plan directories and present a picker.
-- See source guide (`~/.claude/skills/_shared/source-guide.md`) for details on both GitHub modes.
+- See source guide (`skills/_shared/source-guide.md`) for details on both GitHub modes.
 
 ## Engineering Philosophy
 

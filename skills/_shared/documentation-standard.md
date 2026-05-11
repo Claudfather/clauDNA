@@ -1,6 +1,6 @@
 # Documentation Standard
 
-Shared reference for skills that read from or write to the `documentation/` directory. Skills reference this file at `~/.claude/skills/_shared/documentation-standard.md`.
+Shared reference for skills that read from or write to the `documentation/` directory. Skills reference this file at `skills/_shared/documentation-standard.md`.
 
 ---
 

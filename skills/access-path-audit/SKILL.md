@@ -14,7 +14,7 @@ Audit whether a system's access paths consistently enforce cross-cutting concern
 
 Parse `$ARGUMENTS` at invocation:
 - `--auto`: Fully non-interactive. Implies `--output github`. Scans, creates issues, returns summary. See orchestration guide Section 10.
-- `--output github`: Write findings and remediation plans as GitHub Issues. See output guide (`~/.claude/skills/_shared/output-guide.md`).
+- `--output github`: Write findings and remediation plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
 - Remaining text is the focus area (e.g., `auth`, `validation`, `api/`). If provided, scope the audit to that area.
 
@@ -200,7 +200,7 @@ Each doc represents **exactly 1 PR** and must include:
 
 #### Subagent Workflow
 
-Follow Section 9 of the orchestration guide (`~/.claude/skills/_shared/orchestration-guide.md`). Scratch directory: `/tmp/access-path-audit-<YYYY-MM-DD_HHMMSS>/research/`. Plan agents read research from this directory.
+Follow Section 9 of the orchestration guide (`skills/_shared/orchestration-guide.md`). Scratch directory: `/tmp/access-path-audit-<YYYY-MM-DD_HHMMSS>/research/`. Plan agents read research from this directory.
 
 ---
 
@@ -208,7 +208,7 @@ Follow Section 9 of the orchestration guide (`~/.claude/skills/_shared/orchestra
 
 This skill supports `--output github` and `--output session` in addition to the default `docs` target.
 
-Follow the output guide at `~/.claude/skills/_shared/output-guide.md`:
+Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: use the structured issue body format (Section 4), check for duplicates (Section 4.5), apply labels (Section 4.3). Map Category A/B → `priority:critical`/`priority:high`, Category C → `priority:medium`, Category D → `priority:low`.
 - For `session`: present findings in chat, stay in Plan Mode (Section 5)
 - For `docs` (default): follow the subagent workflow in the orchestration guide
@@ -270,7 +270,7 @@ Then tell the user:
 
 ## Notes
 
-- **Subagent pattern.** Disk-write pattern per `~/.claude/skills/_shared/orchestration-guide.md` Sections 2 & 6. Three subagents in Phase 1 (two parallel, one sequential). Phase 2 uses Plan agents per Section 9. Orchestrator coordinates only.
+- **Subagent pattern.** Disk-write pattern per `skills/_shared/orchestration-guide.md` Sections 2 & 6. Three subagents in Phase 1 (two parallel, one sequential). Phase 2 uses Plan agents per Section 9. Orchestrator coordinates only.
 - **Pass focus area** from Step 1 into both Step 2 subagent prompts.
 - **Technology-agnostic.** The scan categories cover common patterns across Python, Node.js, Go, Ruby, and Java. The subagent prompts adapt to whatever stack is detected.
 - **User gates at every phase transition.** Scan → confirm → plan. Do not generate remediation docs without user confirmation.

@@ -26,6 +26,9 @@ NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*$")
 DESC_MIN = 20
 DESC_MAX = 500
 BODY_MIN = 200
+STALE_PATH_RE = re.compile(r"~/\.claude/(skills|commands|agents)/")
+STALE_PATH_SKIP_SKILLS = {"cleanup-legacy-install"}
+
 
 def parse_frontmatter(path: Path) -> tuple[dict, str] | None:
     """Return (frontmatter_dict, body) or None if no frontmatter."""
@@ -66,11 +69,15 @@ def validate_allowed_tools(value) -> list[str]:
         entries = []
         for i, entry in enumerate(value):
             if not isinstance(entry, str):
-                errors.append(f"allowed-tools[{i}] must be a string, got {type(entry).__name__}")
+                errors.append(
+                    f"allowed-tools[{i}] must be a string, got {type(entry).__name__}"
+                )
                 continue
             entries.append(entry.strip())
     else:
-        errors.append(f"allowed-tools must be a string or list, got {type(value).__name__}")
+        errors.append(
+            f"allowed-tools must be a string or list, got {type(value).__name__}"
+        )
         return errors
 
     for entry in entries:
@@ -95,7 +102,7 @@ def validate_skill(skill_dir: Path) -> list[str]:
     skill_md = skill_dir / "SKILL.md"
 
     if not skill_md.is_file():
-        return [f"missing SKILL.md"]
+        return ["missing SKILL.md"]
 
     try:
         parsed = parse_frontmatter(skill_md)
@@ -114,7 +121,9 @@ def validate_skill(skill_dir: Path) -> list[str]:
     # Unknown fields
     for field in fm:
         if field not in KNOWN_FIELDS:
-            errors.append(f"frontmatter has unknown field {field!r} (allowed: {sorted(KNOWN_FIELDS)})")
+            errors.append(
+                f"frontmatter has unknown field {field!r} (allowed: {sorted(KNOWN_FIELDS)})"
+            )
 
     # name rules
     fm_name = fm.get("name")
@@ -125,7 +134,9 @@ def validate_skill(skill_dir: Path) -> list[str]:
             if not NAME_RE.match(fm_name):
                 errors.append(f"name {fm_name!r} must match {NAME_RE.pattern}")
             if fm_name != name:
-                errors.append(f"name {fm_name!r} does not match directory name {name!r}")
+                errors.append(
+                    f"name {fm_name!r} does not match directory name {name!r}"
+                )
 
     # description rules
     desc = fm.get("description")
@@ -151,12 +162,22 @@ def validate_skill(skill_dir: Path) -> list[str]:
     # user-invocable rules
     user_invocable = fm.get("user-invocable")
     if user_invocable is not None and not isinstance(user_invocable, bool):
-        errors.append(f"user-invocable must be a boolean, got {type(user_invocable).__name__}")
+        errors.append(
+            f"user-invocable must be a boolean, got {type(user_invocable).__name__}"
+        )
 
     # body length
     body_chars = len(body.strip())
     if body_chars < BODY_MIN:
-        errors.append(f"body too short ({body_chars} chars, min {BODY_MIN}) — looks like a stub")
+        errors.append(
+            f"body too short ({body_chars} chars, min {BODY_MIN}) — looks like a stub"
+        )
+
+    # Stale hardcoded path check
+    if name not in STALE_PATH_SKIP_SKILLS:
+        for line in body.splitlines():
+            if STALE_PATH_RE.search(line):
+                errors.append(f"stale hardcoded path: {line.strip()}")
 
     return errors
 
@@ -166,7 +187,9 @@ def main() -> int:
         print(f"FAIL: skills directory not found at {SKILLS_DIR}", file=sys.stderr)
         return 2
 
-    skill_dirs = sorted(p for p in SKILLS_DIR.iterdir() if p.is_dir() and p.name not in SKIP_DIRS)
+    skill_dirs = sorted(
+        p for p in SKILLS_DIR.iterdir() if p.is_dir() and p.name not in SKIP_DIRS
+    )
 
     all_errors: dict[str, list[str]] = {}
     seen_names: dict[str, str] = {}  # name -> dir
@@ -197,6 +220,19 @@ def main() -> int:
 
         if errors:
             all_errors[name] = errors
+
+    # Lint _shared files for stale paths
+    shared_dir = SKILLS_DIR / "_shared"
+    if shared_dir.is_dir():
+        for md_file in sorted(shared_dir.glob("*.md")):
+            text = md_file.read_text()
+            stale_lines = [
+                line.strip() for line in text.splitlines() if STALE_PATH_RE.search(line)
+            ]
+            if stale_lines:
+                all_errors[f"_shared/{md_file.name}"] = [
+                    f"stale hardcoded path: {line}" for line in stale_lines
+                ]
 
     total_skills = len(skill_dirs) - len(SKIP_SKILLS)
 

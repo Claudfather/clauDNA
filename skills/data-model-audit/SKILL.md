@@ -81,7 +81,7 @@ Print structured report: scope summary, code-to-schema map, ranked findings tabl
 
 ## Notes
 
-- **Subagent pattern.** Disk-write pattern per `~/.claude/skills/_shared/orchestration-guide.md` Sections 2 & 6. Three subagents: two parallel (Step 2), one sequential (Step 3). Orchestrator coordinates only.
+- **Subagent pattern.** Disk-write pattern per `skills/_shared/orchestration-guide.md` Sections 2 & 6. Three subagents: two parallel (Step 2), one sequential (Step 3). Orchestrator coordinates only.
 - **Pass focus area** from Step 1 into both Step 2 subagent prompts.
 - **Secrets masking.** Never include connection strings verbatim — file:line only.
 - **User gates.** Confirmation required after Step 3 before fit analysis.
