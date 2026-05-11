@@ -59,7 +59,7 @@ Launch 3 parallel `general-purpose` subagents. Read `scout-prompts.md` in this s
 
 ### Step 3: Present Catalog
 
-Read **only scout summaries** — never full research files. Check each item's similarity to clauDNA via Glob/Grep on `global/skills/`. Assign **NEW**, **SIMILAR**, or **PARTIAL**. Present numbered catalog grouped by Skills & Commands, Config Patterns, Novel Approaches. Prompt: pick by number, `all`, or `none`.
+Read **only scout summaries** — never full research files. Check each item's similarity to clauDNA via Glob/Grep on `skills/`. Assign **NEW**, **SIMILAR**, or **PARTIAL**. Present numbered catalog grouped by Skills & Commands, Config Patterns, Novel Approaches. Prompt: pick by number, `all`, or `none`.
 
 ### Step 4: User Picks
 

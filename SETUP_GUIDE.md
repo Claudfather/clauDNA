@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-05-06
 
-This guide is the deep-dive companion to [README.md](./README.md). The README covers the happy path (`/clauDNA-setup` or `./install.sh`); this guide covers the things those tools deliberately don't handle — Snowflake key-pair authentication, shell aliases, the Claude Code configuration hierarchy, troubleshooting, and the principles behind clauDNA's defaults.
+This guide is the deep-dive companion to [README.md](./README.md). The README covers the happy paths (marketplace install via `/plugin install claudna@Claudfather`, or headless `./install.sh`); this guide covers the things those tools deliberately don't handle — Snowflake key-pair authentication, shell aliases, the Claude Code configuration hierarchy, troubleshooting, and the principles behind clauDNA's defaults.
 
 If all you need is "install clauDNA", read the README. Come here when something goes sideways or you want to understand *why* the defaults are what they are.
 
@@ -62,11 +62,26 @@ Claude Code reads configuration from multiple locations, merged in this order (l
 | Team standards | `<project>/.claude/` | Yes (committed) | Project conventions, shared commands |
 | Local overrides | `<project>/.claude/settings.local.json` | No | Machine-specific paths |
 
-### What clauDNA installs to `~/.claude/`
+### Where clauDNA's files live
 
+Two layouts, depending on install path:
+
+**Marketplace install** (interactive `/plugin install`):
+```
+~/.claude/plugins/cache/Claudfather/claudna/0.2.0/
+├── .claude-plugin/plugin.json     # declares "hooks": "./plugin-hooks/hooks.json"
+├── skills/            # plugin auto-discovers; invocation namespaced as /claudna:<name>
+├── agents/
+├── commands/
+└── plugin-hooks/      # renamed from hooks/ to work around Claude Code's hooks/-deletion bug
+    ├── hooks.json     # auto-wired on plugin enable (path declared in plugin.json)
+    └── *.sh
+```
+
+**Headless install** (`./install.sh`):
 ```
 ~/.claude/
-├── settings.json       # USER-MANAGED — clauDNA only adds permissions, never overwrites
+├── settings.json       # USER-MANAGED — install.sh only adds permissions, never overwrites
 ├── skills/             # Skills (slash commands + context skills)
 ├── agents/             # Specialized subagents (snowflake-analyst, dbt-engineer, etc.)
 ├── commands/           # 1 command (clauDNA-sync)
@@ -253,9 +268,11 @@ The `/worktree` skill manages this interactively if you'd rather not memorize th
 
 ### Hooks not running
 
-**Cause:** Not executable or wrong path in `settings.json`.
+**Marketplace install:** hooks ship in `plugin-hooks/hooks.json` inside the plugin and auto-wire on enable. If they're not firing, check:
+- `/plugin list` shows `claudna` as enabled
+- Try `/reload-plugins`
 
-**Fix:**
+**Headless install (`install.sh`):** hooks live at `~/.claude/hooks/*.sh` and are wired by `~/.claude/settings.json`. Check:
 ```bash
 chmod +x ~/.claude/hooks/*.sh
 ~/.claude/hooks/statusline.sh   # smoke test
@@ -263,12 +280,24 @@ chmod +x ~/.claude/hooks/*.sh
 
 ### Status line not showing
 
-**Cause:** Script not executable or errors silently.
+Claude Code does not yet support statusLine declarations inside plugin manifests, so the `statusline.sh` script is opt-in regardless of install path.
 
-**Fix:**
+**Marketplace install:** add to your `~/.claude/settings.json`:
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bash ${HOME}/.claude/plugins/cache/Claudfather/claudna/0.2.0/plugin-hooks/statusline.sh"
+  }
+}
+```
+
+**Headless install:** `install.sh` interactively offers to add a statusLine pointing at `~/.claude/hooks/statusline.sh`. If it didn't, run it again or add the block manually.
+
+If the script runs but produces no output, smoke-test it directly:
 ```bash
-~/.claude/hooks/statusline.sh
-chmod +x ~/.claude/hooks/statusline.sh
+~/.claude/hooks/statusline.sh        # headless path
+bash ~/.claude/plugins/cache/Claudfather/claudna/0.2.0/plugin-hooks/statusline.sh  # marketplace path
 ```
 
 ### Shell aliases not working
@@ -281,7 +310,10 @@ chmod +x ~/.claude/hooks/statusline.sh
 
 **Cause:** Compound shell commands (e.g. `cmd1 && cmd2`, `cmd1 | cmd2`) bypass simple wildcard match.
 
-**Fix:** clauDNA ships a `pretooluse-permissions.sh` hook that auto-approves compound commands when *every* sub-command matches an allow pattern. Make sure it's wired into `settings.json`:
+**Fix:** clauDNA ships a `pretooluse-permissions.sh` hook that auto-approves compound commands when *every* sub-command matches an allow pattern.
+
+- **Marketplace install:** the hook is wired automatically via `plugin-hooks/hooks.json` when the plugin is enabled. Run `/plugin list` to confirm `claudna` is on.
+- **Headless install:** the hook needs to be wired into `~/.claude/settings.json`:
 
 ```jsonc
 "hooks": {
@@ -291,7 +323,7 @@ chmod +x ~/.claude/hooks/statusline.sh
 }
 ```
 
-`/clauDNA-setup` and `/clauDNA-sync` offer to add this block automatically.
+`/clauDNA-setup` and `install.sh` offer to add this block automatically for the headless path.
 
 ---
 

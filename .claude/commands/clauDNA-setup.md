@@ -1,6 +1,15 @@
 # clauDNA Setup
 
-Bootstrap or sync the clauDNA global configuration. Handles both first-time install and ongoing sync to `~/.claude/`.
+Bootstrap or sync the clauDNA global configuration via the **headless install path**. Handles both first-time install and ongoing sync to `~/.claude/`.
+
+> **For most users, the marketplace install is the recommended path:**
+> ```
+> /plugin marketplace add chrisrogers37/claudna
+> /plugin install claudna@Claudfather
+> ```
+> This command exists for headless setup (CI runners, Docker images, fleet provisioning) and for users who deliberately want files materialized under `~/.claude/` instead of inside the plugin cache.
+>
+> If the user has already installed via the marketplace (`~/.claude/plugins/cache/Claudfather/claudna/` exists), tell them: "You're already installed via the marketplace. Use `/plugin update claudna@Claudfather` for updates. This `/clauDNA-setup` command is for the headless install path." and stop.
 
 ## Backup Policy
 
@@ -31,10 +40,10 @@ Check if the breadcrumb file `~/.claude/.clauDNA-repo` exists.
 
 Scan the **repo** to count what will be installed:
 
-- Skills: list directories in `global/skills/` (each contains `SKILL.md`, except `_shared/` which contains shared reference files)
-- Commands: list `*.md` files in `global/commands/`
-- Agents: list `*.md` files in `global/agents/`
-- Hooks: list `*.sh` files in `global/hooks/`
+- Skills: list directories in `skills/` (each contains `SKILL.md`, except `_shared/` which contains shared reference files)
+- Commands: list `*.md` files in `commands/`
+- Agents: list `*.md` files in `agents/`
+- Hooks: list `*.sh` files in `plugin-hooks/` (renamed from `hooks/` to avoid a Claude Code deletion bug)
 - Docs: `SETUP_GUIDE.md` + `CLAUDE_MD_TEMPLATE.md`
 
 Scan the **local** `~/.claude/` to detect existing files:
@@ -154,21 +163,21 @@ For each repo file that HAS a local collision:
 
 #### Categories
 
-**Skills** — for each directory in `global/skills/`:
+**Skills** — for each directory in `skills/`:
 - Create `~/.claude/skills/<name>/` (and `references/` if it exists in the repo)
 - Read and Write each file within the skill directory (`SKILL.md` and any `references/*.md`)
 - Note: `_shared/` contains shared reference files used by orchestration skills. It has no `SKILL.md` and won't appear as a user-invocable skill. Install it like any other skill directory.
 
-**Commands** — for each `*.md` file in `global/commands/`:
-- Read from `global/commands/<name>.md`
+**Commands** — for each `*.md` file in `commands/`:
+- Read from `commands/<name>.md`
 - Write to `~/.claude/commands/<name>.md`
 
-**Agents** — for each `*.md` file in `global/agents/`:
-- Read from `global/agents/<name>.md`
+**Agents** — for each `*.md` file in `agents/`:
+- Read from `agents/<name>.md`
 - Write to `~/.claude/agents/<name>.md`
 
-**Hooks** — for each `*.sh` file in `global/hooks/`:
-- Read from `global/hooks/<name>.sh`
+**Hooks** — for each `*.sh` file in `plugin-hooks/` (repo source):
+- Read from `plugin-hooks/<name>.sh`
 - Write to `~/.claude/hooks/<name>.sh`
 - Run `chmod +x ~/.claude/hooks/<name>.sh` after writing
 
@@ -177,7 +186,7 @@ For each repo file that HAS a local collision:
 - Read `CLAUDE_MD_TEMPLATE.md` → Write to `~/.claude/docs/CLAUDE_MD_TEMPLATE.md`
 
 **Skip `settings.json`** — print an explicit note:
-> `settings.json` is user-managed and was NOT overwritten. See `global/settings.json` for a reference example.
+> `settings.json` is user-managed and was NOT overwritten. See `scripts/settings-reference.json` for a reference example.
 
 ### Step 4.5: Permissions Merge
 
@@ -214,7 +223,7 @@ Deprecated Syntax Detected
 
 #### Sub-step B: Missing Permissions Check
 
-1. Read `global/recommended-permissions.json` from the repo.
+1. Read `scripts/recommended-permissions.json` from the repo.
 2. For each recommended permission in each category, check coverage:
    - **Exact match** in user's array → "already present"
    - `Bash(CMD *)` when user has `Bash(CMD:*)` → "present (deprecated syntax)"
@@ -248,9 +257,9 @@ Permissions Check
 
 ### Step 4.6: Settings Defaults (statusLine & hooks)
 
-After permissions, offer to add the recommended `statusLine` and `hooks` config from `global/settings.json`. These activate the hook scripts installed in `~/.claude/hooks/`.
+After permissions, offer to add the recommended `statusLine` and `hooks` config from `scripts/settings-reference.json`. These activate the hook scripts installed in `~/.claude/hooks/`.
 
-1. Read `global/settings.json` from the repo for the recommended `statusLine` and `hooks` values.
+1. Read `scripts/settings-reference.json` from the repo for the recommended `statusLine` and `hooks` values.
 2. Read `~/.claude/settings.json` (or `{}` if missing).
 3. Check each setting:
    - **`statusLine`** — if the key is missing or null in user's settings → offer to add. If already present (any value) → skip (respect user's custom config).
@@ -268,7 +277,7 @@ Settings Defaults
 5. Ask the user: **"Add these settings defaults? They activate the hook scripts just installed. Options: All / Pick individually / Skip"**
 6. For each accepted setting, merge into `settings.json` using Read/Edit/Write. **Never overwrite an existing `statusLine` or `hooks` value** — only add if the key is absent.
 7. If both are already present, print "statusLine and hooks already configured" and skip.
-8. **PreToolUse check:** After the above, if `hooks` is now present but `hooks.PreToolUse` is missing, offer to add the PreToolUse block from `global/settings.json`. This auto-approves compound commands where every sub-command matches an allow pattern. Present:
+8. **PreToolUse check:** After the above, if `hooks` is now present but `hooks.PreToolUse` is missing, offer to add the PreToolUse block from `scripts/settings-reference.json`. This auto-approves compound commands where every sub-command matches an allow pattern. Present:
 
 ```
 PreToolUse Hook
@@ -279,7 +288,7 @@ PreToolUse Hook
 ═══════════════════════════════════════════
 ```
 
-If accepted, read the `hooks.PreToolUse` value from `global/settings.json` and merge it into the user's `hooks` object. Never overwrite an existing `hooks.PreToolUse` value.
+If accepted, read the `hooks.PreToolUse` value from `scripts/settings-reference.json` and merge it into the user's `hooks` object. Never overwrite an existing `hooks.PreToolUse` value.
 
 ### Step 4.7: Sandbox Configuration (Opt-In)
 
@@ -310,7 +319,7 @@ Sandbox Configuration (Recommended)
 ```
 
 4. Ask: **"Enable sandbox? [Y/n]"**
-5. If accepted: read the `sandbox` value from `global/settings.json` and merge it into `~/.claude/settings.json`. Use Read/Edit/Write — never overwrite other keys.
+5. If accepted: read the `sandbox` value from `scripts/settings-reference.json` and merge it into `~/.claude/settings.json`. Use Read/Edit/Write — never overwrite other keys.
 6. If declined: print "Skipped sandbox configuration." and continue.
 7. **Sandbox extensions (optional):** If sandbox was accepted, check `recommended-permissions.json` for the `sandbox-extensions` category. Present it as opt-in:
 
@@ -359,10 +368,10 @@ These are the managed file pairs (repo path → local path):
 
 | Repo | Local |
 |------|-------|
-| `global/skills/<name>/**` | `~/.claude/skills/<name>/**` |
-| `global/commands/*.md` | `~/.claude/commands/*.md` |
-| `global/agents/*.md` | `~/.claude/agents/*.md` |
-| `global/hooks/*.sh` | `~/.claude/hooks/*.sh` |
+| `skills/<name>/**` | `~/.claude/skills/<name>/**` |
+| `commands/*.md` | `~/.claude/commands/*.md` |
+| `agents/*.md` | `~/.claude/agents/*.md` |
+| `plugin-hooks/*.sh` | `~/.claude/hooks/*.sh` |
 
 **Excluded from sync** (never touched):
 - `~/.claude/settings.json` — user-managed
@@ -429,7 +438,7 @@ For each file that is NOT in sync, in order:
 
 ### Step 8.5: Permissions Merge (Sync)
 
-Same as Step 4.5 — check `~/.claude/settings.json` against `global/recommended-permissions.json` and offer to add missing permissions. This surfaces newly added recommended permissions when the repo updates.
+Same as Step 4.5 — check `~/.claude/settings.json` against `scripts/recommended-permissions.json` and offer to add missing permissions. This surfaces newly added recommended permissions when the repo updates.
 
 Follow the exact same procedure as Step 4.5.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate every skill under global/skills/ against SKILL_CONTRACT.md.
+"""Validate every skill under skills/ against SKILL_CONTRACT.md.
 
 Run: python scripts/validate-skills.py
 Exits non-zero on any violation; prints a structured report.
@@ -14,7 +14,7 @@ from pathlib import Path
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SKILLS_DIR = REPO_ROOT / "global" / "skills"
+SKILLS_DIR = REPO_ROOT / "skills"
 
 SKIP_DIRS = {"_shared"}
 SKIP_SKILLS: set[str] = set()  # add skill names here to intentionally bypass validation

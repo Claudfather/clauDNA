@@ -1,35 +1,59 @@
 # clauDNA
 
-Global Claude Code configuration repo. Manages skills, agents, hooks, and commands installed to `~/.claude/`.
+Claude Code plugin pack: curated skills, agents, and hooks distributed via the `Claudfather` marketplace. Also installable headlessly via a bash script for CI / fleet provisioning.
 
-## Quick Start
+## Quick Start (marketplace install — recommended)
 
-```bash
-git clone git@github.com:YOUR_ORG/clauDNA.git
-cd clauDNA
-claude
+Inside Claude Code:
+
+```
+/plugin marketplace add chrisrogers37/claudna
+/plugin install claudna@Claudfather
 ```
 
-Then run `/clauDNA-setup` inside Claude Code. It detects existing `~/.claude/` files, backs up before overwriting, and prompts for review on any collisions. Works for first-time install and ongoing sync.
+That's it. Skills become available as `/claudna:<skill-name>` (namespaced under the plugin). Hooks (auto-format, pretooluse permissions, notifications) activate automatically when the plugin is enabled.
 
-Alternatively, `./install.sh` for a fast, minimal-interaction setup.
+### Headless install (CI, fleet, Docker images)
+
+If you can't run interactive Claude Code commands:
+
+```bash
+git clone git@github.com:chrisrogers37/claudna.git
+cd claudna
+./install.sh
+```
+
+`install.sh` copies skills/agents/hooks directly into `~/.claude/`, plus interactively offers to add recommended permissions, sandbox config, and statusLine config to `~/.claude/settings.json`. Skills are invoked unnamespaced (`/<skill-name>`) in this mode.
 
 ### After install
 
-1. **Snowflake setup** — Follow [SETUP_GUIDE.md Section 5](./SETUP_GUIDE.md#5-snowflake-key-pair-authentication) for key pair auth
-2. **Shell aliases** — `cat shell/zshrc-additions.sh >> ~/.zshrc && source ~/.zshrc`
-3. **Project setup** — In any project, run `/init-project` to generate `CLAUDE.md`, `CHANGELOG.md`, and `.claude/lessons.md` customized to the codebase
+1. **Snowflake setup** — Follow [SETUP_GUIDE.md Section 5](./SETUP_GUIDE.md#5-snowflake-key-pair-authentication) for key pair auth (optional, only if you use the Snowflake skills).
+2. **Shell aliases** — `cat shell/zshrc-additions.sh >> ~/.zshrc && source ~/.zshrc` (optional).
+3. **Project setup** — In any project, run `/init-project` (or `/claudna:init-project` if installed via marketplace) to generate `CLAUDE.md`, `CHANGELOG.md`, and `.claude/lessons.md`.
 
-## What's Installed
+### Optional: enable the statusLine
 
-Everything under `global/` gets installed to `~/.claude/`:
+The plugin ships a custom `statusline.sh` but Claude Code does not yet support statusLine declarations inside plugin manifests. To opt in, add this to your `~/.claude/settings.json`:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bash ${HOME}/.claude/plugins/cache/Claudfather/claudna/0.2.0/plugin-hooks/statusline.sh"
+  }
+}
+```
+
+Update the version segment when bumping plugins.
+
+## What ships with the plugin
 
 | Directory | Count | Contents |
 |-----------|-------|----------|
-| `skills/` | | Slash commands and context skills (see below) |
+| `skills/` | 47 | 46 user-invocable slash commands + 1 context-only skill (`notifications`) |
 | `agents/` | 8 | `snowflake-analyst`, `dbt-engineer`, `neon-analyst`, `modal-ops`, `railway-ops`, `vercel-ops`, `code-reviewer`, `spec-reviewer` |
-| `hooks/` | 4 | Auto-format on save, status line, notifications, pretooluse permissions |
-| `commands/` | 1 | `clauDNA-sync` (global sync from any project) |
+| `plugin-hooks/` | 3 active + 1 opt-in | Auto-format on Write/Edit, pretooluse permission expansion, macOS notifications. (`statusline.sh` is opt-in — see above.) Named `plugin-hooks/` to avoid a Claude Code bug that deletes any project-root `hooks/` directory between tool calls. |
+| `commands/` | 1 | `clauDNA-sync` (legacy; still useful for `install.sh` users) |
 
 ## Skills
 
@@ -116,8 +140,8 @@ User-invocable slash commands + 1 context-only skill (`notifications`).
 | `/file-github-issue` | File a GitHub issue from a screenshot + short description |
 | `/github-activity-report` | GitHub activity stats (PRs, commits, contributors) over a time window |
 | `/clauDNA-migrate` | Migrate legacy commands to skills format |
-| `/clauDNA-setup` | Bootstrap or sync from this repo |
-| `/clauDNA-sync` | Sync global config from any project (requires prior install) |
+| `/clauDNA-setup` | Bootstrap / sync (headless install only — marketplace users use `/plugin install`) |
+| `/clauDNA-sync` | Diff repo against `~/.claude/` (headless install only — marketplace users use `/plugin update`) |
 
 ## Daily Workflow
 
@@ -171,7 +195,9 @@ Specialized personas invoked by skills or directly:
 
 ## Safety
 
-Both install methods back up existing managed files before overwriting:
+**Marketplace install** is managed by Claude Code: plugins live under `~/.claude/plugins/cache/Claudfather/claudna/<version>/`. Updates land in a new version directory; old versions are kept for ~7 days before auto-cleanup.
+
+**Headless install (`install.sh`)** backs up existing managed files before overwriting:
 
 ```
 ~/.local/share/clauDNA/backups/<YYYY-MM-DD_HHMMSS>/
@@ -180,13 +206,13 @@ Both install methods back up existing managed files before overwriting:
 This location is outside `~/.claude/` so Claude Code never discovers backup files.
 
 **Never touched:**
-- `~/.claude/settings.json` — user-managed, never overwritten (permissions merge only *adds* entries)
+- `~/.claude/settings.json` — user-managed, never overwritten (`install.sh`'s permissions merge only *adds* entries)
 - `~/.claude/notes/` — personal data (lessons, decisions, patterns)
 - `~/.claude/docs/` — installed once during setup, not synced afterward
 
 ## Project Template
 
-`project-template/` provides a starter `.claude/` directory for individual projects:
+`project-template/` provides a starter `.claude/` directory for individual projects. It is *not* shipped via the plugin — copy it manually or use `/init-project`:
 
 | File | Purpose |
 |------|---------|
@@ -196,10 +222,12 @@ This location is outside `~/.claude/` so Claude Code never discovers backup file
 
 ## Contributing
 
-1. Edit files in `global/` (source of truth)
-2. Test with `/clauDNA-setup` to push changes to `~/.claude/`
-3. Update CHANGELOG.md
-4. Submit PR — after merge, team members run `/clauDNA-setup` to update
+1. Edit files in `skills/`, `agents/`, `commands/`, or `plugin-hooks/` (source of truth).
+2. Test locally with `claude --plugin-dir /path/to/claudna` (loads the plugin for one session).
+3. Run `python3 scripts/validate-skills.py` — CI enforces the same.
+4. Bump `version` in `.claude-plugin/plugin.json` (marketplace users only get updates on version bumps).
+5. Update `CHANGELOG.md`.
+6. Submit PR — after merge, users update via `/plugin update claudna@Claudfather`.
 
 ## Documentation
 

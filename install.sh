@@ -1,11 +1,21 @@
 #!/bin/bash
-# clauDNA install script
-# Sets up global Claude Code configuration with collision detection and backup
+# clauDNA install script — headless / fleet provisioning path
+# Sets up global Claude Code configuration with collision detection and backup.
+#
+# This script provisions files directly into ~/.claude/ — useful for fleet
+# provisioning, Docker images, and CI runners where Claude Code's interactive
+# /plugin command cannot be invoked.
+#
+# For interactive setup, prefer the marketplace install:
+#   /plugin marketplace add chrisrogers37/claudna
+#   /plugin install claudna@Claudfather
 
 set -e
 
-echo "=== clauDNA installer ==="
-echo "(Tip: You can also run 'claude' from this repo and use /clauDNA-setup)"
+echo "=== clauDNA installer (headless / CI path) ==="
+echo "For interactive setup, prefer the marketplace install:"
+echo "  /plugin marketplace add chrisrogers37/claudna"
+echo "  /plugin install claudna@Claudfather"
 echo ""
 
 # Get the directory where this script lives
@@ -13,25 +23,26 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # --- Collision Detection ---
 COLLISIONS=()
-for file in "$SCRIPT_DIR"/global/commands/*.md; do
+for file in "$SCRIPT_DIR"/commands/*.md; do
     name=$(basename "$file")
     if [ -f "$HOME/.claude/commands/$name" ]; then
         COLLISIONS+=("commands/$name")
     fi
 done
-for dir in "$SCRIPT_DIR"/global/skills/*/; do
+for dir in "$SCRIPT_DIR"/skills/*/; do
     name=$(basename "$dir")
+    [ "$name" = "_shared" ] && continue
     if [ -f "$HOME/.claude/skills/$name/SKILL.md" ]; then
         COLLISIONS+=("skills/$name/")
     fi
 done
-for file in "$SCRIPT_DIR"/global/agents/*.md; do
+for file in "$SCRIPT_DIR"/agents/*.md; do
     name=$(basename "$file")
     if [ -f "$HOME/.claude/agents/$name" ]; then
         COLLISIONS+=("agents/$name")
     fi
 done
-for file in "$SCRIPT_DIR"/global/hooks/*.sh; do
+for file in "$SCRIPT_DIR"/plugin-hooks/*.sh; do
     name=$(basename "$file")
     if [ -f "$HOME/.claude/hooks/$name" ]; then
         COLLISIONS+=("hooks/$name")
@@ -75,32 +86,37 @@ mkdir -p ~/.snowflake
 echo "$SCRIPT_DIR" > ~/.claude/.clauDNA-repo
 
 # --- Copy Files ---
-echo "Installing global commands..."
-cp "$SCRIPT_DIR"/global/commands/*.md ~/.claude/commands/
+echo "Installing commands..."
+cp "$SCRIPT_DIR"/commands/*.md ~/.claude/commands/
 
-echo "Installing global skills..."
-for dir in "$SCRIPT_DIR"/global/skills/*/; do
+echo "Installing skills..."
+for dir in "$SCRIPT_DIR"/skills/*/; do
     name=$(basename "$dir")
+    [ "$name" = "_shared" ] && continue
     mkdir -p "$HOME/.claude/skills/$name"
     cp -r "$dir"* "$HOME/.claude/skills/$name/"
 done
 
-echo "Installing global agents..."
-cp "$SCRIPT_DIR"/global/agents/*.md ~/.claude/agents/
+echo "Installing agents..."
+cp "$SCRIPT_DIR"/agents/*.md ~/.claude/agents/
 
 echo "Installing hooks..."
-cp "$SCRIPT_DIR"/global/hooks/*.sh ~/.claude/hooks/
+# Copy hook scripts from plugin-hooks/ (renamed to avoid Claude Code's hooks/-deletion bug)
+# into the user's ~/.claude/hooks/. hooks.json is plugin-only and not copied.
+for f in "$SCRIPT_DIR"/plugin-hooks/*.sh; do
+    [ -f "$f" ] && cp "$f" ~/.claude/hooks/
+done
 chmod +x ~/.claude/hooks/*.sh
 
 # NOTE: We intentionally do NOT overwrite ~/.claude/settings.json
 # Users manage their own global settings (permissions, model, hooks).
-# See global/settings.json for a reference example.
-echo "Skipping settings.json (user-managed — see global/settings.json for reference)"
+# See scripts/settings-reference.json for a reference example.
+echo "Skipping settings.json (user-managed — see scripts/settings-reference.json for reference)"
 
 # --- Permissions Merge ---
 # Offer to add recommended permissions to settings.json (additive only)
 if command -v jq &>/dev/null; then
-    RECOMMENDED="$SCRIPT_DIR/global/recommended-permissions.json"
+    RECOMMENDED="$SCRIPT_DIR/scripts/recommended-permissions.json"
     SETTINGS="$HOME/.claude/settings.json"
 
     if [ -f "$RECOMMENDED" ]; then
@@ -219,7 +235,7 @@ if command -v jq &>/dev/null; then
     fi
     # --- Settings Defaults (statusLine & hooks) ---
     if [ -f "$SETTINGS" ]; then
-        REFERENCE="$SCRIPT_DIR/global/settings.json"
+        REFERENCE="$SCRIPT_DIR/scripts/settings-reference.json"
         NEEDS_STATUSLINE=false
         NEEDS_HOOKS=false
 

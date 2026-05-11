@@ -1,35 +1,47 @@
 # clauDNA
 
-Global Claude Code configuration repo. Manages slash commands, agents, hooks, and documentation installed to `~/.claude/`.
+Claude Code plugin pack distributed via the `Claudfather` marketplace. Ships skills, agents, and hooks as a single plugin (`claudna`). Also provides a headless `install.sh` for fleet / CI provisioning where the interactive `/plugin` command isn't available.
 
 ## Repo Structure
 
 ```
-global/                         → Files installed to ~/.claude/ (skills, commands, agents, hooks)
-  skills/                       → Skill directories + _shared/ → installed to ~/.claude/skills/
-    _shared/                    → Shared orchestration guide (not a skill, no SKILL.md)
-  commands/                     → 1 command (clauDNA-sync) → installed to ~/.claude/commands/
-  agents/                       → Agent files → installed to ~/.claude/agents/
-  hooks/                        → Hook scripts → installed to ~/.claude/hooks/
-  settings.json                 → Reference example only (never installed)
-  recommended-permissions.json  → Permission categories offered during setup/sync
-project-template/               → Template for per-project .claude/ setup
-shell/                          → Shell aliases (zshrc additions)
-snowflake/                      → Snowflake connection config template
-.claude/                        → Repo-local commands (like /clauDNA-setup)
-install.sh                      → Fast non-interactive installer (alternative to /clauDNA-setup)
+.claude-plugin/
+  plugin.json                   → Plugin manifest (name: claudna, version)
+  marketplace.json              → Marketplace manifest (name: Claudfather, lists claudna)
+skills/                         → Skill directories (one per skill, plugin auto-discovers)
+  _shared/                      → Shared orchestration material referenced by skills (no SKILL.md)
+agents/                         → Agent definition files
+commands/                       → Slash command files (legacy; prefer skills/)
+plugin-hooks/                   → Hook scripts + declarative hook config (renamed from hooks/ to work around Claude Code bug — see CHANGELOG)
+  hooks.json                    → Declarative hook wiring (referenced from .claude-plugin/plugin.json; loaded on plugin enable)
+  *.sh                          → Hook scripts referenced from hooks.json via ${CLAUDE_PLUGIN_ROOT}/plugin-hooks/
+project-template/               → Aux: per-project .claude/ setup template (not shipped via plugin)
+shell/                          → Aux: zshrc additions (not shipped via plugin)
+snowflake/                      → Aux: Snowflake connection config template (not shipped via plugin)
+scripts/
+  validate-skills.py            → CI-enforced SKILL_CONTRACT validator (walks skills/)
+  recommended-permissions.json  → Permission categories offered by install.sh
+  settings-reference.json       → Reference settings.json (used by install.sh, never auto-installed)
+.claude/                        → Repo-local commands (e.g. /clauDNA-setup for headless setup)
+install.sh                      → Headless / fleet / CI install path (alternative to /plugin install)
 ```
 
-## Key Commands
+## Key Install Paths
 
-- `/clauDNA-setup` — Bootstrap or sync clauDNA from this repo (works without prior install)
-- `/clauDNA-sync` — Sync global config from any project (requires prior install)
+- **Marketplace (preferred, human users):**
+  ```
+  /plugin marketplace add chrisrogers37/claudna
+  /plugin install claudna@Claudfather
+  ```
+  Skills are invoked as `/claudna:<skill-name>`.
+
+- **Headless (CI, fleet, Docker images):** clone the repo and run `./install.sh`. Files land directly in `~/.claude/`. Skills are invoked unnamespaced (`/<skill-name>`).
 
 ## Rules
 
 ### Don't (sync/install safety)
 
-- **Never overwrite `settings.json`** — `~/.claude/settings.json` is user-managed. The permissions merge step only ADDS entries to `permissions.allow` — it never removes entries, never modifies other fields (model, hooks, statusLine), and always requires user confirmation.
+- **Never overwrite `settings.json`** — `~/.claude/settings.json` is user-managed. `install.sh`'s permissions merge only ADDS entries to `permissions.allow` — it never removes entries, never modifies other fields (model, hooks, statusLine), and always requires user confirmation.
 - **Never sync `~/.claude/notes/`** — Personal data (lessons, decisions, patterns). Never pulled back to the repo.
 - **Never sync `~/.claude/docs/`** — Installed once during setup, not managed afterward.
 - **Use Read/Write tools for file operations** — Not shell `cp`. This gives visibility into what changes and avoids permission issues. Exception: backup copies use `cp -r` since they're preservation, not reviewed changes.
@@ -55,10 +67,11 @@ install.sh                      → Fast non-interactive installer (alternative 
 
 ## Working on This Repo
 
-When modifying managed files in `global/`:
-1. Edit the file in `global/` (the source of truth)
-2. Test by running `/clauDNA-setup` to push to local
-3. Update CHANGELOG.md with the change
-4. Before opening a PR, run `python scripts/validate-skills.py` — CI runs the same check and will block merge on violations
+When modifying components inside the plugin tree (`skills/`, `agents/`, `commands/`, `plugin-hooks/`):
+1. Edit the file in place (this repo is the source of truth).
+2. Test by loading the plugin locally: `claude --plugin-dir /Users/chris/Projects/claudna` and invoking the affected skill.
+3. Update `CHANGELOG.md` with the change.
+4. Before opening a PR, run `python3 scripts/validate-skills.py` — CI runs the same check and will block merge on violations.
+5. When bumping for release, update `version` in `.claude-plugin/plugin.json`. Without a bump, marketplace users do not receive the update.
 
 When adding or modifying a skill, the binding rules live in [SKILL_CONTRACT.md](./SKILL_CONTRACT.md). The contract is enforced by `scripts/validate-skills.py` and the `validate-skills` GitHub Actions workflow. If you need to relax a rule, update both the contract and the validator together — never one without the other.

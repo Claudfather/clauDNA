@@ -2,6 +2,16 @@
 
 Compare managed files between the clauDNA repo and `~/.claude/`, then interactively sync differences in either direction.
 
+> **This command is for the headless `install.sh` install path only.** If you installed clauDNA via the marketplace (`/plugin install claudna@Claudfather`), use `/plugin update claudna@Claudfather` instead — the plugin cache is managed by Claude Code and should not be hand-synced.
+
+## Step 0: Detect Install Mode
+
+Check whether the user installed via the marketplace or via `install.sh`:
+
+- If `~/.claude/plugins/cache/Claudfather/claudna/` exists AND `~/.claude/.clauDNA-repo` does **not** exist → marketplace install. Tell the user: "You installed clauDNA via the marketplace. Use `/plugin update claudna@Claudfather` to pull updates, or `/plugin uninstall` + `/plugin install` for a clean reinstall. This `/clauDNA-sync` command is for the headless `install.sh` path only." Stop.
+- If `~/.claude/.clauDNA-repo` exists → headless install, proceed with the steps below.
+- If neither exists → tell the user: "No clauDNA install detected. Either run `/plugin marketplace add chrisrogers37/claudna` then `/plugin install claudna@Claudfather`, or clone the repo and run `./install.sh`." Stop.
+
 ## Backup Policy
 
 Before any sync that would modify files, back up existing managed files to:
@@ -28,10 +38,10 @@ These are the managed file pairs (repo path → local path):
 
 | Repo | Local |
 |------|-------|
-| `global/skills/<name>/**` | `~/.claude/skills/<name>/**` |
-| `global/commands/*.md` | `~/.claude/commands/*.md` |
-| `global/agents/*.md` | `~/.claude/agents/*.md` |
-| `global/hooks/*.sh` | `~/.claude/hooks/*.sh` |
+| `skills/<name>/**` | `~/.claude/skills/<name>/**` |
+| `commands/*.md` | `~/.claude/commands/*.md` |
+| `agents/*.md` | `~/.claude/agents/*.md` |
+| `plugin-hooks/*.sh` | `~/.claude/hooks/*.sh` (hooks.json stays plugin-only — not synced) |
 
 Note: `_shared/` directories under `skills/` contain shared reference files used by orchestration skills. They have no `SKILL.md` but are synced like any other skill directory.
 
@@ -114,7 +124,7 @@ When dispatching subagents for bulk sync, instruct them to use **only Read/Write
 
 ### Step 6.5: Permissions Check
 
-After syncing files, check `~/.claude/settings.json` against the repo's `global/recommended-permissions.json` and offer to add any missing recommended permissions.
+After syncing files, check `~/.claude/settings.json` against the repo's `scripts/recommended-permissions.json` and offer to add any missing recommended permissions.
 
 Follow the same two-sub-step procedure as Step 4.5 in `/clauDNA-setup`:
 
@@ -140,7 +150,7 @@ This ensures every sync run surfaces deprecated syntax until migrated, and newly
 After permissions, check if `statusLine` and `hooks` configs are present in `~/.claude/settings.json`. These activate the hook scripts synced in Step 6.
 
 Follow the same procedure as Step 4.6 in `/clauDNA-setup`:
-1. Read `global/settings.json` from the repo for recommended values
+1. Read `scripts/settings-reference.json` from the repo for recommended values
 2. Check if `statusLine` and `hooks` keys exist in user's settings
 3. Offer to add any that are missing (never overwrite existing values)
 4. **PreToolUse check:** If `hooks` is present but `hooks.PreToolUse` is missing, offer to add the PreToolUse block. This auto-approves compound commands where every sub-command matches an allow pattern.
@@ -152,11 +162,11 @@ This ensures newly added settings defaults from updated repos are surfaced on sy
 After settings defaults, check if sandbox configuration is present in `~/.claude/settings.json`.
 
 Follow the same procedure as Step 4.7 in `/clauDNA-setup`:
-1. Read `global/settings.json` from the repo for the recommended `sandbox` value
+1. Read `scripts/settings-reference.json` from the repo for the recommended `sandbox` value
 2. Check if the `sandbox` key exists in user's settings (any value → skip)
 3. If missing, present the sandbox recommendation with tradeoffs
 4. Ask: **"Enable sandbox? [Y/n]"**
-5. If accepted: merge the `sandbox` object from repo's `global/settings.json` into user's settings
+5. If accepted: merge the `sandbox` object from repo's `scripts/settings-reference.json` into user's settings
 6. If sandbox was accepted, optionally offer `sandbox-extensions` permissions from `recommended-permissions.json` (default: no)
 
 This ensures newly added sandbox recommendations from updated repos are surfaced on sync.
