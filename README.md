@@ -53,7 +53,7 @@ Update the version segment when bumping plugins.
 | `skills/` | 47 | 46 user-invocable slash commands + 1 context-only skill (`notifications`) |
 | `agents/` | 8 | `snowflake-analyst`, `dbt-engineer`, `neon-analyst`, `modal-ops`, `railway-ops`, `vercel-ops`, `code-reviewer`, `spec-reviewer` |
 | `plugin-hooks/` | 3 active + 1 opt-in | Auto-format on Write/Edit, pretooluse permission expansion, macOS notifications. (`statusline.sh` is opt-in — see above.) Named `plugin-hooks/` to avoid a Claude Code bug that deletes any project-root `hooks/` directory between tool calls. |
-| `commands/` | 1 | `clauDNA-sync` (legacy; still useful for `install.sh` users) |
+| `commands/` | 0 | (removed; install/update is handled by `/plugin install` or `./install.sh`) |
 
 ## Skills
 
@@ -139,9 +139,6 @@ User-invocable slash commands + 1 context-only skill (`notifications`).
 | `/init-project` | Set up CLAUDE.md, CHANGELOG.md, and .claude/ for a new or existing project |
 | `/file-github-issue` | File a GitHub issue from a screenshot + short description |
 | `/github-activity-report` | GitHub activity stats (PRs, commits, contributors) over a time window |
-| `/clauDNA-migrate` | Migrate legacy commands to skills format |
-| `/clauDNA-setup` | Bootstrap / sync (headless install only — marketplace users use `/plugin install`) |
-| `/clauDNA-sync` | Diff repo against `~/.claude/` (headless install only — marketplace users use `/plugin update`) |
 
 ## Daily Workflow
 

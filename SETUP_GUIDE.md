@@ -84,7 +84,7 @@ Two layouts, depending on install path:
 ├── settings.json       # USER-MANAGED — install.sh only adds permissions, never overwrites
 ├── skills/             # Skills (slash commands + context skills)
 ├── agents/             # Specialized subagents (snowflake-analyst, dbt-engineer, etc.)
-├── commands/           # 1 command (clauDNA-sync)
+├── commands/           # (empty by default — install/update via /plugin or install.sh)
 ├── hooks/              # auto-format, statusline, notify, pretooluse-permissions
 ├── notes/              # Personal — never synced from this repo
 └── docs/               # Installed once during setup, never resynced
@@ -323,7 +323,7 @@ bash ~/.claude/plugins/cache/Claudfather/claudna/0.2.0/plugin-hooks/statusline.s
 }
 ```
 
-`/clauDNA-setup` and `install.sh` offer to add this block automatically for the headless path.
+`install.sh` offers to add this block automatically for the headless path.
 
 ---
 

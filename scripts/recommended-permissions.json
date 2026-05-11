@@ -1,5 +1,5 @@
 {
-  "_comment": "Recommended permission patterns for ~/.claude/settings.json. Used by /clauDNA-setup to offer missing permissions. Categories are presented to the user for opt-in. Never removes existing entries.",
+  "_comment": "Recommended permission patterns for ~/.claude/settings.json. Used by install.sh to offer missing permissions. Categories are presented to the user for opt-in. Never removes existing entries.",
   "categories": [
     {
       "id": "core",

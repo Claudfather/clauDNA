@@ -22,7 +22,7 @@ scripts/
   validate-skills.py            → CI-enforced SKILL_CONTRACT validator (walks skills/)
   recommended-permissions.json  → Permission categories offered by install.sh
   settings-reference.json       → Reference settings.json (used by install.sh, never auto-installed)
-.claude/                        → Repo-local commands (e.g. /clauDNA-setup for headless setup)
+.claude/                        → Repo-local settings (permission allowlists for working in this repo)
 install.sh                      → Headless / fleet / CI install path (alternative to /plugin install)
 ```
 

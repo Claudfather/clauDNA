@@ -82,9 +82,6 @@ echo "Creating directories..."
 mkdir -p ~/.claude/{commands,skills,agents,hooks,notes/{projects,patterns,decisions,lessons},docs}
 mkdir -p ~/.snowflake
 
-# Write breadcrumb so /clauDNA-sync skill can find this repo
-echo "$SCRIPT_DIR" > ~/.claude/.clauDNA-repo
-
 # --- Copy Files ---
 echo "Installing commands..."
 cp "$SCRIPT_DIR"/commands/*.md ~/.claude/commands/
@@ -198,7 +195,7 @@ if command -v jq &>/dev/null; then
                 for dp in "${DEPRECATED_MATCH[@]}"; do
                     echo "   $dp — covered via deprecated Bash(cmd:*) form"
                 done
-                echo "   Run /clauDNA-setup from Claude Code for interactive migration."
+                echo "   Re-run this installer interactively to migrate."
             fi
 
             if [ ${#MISSING[@]} -gt 0 ]; then
@@ -226,7 +223,7 @@ if command -v jq &>/dev/null; then
                     echo "Added ${#MISSING[@]} permissions to ~/.claude/settings.json"
                 else
                     echo "Skipped permissions merge."
-                    echo "  Run /clauDNA-setup from Claude Code for interactive per-category selection."
+                    echo "  Re-run this installer to opt into per-category selection."
                 fi
             else
                 echo "All recommended permissions already present in settings.json."
@@ -329,7 +326,7 @@ else
     echo ""
     echo "Note: jq is not installed. Skipping permissions merge and settings defaults."
     echo "  Install jq: brew install jq (macOS) or apt install jq (Linux)"
-    echo "  Or run /clauDNA-setup from Claude Code for interactive setup."
+    echo "  Then re-run this installer."
 fi
 
 # Create starter lessons file if it doesn't exist
@@ -363,7 +360,6 @@ echo "  - agents/       ($(ls ~/.claude/agents/*.md 2>/dev/null | wc -l | tr -d 
 echo "  - hooks/        ($(ls ~/.claude/hooks/*.sh 2>/dev/null | wc -l | tr -d ' ') hooks)"
 echo "  - settings.json  (skipped — user-managed)"
 echo "  - docs/"
-echo "  - .clauDNA-repo  (breadcrumb → $SCRIPT_DIR)"
 if [ -n "$BACKUP_DIR" ]; then
     echo "  - backup         ($BACKUP_DIR)"
 fi
@@ -384,7 +380,7 @@ if [ "$SUPERSEDED_COUNT" -gt 0 ]; then
     echo "═══════════════════════════════════════════"
     echo "  ~/.claude/commands/ contains $LEGACY_COUNT .md files"
     echo "  $SUPERSEDED_COUNT have skill equivalents (skills take precedence)"
-    echo "  Run /clauDNA-migrate to clean up"
+    echo "  Remove the redundant command files manually: rm <list of shadowed files>"
     echo "═══════════════════════════════════════════"
 fi
 

@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `global/recommended-permissions.json` → `scripts/recommended-permissions.json` (still used only by `install.sh`).
 - `global/settings.json` → `scripts/settings-reference.json` (still used only by `install.sh`).
 - `install.sh` is repositioned as the **headless / CI / fleet provisioning** path. Marketplace install is now the recommended path for human users. The script's permissions-merge, sandbox-opt-in, and statusLine-opt-in logic is unchanged and still runs for headless installs.
-- `/clauDNA-setup` and `/clauDNA-sync` commands now detect install mode and direct marketplace users to `/plugin install` / `/plugin update` instead.
+- Removed `/clauDNA-setup`, `/clauDNA-sync`, `/clauDNA-migrate` commands and skills. The marketplace install path uses `/plugin install` / `/plugin update`; the headless install path uses `./install.sh`. The diff/sync/migrate logic these commands provided is no longer relevant under the plugin model.
 - `scripts/validate-skills.py` and `SKILL_CONTRACT.md` updated to reference `skills/` instead of `global/skills/`. CI workflow unchanged.
 
 ### Notes

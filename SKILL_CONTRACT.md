@@ -31,7 +31,7 @@ Hard rules:
 
 | Field | Type | Rules |
 |---|---|---|
-| `name` | string | Letters (any case), digits, and hyphens only. Must match the parent directory name exactly. Globally unique across the repo (no two skills share a `name`). Convention is `kebab-case`; the project-branded skills (`clauDNA-setup`, `clauDNA-sync`, `clauDNA-migrate`) intentionally use mixed case. |
+| `name` | string | Letters (any case), digits, and hyphens only. Must match the parent directory name exactly. Globally unique across the repo (no two skills share a `name`). Convention is `kebab-case`. |
 | `description` | string | One sentence describing when to use the skill. Begins with "Use when…" by convention. Length: 20–500 characters. Surfaces in the skill picker — keep it specific enough that the loader can decide relevance. |
 
 ### Optional fields

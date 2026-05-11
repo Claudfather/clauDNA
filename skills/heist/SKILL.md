@@ -81,7 +81,7 @@ Naming collision on adopt: ask for alternative name.
 
 ### Step 7: Summary & Cleanup
 
-Present target, counts (scanned/selected), actions (ADOPTED with paths, ENHANCED with changes, SKIPPED). Next steps: `git diff`, `/clauDNA-setup`, update CHANGELOG.md. Cleanup: `rm -rf /tmp/heist-<timestamp>/`
+Present target, counts (scanned/selected), actions (ADOPTED with paths, ENHANCED with changes, SKIPPED). Next steps: `git diff`, run `./install.sh` (headless) or bump plugin version in `.claude-plugin/plugin.json` (marketplace), update CHANGELOG.md. Cleanup: `rm -rf /tmp/heist-<timestamp>/`
 
 ---
 
