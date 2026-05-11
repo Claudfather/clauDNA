@@ -403,7 +403,7 @@ When multiple skills could apply to a task, invoke them in tier order. Process s
 | 1 | **Process** | review-self, investigate-app, verify-completion | Establish approach, verify assumptions, gather evidence, debug |
 | 2 | **Planning** | product-enhance, product-vision, design-review, security-audit, tech-debt, frontend-performance-audit | Analyze what to build, identify gaps, produce design docs |
 | 3 | **Implementation** | implement-plan, review-changes, review-pr, quick-commit, commit-push-pr | Execute plans, review code, commit and ship PRs |
-| 4 | **Deployment & Ops** | railway-deploy, vercel-deploy, modal-deploy, railway-status, vercel-status, modal-status, railway-logs, vercel-logs, modal-logs, dbt, neon-branch, neon-info, neon-query, snowflake-query | Deploy, monitor, query infrastructure |
+| 4 | **Deployment & Ops** | railway-deploy, vercel-deploy, modal-deploy, railway-status, vercel-status, modal-status, railway-logs, vercel-logs, modal-logs, dbt, neon-branch, neon-info, neon-query | Deploy, monitor, query infrastructure |
 
 **Utility skills** (context-resume, session-handoff, lessons, notes, find-skills, cache-audit, docs-review, repo-health, worktree, clauDNA-migrate, notifications) are not tiered -- they are invoked on demand for session management, not as part of a build workflow.
 

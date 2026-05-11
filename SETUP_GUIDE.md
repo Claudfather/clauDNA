@@ -34,7 +34,7 @@ If all you need is "install clauDNA", read the README. Come here when something 
 
 | Software | Used By | Installation |
 |----------|---------|--------------|
-| SnowSQL | `/snowflake-query`, `/dbt` | Download from Snowflake |
+| SnowSQL | `/dbt` | Download from Snowflake |
 | OpenSSL | Snowflake key-pair auth | Pre-installed on macOS |
 | `gh` (GitHub CLI) | `/review-pr`, `/heist`, GitHub-issue output modes | `brew install gh` |
 | `psql` | `/neon-query`, `/neon-info`, `/neon-branch` | `brew install libpq` |
