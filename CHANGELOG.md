@@ -20,6 +20,11 @@ This release converts clauDNA from a bash-installed `~/.claude/` overlay into a 
   ```
 - `plugin-hooks/hooks.json` — declarative hook wiring that activates automatically when the plugin is enabled. PreToolUse permission expansion, PostToolUse auto-format, and Notification hooks no longer require manual `settings.json` edits.
 - `LICENSE` (MIT) at the plugin root.
+- New skills shipped with this release (some inherited from upstream commits already merged to main, included here for completeness):
+  - `/claudna:cleanup-legacy-install` — one-shot cleanup of pre-plugin `~/.claude/` overlays (install.sh, claudfather, claudefather). Discovery-based: enumerates the plugin's own components and removes only matching-name files from the legacy install, with diff-based safety checks and timestamped backups.
+  - `/claudna:adversarial-review` — structured plan challenge with evidence and anti-groupthink guards.
+  - `/claudna:learn`, `/claudna:reflect`, `/claudna:index`, `/claudna:remember`, `/claudna:publish` — knowledge system lifecycle (ingest → synthesize → organize → recall → distribute).
+- SETUP_GUIDE §0 — "Upgrading from 0.1.x" with the 4-step upgrade sequence (`/plugin install` → `/claudna:cleanup-legacy-install` → `/reload-plugins`).
 - SETUP_GUIDE §3 — recommended `~/.claude/settings.json` snippets (permissions, statusLine, sandbox) for users to merge manually since plugins cannot write to user settings.
 - SETUP_GUIDE §4 — full headless / CI / Docker provisioning recipe using `enabledPlugins`, `extraKnownMarketplaces`, and `CLAUDE_CODE_SYNC_PLUGIN_INSTALL`.
 

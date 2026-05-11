@@ -10,6 +10,7 @@ If all you need is "install clauDNA", read the README. Come here when something 
 
 ## Table of Contents
 
+0. [Upgrading from 0.1.x](#0-upgrading-from-01x) — read first if you previously installed via `install.sh`, `claudfather`, or `claudefather`
 1. [Prerequisites](#1-prerequisites)
 2. [Configuration Hierarchy](#2-configuration-hierarchy)
 3. [Bootstrapping `~/.claude/settings.json`](#3-bootstrapping-claudesettingsjson)
@@ -19,6 +20,44 @@ If all you need is "install clauDNA", read the README. Come here when something 
 7. [Troubleshooting](#7-troubleshooting)
 8. [Appendix A: Boris Cherny's Key Tips](#appendix-a-boris-chernys-key-tips)
 9. [Appendix B: Workflow Orchestration Principles](#appendix-b-workflow-orchestration-principles)
+
+---
+
+## 0. Upgrading from 0.1.x
+
+**Skip this section if you've never installed clauDNA before.**
+
+If you previously installed clauDNA via `install.sh` (or the sibling `claudfather` / `claudefather` projects), the install copied skills, agents, hooks, and a breadcrumb file directly into `~/.claude/`. Those copies will **shadow the marketplace plugin** unless you remove them — Claude Code resolves bare `/<skill>` invocations against `~/.claude/skills/` first, so the old version wins and you get silent double-installation.
+
+claudna ships a skill that does this cleanup for you. The upgrade sequence:
+
+```
+/plugin marketplace add Claudfather/clauDNA
+/plugin install claudna@Claudfather
+/claudna:cleanup-legacy-install
+/reload-plugins
+```
+
+What `/claudna:cleanup-legacy-install` does:
+
+- Detects breadcrumb files (`~/.claude/.clauDNA-repo`, `~/.claude/.claudfather-repo`, `~/.claude/.claudefather-repo`).
+- Enumerates the plugin's own skills/agents/hooks and finds matching-name files in `~/.claude/skills/`, `~/.claude/agents/`, `~/.claude/hooks/`. Files that match by name AND have identical content to the plugin's version are flagged as safe to remove. Files that differ are flagged for explicit per-file confirmation (so you don't lose anything you customized).
+- Detects stale `statusLine` config pointing at `~/.claude/hooks/statusline.sh` and offers to either update the path to the plugin cache or remove the entry.
+- Backs everything up to `~/.local/share/clauDNA/backups/cleanup-legacy-install-<timestamp>/` before removing anything. Restore is a `cp -r` away if you change your mind.
+- Leaves your `permissions.allow` entries alone — those were added by install.sh additively and are still useful in the plugin world.
+
+If you'd rather do it manually, the affected paths are:
+
+| Path | What it was |
+|---|---|
+| `~/.claude/.clauDNA-repo` | Breadcrumb pointing at the cloned repo |
+| `~/.claude/skills/<name>/` | Copies of the 0.1.x skill set |
+| `~/.claude/agents/<name>.md` | Copies of clauDNA agents |
+| `~/.claude/hooks/<name>.sh` | Copies of hook scripts |
+| `~/.claude/commands/clauDNA-sync.md` | Legacy sync command (removed in 0.2.0) |
+| `~/.claude/docs/SETUP_GUIDE.md`, `~/.claude/docs/CLAUDE_MD_TEMPLATE.md` | Stale doc copies |
+
+Don't bulk-`rm -rf` `~/.claude/skills/` or `~/.claude/hooks/` — those directories may contain files from other sources (your own skills, other plugins' headless installs, etc.). The skill's name-by-name matching is the safe path.
 
 ---
 
@@ -145,10 +184,39 @@ Optional categories — add only the ones whose skills you actually use:
 |---|---|---|
 | **Python** | Python projects, formatters | `Bash(python *)`, `Bash(python3 *)`, `Bash(pip *)`, `Bash(pip3 *)`, `Bash(pytest *)`, `Bash(ruff *)` |
 | **Node** | JS/TS projects | `Bash(node *)`, `Bash(npm *)`, `Bash(npx *)`, `Bash(prettier *)` |
-| **Data & Analytics** | `/claudna:snowflake-query`, `/claudna:dbt`, `/claudna:neon-*` | `Bash(snowsql *)`, `Bash(dbt *)`, `Bash(psql *)`, `Bash(pg_isready *)` |
+| **Data & Analytics** | `/claudna:dbt`, `/claudna:neon-*`, `snowflake-analyst` agent | `Bash(snowsql *)`, `Bash(dbt *)`, `Bash(psql *)`, `Bash(pg_isready *)` |
 | **Infrastructure CLIs** | `/claudna:railway-*`, `/claudna:vercel-*`, `/claudna:modal-*` | `Bash(railway *)`, `Bash(vercel *)`, `Bash(modal *)` |
 | **Browser Automation** | `/claudna:design-review`, `/claudna:visual-crawl` | `Bash(/Applications/Google*)`, `Bash("/Applications/Google*)`, `Bash(google-chrome*)`, `Bash(chromium*)` |
-| **Auto-skill-approval** | Bots / cron / non-interactive runs | `Skill(session-handoff)`, `Skill(session-handoff:*)`, `Skill(tech-debt)`, `Skill(tech-debt:*)`, etc. |
+| **Auto-skill-approval** | Bots / cron / non-interactive runs | See "Auto-skill-approval" expansion below |
+
+#### Auto-skill-approval expansion
+
+For bots, cron, and non-interactive runs that invoke claudna skills programmatically, add `Skill(...)` rules to prevent permission prompts. **Anthropic's docs do not specify whether `Skill()` matches against the bare skill name (`session-handoff`) or the plugin-namespaced form (`claudna:session-handoff`).** To be safe, write both forms. Permission rules are additive — extra rules don't hurt.
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Skill(session-handoff)",            "Skill(session-handoff:*)",
+      "Skill(claudna:session-handoff)",    "Skill(claudna:session-handoff:*)",
+      "Skill(context-resume)",             "Skill(context-resume:*)",
+      "Skill(claudna:context-resume)",     "Skill(claudna:context-resume:*)",
+      "Skill(tech-debt)",                  "Skill(tech-debt:*)",
+      "Skill(claudna:tech-debt)",          "Skill(claudna:tech-debt:*)",
+      "Skill(security-audit)",             "Skill(security-audit:*)",
+      "Skill(claudna:security-audit)",     "Skill(claudna:security-audit:*)",
+      "Skill(product-enhance)",            "Skill(product-enhance:*)",
+      "Skill(claudna:product-enhance)",    "Skill(claudna:product-enhance:*)",
+      "Skill(docs-review)",                "Skill(docs-review:*)",
+      "Skill(claudna:docs-review)",        "Skill(claudna:docs-review:*)",
+      "Skill(frontend-performance-audit)", "Skill(frontend-performance-audit:*)",
+      "Skill(claudna:frontend-performance-audit)", "Skill(claudna:frontend-performance-audit:*)"
+    ]
+  }
+}
+```
+
+Extend the list for any other skills your bot invokes. If empirical testing confirms which form Claude Code actually matches, this section will be tightened in a future release.
 
 ### 3.2 statusLine (optional)
 
@@ -163,7 +231,13 @@ The plugin ships a `statusline.sh` that shows branch, lines changed, model, and 
 }
 ```
 
-Update the version segment whenever you bump claudna to a new release.
+> **Known friction:** the version segment (`0.2.0`) is **hardcoded** because the plugin cache path includes the version. Every claudna release bump leaves this path pointing at a stale (or pruned) version directory, and the statusLine silently stops rendering. Workarounds, none of them great:
+>
+> 1. **Update the path on every `/plugin update`** — a `sed` / `jq` one-liner in your post-update routine. Simplest. The path you want is `~/.claude/plugins/cache/Claudfather/claudna/<latest-version>/plugin-hooks/statusline.sh`.
+> 2. **Symlink to a stable path** — `ln -sfn ~/.claude/plugins/cache/Claudfather/claudna/0.2.0/plugin-hooks/statusline.sh ~/.local/bin/claudna-statusline.sh` and point the statusLine command at the symlink. You still re-run the symlink command on every plugin bump, but the statusLine entry in settings.json stays stable.
+> 3. **Copy `statusline.sh` to a path you control** — `cp ~/.claude/plugins/cache/Claudfather/claudna/0.2.0/plugin-hooks/statusline.sh ~/.claude/hooks/claudna-statusline.sh` and point statusLine there. Frozen version (won't pick up improvements) but zero maintenance.
+>
+> Anthropic hasn't shipped a plugin-shipped statusLine surface yet (`statusLine` in `plugin.json` is not honored), so until they do, one of the three options is unavoidable.
 
 ### 3.3 Sandbox (recommended)
 
@@ -224,6 +298,8 @@ Drop a `settings.json` like this into the image / runner's `~/.claude/`:
 }
 ```
 
+The `"source": { "source": "github", ... }` nesting is **not a typo**. The outer key `"source"` is the field name on the marketplace entry; the inner `{ "source": "github", "repo": "..." }` is the [source descriptor](https://code.claude.com/docs/en/plugin-marketplaces) — `"source"` here is a discriminator naming the source type (`github`, `url`, `git`, etc.), and `"repo"` is the repo identifier for that type. Both keys are required by the Claude Code marketplace schema. If this looks ugly, blame the schema, not the docs.
+
 Add whatever `permissions.allow` entries the bot needs. For locked-down CI, use `"defaultMode": "dontAsk"` which denies anything not on the allow list (plus the built-in read-only command set).
 
 ### 4.2 Launch command
@@ -260,15 +336,28 @@ Wire this into your bot's startup script or a deploy hook so each run gets the l
 FROM node:20-bookworm
 RUN npm install -g @anthropic-ai/claude-code
 
-# Pre-install claudna at image build time so cold starts are fast
+# Copy the bot's pre-baked settings (marketplace + enabledPlugins declarations
+# from §4.1, plus whatever permissions and defaults the bot needs).
 COPY bot-settings.json /root/.claude/settings.json
-ENV CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1
-ENV ANTHROPIC_API_KEY=""
+
+# Pre-install claudna at image *build* time so cold container starts don't
+# pay the marketplace-clone + install cost on every container boot.
 RUN claude plugin marketplace add Claudfather/clauDNA && \
     claude plugin install claudna@Claudfather
 
+# Set ANTHROPIC_API_KEY at runtime (e.g., via `docker run -e ANTHROPIC_API_KEY=...`).
+ENV ANTHROPIC_API_KEY=""
+
+# Belt-and-suspenders: if a container ever boots with a fresh ~/.claude/
+# (e.g., volume mount that masks the baked-in install), CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1
+# tells Claude Code to install enabledPlugins on session start. With the image
+# baked above, this is a no-op; on a fresh mount, it's the rescue path.
+ENV CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1
+
 ENTRYPOINT ["claude", "--bare", "-p"]
 ```
+
+The two install paths (`RUN claude plugin install ...` at build time + `ENV CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1` at runtime) **are intentionally both present**: the build-time install delivers fast cold starts, and the runtime env var is the rescue path if a volume mount or fresh `~/.claude/` ever lands without the bake-in. Claude Code is idempotent here — the env var is a no-op when the plugin is already installed at the declared version.
 
 ---
 
