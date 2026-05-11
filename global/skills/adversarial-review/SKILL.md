@@ -55,6 +55,8 @@ Write these reasons without consulting the lenses below. Prospective hindsight i
 
 Apply each lens independently. Do not skip any. Each lens asks a different class of question — a plan that survives all seven is genuinely robust.
 
+**Evidence Required:** Any finding that references specific code must cite file:line. Before presenting, verify the citation is accurate by reading the file. Speculative objections waste time — ground every claim.
+
 ### Lens 1: First Principles
 
 Step back from the plan entirely. Forget the proposed solution.
@@ -65,6 +67,7 @@ Step back from the plan entirely. Forget the proposed solution.
 - **What would you build if starting from scratch today?** No legacy, no existing code, no sunk cost. Does that look like what the plan proposes?
 - **Is this accidental complexity?** Could the same outcome be achieved with dramatically less machinery?
 - **Via negativa** — what in this plan should be *removed*? What common mistakes in this domain must we avoid? Define the plan by what it must NOT do.
+- **Target confident assumptions first** — the assumptions the team feels most certain about are the ones least likely to be questioned. That is where blind spots hide.
 
 ### Lens 2: Gaps and Blind Spots
 
@@ -163,6 +166,8 @@ After all lenses are applied, run one final calibration loop:
 
 Repeat until you reach "yes." This catches the failure modes that are obvious-in-hindsight but don't fit neatly into any lens category. It also prevents the review from ending with a long list of risks but no conviction about whether the plan is actually ready.
 
+**Early-Agreement Check:** If this review produced zero Blockers and zero Risks on the first pass, that is a signal you rubber-stamped. Re-run Phase 3 with the explicit mandate to find at least one credible Blocker. If you still cannot, note that explicitly — it is a genuine signal of plan strength, not a review failure.
+
 ---
 
 ## Phase 5: Multi-Reviewer Mode (`--dispatch`)
@@ -188,6 +193,11 @@ After all return, synthesize: merge overlapping findings, resolve contradictions
 If all reviewers agree the plan is fundamentally sound (zero Blockers across all five), spawn a 6th reviewer — the **Contrarian** — whose explicit mandate is to argue the plan will fail. The Contrarian must produce at least one Blocker-level finding. If even the Contrarian cannot find a credible Blocker, note that explicitly — it is a genuine signal of plan strength, not a failure of the review.
 
 This catches groupthink: when all reviewers share the same priors, they can converge on the same blind spot.
+
+### Anti-Groupthink Guards
+
+- **Sycophancy check:** if a reviewer changes position after seeing another reviewer's output, they must cite new evidence — not just agreement. Position changes without new evidence are flagged.
+- **Correlated-bias warning:** if all reviewers converge on zero Blockers, treat unanimous agreement as suspicious and trigger the 10th Man Rule automatically.
 
 ---
 
