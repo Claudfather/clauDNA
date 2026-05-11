@@ -18,7 +18,7 @@ Follow these steps exactly in order. If any prerequisite fails, stop and surface
 
 ### Step 1: Confirm intent and collect inputs
 
-Trigger: the user invoked `/file-github-issue [repo]`, or wrote ambient prose containing at least one image AND a filing-intent phrase ("open an issue", "report this", "log a bug", "file a bug", "file an issue"). If neither the image nor a filing phrase is present, ask the user to confirm intent and halt.
+Trigger: the user invoked `/claudna:file-github-issue [repo]`, or wrote ambient prose containing at least one image AND a filing-intent phrase ("open an issue", "report this", "log a bug", "file a bug", "file an issue"). If neither the image nor a filing phrase is present, ask the user to confirm intent and halt.
 
 Collect:
 
@@ -115,7 +115,7 @@ Wait for the user's reply:
 - `y` → proceed to step 6.
 - `n` or `cancel` → exit cleanly. No commit, no issue.
 - Anything else → treat as edit instructions. Apply them (may change title, body, labels, or target repo). If the target repo changed, re-run step 3 (label pre-flight) AND step 4c (dupe search), since both are repo-scoped. Then re-render this preview. No round limit.
-- Edit rounds can change text and metadata but NOT the image set. If the user wants to add, remove, or replace screenshots, treat that as a new `/file-github-issue` invocation — cancel this one and restart.
+- Edit rounds can change text and metadata but NOT the image set. If the user wants to add, remove, or replace screenshots, treat that as a new `/claudna:file-github-issue` invocation — cancel this one and restart.
 
 ### Step 6: Upload images
 
@@ -157,7 +157,7 @@ Max file size: the Contents API hard-limits at 100MB. For files over ~1MB the AP
 
 1. Write the substituted body to a tmpfile. BSD `mktemp` on macOS requires `XXXXXX` at the **end** of the template — no `.md` suffix; `gh --body-file` doesn't care about extension:
    ```sh
-   TMPFILE=$(mktemp "${TMPDIR:-/tmp}/file-github-issue.XXXXXX")
+   TMPFILE=$(mktemp "${TMPDIR:-/tmp}/claudna:file-github-issue.XXXXXX")
    ```
 2. File the issue with the effective label set from step 3:
    ```sh
@@ -177,7 +177,7 @@ If `gh issue create` fails (e.g., 403/404 for missing permissions): surface the 
 
 Two surfaces, same body underneath:
 
-- **Slash command:** `/file-github-issue [repo]`. Arg optional — if missing, default to the current repo's `origin` remote (parsed from `git remote get-url origin`); if no remote or ambiguous, ask. Accepts a fully-qualified `owner/repo` slug.
+- **Slash command:** `/claudna:file-github-issue [repo]`. Arg optional — if missing, default to the current repo's `origin` remote (parsed from `git remote get-url origin`); if no remote or ambiguous, ask. Accepts a fully-qualified `owner/repo` slug.
 - **Ambient:** a user prompt with an image and filing-intent language ("open an issue…", "report this bug…"). Strong signals for activation: at least one image in the turn **and** a filing-intent phrase. These are guidance, not hard gates — step 1 re-checks for both and asks for confirmation if either is missing.
 
 ## Failure modes
@@ -237,4 +237,4 @@ If you catch yourself thinking any of these, STOP — you are about to file an i
 | "The pre-flight failed, I'll bail" | Don't. Fall back to sending all proposed labels and note it in the preview. |
 | "The user's 4b.5 reply is terse / unhelpful, I'll reword or expand it" | No. One prompt, one reply. Use the reply verbatim. If it's wrong, the user will fix it in the preview edit round. |
 | "The user changed the target repo in preview edits, the old dupe results probably still apply" | No. Dupe search is repo-scoped. Re-run step 4c alongside step 3 whenever the target repo changes. |
-| "The user wants to swap the screenshot, I'll just attach it in the preview edit" | No. Edit rounds change text and metadata only. For image changes, cancel and restart `/file-github-issue`. |
+| "The user wants to swap the screenshot, I'll just attach it in the preview edit" | No. Edit rounds change text and metadata only. For image changes, cancel and restart `/claudna:file-github-issue`. |

@@ -1,13 +1,13 @@
 ---
 name: session-handoff
-description: "Use at the end of a session to validate persisted state, prune stale items, capture session context, and write a handoff file for /context-resume. Supports --auto for fully non-interactive operation."
+description: "Use at the end of a session to validate persisted state, prune stale items, capture session context, and write a handoff file for /claudna:context-resume. Supports --auto for fully non-interactive operation."
 allowed-tools: Bash(git *), Bash(gh *), Bash(ls *), Bash(wc *), Bash(date *), Read, Write, Edit, Glob, Grep
 argument-hint: "[--auto]"
 ---
 
 # Session Handoff
 
-Validate, prune, capture, and write. Counterpart to `/context-resume`.
+Validate, prune, capture, and write. Counterpart to `/claudna:context-resume`.
 
 Target: 2-3 minutes interactive, under 1 minute with `--auto`.
 
@@ -42,7 +42,7 @@ Read the project's `MEMORY.md` (at `~/.claude/projects/<project-path>/memory/MEM
 
 ### 0B. Handoff File Validation
 
-If a previous handoff file exists at `~/.claude/notes/projects/<slug>/context-resume.md`:
+If a previous handoff file exists at `~/.claude/notes/projects/<slug>/claudna:context-resume.md`:
 - Check if open PRs listed are still open (via `gh pr view`)
 - Check if branches listed still exist
 - Check if "next steps" are still relevant (were they completed this session?)
@@ -88,7 +88,7 @@ Review the session for knowledge worth persisting. Look for:
 
 **Scope each item:**
 - **Project-scoped** → write to auto-memory at `~/.claude/projects/<project-path>/memory/`
-- **Cross-project** → write to `~/.claude/notes/` (use `/notes` or `/lessons` conventions)
+- **Cross-project** → write to `~/.claude/notes/` (use `/claudna:notes` or `/claudna:lessons` conventions)
 
 **With `--auto`:** Auto-save all identified learnings without asking. Classify and write silently. Skip anything ambiguous about scope — default to project-scoped.
 
@@ -122,9 +122,9 @@ If none found, skip silently.
 
 ## Step 4: Write Handoff File
 
-**Location:** `~/.claude/notes/projects/<project-slug>/context-resume.md`
+**Location:** `~/.claude/notes/projects/<project-slug>/claudna:context-resume.md`
 
-**Slug derivation:** Git remote `org/repo` with `/` replaced by `--`. Fallback: directory name. Must match what `/context-resume` uses.
+**Slug derivation:** Git remote `org/repo` with `/` replaced by `--`. Fallback: directory name. Must match what `/claudna:context-resume` uses.
 
 Write tool creates parent directories automatically. See [templates.md](references/templates.md) for the output format.
 
@@ -132,16 +132,16 @@ The handoff file is agent-optimized — structured for machine parsing, not huma
 
 After writing:
 - **With `--auto`:** Silent. No confirmation message needed.
-- **Without `--auto`:** "Handoff written to `~/.claude/notes/projects/<slug>/context-resume.md`. Use `/context-resume` next session."
+- **Without `--auto`:** "Handoff written to `~/.claude/notes/projects/<slug>/claudna:context-resume.md`. Use `/claudna:context-resume` next session."
 
 ---
 
 ## Integration Points
 
-Other skills should trigger `/session-handoff --auto` at natural end-of-work boundaries:
+Other skills should trigger `/claudna:session-handoff --auto` at natural end-of-work boundaries:
 
-- `/commit-push-pr` — after PR is created, suggest or auto-run handoff
-- `/implement-plan` — after final phase is complete
+- `/claudna:commit-push-pr` — after PR is created, suggest or auto-run handoff
+- `/claudna:implement-plan` — after final phase is complete
 - Pre-restart hooks — before `systemctl restart` or session teardown
 - Context compaction — when the system compresses context, trigger a background handoff to capture state before it's summarized away
 

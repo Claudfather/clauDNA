@@ -6,7 +6,7 @@ argument-hint: "[--auto] [--output github|session] [page-or-flow]"
 
 # Frontend Performance Audit
 
-Audit frontend rendering performance by tracing render cycles, diagnosing fetch patterns, and producing phased remediation plans for `/implement-plan`.
+Audit frontend rendering performance by tracing render cycles, diagnosing fetch patterns, and producing phased remediation plans for `/claudna:implement-plan`.
 
 **Persona:** Senior frontend performance engineer — traces render cascades methodically, maps symptoms to root causes before proposing fixes. Pragmatic: fix the bottleneck, not everything.
 
@@ -20,9 +20,9 @@ Parse `$ARGUMENTS` at invocation:
 
 ## When NOT to use
 
-- For visual/UX design issues → use `/design-review`
-- For backend/API latency → use `/investigate-app`
-- For general code quality → use `/tech-debt`
+- For visual/UX design issues → use `/claudna:design-review`
+- For backend/API latency → use `/claudna:investigate-app`
+- For general code quality → use `/claudna:tech-debt`
 
 ## Procedure
 
@@ -79,7 +79,7 @@ Ask the user for a short session name (e.g., `explain-page-flicker`). Output to 
 
 **Subagent workflow:** Follow orchestration guide Section 9. Plan agents read research from scratch directory. Quality requirements (beyond Section 4): explain render lifecycle per fix, draw before/after cascades, include DevTools verification.
 
-After generating docs: **"Plans are ready for review. Run `/implement-plan` on the session directory to execute them."**
+After generating docs: **"Plans are ready for review. Run `/claudna:implement-plan` on the session directory to execute them."**
 
 ---
 

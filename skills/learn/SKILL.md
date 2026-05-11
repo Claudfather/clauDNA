@@ -117,7 +117,7 @@ Create the target directory if it does not exist.
 
 ### Step 2: Update Index
 
-Auto-run `/index` on the target directory to regenerate INDEX.md.
+Auto-run `/claudna:index` on the target directory to regenerate INDEX.md.
 
 ### Step 3: Report
 
@@ -138,7 +138,7 @@ Report the result: `"Learned: <title> -> <path>"`
 
 ## Notes
 
-- This skill is one verb in the knowledge lifecycle: `/learn` (ingest) -> work -> `/reflect` (synthesize) -> `/index` (organize) -> next session reads indexed knowledge.
+- This skill is one verb in the knowledge lifecycle: `/claudna:learn` (ingest) -> work -> `/claudna:reflect` (synthesize) -> `/claudna:index` (organize) -> next session reads indexed knowledge.
 - Default to summarize. Engineers want the signal, not the full MDN page. Use `--full` only when the original structure matters (specs, API references, schemas).
 - Frontmatter follows the fleet's documentation schema. The `slug` field enables future wikilink `[[linking]]` support.
 - When in doubt about the target directory, prefer creating a new subdirectory over dumping into a catch-all. Knowledge is easier to find when it is organized by repo or topic.

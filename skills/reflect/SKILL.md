@@ -18,10 +18,10 @@ Parse `$ARGUMENTS` at invocation:
 
 ## When to Run
 
-Run `/reflect` BEFORE `/compact`. The context-management protocol sequence is:
+Run `/claudna:reflect` BEFORE `/compact`. The context-management protocol sequence is:
 
 ```
-complete task -> /reflect -> /compact
+complete task -> /claudna:reflect -> /compact
 ```
 
 | Context Level | Action |
@@ -118,7 +118,7 @@ Create the target directory if it does not exist.
 
 ### Step 4: Update Index
 
-Auto-run `/index` on the target directory to update INDEX.md.
+Auto-run `/claudna:index` on the target directory to update INDEX.md.
 
 ### Step 5: Report
 
@@ -130,13 +130,13 @@ Report the result: `"Reflected: <title> -> <path>"`
 
 After writing, proceed to `/compact` as the context-management protocol dictates.
 
-`/reflect` is a pre-compact step, not a standalone activity. The full sequence:
+`/claudna:reflect` is a pre-compact step, not a standalone activity. The full sequence:
 
 ```
-complete task -> /reflect -> /compact
+complete task -> /claudna:reflect -> /compact
 ```
 
-Do not wait for human confirmation between `/reflect` and `/compact` — the point is to capture context before it evaporates.
+Do not wait for human confirmation between `/claudna:reflect` and `/compact` — the point is to capture context before it evaporates.
 
 ---
 
@@ -151,7 +151,7 @@ Do not wait for human confirmation between `/reflect` and `/compact` — the poi
 
 ## Notes
 
-- This skill is one verb in the knowledge lifecycle: `/learn` (ingest) -> work -> `/reflect` (synthesize) -> `/index` (organize) -> next session reads indexed knowledge.
+- This skill is one verb in the knowledge lifecycle: `/claudna:learn` (ingest) -> work -> `/claudna:reflect` (synthesize) -> `/claudna:index` (organize) -> next session reads indexed knowledge.
 - Speed over completeness. A quick, concrete reflection captured before `/compact` is worth more than a thorough retrospective written from faded memory.
 - The structured template exists to prevent platitudes. If you catch yourself writing generic advice ("always test first"), either make it specific ("the `auth_callback` endpoint needs integration tests because mocking the OAuth flow hides redirect bugs") or skip the field.
 - Same-day appending prevents file explosion during active sprint days where a bot may reflect multiple times.

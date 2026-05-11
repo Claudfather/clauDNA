@@ -1,6 +1,6 @@
 # Evidence Gathering Checklist
 
-Reference for Steps 3-4 of `/investigate-app`. Each category is gathered by a parallel Explore subagent that writes research to `/tmp/investigate-app-<timestamp>/research/<signal-slug>.md` and returns only a 2-4 line summary.
+Reference for Steps 3-4 of `/claudna:investigate-app`. Each category is gathered by a parallel Explore subagent that writes research to `/tmp/investigate-app-<timestamp>/research/<signal-slug>.md` and returns only a 2-4 line summary.
 
 ## A. Platform Logs
 

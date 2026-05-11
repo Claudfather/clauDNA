@@ -109,7 +109,7 @@ If `PROJECT_MISSION.md` doesn't exist, create it. Use the project name and descr
 [One-paragraph mission statement: what this project does, who it's for, what success looks like.]
 ```
 
-If the user provided a clear description in Step 2, write a real mission statement. If not, create the stub and note that `/product-vision` will flesh it out. This file anchors `/product-vision` ideation and gives all skills a shared understanding of the project's purpose.
+If the user provided a clear description in Step 2, write a real mission statement. If not, create the stub and note that `/claudna:product-vision` will flesh it out. This file anchors `/claudna:product-vision` ideation and gives all skills a shared understanding of the project's purpose.
 
 ### Step 7: Scaffold documentation/
 
@@ -135,7 +135,7 @@ documentation/
 If `documentation/` already exists, scan for missing subdirectories and create only what's missing.
 
 **Directory purposes:**
-- `planning/` — skill output from `/tech-debt`, `/security-audit`, `/product-enhance`, `/product-vision`. Session subdirectories created at runtime.
+- `planning/` — skill output from `/claudna:tech-debt`, `/claudna:security-audit`, `/claudna:product-enhance`, `/claudna:product-vision`. Session subdirectories created at runtime.
 - `decisions/` — Architecture Decision Records (ADRs). Why we chose X over Y. Permanent, not archived.
 - `specs/` — Technical specifications, API contracts, data schemas. Living docs.
 - `guides/` — Setup guides, onboarding, runbooks. Living docs.

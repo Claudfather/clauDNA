@@ -85,5 +85,5 @@ Print structured report: scope summary, code-to-schema map, ranked findings tabl
 - **Pass focus area** from Step 1 into both Step 2 subagent prompts.
 - **Secrets masking.** Never include connection strings verbatim — file:line only.
 - **User gates.** Confirmation required after Step 3 before fit analysis.
-- **Terminal at report.** Diagnostic only — no artifacts. User acts via `/implement-plan` if desired.
+- **Terminal at report.** Diagnostic only — no artifacts. User acts via `/claudna:implement-plan` if desired.
 - Orchestration guide: Section 9 N/A (no Plan subagents). Section 10: "Respect existing architecture" applies; doc/testing rules do not.

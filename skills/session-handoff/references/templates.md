@@ -1,6 +1,6 @@
 # Handoff File Template
 
-Write the handoff file using this structured format. Optimized for agent consumption by `/context-resume`.
+Write the handoff file using this structured format. Optimized for agent consumption by `/claudna:context-resume`.
 
 ```markdown
 # Context Resume: <project-name>

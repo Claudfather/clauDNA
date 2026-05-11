@@ -20,8 +20,8 @@ Parse `$ARGUMENTS` at invocation:
 
 ## When NOT to use
 
-- For code quality/tech debt → use `/tech-debt`
-- For security vulnerabilities → use `/security-audit`
+- For code quality/tech debt → use `/claudna:tech-debt`
+- For security vulnerabilities → use `/claudna:security-audit`
 - For writing new docs from scratch → just ask Claude directly
 
 ## Procedure

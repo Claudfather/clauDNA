@@ -94,4 +94,4 @@ Present target, counts (scanned/selected), actions (ADOPTED with paths, ENHANCED
 - **Self-contained adoptions** — Inline or remove foreign dependencies.
 - **Works on any repo** — Not just skill repos. Scouts find patterns in any codebase.
 - **Attribution** — HTML comment linking source repo/path in all adopted/enhanced content.
-- **vs `/find-skills`** — `/find-skills` searches skills.sh registry. `/heist` targets one repo, compares, and can enhance existing skills.
+- **vs `/claudna:find-skills`** — `/claudna:find-skills` searches skills.sh registry. `/claudna:heist` targets one repo, compares, and can enhance existing skills.

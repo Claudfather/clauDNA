@@ -1,6 +1,6 @@
 ---
 name: context-resume
-description: "Use at the start of a new session to pick up where you left off. Counterpart to /session-handoff."
+description: "Use at the start of a new session to pick up where you left off. Counterpart to /claudna:session-handoff."
 allowed-tools: Bash(git *), Bash(gh *), Bash(stat *), Bash(ls *), Read, Grep, Glob
 ---
 
@@ -15,7 +15,7 @@ Derive the project slug:
 2. Fallback: current directory name
 3. Replace `/` with `--` for the file path (e.g., `your-org--api-server`)
 
-Check for handoff file at `~/.claude/notes/projects/<slug>/context-resume.md`.
+Check for handoff file at `~/.claude/notes/projects/<slug>/claudna:context-resume.md`.
 
 If it exists, read it — this is the most valuable context. **Staleness check:** if older than 14 days, flag it ("Last handoff was N days ago — context may be stale") but still read it for reference. Weight the live scan more heavily when stale.
 
@@ -39,8 +39,8 @@ Use the format from [references/templates.md](references/templates.md).
 
 Suggest what to work on, prioritized:
 1. PR with changes requested — "PR #N has changes requested. Address those first?"
-2. In-progress plan doc — "Phase N is in progress. Continue with `/implement-plan`?"
-3. PRs to review — "N PRs waiting for review. Run `/review-pr N`?"
+2. In-progress plan doc — "Phase N is in progress. Continue with `/claudna:implement-plan`?"
+3. PRs to review — "N PRs waiting for review. Run `/claudna:review-pr N`?"
 4. Handoff next steps — "Last session suggested: [step]. Pick that up?"
 5. Dirty working tree — "Uncommitted changes. Review and commit first?"
 
@@ -52,4 +52,4 @@ Ask: **"What would you like to focus on?"**
 - **Speed over depth.** Scan, summarize, suggest. No deep analysis.
 - **No compound commands.** Never chain commands with `&&`, `||`, or `;`. Make separate parallel tool calls instead — `allowed-tools` patterns only match simple commands, not compound ones.
 - **Handoff file is gold.** Prioritize curated handoff context over raw git scanning.
-- **Slug must match /session-handoff.** Both use: git remote `org/repo` with `/` to `--`, directory name fallback.
+- **Slug must match /claudna:session-handoff.** Both use: git remote `org/repo` with `/` to `--`, directory name fallback.

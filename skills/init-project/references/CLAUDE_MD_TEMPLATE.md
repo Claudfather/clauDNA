@@ -44,7 +44,7 @@ After ANY correction from the user:
 1. Acknowledge the correction
 2. Update `.claude/lessons.md` with the pattern
 3. Write rules that prevent the same mistake
-4. Review lessons when relevant (via `/lessons`)
+4. Review lessons when relevant (via `/claudna:lessons`)
 
 ## Task Management
 
@@ -106,6 +106,6 @@ After ANY correction from the user:
 
 ---
 
-_Update this file at session boundaries (e.g., during `/session-handoff`). After corrections, update `.claude/lessons.md`._
+_Update this file at session boundaries (e.g., during `/claudna:session-handoff`). After corrections, update `.claude/lessons.md`._
 
 _If this file grows beyond ~200 lines, move domain-specific details into `.claude/rules/` files with `paths:` frontmatter for on-demand loading._

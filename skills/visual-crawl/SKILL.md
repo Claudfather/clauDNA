@@ -46,10 +46,10 @@ If neither `--url` nor `--local` is specified, ask the user.
 
 ## When NOT to use
 
-- For design critique and enhancement proposals → use `/design-review`
-- For frontend performance (flickering, re-renders, layout shifts) → use `/frontend-performance-audit`
-- For code quality/tech debt → use `/tech-debt`
-- For security vulnerabilities → use `/security-audit`
+- For design critique and enhancement proposals → use `/claudna:design-review`
+- For frontend performance (flickering, re-renders, layout shifts) → use `/claudna:frontend-performance-audit`
+- For code quality/tech debt → use `/claudna:tech-debt`
+- For security vulnerabilities → use `/claudna:security-audit`
 
 **Enter Plan Mode.** Call `EnterPlanMode`. All discovery and crawl steps are read-only. If declined, proceed by convention.
 
@@ -509,7 +509,7 @@ When `--auto` is set:
 - **One screenshot per Bash call.** No shell operators (`&&`, `||`, `;`, `|`). Playwright commands are single-shot.
 - **Sequential routes, parallel viewports.** Don't open multiple browser instances for different routes simultaneously — sequential keeps memory pressure low and avoids resource exhaustion on constrained hardware.
 - **Screenshots are evidence.** Every finding must reference at least one screenshot file.
-- **Don't fix code.** This skill identifies problems. Use `/implement-plan` or manual fixes afterward.
+- **Don't fix code.** This skill identifies problems. Use `/claudna:implement-plan` or manual fixes afterward.
 - **Respect robots.txt.** If a deployed URL has `Disallow` rules, honor them unless the user explicitly overrides.
 - **Timeout handling.** If a page doesn't load within 30 seconds, log a finding (possible server issue) and continue to next route.
 - **Subagents for research.** Use Explore subagents for route discovery and codebase analysis. Use general-purpose subagents for disk writes. Keep orchestrator context lean.

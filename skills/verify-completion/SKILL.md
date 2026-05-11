@@ -85,6 +85,6 @@ ALWAYS before: any success/completion/satisfaction claim, committing, PR creatio
 
 ## Cross-References
 
-- `/implement-plan` Step 6 -- applies this discipline to deliverable audit
-- `/review-changes` -- run verification before recommending "commit"
-- `/quick-commit` -- run verification before staging and committing
+- `/claudna:implement-plan` Step 6 -- applies this discipline to deliverable audit
+- `/claudna:review-changes` -- run verification before recommending "commit"
+- `/claudna:quick-commit` -- run verification before staging and committing

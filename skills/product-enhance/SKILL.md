@@ -18,9 +18,9 @@ Parse `$ARGUMENTS` at invocation:
 
 ## When NOT to use
 
-- For net-new feature brainstorming (divergent ideation) → use `/product-vision`
-- For code quality/tech debt → use `/tech-debt`
-- For security vulnerabilities → use `/security-audit`
+- For net-new feature brainstorming (divergent ideation) → use `/claudna:product-vision`
+- For code quality/tech debt → use `/claudna:tech-debt`
+- For security vulnerabilities → use `/claudna:security-audit`
 
 ## Process Flow (authoritative)
 
@@ -54,7 +54,7 @@ digraph product_enhance {
 
     generate [label="Step 5: Generate Design Docs\nPlan subagents" shape=box];
 
-    done [label="Summary\nReady for /implement-plan" shape=box style=filled fillcolor=lightgreen];
+    done [label="Summary\nReady for /claudna:implement-plan" shape=box style=filled fillcolor=lightgreen];
 
     start -> enter_plan;
     enter_plan -> entry;
@@ -127,7 +127,7 @@ Compare Step 2 answers against Step 1B findings via **Explore subagents** (disk-
 
 Output to `documentation/planning/phases/<session_name>_<YYYY-MM-DD>/`, prefixed `01_`, `02_` by implementation order. `00_OVERVIEW.md`: context, dependency graph, parallel phases, total effort. Archive per Section 8; Plan agents per Section 9, reading from scratch research dir.
 
-Present a `Product Enhancement Summary`, then direct user to `/implement-plan`. **This skill produces plans, not code.**
+Present a `Product Enhancement Summary`, then direct user to `/claudna:implement-plan`. **This skill produces plans, not code.**
 
 ---
 

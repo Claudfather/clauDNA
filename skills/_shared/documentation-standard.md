@@ -6,7 +6,7 @@ Shared reference for skills that read from or write to the `documentation/` dire
 
 ## 1. Directory Layout
 
-Every repo initialized with `/init-project` has this structure:
+Every repo initialized with `/claudna:init-project` has this structure:
 
 ```
 <repo-root>/
@@ -18,11 +18,11 @@ Every repo initialized with `/init-project` has this structure:
 │   └── settings.json
 └── documentation/
     ├── planning/                    # Active plans and audits (skill output)
-    │   ├── phases/                  # /product-enhance
-    │   ├── tech_debt/               # /tech-debt
-    │   ├── security/                # /security-audit
-    │   ├── access-paths/            # /access-path-audit
-    │   ├── product-vision/          # /product-vision
+    │   ├── phases/                  # /claudna:product-enhance
+    │   ├── tech_debt/               # /claudna:tech-debt
+    │   ├── security/                # /claudna:security-audit
+    │   ├── access-paths/            # /claudna:access-path-audit
+    │   ├── product-vision/          # /claudna:product-vision
     │   └── investigations/          # Ad-hoc research
     ├── decisions/                   # Architecture Decision Records
     ├── specs/                       # Technical specifications
@@ -36,11 +36,11 @@ When writing planning output (default `--output docs` target), use these paths:
 
 | Skill | Output directory |
 |-------|-----------------|
-| `/tech-debt` | `documentation/planning/tech_debt/` |
-| `/product-enhance` | `documentation/planning/phases/` |
-| `/security-audit` | `documentation/planning/security/` |
-| `/access-path-audit` | `documentation/planning/access-paths/` |
-| `/product-vision` | `documentation/planning/product-vision/` |
+| `/claudna:tech-debt` | `documentation/planning/tech_debt/` |
+| `/claudna:product-enhance` | `documentation/planning/phases/` |
+| `/claudna:security-audit` | `documentation/planning/security/` |
+| `/claudna:access-path-audit` | `documentation/planning/access-paths/` |
+| `/claudna:product-vision` | `documentation/planning/product-vision/` |
 
 If the target directory doesn't exist, create it (with `.gitkeep`) before writing. Don't fail on missing directories.
 
@@ -50,7 +50,7 @@ Session directories follow: `<session-name>_<YYYY-MM-DD>`
 
 Example: `api-rate-limiting_2026-05-10`
 
-The `/name-session` skill generates these. Session names are kebab-case slugified descriptors.
+The `/claudna:name-session` skill generates these. Session names are kebab-case slugified descriptors.
 
 ## 4. File Naming Within Sessions
 
@@ -65,7 +65,7 @@ Phase files use: `NN_<phase-slug>.md` (e.g., `01_input-validation.md`).
 
 ## 5. Status Markers
 
-Embed these in plan documents. They are machine-read by `/context-resume`, `/session-handoff`, and `/implement-plan`:
+Embed these in plan documents. They are machine-read by `/claudna:context-resume`, `/claudna:session-handoff`, and `/claudna:implement-plan`:
 
 | Marker | Meaning |
 |--------|---------|
@@ -81,7 +81,7 @@ When all phases are `✅ COMPLETE` and the final PR is merged:
 git mv documentation/planning/<category>/<session>/ documentation/archive/<session>/
 ```
 
-`/implement-plan` does this in Step 8. `/session-handoff` flags completed-but-unarchived sessions.
+`/claudna:implement-plan` does this in Step 8. `/claudna:session-handoff` flags completed-but-unarchived sessions.
 
 ## 7. Non-Planning Directories
 
@@ -97,7 +97,7 @@ These are not archived — they're living documents that evolve with the codebas
 
 ## 8. Reading Documentation State
 
-Skills that scan documentation state (e.g., `/context-resume`, `/session-handoff`, `/repo-health`):
+Skills that scan documentation state (e.g., `/claudna:context-resume`, `/claudna:session-handoff`, `/claudna:repo-health`):
 
 ```bash
 # Find in-progress plans
@@ -113,4 +113,4 @@ grep -r "PENDING" documentation/planning/
 
 ## 9. PROJECT_MISSION.md
 
-Lives at repo root (not in `documentation/`). Contains a one-paragraph mission statement: what this project does, who it's for, what success looks like. Read by `/product-vision` to anchor ideation. Created by `/init-project`, refined by `/mission`.
+Lives at repo root (not in `documentation/`). Contains a one-paragraph mission statement: what this project does, who it's for, what success looks like. Read by `/claudna:product-vision` to anchor ideation. Created by `/claudna:init-project`, refined by `/mission`.

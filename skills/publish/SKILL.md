@@ -6,7 +6,7 @@ argument-hint: "<source-file> [--to disk|github-issue|github-pr|notion] [--repo 
 
 # Publish
 
-Markdown-first, output-last. Takes a doc with frontmatter and publishes it to the right destination. The doc is always the source of truth — /publish is just the adapter.
+Markdown-first, output-last. Takes a doc with frontmatter and publishes it to the right destination. The doc is always the source of truth — /claudna:publish is just the adapter.
 
 ## Arguments
 
@@ -39,7 +39,7 @@ Write the doc to the appropriate shared docs directory based on the `type:` fiel
 | audit, review | `shared/planning/active/` |
 
 After writing:
-1. Run `/index` on the destination directory to update INDEX.md.
+1. Run `/claudna:index` on the destination directory to update INDEX.md.
 2. Report the file path written.
 
 If the file already exists at the destination, compare and warn before overwriting.
@@ -102,7 +102,7 @@ Requires the Notion MCP server to be configured. If not available, report the er
 When `--dry-run` is set, show exactly what would happen without doing it:
 
 ```
-Dry run: /publish doc.md --to github-issue --repo shuffify
+Dry run: /claudna:publish doc.md --to github-issue --repo shuffify
 
 Would create GitHub issue:
   Repo: chrisrogers37/shuffify

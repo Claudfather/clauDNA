@@ -5,7 +5,7 @@ description: "Use when you want to check whether your CLAUDE.md and project conf
 
 # Cache Audit
 
-Diagnostic scan of a project's Claude Code configuration for patterns that hurt prompt cache efficiency. Run this occasionally — like `/tech-debt` or `/security-audit` — to check your project's cache hygiene.
+Diagnostic scan of a project's Claude Code configuration for patterns that hurt prompt cache efficiency. Run this occasionally — like `/claudna:tech-debt` or `/claudna:security-audit` — to check your project's cache hygiene.
 
 This is a **read-only** skill. It reads files and presents findings. It does not modify anything.
 

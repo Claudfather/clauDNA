@@ -20,10 +20,10 @@ Parse `$ARGUMENTS` at invocation:
 
 ## When NOT to use
 
-- For security vulnerabilities (injection, secrets, OWASP) → use `/security-audit`
-- For general code quality / tech debt → use `/tech-debt`
-- For production outages or broken behavior → use `/investigate-app`
-- For frontend performance → use `/frontend-performance-audit`
+- For security vulnerabilities (injection, secrets, OWASP) → use `/claudna:security-audit`
+- For general code quality / tech debt → use `/claudna:tech-debt`
+- For production outages or broken behavior → use `/claudna:investigate-app`
+- For frontend performance → use `/claudna:frontend-performance-audit`
 
 ## The Key Insight
 
@@ -40,7 +40,7 @@ Not every difference across access paths is a bug. A CLI having no auth is corre
 | **1: Scan** | Steps 1–5 | Detect paths, parallel discovery, convergence analysis, classify findings, present summary | No |
 | **Gate** | — | User confirms whether to generate remediation plans | **Yes** |
 | **2: Remediation** | — | Generate per-PR planning docs grouped by related findings | No |
-| **3: Summary** | — | Present final summary, hand off to `/implement-plan` | No |
+| **3: Summary** | — | Present final summary, hand off to `/claudna:implement-plan` | No |
 
 ## Procedure
 
@@ -250,9 +250,9 @@ Access Path Audit Summary
 
 Then tell the user:
 
-**"Plans are ready. Run `/implement-plan documentation/planning/access-paths/<session>/` to start building — it will handle challenge review, branching, implementation, and PRs for each phase doc."**
+**"Plans are ready. Run `/claudna:implement-plan documentation/planning/access-paths/<session>/` to start building — it will handle challenge review, branching, implementation, and PRs for each phase doc."**
 
-**This skill produces plans, not code.** Implementation is always handled by `/implement-plan`, which provides its own challenge round, verification, and PR workflow. Do NOT build, branch, or create PRs from this skill.
+**This skill produces plans, not code.** Implementation is always handled by `/claudna:implement-plan`, which provides its own challenge round, verification, and PR workflow. Do NOT build, branch, or create PRs from this skill.
 
 ---
 

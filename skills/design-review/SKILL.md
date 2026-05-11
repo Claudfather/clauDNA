@@ -37,9 +37,9 @@ Parse `$ARGUMENTS` at invocation:
 
 ## When NOT to use
 
-- For frontend performance (flickering, slow loads, re-renders) → use `/frontend-performance-audit`
-- For code quality/tech debt → use `/tech-debt`
-- For product feature gaps → use `/product-enhance`
+- For frontend performance (flickering, slow loads, re-renders) → use `/claudna:frontend-performance-audit`
+- For code quality/tech debt → use `/claudna:tech-debt`
+- For product feature gaps → use `/claudna:product-enhance`
 
 ## Procedure
 
@@ -115,7 +115,7 @@ Output to `documentation/planning/phases/<session_name>_<YYYY-MM-DD>/`. Overview
 
 Phase docs include: header, context + screenshots, visual spec (exact before/after), dependencies, implementation plan, responsive behavior, accessibility checklist, test plan, verification, "What NOT To Do."
 
-Tell user: **"Run `/implement-plan` on the phase directory to start building."** This skill produces plans, not code.
+Tell user: **"Run `/claudna:implement-plan` on the phase directory to start building."** This skill produces plans, not code.
 
 ---
 

@@ -15,4 +15,4 @@
 | Orchestrator running commands in worktree dirs | Triggers permission prompts — delegate to subagents |
 | `gh pr merge --delete-branch` fails | Remove worktrees BEFORE merging — can't delete checked-out branches |
 | Second/third PR has merge conflicts | Rebase on updated main after each prior merge |
-| Running `/worktree` from inside a worktree | `--show-toplevel` returns worktree root — use `git worktree list` to find main repo |
+| Running `/claudna:worktree` from inside a worktree | `--show-toplevel` returns worktree root — use `git worktree list` to find main repo |

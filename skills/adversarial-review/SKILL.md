@@ -287,7 +287,7 @@ When the plan author responds to findings, enforce steel-manning (Dennett's Prot
 
 > For each finding you disagree with, first restate it in its **strongest possible form** — so strong that the reviewer would say "yes, that's even better than what I said." Only after doing that, explain why you believe it is mitigated.
 
-This prevents strawmanning of criticism. Can be invoked as a follow-up: `/adversarial-review --respond <plan> <review>`.
+This prevents strawmanning of criticism. Can be invoked as a follow-up: `/claudna:adversarial-review --respond <plan> <review>`.
 
 ---
 

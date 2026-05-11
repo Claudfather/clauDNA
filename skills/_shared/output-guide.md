@@ -70,7 +70,7 @@ Write full implementation plans as GitHub Issue bodies. Each issue maps to one p
 
 ### 4.1. Issue Body Format
 
-The issue body uses a **structured format** that maps 1:1 to the phase doc structure (orchestration guide Section 5). This structure is a contract — it must be parseable by `--source github` in `/implement-plan`.
+The issue body uses a **structured format** that maps 1:1 to the phase doc structure (orchestration guide Section 5). This structure is a contract — it must be parseable by `--source github` in `/claudna:implement-plan`.
 
 ```markdown
 ## Summary
@@ -124,7 +124,7 @@ The issue body uses a **structured format** that maps 1:1 to the phase doc struc
 - Related issues: #NNN, #NNN (if any)
 ```
 
-**Important:** The `## Implementation Plan` section with its `### Steps` subsection is what distinguishes a full-detail issue from a findings-only issue. When `/implement-plan --source github` reads an issue, it checks for this section to determine whether the issue is implementation-ready.
+**Important:** The `## Implementation Plan` section with its `### Steps` subsection is what distinguishes a full-detail issue from a findings-only issue. When `/claudna:implement-plan --source github` reads an issue, it checks for this section to determine whether the issue is implementation-ready.
 
 ### 4.2. Issue Title
 

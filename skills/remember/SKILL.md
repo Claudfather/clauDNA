@@ -62,7 +62,7 @@ Found 4 matching docs for "shuffify auth rework":
 2. [Shuffify Auth Rework Plan](planning/active/shuffify-auth-rework.md) — OAuth migration plan (status: active, owner: greg)
 3. [OAuth Token Refresh Patterns](knowledge/shuffify/oauth-token-refresh.md) — refresh flow and edge cases (status: current, owner: craig)
 
-Review these before starting. Read specific docs with /remember --full or by opening the file directly.
+Review these before starting. Read specific docs with /claudna:remember --full or by opening the file directly.
 ```
 
 ### --full Mode
@@ -95,7 +95,7 @@ Check planning/active/shuffify-auth-rework.md before starting to avoid contradic
 ## Rules
 
 - **5-doc cap is non-negotiable.** If more than 5 docs match, show the top 5 and note how many were omitted.
-- Scan INDEX.md only — never walk directories to find docs. If INDEX.md is missing or empty, note it and suggest running `/index`.
+- Scan INDEX.md only — never walk directories to find docs. If INDEX.md is missing or empty, note it and suggest running `/claudna:index`.
 - Don't modify any files. This is a read-only skill.
 - If no matches are found, say so clearly — don't fabricate relevant docs.
 

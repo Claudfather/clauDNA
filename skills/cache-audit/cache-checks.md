@@ -46,7 +46,7 @@ Check whether `.claude/lessons.md` is being auto-loaded or referenced in a way t
 2. Check if `CLAUDE.md` contains instructions to "always read lessons at session start" or similar auto-load directives
 3. Check if `.claude/settings.json` exists and references lessons in any auto-load configuration
 
-The correct pattern: lessons should be available on-demand (via `/lessons` or `/review-self`) but NOT auto-loaded into every session. Auto-loading adds variable content to the system prompt, which hurts caching.
+The correct pattern: lessons should be available on-demand (via `/claudna:lessons` or `/review-self`) but NOT auto-loaded into every session. Auto-loading adds variable content to the system prompt, which hurts caching.
 
 **Scoring:**
 - **PASS**: No auto-load references found. Lessons are on-demand only.
@@ -79,7 +79,7 @@ Scan `CLAUDE.md` for instructions that encourage editing CLAUDE.md during an act
 - "Add new patterns to CLAUDE.md as you discover them"
 - "Keep CLAUDE.md current during work"
 
-The correct pattern: update CLAUDE.md at session boundaries (during `/session-handoff`), not mid-session. Mid-session edits invalidate the cached system prompt.
+The correct pattern: update CLAUDE.md at session boundaries (during `/claudna:session-handoff`), not mid-session. Mid-session edits invalidate the cached system prompt.
 
 Also check the Self-Improvement Loop section — "Update `.claude/lessons.md`" is fine (lessons are not in the system prompt), but "Update CLAUDE.md" is a cache-busting pattern.
 

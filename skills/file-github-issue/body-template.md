@@ -24,7 +24,7 @@ Use this structure when drafting the issue body (step 4 of `SKILL.md`).
 ![screenshot](<attachment-url-1>)
 
 ---
-_Filed via `/file-github-issue`._
+_Filed via `/claudna:file-github-issue`._
 ```
 
 ## Multiple images

@@ -262,7 +262,7 @@ When all phases are complete, the session directory moves to:
 documentation/archive/<session_name>_<YYYY-MM-DD>/
 ```
 
-via `git mv`. This is handled by `/implement-plan` — planning skills only generate plans, never archive them.
+via `git mv`. This is handled by `/claudna:implement-plan` — planning skills only generate plans, never archive them.
 
 ---
 
@@ -339,15 +339,15 @@ When `--auto` is set (see orchestration guide Section 10):
 
 | Skill | Auto-viable? | Notes |
 |---|---|---|
-| `/tech-debt` | ✅ Yes | Scan + issue creation, no user input needed |
-| `/security-audit` | ✅ Yes | Scan + issue creation, no user input needed |
-| `/product-enhance` | ✅ Yes | Uses triage path (skip discovery/interview) |
-| `/frontend-performance-audit` | ✅ Yes | Requires page/flow in arguments |
-| `/docs-review` | ✅ Yes | Global review mode, auto-fix stale docs |
-| `/access-path-audit` | ✅ Yes | Scan + issue creation, no user input needed |
-| `/product-vision` | ⚠️ Limited | Vision without user input produces generic ideas. Use only with tight scope. |
-| `/design-review` | ❌ No | Requires screenshots, deployed URL, visual judgment |
-| `/session-handoff` | ✅ Yes | Already implemented |
+| `/claudna:tech-debt` | ✅ Yes | Scan + issue creation, no user input needed |
+| `/claudna:security-audit` | ✅ Yes | Scan + issue creation, no user input needed |
+| `/claudna:product-enhance` | ✅ Yes | Uses triage path (skip discovery/interview) |
+| `/claudna:frontend-performance-audit` | ✅ Yes | Requires page/flow in arguments |
+| `/claudna:docs-review` | ✅ Yes | Global review mode, auto-fix stale docs |
+| `/claudna:access-path-audit` | ✅ Yes | Scan + issue creation, no user input needed |
+| `/claudna:product-vision` | ⚠️ Limited | Vision without user input produces generic ideas. Use only with tight scope. |
+| `/claudna:design-review` | ❌ No | Requires screenshots, deployed URL, visual judgment |
+| `/claudna:session-handoff` | ✅ Yes | Already implemented |
 
 ---
 
@@ -355,8 +355,8 @@ When `--auto` is set (see orchestration guide Section 10):
 
 The following rules apply to ALL orchestration skills. Skills should reference this section rather than restating these individually:
 
-- **One PR per doc.** Each phase/remediation/fix doc maps to exactly one PR when implemented via `/implement-plan`.
-- **This skill produces plans, not code.** Implementation is always handled by `/implement-plan`, which provides its own challenge round, verification, and PR workflow. Do NOT build, branch, or create PRs from planning skills.
+- **One PR per doc.** Each phase/remediation/fix doc maps to exactly one PR when implemented via `/claudna:implement-plan`.
+- **This skill produces plans, not code.** Implementation is always handled by `/claudna:implement-plan`, which provides its own challenge round, verification, and PR workflow. Do NOT build, branch, or create PRs from planning skills.
 - **Testing is non-negotiable.** Every phase doc must include a test plan. Implementations without tests are incomplete.
 - **Documentation is non-negotiable.** Every phase doc must specify documentation updates. Code without docs is incomplete.
 - **Respect existing architecture.** Enhancements and fixes should work *with* the system's existing patterns, not introduce alien abstractions.

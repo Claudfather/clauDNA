@@ -1,6 +1,6 @@
 # Platform Detection Reference
 
-Reference for Step 2 of `/investigate-app`. Detect deployment platforms by checking for config files and CLIs, then bootstrap any missing CLIs.
+Reference for Step 2 of `/claudna:investigate-app`. Detect deployment platforms by checking for config files and CLIs, then bootstrap any missing CLIs.
 
 ## Detection Checks
 

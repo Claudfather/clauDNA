@@ -18,9 +18,9 @@ Parse `$ARGUMENTS` at invocation:
 
 ## When NOT to use
 
-- For security-specific vulnerabilities → use `/security-audit`
-- For frontend performance issues → use `/frontend-performance-audit`
-- For product feature gaps → use `/product-enhance`
+- For security-specific vulnerabilities → use `/claudna:security-audit`
+- For frontend performance issues → use `/claudna:frontend-performance-audit`
+- For product feature gaps → use `/claudna:product-enhance`
 
 **Enter Plan Mode.** Call `EnterPlanMode` to enter deliberation mode. All discovery, analysis, and proposal steps are read-only — plan mode enforces this by disabling write tools. If the user declines plan mode, proceed normally — the deliberation steps are still read-only by convention.
 
@@ -28,7 +28,7 @@ Parse `$ARGUMENTS` at invocation:
 
 These constraints arbitrate every cleanup decision. When in doubt, defer to them in this order:
 
-1. **No functionality regression.** Cleanup must preserve behavior. The test suite must pass before AND after each change. If a refactor would change observable behavior — even subtly — it's out of scope of this skill: flag it as a separate issue and skip. The whole point of `/tech-debt` is to ship cleaner code with the same semantics; any uncertainty about preservation is reason to bail on the change.
+1. **No functionality regression.** Cleanup must preserve behavior. The test suite must pass before AND after each change. If a refactor would change observable behavior — even subtly — it's out of scope of this skill: flag it as a separate issue and skip. The whole point of `/claudna:tech-debt` is to ship cleaner code with the same semantics; any uncertainty about preservation is reason to bail on the change.
 
 2. **Call-site check on every edited surface.** Renaming a symbol, extracting a function, decomposing a file, or relocating a constant all change the surface that callers reach. Before merging any cleanup PR, grep every caller of the edited surface (function name, type, exported constant, file path, route handler) and verify each still resolves. Run tests on the touching surfaces specifically. A missed call-site is the most common form of "behavior-preserving" refactor that quietly breaks production — guard against it explicitly.
 
@@ -202,7 +202,7 @@ Each plan document represents **exactly 1 PR** and must include:
    - Post-change verification: same test suite passes after the change (capture command + result).
    - Call-site audit: for every renamed/extracted/moved surface, list the grep command used to find callers and confirm each was updated. If a caller resists trivial migration, abort the change — it's a sign the refactor is changing more than the surface.
    - Manual smoke (where applicable): UI changes get a dual-mode visual smoke; API changes get a representative curl/HTTP probe; data-layer changes get a sample query.
-   - If any item above can't be filled in honestly, the PR is OUT of scope for `/tech-debt` — split or skip.
+   - If any item above can't be filled in honestly, the PR is OUT of scope for `/claudna:tech-debt` — split or skip.
 
 #### C. Subagent Workflow
 

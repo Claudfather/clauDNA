@@ -40,7 +40,7 @@ allowed-tools:
 
 # Implement Plan
 
-Execute a design or development plan against the codebase. Challenge first, refine through dialogue, then build — updating the plan as the single source of truth throughout. Works with any structured development document (downstream of `/tech-debt`, `/product-enhance`, or standalone) or a GitHub Issue created by `--output github`.
+Execute a design or development plan against the codebase. Challenge first, refine through dialogue, then build — updating the plan as the single source of truth throughout. Works with any structured development document (downstream of `/claudna:tech-debt`, `/claudna:product-enhance`, or standalone) or a GitHub Issue created by `--output github`.
 
 ## Arguments
 
@@ -257,7 +257,7 @@ Each item goes through the full implementation flow (Steps 2-8) sequentially. Af
 - "Skip to a different item" (if 3+ items remain)
 - "Stop here"
 
-**Do NOT auto-start the next item.** The user should run `/compact` between items to manage context. Present the exact command: `/compact` then `/implement-plan <path-or-source>` for the next queued item.
+**Do NOT auto-start the next item.** The user should run `/compact` between items to manage context. Present the exact command: `/compact` then `/claudna:implement-plan <path-or-source>` for the next queued item.
 
 For direct paths (A and B): the queue contains a single item. Steps 2-9 execute once with no queue logic.
 
@@ -343,7 +343,7 @@ On `merge`: merge PR, switch to main and pull (separate Bash calls).
 
 **For `--source github`:** The issue auto-closes when the PR merges (via `Closes #<number>`). No archival needed.
 
-**If more items remain in the queue:** Present the queue status and use AskUserQuestion to offer continuing to the next item, skipping, or stopping. Provide the exact commands: `/compact` then `/implement-plan <path-or-source>` for the next item.
+**If more items remain in the queue:** Present the queue status and use AskUserQuestion to offer continuing to the next item, skipping, or stopping. Provide the exact commands: `/compact` then `/claudna:implement-plan <path-or-source>` for the next item.
 
 Suggest worktree parallelism for independent phases. **Do NOT auto-start** — the user must run `/compact` between items.
 

@@ -20,9 +20,9 @@ Parse `$ARGUMENTS` at invocation:
 
 ## When NOT to use
 
-- For general code quality/tech debt → use `/tech-debt`
-- For frontend performance → use `/frontend-performance-audit`
-- For production outages → use `/investigate-app`
+- For general code quality/tech debt → use `/claudna:tech-debt`
+- For frontend performance → use `/claudna:frontend-performance-audit`
+- For production outages → use `/claudna:investigate-app`
 
 ## Procedure
 
@@ -137,9 +137,9 @@ Security Audit Summary
 
 Then tell the user:
 
-**"Plans are ready. Run `/implement-plan documentation/planning/security/<session>/` to start building — it will handle challenge review, branching, implementation, and PRs for each phase doc."**
+**"Plans are ready. Run `/claudna:implement-plan documentation/planning/security/<session>/` to start building — it will handle challenge review, branching, implementation, and PRs for each phase doc."**
 
-**This skill produces plans, not code.** Implementation is always handled by `/implement-plan`, which provides its own challenge round, verification, and PR workflow. Do NOT build, branch, or create PRs from this skill.
+**This skill produces plans, not code.** Implementation is always handled by `/claudna:implement-plan`, which provides its own challenge round, verification, and PR workflow. Do NOT build, branch, or create PRs from this skill.
 
 ---
 

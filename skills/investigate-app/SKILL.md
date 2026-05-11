@@ -80,7 +80,7 @@ Generate implementation plans for approved fixes. Ask user for a session name (e
 
 ### Step 8: Postmortem Summary & Handoff
 
-Present summary: session, date, problem, platform, root causes, fix list, prevention recommendations, docs path. Direct user to run `/implement-plan` on the investigation directory.
+Present summary: session, date, problem, platform, root causes, fix list, prevention recommendations, docs path. Direct user to run `/claudna:implement-plan` on the investigation directory.
 
 **This skill produces plans, not code.** Do NOT build, branch, or create PRs.
 
