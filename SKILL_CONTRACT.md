@@ -8,7 +8,7 @@ If you want to understand *what* a skill is conceptually, read this file. If you
 
 ## 1. Directory layout
 
-Every skill lives under `global/skills/<name>/`. The directory contents:
+Every skill lives under `skills/<name>/`. The directory contents:
 
 | File | Required? | Purpose |
 |---|---|---|
@@ -17,9 +17,9 @@ Every skill lives under `global/skills/<name>/`. The directory contents:
 | `references/` | Optional | Subdirectory for grouped reference material (used by `context-resume`, `session-handoff`) |
 
 Hard rules:
-- The directory **name** is the skill's slash-command name (e.g. `/tech-debt` lives at `global/skills/tech-debt/`).
+- The directory **name** is the skill's slash-command name (e.g. `/tech-debt` lives at `skills/tech-debt/`).
 - The directory name **must match** the `name` field inside `SKILL.md` exactly.
-- One special directory exists: `global/skills/_shared/`. It holds shared orchestration material referenced by skills, contains no `SKILL.md`, and is not itself a skill. The validator skips it.
+- One special directory exists: `skills/_shared/`. It holds shared orchestration material referenced by skills, contains no `SKILL.md`, and is not itself a skill. The validator skips it.
 
 ---
 
@@ -31,7 +31,7 @@ Hard rules:
 
 | Field | Type | Rules |
 |---|---|---|
-| `name` | string | Letters (any case), digits, and hyphens only. Must match the parent directory name exactly. Globally unique across the repo (no two skills share a `name`). Convention is `kebab-case`; the project-branded skills (`clauDNA-setup`, `clauDNA-sync`, `clauDNA-migrate`) intentionally use mixed case. |
+| `name` | string | Letters (any case), digits, and hyphens only. Must match the parent directory name exactly. Globally unique across the repo (no two skills share a `name`). Convention is `kebab-case`. |
 | `description` | string | One sentence describing when to use the skill. Begins with "Use when…" by convention. Length: 20–500 characters. Surfaces in the skill picker — keep it specific enough that the loader can decide relevance. |
 
 ### Optional fields

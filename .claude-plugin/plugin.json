@@ -1,0 +1,25 @@
+{
+  "name": "claudna",
+  "version": "0.2.0",
+  "description": "Curated Claude Code skills, agents, and hooks — the canonical capability set of the Claudfather ecosystem.",
+  "author": {
+    "name": "Chris Rogers",
+    "url": "https://github.com/chrisrogers37"
+  },
+  "homepage": "https://github.com/chrisrogers37/claudna",
+  "repository": "https://github.com/chrisrogers37/claudna",
+  "license": "MIT",
+  "hooks": "./plugin-hooks/hooks.json",
+  "keywords": [
+    "skills",
+    "agents",
+    "hooks",
+    "devops",
+    "vercel",
+    "modal",
+    "railway",
+    "snowflake",
+    "neon",
+    "dbt"
+  ]
+}

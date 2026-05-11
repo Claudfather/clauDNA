@@ -1,8 +1,8 @@
 # clauDNA Setup Guide
 
-**Last Updated:** 2026-05-06
+**Last Updated:** 2026-05-11
 
-This guide is the deep-dive companion to [README.md](./README.md). The README covers the happy path (`/clauDNA-setup` or `./install.sh`); this guide covers the things those tools deliberately don't handle — Snowflake key-pair authentication, shell aliases, the Claude Code configuration hierarchy, troubleshooting, and the principles behind clauDNA's defaults.
+This guide is the deep-dive companion to [README.md](./README.md). The README covers the marketplace install (`/plugin install claudna@Claudfather`); this guide covers everything beyond that — recommended `settings.json` tweaks, headless provisioning for bots and CI, Snowflake key-pair auth, shell aliases, the Claude Code configuration hierarchy, and troubleshooting.
 
 If all you need is "install clauDNA", read the README. Come here when something goes sideways or you want to understand *why* the defaults are what they are.
 
@@ -10,13 +10,54 @@ If all you need is "install clauDNA", read the README. Come here when something 
 
 ## Table of Contents
 
+0. [Upgrading from 0.1.x](#0-upgrading-from-01x) — read first if you previously installed via `install.sh`, `claudfather`, or `claudefather`
 1. [Prerequisites](#1-prerequisites)
 2. [Configuration Hierarchy](#2-configuration-hierarchy)
-3. [Snowflake Key-Pair Authentication](#3-snowflake-key-pair-authentication)
-4. [Shell Configuration](#4-shell-configuration)
-5. [Troubleshooting](#5-troubleshooting)
-6. [Appendix A: Boris Cherny's Key Tips](#appendix-a-boris-chernys-key-tips)
-7. [Appendix B: Workflow Orchestration Principles](#appendix-b-workflow-orchestration-principles)
+3. [Bootstrapping `~/.claude/settings.json`](#3-bootstrapping-claudesettingsjson)
+4. [Headless / CI / Docker Provisioning](#4-headless--ci--docker-provisioning)
+5. [Snowflake Key-Pair Authentication](#5-snowflake-key-pair-authentication)
+6. [Shell Configuration](#6-shell-configuration)
+7. [Troubleshooting](#7-troubleshooting)
+8. [Appendix A: Boris Cherny's Key Tips](#appendix-a-boris-chernys-key-tips)
+9. [Appendix B: Workflow Orchestration Principles](#appendix-b-workflow-orchestration-principles)
+
+---
+
+## 0. Upgrading from 0.1.x
+
+**Skip this section if you've never installed clauDNA before.**
+
+If you previously installed clauDNA via `install.sh` (or the sibling `claudfather` / `claudefather` projects), the install copied skills, agents, hooks, and a breadcrumb file directly into `~/.claude/`. Those copies will **shadow the marketplace plugin** unless you remove them — Claude Code resolves bare `/<skill>` invocations against `~/.claude/skills/` first, so the old version wins and you get silent double-installation.
+
+claudna ships a skill that does this cleanup for you. The upgrade sequence:
+
+```
+/plugin marketplace add Claudfather/clauDNA
+/plugin install claudna@Claudfather
+/claudna:cleanup-legacy-install
+/reload-plugins
+```
+
+What `/claudna:cleanup-legacy-install` does:
+
+- Detects breadcrumb files (`~/.claude/.clauDNA-repo`, `~/.claude/.claudfather-repo`, `~/.claude/.claudefather-repo`).
+- Enumerates the plugin's own skills/agents/hooks and finds matching-name files in `~/.claude/skills/`, `~/.claude/agents/`, `~/.claude/hooks/`. Files that match by name AND have identical content to the plugin's version are flagged as safe to remove. Files that differ are flagged for explicit per-file confirmation (so you don't lose anything you customized).
+- Detects stale `statusLine` config pointing at `~/.claude/hooks/statusline.sh` and offers to either update the path to the plugin cache or remove the entry.
+- Backs everything up to `~/.local/share/clauDNA/backups/cleanup-legacy-install-<timestamp>/` before removing anything. Restore is a `cp -r` away if you change your mind.
+- Leaves your `permissions.allow` entries alone — those were added by install.sh additively and are still useful in the plugin world.
+
+If you'd rather do it manually, the affected paths are:
+
+| Path | What it was |
+|---|---|
+| `~/.claude/.clauDNA-repo` | Breadcrumb pointing at the cloned repo |
+| `~/.claude/skills/<name>/` | Copies of the 0.1.x skill set |
+| `~/.claude/agents/<name>.md` | Copies of clauDNA agents |
+| `~/.claude/hooks/<name>.sh` | Copies of hook scripts |
+| `~/.claude/commands/clauDNA-sync.md` | Legacy sync command (removed in 0.2.0) |
+| `~/.claude/docs/SETUP_GUIDE.md`, `~/.claude/docs/CLAUDE_MD_TEMPLATE.md` | Stale doc copies |
+
+Don't bulk-`rm -rf` `~/.claude/skills/` or `~/.claude/hooks/` — those directories may contain files from other sources (your own skills, other plugins' headless installs, etc.). The skill's name-by-name matching is the safe path.
 
 ---
 
@@ -34,10 +75,10 @@ If all you need is "install clauDNA", read the README. Come here when something 
 
 | Software | Used By | Installation |
 |----------|---------|--------------|
-| SnowSQL | `/dbt` | Download from Snowflake |
+| SnowSQL | `/claudna:dbt` | Download from Snowflake |
 | OpenSSL | Snowflake key-pair auth | Pre-installed on macOS |
-| `gh` (GitHub CLI) | `/review-pr`, `/heist`, GitHub-issue output modes | `brew install gh` |
-| `psql` | `/neon-query`, `/neon-info`, `/neon-branch` | `brew install libpq` |
+| `gh` (GitHub CLI) | `/claudna:review-pr`, `/claudna:heist`, GitHub-issue output modes | `brew install gh` |
+| `psql` | `/claudna:neon-query`, `/claudna:neon-info`, `/claudna:neon-branch` | `brew install libpq` |
 | `ruff` | Python auto-format hook | `pip install ruff` |
 | `prettier` | JS/TS/MD auto-format hook | `npm install -g prettier` |
 
@@ -62,18 +103,19 @@ Claude Code reads configuration from multiple locations, merged in this order (l
 | Team standards | `<project>/.claude/` | Yes (committed) | Project conventions, shared commands |
 | Local overrides | `<project>/.claude/settings.local.json` | No | Machine-specific paths |
 
-### What clauDNA installs to `~/.claude/`
+### Where claudna lives once installed
 
 ```
-~/.claude/
-├── settings.json       # USER-MANAGED — clauDNA only adds permissions, never overwrites
-├── skills/             # Skills (slash commands + context skills)
-├── agents/             # Specialized subagents (snowflake-analyst, dbt-engineer, etc.)
-├── commands/           # 1 command (clauDNA-sync)
-├── hooks/              # auto-format, statusline, notify, pretooluse-permissions
-├── notes/              # Personal — never synced from this repo
-└── docs/               # Installed once during setup, never resynced
+~/.claude/plugins/cache/Claudfather/claudna/<version>/
+├── .claude-plugin/plugin.json     # declares "hooks": "./plugin-hooks/hooks.json"
+├── skills/            # plugin auto-discovers; invocation namespaced as /claudna:<name>
+├── agents/
+└── plugin-hooks/      # named plugin-hooks/ to avoid a Claude Code bug deleting hooks/
+    ├── hooks.json     # auto-wired on plugin enable (path declared in plugin.json)
+    └── *.sh
 ```
+
+Claude Code manages this directory itself — you should not edit files there. Updates land in a new version directory; old versions are kept for ~7 days before automatic cleanup.
 
 ### The lessons system
 
@@ -84,15 +126,246 @@ Two-tier, by intent:
 | Global | `~/.claude/notes/lessons/global.md` | Universal patterns (tool quirks, general rules) |
 | Project | `<project>/.claude/lessons.md` | Project-specific conventions |
 
-The `/lessons` skill captures lessons after corrections. `/init-project` creates the project-level file.
+The `/claudna:lessons` skill captures lessons after corrections. `/claudna:init-project` creates the project-level file.
 
 ---
 
-## 3. Snowflake Key-Pair Authentication
+## 3. Bootstrapping `~/.claude/settings.json`
+
+The plugin install handles skills, agents, and hooks. It does **not** modify your personal `settings.json` — Claude Code intentionally doesn't let plugins write to user settings. Several recommended tweaks make claudna's skills run cleanly. Add the snippets below to `~/.claude/settings.json` once.
+
+> **Format:** these are partial JSON snippets. Merge them into your existing `settings.json` rather than replacing the whole file. Any JSON tool (`jq`, your editor) can do this.
+
+### 3.1 Recommended permissions
+
+These reduce the number of permission prompts you'll see while claudna's skills work. Permissions are additive — adding these never removes anything.
+
+The minimum set (most skills need these):
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Write",
+      "Edit",
+      "Grep",
+      "Glob",
+      "WebFetch",
+      "WebSearch",
+      "Bash(git *)",
+      "Bash(gh *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(which *)",
+      "Bash(pwd *)",
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(mkdir *)",
+      "Bash(touch *)",
+      "Bash(diff *)",
+      "Bash(chmod *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(curl *)",
+      "Bash(lsof *)",
+      "Bash(test *)"
+    ]
+  }
+}
+```
+
+Optional categories — add only the ones whose skills you actually use:
+
+| Category | Add when using | Permissions |
+|---|---|---|
+| **Python** | Python projects, formatters | `Bash(python *)`, `Bash(python3 *)`, `Bash(pip *)`, `Bash(pip3 *)`, `Bash(pytest *)`, `Bash(ruff *)` |
+| **Node** | JS/TS projects | `Bash(node *)`, `Bash(npm *)`, `Bash(npx *)`, `Bash(prettier *)` |
+| **Data & Analytics** | `/claudna:dbt`, `/claudna:neon-*`, `snowflake-analyst` agent | `Bash(snowsql *)`, `Bash(dbt *)`, `Bash(psql *)`, `Bash(pg_isready *)` |
+| **Infrastructure CLIs** | `/claudna:railway-*`, `/claudna:vercel-*`, `/claudna:modal-*` | `Bash(railway *)`, `Bash(vercel *)`, `Bash(modal *)` |
+| **Browser Automation** | `/claudna:design-review`, `/claudna:visual-crawl` | `Bash(/Applications/Google*)`, `Bash("/Applications/Google*)`, `Bash(google-chrome*)`, `Bash(chromium*)` |
+| **Auto-skill-approval** | Bots / cron / non-interactive runs | See "Auto-skill-approval" expansion below |
+
+#### Auto-skill-approval expansion
+
+For bots, cron, and non-interactive runs that invoke claudna skills programmatically, add `Skill(...)` rules to prevent permission prompts. **Anthropic's docs do not specify whether `Skill()` matches against the bare skill name (`session-handoff`) or the plugin-namespaced form (`claudna:session-handoff`).** To be safe, write both forms. Permission rules are additive — extra rules don't hurt.
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Skill(session-handoff)",            "Skill(session-handoff:*)",
+      "Skill(claudna:session-handoff)",    "Skill(claudna:session-handoff:*)",
+      "Skill(context-resume)",             "Skill(context-resume:*)",
+      "Skill(claudna:context-resume)",     "Skill(claudna:context-resume:*)",
+      "Skill(tech-debt)",                  "Skill(tech-debt:*)",
+      "Skill(claudna:tech-debt)",          "Skill(claudna:tech-debt:*)",
+      "Skill(security-audit)",             "Skill(security-audit:*)",
+      "Skill(claudna:security-audit)",     "Skill(claudna:security-audit:*)",
+      "Skill(product-enhance)",            "Skill(product-enhance:*)",
+      "Skill(claudna:product-enhance)",    "Skill(claudna:product-enhance:*)",
+      "Skill(docs-review)",                "Skill(docs-review:*)",
+      "Skill(claudna:docs-review)",        "Skill(claudna:docs-review:*)",
+      "Skill(frontend-performance-audit)", "Skill(frontend-performance-audit:*)",
+      "Skill(claudna:frontend-performance-audit)", "Skill(claudna:frontend-performance-audit:*)"
+    ]
+  }
+}
+```
+
+Extend the list for any other skills your bot invokes. If empirical testing confirms which form Claude Code actually matches, this section will be tightened in a future release.
+
+### 3.2 statusLine (optional)
+
+The plugin ships a `statusline.sh` that shows branch, lines changed, model, and context %. Claude Code doesn't support plugins shipping a statusLine declaration, so you wire it in your own `settings.json`:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bash ${HOME}/.claude/plugins/cache/Claudfather/claudna/0.2.0/plugin-hooks/statusline.sh"
+  }
+}
+```
+
+> **Known friction:** the version segment (`0.2.0`) is **hardcoded** because the plugin cache path includes the version. Every claudna release bump leaves this path pointing at a stale (or pruned) version directory, and the statusLine silently stops rendering. Workarounds, none of them great:
+>
+> 1. **Update the path on every `/plugin update`** — a `sed` / `jq` one-liner in your post-update routine. Simplest. The path you want is `~/.claude/plugins/cache/Claudfather/claudna/<latest-version>/plugin-hooks/statusline.sh`.
+> 2. **Symlink to a stable path** — `ln -sfn ~/.claude/plugins/cache/Claudfather/claudna/0.2.0/plugin-hooks/statusline.sh ~/.local/bin/claudna-statusline.sh` and point the statusLine command at the symlink. You still re-run the symlink command on every plugin bump, but the statusLine entry in settings.json stays stable.
+> 3. **Copy `statusline.sh` to a path you control** — `cp ~/.claude/plugins/cache/Claudfather/claudna/0.2.0/plugin-hooks/statusline.sh ~/.claude/hooks/claudna-statusline.sh` and point statusLine there. Frozen version (won't pick up improvements) but zero maintenance.
+>
+> Anthropic hasn't shipped a plugin-shipped statusLine surface yet (`statusLine` in `plugin.json` is not honored), so until they do, one of the three options is unavoidable.
+
+### 3.3 Sandbox (recommended)
+
+Sandbox configuration eliminates ~84% of permission prompts by auto-approving Bash commands that run inside the project directory (sandboxed) while leaving cross-directory commands and Read/Write/Edit tools subject to your normal `permissions.allow` rules:
+
+```json
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "allowUnsandboxedCommands": true,
+    "excludedCommands": []
+  }
+}
+```
+
+If you enable sandbox, you may also want the sandbox filesystem extensions for the orchestration skills that write to `/tmp/`:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Edit(/tmp/**)",
+      "Edit(~/.claude/**)"
+    ]
+  }
+}
+```
+
+### 3.4 Plugin-provided hooks (no action required)
+
+The PreToolUse permission-expansion hook, the PostToolUse auto-format hook, and the Notification hook all ship with the plugin and auto-wire on enable. You don't need to add anything to `settings.json` for them. To verify they're firing, run `/plugin list` and confirm `claudna` is enabled, then trigger a `Write` to a `.py` file and watch `ruff` run.
+
+---
+
+## 4. Headless / CI / Docker Provisioning
+
+Claude Code's `/plugin install` is interactive, but plugins can be auto-installed on session start by combining declarative settings with an environment variable. Use this pattern for bots, CI runners, and Docker images.
+
+### 4.1 Settings template
+
+Drop a `settings.json` like this into the image / runner's `~/.claude/`:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "Claudfather": {
+      "source": { "source": "github", "repo": "Claudfather/clauDNA" }
+    }
+  },
+  "enabledPlugins": {
+    "claudna@Claudfather": true
+  },
+  "permissions": {
+    "allow": ["Read", "Write", "Edit", "Bash(git *)", "..."],
+    "defaultMode": "acceptEdits"
+  }
+}
+```
+
+The `"source": { "source": "github", ... }` nesting is **not a typo**. The outer key `"source"` is the field name on the marketplace entry; the inner `{ "source": "github", "repo": "..." }` is the [source descriptor](https://code.claude.com/docs/en/plugin-marketplaces) — `"source"` here is a discriminator naming the source type (`github`, `url`, `git`, etc.), and `"repo"` is the repo identifier for that type. Both keys are required by the Claude Code marketplace schema. If this looks ugly, blame the schema, not the docs.
+
+Add whatever `permissions.allow` entries the bot needs. For locked-down CI, use `"defaultMode": "dontAsk"` which denies anything not on the allow list (plus the built-in read-only command set).
+
+### 4.2 Launch command
+
+Set `CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1` before invoking Claude Code. The plugin auto-installs before the first turn:
+
+```bash
+CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1 \
+    claude -p "your prompt here" --allowedTools "Bash,Read,Edit"
+```
+
+For locked-down runs that need a single result with no surprises:
+
+```bash
+CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1 \
+    claude --bare -p "your prompt" --settings ./bot-settings.json --allowedTools "Read"
+```
+
+`--bare` skips auto-discovery of hooks/skills/MCP/CLAUDE.md from the working dir, so the bot run is reproducible across machines.
+
+### 4.3 Updates
+
+Third-party marketplaces (which Claudfather is) **do not auto-update by default**, even with `FORCE_AUTOUPDATE_PLUGINS=1`. To pick up new claudna versions, run the update explicitly:
+
+```bash
+claude plugin update claudna@Claudfather
+```
+
+Wire this into your bot's startup script or a deploy hook so each run gets the latest published version. Or, if you want strict version pinning, set the plugin's `version` field in the marketplace listing and never call update — the bot stays on whatever version was last installed.
+
+### 4.4 Dockerfile sketch
+
+```dockerfile
+FROM node:20-bookworm
+RUN npm install -g @anthropic-ai/claude-code
+
+# Copy the bot's pre-baked settings (marketplace + enabledPlugins declarations
+# from §4.1, plus whatever permissions and defaults the bot needs).
+COPY bot-settings.json /root/.claude/settings.json
+
+# Pre-install claudna at image *build* time so cold container starts don't
+# pay the marketplace-clone + install cost on every container boot.
+RUN claude plugin marketplace add Claudfather/clauDNA && \
+    claude plugin install claudna@Claudfather
+
+# Set ANTHROPIC_API_KEY at runtime (e.g., via `docker run -e ANTHROPIC_API_KEY=...`).
+ENV ANTHROPIC_API_KEY=""
+
+# Belt-and-suspenders: if a container ever boots with a fresh ~/.claude/
+# (e.g., volume mount that masks the baked-in install), CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1
+# tells Claude Code to install enabledPlugins on session start. With the image
+# baked above, this is a no-op; on a fresh mount, it's the rescue path.
+ENV CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1
+
+ENTRYPOINT ["claude", "--bare", "-p"]
+```
+
+The two install paths (`RUN claude plugin install ...` at build time + `ENV CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1` at runtime) **are intentionally both present**: the build-time install delivers fast cold starts, and the runtime env var is the rescue path if a volume mount or fresh `~/.claude/` ever lands without the bake-in. Claude Code is idempotent here — the env var is a no-op when the plugin is already installed at the declared version.
+
+---
+
+## 5. Snowflake Key-Pair Authentication
 
 Passwordless, browser-free Snowflake access via SnowSQL. This is the most fragile part of the setup, so it gets a dedicated section.
 
-### 3.1 Login Name vs User Name
+### 5.1 Login Name vs User Name
 
 Snowflake has two different identifiers — they are often different and the distinction breaks people regularly:
 
@@ -103,7 +376,7 @@ Snowflake has two different identifiers — they are often different and the dis
 
 **Use the LOGIN NAME in your SnowSQL config, not the user name.**
 
-### 3.2 Generate RSA Key Pair
+### 5.2 Generate RSA Key Pair
 
 ```bash
 mkdir -p ~/.snowflake
@@ -115,7 +388,7 @@ chmod 600 ~/.snowflake/rsa_key.p8
 openssl rsa -in ~/.snowflake/rsa_key.p8 -pubout -out ~/.snowflake/rsa_key.pub
 ```
 
-### 3.3 Extract the Public Key
+### 5.3 Extract the Public Key
 
 ```bash
 cat ~/.snowflake/rsa_key.pub | grep -v "PUBLIC KEY" | tr -d '\n' && echo ""
@@ -123,7 +396,7 @@ cat ~/.snowflake/rsa_key.pub | grep -v "PUBLIC KEY" | tr -d '\n' && echo ""
 
 Outputs a single base64 string — copy it.
 
-### 3.4 Register with Snowflake
+### 5.4 Register with Snowflake
 
 You (or an admin) runs:
 
@@ -140,9 +413,9 @@ DESC USER your_username;
 
 If you hit `Insufficient privileges to operate on user`, send your admin:
 1. Your username (`SELECT CURRENT_USER();`)
-2. The public key string from §3.3
+2. The public key string from §5.3
 
-### 3.5 Configure SnowSQL
+### 5.5 Configure SnowSQL
 
 Use the template at `snowflake/snowsql-config-template` in this repo as a starting point, then write to `~/.snowsql/config`:
 
@@ -181,19 +454,19 @@ output_format = psql
 2. Use your **login name** (often email), not the user name.
 3. Don't include `authenticator = SNOWFLAKE_JWT` — it's auto-detected and setting it explicitly causes issues.
 
-### 3.6 Test
+### 5.6 Test
 
 ```bash
 snowsql -c default -q "SELECT CURRENT_USER(), CURRENT_ROLE(), CURRENT_WAREHOUSE();"
 ```
 
-No browser should open. If one does, see [Troubleshooting](#5-troubleshooting).
+No browser should open. If one does, see [Troubleshooting](#7-troubleshooting).
 
 ---
 
-## 4. Shell Configuration
+## 6. Shell Configuration
 
-clauDNA ships shell aliases for git worktrees in [`shell/zshrc-additions.sh`](./shell/zshrc-additions.sh). To install:
+claudna ships shell aliases for git worktrees in [`shell/zshrc-additions.sh`](./shell/zshrc-additions.sh). To install:
 
 ```bash
 cat shell/zshrc-additions.sh >> ~/.zshrc
@@ -222,11 +495,11 @@ wt-set b ~/Projects/myrepo-worktrees/feature-b
 # Now use `za`, `zb` to hop between them. Open a Claude session in each.
 ```
 
-The `/worktree` skill manages this interactively if you'd rather not memorize the aliases.
+The `/claudna:worktree` skill manages this interactively if you'd rather not memorize the aliases.
 
 ---
 
-## 5. Troubleshooting
+## 7. Troubleshooting
 
 ### Snowflake: "JWT token is invalid"
 
@@ -249,27 +522,24 @@ The `/worktree` skill manages this interactively if you'd rather not memorize th
 
 **Fix:**
 - Confirm: `DESC USER your_user;` should show `RSA_PUBLIC_KEY` populated.
-- Check the public key on the user matches the public key on disk: extract via §3.3 and compare.
+- Check the public key on the user matches the public key on disk: extract via §5.3 and compare.
 
-### Hooks not running
+### Plugin hooks not running
 
-**Cause:** Not executable or wrong path in `settings.json`.
-
-**Fix:**
-```bash
-chmod +x ~/.claude/hooks/*.sh
-~/.claude/hooks/statusline.sh   # smoke test
-```
+Hooks ship in `plugin-hooks/hooks.json` inside the plugin and auto-wire on enable. If they're not firing:
+- Confirm `/plugin list` shows `claudna` as enabled.
+- Try `/reload-plugins`.
+- Check `plugin-hooks/*.sh` are executable inside `~/.claude/plugins/cache/Claudfather/claudna/<ver>/`. (They should be — the plugin install handles permissions.)
 
 ### Status line not showing
 
-**Cause:** Script not executable or errors silently.
+Claude Code does not support statusLine declarations inside plugin manifests. The plugin ships a `statusline.sh` but you have to wire it in your own `settings.json` — see §3.2. If you added the snippet and it still doesn't show:
 
-**Fix:**
 ```bash
-~/.claude/hooks/statusline.sh
-chmod +x ~/.claude/hooks/statusline.sh
+bash ~/.claude/plugins/cache/Claudfather/claudna/0.2.0/plugin-hooks/statusline.sh
 ```
+
+Run that directly to see if the script itself errors. If it does, your shell environment is missing something (likely `gh` for branch info).
 
 ### Shell aliases not working
 
@@ -281,17 +551,17 @@ chmod +x ~/.claude/hooks/statusline.sh
 
 **Cause:** Compound shell commands (e.g. `cmd1 && cmd2`, `cmd1 | cmd2`) bypass simple wildcard match.
 
-**Fix:** clauDNA ships a `pretooluse-permissions.sh` hook that auto-approves compound commands when *every* sub-command matches an allow pattern. Make sure it's wired into `settings.json`:
+**Fix:** claudna ships a `pretooluse-permissions.sh` hook that auto-approves compound commands when *every* sub-command matches an allow pattern. It's wired automatically via `plugin-hooks/hooks.json` when the plugin is enabled. Run `/plugin list` to confirm `claudna` is on. If the hook still doesn't fire, try `/reload-plugins`.
 
-```jsonc
-"hooks": {
-  "PreToolUse": [
-    { "hooks": [{ "type": "command", "command": "~/.claude/hooks/pretooluse-permissions.sh" }] }
-  ]
-}
+### Plugin not auto-updating
+
+Third-party marketplaces don't auto-update by default. Run updates explicitly:
+
+```bash
+claude plugin update claudna@Claudfather
 ```
 
-`/clauDNA-setup` and `/clauDNA-sync` offer to add this block automatically.
+Bake this into your bot's startup or a deploy hook if you want each run to pick up the latest version.
 
 ---
 
@@ -345,7 +615,7 @@ The clauDNA project template (`project-template/CLAUDE.md`) embeds these princip
 ### Self-Improvement Loop
 - After ANY correction from the user: update `.claude/lessons.md` with the pattern
 - Write rules for yourself that prevent the same mistake
-- Review lessons when relevant (via `/lessons`)
+- Review lessons when relevant (via `/claudna:lessons`)
 
 ### Core Principles
 - **Simplicity First** — make every change as simple as possible
