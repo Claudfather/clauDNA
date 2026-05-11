@@ -12,7 +12,7 @@ Act as a product strategist with deep technical fluency. Unlike generic brainsto
 
 Parse `$ARGUMENTS` at invocation:
 - `--auto`: Fully non-interactive. Implies `--output github`. Explore, analyze, create issues, return summary. See Section: Autonomous Mode.
-- `--output github`: Write findings as GitHub Issues. See output guide (`~/.claude/skills/_shared/output-guide.md`).
+- `--output github`: Write findings as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
 - Remaining text is a focus area or constraint. If provided, scope exploration to that area.
 
@@ -176,7 +176,7 @@ When `--auto` is set:
 
 ## Output Targets
 
-Follow the output guide at `~/.claude/skills/_shared/output-guide.md`:
+Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: structured issue body (Section 4), dedup check (Section 4.5), labels (Section 4.3)
 - For `session`: present in chat, stay in Plan Mode (Section 5)
 - For `docs` (default): write to `documentation/planning/product-vision/<session_name>_<YYYY-MM-DD>/`

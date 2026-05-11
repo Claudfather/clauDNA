@@ -14,7 +14,7 @@ Rigorously audit project documentation against the actual codebase. Update inacc
 
 Parse `$ARGUMENTS` at invocation:
 - `--auto`: Fully non-interactive. Auto-fixes stale docs, creates GitHub Issues for gaps (implies `--output github`). See orchestration guide Section 10.
-- `--output github`: Create GitHub Issues for documentation gaps. See output guide (`~/.claude/skills/_shared/output-guide.md`).
+- `--output github`: Create GitHub Issues for documentation gaps. See output guide (`skills/_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
 - Remaining text is the scope path (e.g., `docs/`, `documentation/`). If provided, skip asking in Step 1.
 
@@ -170,7 +170,7 @@ Could a new engineer onboard from these docs alone?
 
 This skill supports `--output github` and `--output session` in addition to the default inline-fix behavior.
 
-Follow the output guide at `~/.claude/skills/_shared/output-guide.md`:
+Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: use the structured issue body format (Section 4), check for duplicates (Section 4.5), apply labels (Section 4.3). Apply `docs` label. Auto-fix verifiable inaccuracies first, then create issues for gaps requiring human judgment.
 - For `session`: present findings in chat, stay in Plan Mode (Section 5)
 - Default: fix docs inline and ask about gaps (current behavior)

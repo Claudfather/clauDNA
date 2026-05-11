@@ -12,7 +12,7 @@ Find, report, and plan remediation of technical debt in the current codebase.
 
 Parse `$ARGUMENTS` at invocation:
 - `--auto`: Fully non-interactive. Implies `--output github`. Scans, creates issues, returns summary. See orchestration guide Section 10.
-- `--output github`: Write findings and plans as GitHub Issues. See output guide (`~/.claude/skills/_shared/output-guide.md`).
+- `--output github`: Write findings and plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
 - Remaining text is the focus area (e.g., `src/api/` or `auth module`). If provided, scope the scan to that area instead of the full codebase.
 
@@ -206,7 +206,7 @@ Each plan document represents **exactly 1 PR** and must include:
 
 #### C. Subagent Workflow
 
-Follow Section 9 of the orchestration guide (`~/.claude/skills/_shared/orchestration-guide.md`). Scratch directory: `/tmp/tech-debt-<YYYY-MM-DD_HHMMSS>/research/`. Plan agents read research from this directory.
+Follow Section 9 of the orchestration guide (`skills/_shared/orchestration-guide.md`). Scratch directory: `/tmp/tech-debt-<YYYY-MM-DD_HHMMSS>/research/`. Plan agents read research from this directory.
 
 ---
 
@@ -214,7 +214,7 @@ Follow Section 9 of the orchestration guide (`~/.claude/skills/_shared/orchestra
 
 This skill supports `--output github` and `--output session` in addition to the default `docs` target.
 
-Follow the output guide at `~/.claude/skills/_shared/output-guide.md`:
+Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: use the structured issue body format (Section 4), check for duplicates (Section 4.5), apply labels (Section 4.3). Map scan priorities: High → `priority:high`, Medium → `priority:medium`, Low → `priority:low`.
 - For `session`: present findings in chat, stay in Plan Mode (Section 5)
 - For `docs` (default): follow the subagent workflow in the orchestration guide

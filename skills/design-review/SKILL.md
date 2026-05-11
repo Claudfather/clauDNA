@@ -31,7 +31,7 @@ Design-literate PM bridging visual polish and engineering. Audit a deployed app,
 ## Arguments
 
 Parse `$ARGUMENTS` at invocation:
-- If it contains `--output github`: activate GitHub Issues output mode. See output guide (`~/.claude/skills/_shared/output-guide.md`).
+- If it contains `--output github`: activate GitHub Issues output mode. See output guide (`skills/_shared/output-guide.md`).
 - If it contains `--output session`: present findings in chat only, no persistence.
 - Remaining text is the deployed URL or focus area. If provided, skip asking in Step 1.
 
@@ -133,7 +133,7 @@ Tell user: **"Run `/claudna:implement-plan` on the phase directory to start buil
 
 This skill supports `--output github` and `--output session` in addition to the default `docs` target.
 
-Follow the output guide at `~/.claude/skills/_shared/output-guide.md`:
+Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: use the structured issue body format (Section 4), check for duplicates (Section 4.5), apply labels (Section 4.3). Apply `design` label. Include SAFE vs RISK classification in issue body.
 - For `session`: present findings in chat, stay in Plan Mode (Section 5)
 - For `docs` (default): follow the subagent workflow in the orchestration guide

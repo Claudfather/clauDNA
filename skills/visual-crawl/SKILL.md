@@ -36,7 +36,7 @@ Systematic visual crawl of a frontend application. Discovers routes, screenshots
 Parse `$ARGUMENTS` at invocation:
 - `--auto`: Fully non-interactive. Implies `--output github`. Crawl, screenshot, test, file issues, return summary.
 - `--deep`: Full interactive testing. Extends Phase 3 with: click every button/link and verify result, fill and submit forms, simulate chat conversations with sample queries, screenshot before/after each interaction, report broken flows. Uses Playwright for interaction testing (inline Python scripts; see Phase 3 below).
-- `--output github`: Write findings as GitHub Issues (default). See output guide (`~/.claude/skills/_shared/output-guide.md`).
+- `--output github`: Write findings as GitHub Issues (default). See output guide (`skills/_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
 - `--url <base-url>`: Crawl a deployed URL (e.g., `--url https://app.example.com`).
 - `--local`: Spin up a local dev server from the project directory and crawl it.
@@ -463,7 +463,7 @@ Priority mapping:
 
 **If `--output github` or `--auto`:**
 
-Create GitHub Issues per output guide (`~/.claude/skills/_shared/output-guide.md`):
+Create GitHub Issues per output guide (`skills/_shared/output-guide.md`):
 - One issue per finding (or group related findings on same page)
 - Include screenshot attachments (desktop + mobile for visual bugs)
 - Apply labels: `auto-audit`, `visual-crawl`, category label, priority label
@@ -519,6 +519,6 @@ When `--auto` is set:
 
 ## Output Targets
 
-Follow the output guide at `~/.claude/skills/_shared/output-guide.md`:
+Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github` (default): structured issue body (Section 4), dedup check (Section 4.5), labels (Section 4.3). Apply `visual-crawl` label + category-specific label.
 - For `session`: present findings in chat, stay in Plan Mode (Section 5)

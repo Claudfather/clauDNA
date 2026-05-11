@@ -1,6 +1,6 @@
 # Shared Orchestration Guide
 
-Shared reference for skills that use subagent orchestration to produce design documents. This file is not a skill — it has no `SKILL.md` and does not appear in skill listings. Skills reference it by telling subagents to read it from disk at `~/.claude/skills/_shared/orchestration-guide.md`.
+Shared reference for skills that use subagent orchestration to produce design documents. This file is not a skill — it has no `SKILL.md` and does not appear in skill listings. Skills reference it by telling subagents to read it from disk at `skills/_shared/orchestration-guide.md`.
 
 ---
 
@@ -83,7 +83,7 @@ The orchestrator constructs a prompt for each Plan agent that includes:
 ```
 ## Setup
 
-1. Read ~/.claude/skills/_shared/orchestration-guide.md — follow Section 4
+1. Read skills/_shared/orchestration-guide.md — follow Section 4
    (Quality Standards) and Section 5 (Phase Doc Structure) exactly.
 2. Read the research file(s) at: /tmp/<skill>-<timestamp>/research/<slug>.md
 3. [Any skill-specific quality requirements, inlined by the calling skill]
@@ -207,7 +207,7 @@ Both Read and Write are blanket-allowed via the `claude-workflow` permission cat
 
 - Research subagents writing research to `/tmp/` → **no permission prompt**
 - Plan agents reading research from `/tmp/` → **no permission prompt**
-- Plan agents reading this guide from `~/.claude/skills/_shared/` → **no permission prompt**
+- Plan agents reading this guide from `skills/_shared/` → **no permission prompt**
 - Plan agents writing docs to `documentation/planning/` → **no permission prompt**
 
 Subagents launched via the Task tool inherit the parent session's permissions. No additional permission grants are needed.
@@ -270,7 +270,7 @@ via `git mv`. This is handled by `/claudna:implement-plan` — planning skills o
 
 When a skill's doc generation step (typically the final step) delegates to Plan subagents, include this reference instead of inlining the full workflow:
 
-> **Follow the subagent workflow defined in the orchestration guide (`~/.claude/skills/_shared/orchestration-guide.md`):**
+> **Follow the subagent workflow defined in the orchestration guide (`skills/_shared/orchestration-guide.md`):**
 > - Plan Agent → Disk pattern (Section 3)
 > - Quality standards (Section 4)
 > - Phase doc structure (Section 5)
@@ -287,7 +287,7 @@ Skills that have domain-specific quality requirements or custom phase doc sectio
 
 Skills support `--output github` and `--output session` in addition to the default `docs` target. When `--output github` is active, the skill runs the full analysis and plan generation pipeline (no phases are skipped), then writes output as GitHub Issues instead of planning docs. When `--output session` is active, findings are presented in chat only with no persistence.
 
-Follow the output guide at `~/.claude/skills/_shared/output-guide.md` for target-specific formatting, deduplication, labels, and subagent workflow details.
+Follow the output guide at `skills/_shared/output-guide.md` for target-specific formatting, deduplication, labels, and subagent workflow details.
 
 ---
 

@@ -1,6 +1,6 @@
 # Output Guide
 
-Shared reference for planning skills that support `--output <target>`. Skills reference this file at `~/.claude/skills/_shared/output-guide.md`.
+Shared reference for planning skills that support `--output <target>`. Skills reference this file at `skills/_shared/output-guide.md`.
 
 ---
 
@@ -261,7 +261,7 @@ This enables the "stale area" detection that drives the rolling audit rotation.
 
 In the skill's Arguments section:
 ```
-- `--output github`: Write findings and plans as GitHub Issues. See output guide (`~/.claude/skills/_shared/output-guide.md`).
+- `--output github`: Write findings and plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
 - Default (no flag): Write planning docs to `documentation/planning/`.
 ```
@@ -272,7 +272,7 @@ In the skill's output section (replacing "Alternative: GitHub Issues Output"):
 
 This skill supports `--output github` and `--output session` in addition to the default `docs` target.
 
-Follow the output guide at `~/.claude/skills/_shared/output-guide.md`:
+Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: use the structured issue body format (Section 4), check for duplicates (Section 4.5), apply labels (Section 4.3)
 - For `session`: present findings in chat, stay in Plan Mode (Section 5)
 - For `docs` (default): follow the subagent workflow in the orchestration guide
