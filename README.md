@@ -13,7 +13,7 @@ Inside Claude Code:
 /plugin install claudna@Claudfather
 ```
 
-That's it. Skills become available as `/claudna:<skill-name>` (namespaced under the plugin). Hooks (auto-format, pretooluse permission expansion, notifications) activate automatically when the plugin is enabled.
+That's it. Skills become available as `/claudna:<skill-name>` (namespaced under the plugin). Tab completion works — type `/claudna:` and press Tab to browse, or `/claudna:tech` and Tab to narrow. Hooks (auto-format, pretooluse permission expansion, notifications) activate automatically when the plugin is enabled.
 
 ### After install
 
