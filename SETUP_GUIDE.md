@@ -553,6 +553,15 @@ Run that directly to see if the script itself errors. If it does, your shell env
 
 **Fix:** claudna ships a `pretooluse-permissions.sh` hook that auto-approves compound commands when *every* sub-command matches an allow pattern. It's wired automatically via `plugin-hooks/hooks.json` when the plugin is enabled. Run `/plugin list` to confirm `claudna` is on. If the hook still doesn't fire, try `/reload-plugins`.
 
+**Still getting prompted?** The hook splits on `&&`, `||`, `|`, and `;` only. Commands using other shell constructs fall through to the normal permission prompt:
+
+- Command substitution: `$(cmd)` or `` `cmd` ``
+- Process substitution: `<(cmd)` or `>(cmd)`
+- Here-docs / here-strings: `<< EOF`, `<<<`
+- Brace groups: `{ cmd1; cmd2; }`
+
+This is by design — these constructs are too complex to split reliably. If you're seeing prompts for a compound form you use often, consider adding the full command as a single `Bash(...)` pattern in your allow list.
+
 ### Plugin not auto-updating
 
 Third-party marketplaces don't auto-update by default. Run updates explicitly:
