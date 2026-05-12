@@ -4,6 +4,8 @@ Claude Code plugin pack: curated skills, agents, and hooks distributed via the `
 
 ## Quick Start
 
+Requires [Claude Code](https://claude.ai/download) (`npm install -g @anthropic-ai/claude-code`).
+
 Inside Claude Code:
 
 ```
