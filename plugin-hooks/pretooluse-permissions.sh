@@ -20,6 +20,18 @@ set -eo pipefail
 #   - Falls through (no output) for unrecognized or unparseable commands
 #   - Never returns "deny" — only "allow" or silent pass-through
 #   - Debug log: /tmp/claude-permissions.log
+#
+# Compound-command splitting scope:
+#   Handled (split + each part validated independently):
+#     &&   ||   |   ;
+#
+#   NOT handled (detected early and falls through — user gets a permission prompt):
+#     $( )       command substitution
+#     ` `        backtick command substitution
+#     <( ) >( )  process substitution
+#     <<  <<<    here-docs and here-strings
+#     { ; }      brace groups (not detected — falls through via match failure)
+#     nested quoting edge cases beyond basic single/double quote tracking
 
 LOG="/tmp/claude-permissions.log"
 MAX_LOG_SIZE=1048576  # 1MB
