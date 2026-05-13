@@ -1,5 +1,6 @@
 ---
 name: lessons
+user-invocable: true
 description: "Use when Claude has been corrected and the lesson should be captured, or when you want to review past lessons."
 ---
 

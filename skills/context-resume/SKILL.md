@@ -1,5 +1,6 @@
 ---
 name: context-resume
+user-invocable: true
 description: "Use at the start of a new session to pick up where you left off. Counterpart to /claudna:session-handoff."
 allowed-tools: Bash(git *), Bash(gh *), Bash(stat *), Bash(ls *), Read, Grep, Glob
 ---

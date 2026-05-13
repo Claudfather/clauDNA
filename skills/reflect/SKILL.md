@@ -1,5 +1,6 @@
 ---
 name: reflect
+user-invocable: true
 description: "Knowledge synthesis — extract process learnings from the current session"
 argument-hint: "[--target local|shared] [--notes file]"
 ---

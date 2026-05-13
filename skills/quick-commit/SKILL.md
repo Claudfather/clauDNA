@@ -1,5 +1,6 @@
 ---
 name: quick-commit
+user-invocable: true
 description: "Use when you want to quickly stage and commit all current changes with a conventional commit message."
 ---
 

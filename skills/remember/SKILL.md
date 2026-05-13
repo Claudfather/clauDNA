@@ -1,5 +1,6 @@
 ---
 name: remember
+user-invocable: true
 description: "Recall relevant knowledge before starting work. Scans shared docs INDEX.md files, filters by repo/tags/topic, and surfaces the most relevant docs. First verb in the knowledge lifecycle loop."
 argument-hint: "[task description or repo name] [--repo <name>] [--full] [--include-stale]"
 ---

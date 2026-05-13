@@ -1,5 +1,6 @@
 ---
 name: session-handoff
+user-invocable: true
 description: "Use at the end of a session to validate persisted state, prune stale items, capture session context, and write a handoff file for /claudna:context-resume. Supports --auto for fully non-interactive operation."
 allowed-tools: Bash(git *), Bash(gh *), Bash(ls *), Bash(wc *), Bash(date *), Read, Write, Edit, Glob, Grep
 argument-hint: "[--auto]"

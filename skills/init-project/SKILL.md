@@ -1,5 +1,6 @@
 ---
 name: init-project
+user-invocable: true
 description: "Use when setting up a new project or adding standard Claude Code configuration (CLAUDE.md, CHANGELOG.md, .claude/, documentation/) to an existing project."
 allowed-tools: Read(*), Write(*), Edit(*), Glob(*), Grep(*), Bash(git *), Bash(ls *), Bash(mkdir *)
 ---

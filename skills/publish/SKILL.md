@@ -1,5 +1,6 @@
 ---
 name: publish
+user-invocable: true
 description: "Output adapter for shared docs. Takes a markdown file with frontmatter and publishes it to a destination: disk (shared docs directory), GitHub issue, GitHub PR description, or Notion page."
 argument-hint: "<source-file> [--to disk|github-issue|github-pr|notion] [--repo <name>] [--dry-run]"
 ---

@@ -1,5 +1,6 @@
 ---
 name: notes
+user-invocable: true
 description: "Use when you want to save, read, or organize persistent notes across Claude sessions."
 ---
 

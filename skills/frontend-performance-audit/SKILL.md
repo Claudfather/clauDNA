@@ -1,5 +1,6 @@
 ---
 name: frontend-performance-audit
+user-invocable: true
 description: "Use when a frontend page or flow has performance symptoms -- flickering, slow loads, janky scroll, excessive re-renders, or layout shifts. Supports --output github to create issues and --output session for chat-only analysis."
 argument-hint: "[--auto] [--output github|session] [page-or-flow]"
 ---

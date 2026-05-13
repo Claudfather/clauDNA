@@ -1,5 +1,6 @@
 ---
 name: review-pr
+user-invocable: true
 description: "Use when you need to review a pull request -- yours or someone else's -- before merging."
 argument-hint: "[PR number or URL]"
 ---

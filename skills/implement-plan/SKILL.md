@@ -1,5 +1,6 @@
 ---
 name: implement-plan
+user-invocable: true
 description: "Use when you have a design or development plan document ready to implement against the codebase."
 argument-hint: "[--source github [number]] [file-path-or-directory]"
 allowed-tools:
