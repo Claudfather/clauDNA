@@ -1,5 +1,6 @@
 ---
 name: dbt
+user-invocable: true
 description: "Use when you need to run dbt commands against Snowflake -- build, test, compile, or full-refresh."
 argument-hint: "[dbt command or model name]"
 ---

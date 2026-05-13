@@ -1,5 +1,6 @@
 ---
 name: neon-info
+user-invocable: true
 description: "Use when you want a quick overview of your Neon PostgreSQL database -- connection status, tables, sizes, and branches."
 ---
 

@@ -1,5 +1,6 @@
 ---
 name: data-model-audit
+user-invocable: true
 description: "Use when you want to audit how well a data model serves its application — traces code paths to database interactions, maps intent to schema, and identifies mismatches, gaps, and optimization opportunities."
 ---
 

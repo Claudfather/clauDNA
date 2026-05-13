@@ -1,5 +1,6 @@
 ---
 name: neon-branch
+user-invocable: true
 description: "Use when you need to create, list, delete, or reset Neon database branches for safe experimentation."
 argument-hint: "[branch action: create, list, delete, reset]"
 ---

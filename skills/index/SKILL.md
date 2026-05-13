@@ -1,5 +1,6 @@
 ---
 name: index
+user-invocable: true
 description: "Scan a documentation directory, validate frontmatter, and regenerate INDEX.md. Use after creating or updating shared docs, or to audit knowledge base health. This is the sole writer of INDEX.md files."
 argument-hint: "[directory-path] [--validate-only] [--recursive] [--fix] [--stale]"
 ---

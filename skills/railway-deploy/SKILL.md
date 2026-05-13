@@ -1,5 +1,6 @@
 ---
 name: railway-deploy
+user-invocable: true
 description: "Use when you need to deploy a service to Railway or update an existing Railway deployment."
 argument-hint: "[service or environment]"
 ---

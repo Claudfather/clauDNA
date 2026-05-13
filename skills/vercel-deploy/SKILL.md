@@ -1,5 +1,6 @@
 ---
 name: vercel-deploy
+user-invocable: true
 description: "Use when you need to deploy to Vercel -- production or preview -- or update an existing deployment."
 argument-hint: "[environment: production or preview]"
 ---

@@ -1,5 +1,6 @@
 ---
 name: development-retro
+user-invocable: true
 description: "Use when a PR has been merged, a development session is ending, or the user asks what else you noticed — surfaces journey-specific observations, systemic patterns, and friction points from the implementation process."
 allowed-tools: Bash(git *), Bash(gh *), Read, Glob, Grep
 ---

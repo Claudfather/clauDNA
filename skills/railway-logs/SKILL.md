@@ -1,5 +1,6 @@
 ---
 name: railway-logs
+user-invocable: true
 description: "Use when you need to view, filter, or debug Railway service logs."
 argument-hint: "[service name or filter]"
 ---

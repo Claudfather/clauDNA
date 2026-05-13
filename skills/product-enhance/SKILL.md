@@ -1,5 +1,6 @@
 ---
 name: product-enhance
+user-invocable: true
 description: "Use when you have specific product issues to triage or want to discover enhancement opportunities through gap analysis. Supports --output github to create issues and --output session for chat-only analysis."
 argument-hint: "[--auto] [--output github|session] [focus-area]"
 ---
