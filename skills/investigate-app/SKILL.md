@@ -1,5 +1,6 @@
 ---
 name: investigate-app
+user-invocable: true
 description: "Use when something is broken in production and you need to investigate -- errors, outages, degraded performance, or unexpected behavior."
 ---
 

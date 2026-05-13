@@ -1,5 +1,6 @@
 ---
 name: name-session
+user-invocable: true
 description: "Use when ending a session and you want to label it for easy identification in /resume. Also useful mid-session when work scope becomes clear."
 allowed-tools: Bash(git *), Bash(gh *)
 ---

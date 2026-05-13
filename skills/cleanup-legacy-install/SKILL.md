@@ -1,5 +1,6 @@
 ---
 name: cleanup-legacy-install
+user-invocable: true
 description: "Use when upgrading from a pre-plugin clauDNA install (install.sh, claudefather, or claudfather) to the marketplace plugin. Detects and removes the legacy ~/.claude/ overlay so plugin-installed skills don't get shadowed by stale copies."
 allowed-tools: Read(*), Bash(ls *), Bash(cat *), Bash(diff *), Bash(cp *), Bash(rm *), Bash(rmdir *), Bash(mkdir *), Bash(date *), Bash(find *), Bash(test *)
 ---

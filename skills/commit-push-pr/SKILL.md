@@ -1,5 +1,6 @@
 ---
 name: commit-push-pr
+user-invocable: true
 description: "Use when changes are ready to commit, push, and open as a pull request in one step."
 ---
 

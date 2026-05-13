@@ -1,5 +1,6 @@
 ---
 name: visual-crawl
+user-invocable: true
 description: "Autonomous visual crawl + screenshot + issue-filing for frontend apps. Discovers routes, screenshots at 3 viewports, tests interactions, compares design tokens, and files GitHub issues for every finding. Supports --deep for full interactive testing (click every button, simulate chat, verify forms). Supports --output github (default), --output session, --auto, --url, --local."
 argument-hint: "[--auto] [--deep] [--output github|session] [--url <base-url>] [--local] [focus-area]"
 allowed-tools:

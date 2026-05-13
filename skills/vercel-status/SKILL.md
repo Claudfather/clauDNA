@@ -1,5 +1,6 @@
 ---
 name: vercel-status
+user-invocable: true
 description: "Use when you want an overview of your Vercel project -- deployments, domains, environment variables, and config."
 ---
 

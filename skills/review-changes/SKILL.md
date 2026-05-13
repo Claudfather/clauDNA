@@ -1,5 +1,6 @@
 ---
 name: review-changes
+user-invocable: true
 description: "Use when you have uncommitted changes and want them reviewed before committing."
 ---
 

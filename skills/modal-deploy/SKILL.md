@@ -1,5 +1,6 @@
 ---
 name: modal-deploy
+user-invocable: true
 description: "Use when you need to deploy a Modal app to production or update an existing deployment."
 argument-hint: "[app or module to deploy]"
 ---

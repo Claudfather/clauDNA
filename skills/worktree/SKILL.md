@@ -1,5 +1,6 @@
 ---
 name: worktree
+user-invocable: true
 description: "Use when you want to run multiple Claude sessions in parallel on different branches using git worktrees."
 ---
 

@@ -1,5 +1,6 @@
 ---
 name: modal-status
+user-invocable: true
 description: "Use when you want an overview of your Modal workspace -- deployed apps, containers, secrets, and volumes."
 ---
 

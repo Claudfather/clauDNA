@@ -1,5 +1,6 @@
 ---
 name: adversarial-review
+user-invocable: true
 description: "Challenge a plan, design, or proposal before committing to it. Applies first-principles thinking, pre-mortem analysis, assumption mapping, and structured lenses to surface gaps, edge cases, and failure modes. Use at any juncture where you have a direction and want it stress-tested before execution."
 argument-hint: "[plan-file-path] [--dispatch] [--output github|session]"
 ---

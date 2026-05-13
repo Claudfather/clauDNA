@@ -1,5 +1,6 @@
 ---
 name: tech-debt
+user-invocable: true
 description: "Use when you want to find and plan remediation of technical debt in the codebase. Supports --output github to create issues and --output session for chat-only analysis."
 argument-hint: "[--auto] [--output github|session] [focus-area]"
 ---

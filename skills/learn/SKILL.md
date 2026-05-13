@@ -1,5 +1,6 @@
 ---
 name: learn
+user-invocable: true
 description: "Knowledge ingestion — pull content from external sources into the knowledge base"
 argument-hint: "<url|path|text> [--repo name] [--tags a,b] [--full] [--update]"
 ---

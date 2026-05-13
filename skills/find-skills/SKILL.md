@@ -1,5 +1,6 @@
 ---
 name: find-skills
+user-invocable: true
 description: "Use when the user asks about finding, discovering, or installing agent skills, or asks how to do something that might exist as an installable skill."
 ---
 

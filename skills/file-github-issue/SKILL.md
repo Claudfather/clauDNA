@@ -1,5 +1,6 @@
 ---
 name: file-github-issue
+user-invocable: true
 description: "Use when a user wants to file a GitHub issue with a screenshot against a GitHub repo. Expected inputs: a screenshot, a short description, the target repo, and the page URL or app section where the issue was observed (the skill prompts for the URL if missing)."
 argument-hint: "[repo]"
 ---

@@ -1,5 +1,6 @@
 ---
 name: cache-audit
+user-invocable: true
 description: "Use when you want to check whether your CLAUDE.md and project configuration are hurting prompt cache efficiency."
 ---
 

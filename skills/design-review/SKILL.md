@@ -1,5 +1,6 @@
 ---
 name: design-review
+user-invocable: true
 description: "Use when you want a visual and UX audit of a deployed application to find design gaps and plan improvements. Supports --output github to create issues and --output session for chat-only analysis."
 argument-hint: "[--output github|session] [deployed-url]"
 allowed-tools:

@@ -1,5 +1,6 @@
 ---
 name: product-vision
+user-invocable: true
 description: "Architecture-aware product vision — explores what a codebase could become by analyzing existing infrastructure, identifying 1-2 hop features, grouping compound plays, and aligning to a project mission. Replaces /product-brainstorm. Supports --auto and --output github."
 argument-hint: "[--auto] [--output github|session] [focus-area]"
 ---
