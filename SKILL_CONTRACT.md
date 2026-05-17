@@ -121,6 +121,27 @@ The validator returns non-zero on any violation and prints a structured report. 
 
 To intentionally introduce a non-conforming skill (e.g. an experimental in-progress skill), add it to `scripts/validate-skills.py`'s `SKIP` set — but `SKIP` exists for genuinely transitional cases, not as a workaround for unwanted rules. Prefer fixing the skill.
 
+### 5.1. Behavioral checks (hard errors)
+
+Beyond frontmatter structure, the validator enforces behavioral consistency between what a skill *claims* and what its body *implements*:
+
+| Check | Trigger | Rule | Rationale |
+|---|---|---|---|
+| **`--output github` reference** | `argument-hint` contains `--output github` | Body must reference `output-guide` (matching `skills/_shared/output-guide.md`). | Skills claiming GitHub output must follow the shared output guide so consumers get consistent issue formatting. |
+| **`--auto` / `AskUserQuestion` conflict** | `argument-hint` contains `--auto` | Body must NOT contain the literal string `AskUserQuestion`. | `--auto` means non-interactive execution. `AskUserQuestion` blocks on user input, which contradicts the contract. |
+
+Both checks produce hard errors that fail CI.
+
+### 5.2. Advisory warnings (non-blocking)
+
+The validator also emits advisory warnings that surface potential staleness but do not fail CI:
+
+| Check | Trigger | Rule | Rationale |
+|---|---|---|---|
+| **`allowed-tools` body usage** | `allowed-tools` field is present | Each declared tool (or Bash command) should appear somewhere in the body text. Tools with zero mentions produce a `[WARN]`. | Catches stale `allowed-tools` lists where a tool was declared but the body no longer uses it. Some tools (e.g. `Read`, `Glob`) may be used implicitly — the warning is advisory, not CI-blocking. |
+
+Warnings print in the validator output but do not affect the exit code.
+
 ---
 
 ## 6. Changing this contract

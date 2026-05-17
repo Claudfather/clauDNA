@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Validator behavioral checks** — three new enforcement rules in `scripts/validate-skills.py` (#25):
+  - Skills claiming `--output github` in `argument-hint` must reference `output-guide.md` in the body (hard error).
+  - Skills claiming `--auto` in `argument-hint` must not contain `AskUserQuestion` in the body (hard error).
+  - Skills with `allowed-tools` entries not mentioned in the body emit advisory `[WARN]` (non-blocking, catches stale tool declarations).
 - `/claudna:skill-health` — diagnostic skill that checks plugin installation state: version currency, hook wiring, skill integrity, dependency availability, and telemetry configuration. Degrades gracefully without network access. (#63)
 - **Unified CI workflow** (`.github/workflows/ci.yml`) — gates PRs with four jobs: skill validation, manifest validation, changelog check (new [Unreleased] content required), and Python lint via ruff. Added `ruff.toml` config.
 
