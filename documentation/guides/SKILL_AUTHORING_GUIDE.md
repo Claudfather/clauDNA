@@ -2,7 +2,7 @@
 
 How to write, test, and submit a skill for clauDNA. This guide takes you from idea to merged PR.
 
-For the binding rules enforced by CI, see [SKILL_CONTRACT.md](../SKILL_CONTRACT.md). For the contribution workflow (branching, PRs, changelogs), see [CONTRIBUTING.md](../CONTRIBUTING.md). This guide focuses on _how to write a good skill_ — the craft, not just the contract.
+For the binding rules enforced by CI, see [SKILL_CONTRACT.md](../../SKILL_CONTRACT.md). For the contribution workflow (branching, PRs, changelogs), see [CONTRIBUTING.md](../../CONTRIBUTING.md). This guide focuses on _how to write a good skill_ — the craft, not just the contract.
 
 ## What Makes a Good Skill
 
@@ -159,7 +159,7 @@ This loads your local checkout as the plugin for one session. Invoke your skill 
 
 ### 6. Submit
 
-Follow the workflow in [CONTRIBUTING.md](../CONTRIBUTING.md): branch, CHANGELOG entry, PR.
+Follow the workflow in [CONTRIBUTING.md](../../CONTRIBUTING.md): branch, CHANGELOG entry, PR.
 
 ## Body Conventions
 
