@@ -3,6 +3,9 @@ name: modal-logs
 user-invocable: true
 description: "Use when you need to view, stream, or debug Modal app or container logs."
 argument-hint: "[app name or container ID]"
+requires:
+  - cli: modal
+    reason: "Modal CLI for log access"
 ---
 
 # Modal Logs

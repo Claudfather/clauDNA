@@ -2,6 +2,9 @@
 name: vercel-status
 user-invocable: true
 description: "Use when you want an overview of your Vercel project -- deployments, domains, environment variables, and config."
+requires:
+  - cli: vercel
+    reason: "Vercel CLI for project inspection"
 ---
 
 # Vercel Status
