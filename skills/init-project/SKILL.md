@@ -74,6 +74,14 @@ Generate `CLAUDE.md` using the template at [references/CLAUDE_MD_TEMPLATE.md](re
 
 **For large projects** (200+ lines after customization): Consider creating `.claude/rules/` files with `paths:` frontmatter to scope domain-specific rules to matching files. Keep CLAUDE.md under 200 lines — only universal rules and safety constraints.
 
+**Cache efficiency guidelines** (these affect prompt cache hit rates across every API call). For detailed scoring criteria (PASS/WARN/FAIL for each check), see [cache-checks.md](cache-checks.md) in this skill directory.
+- Static sections first, dynamic sections last. Add `<!-- Static sections above, project-specific sections below. Keep this order for prompt cache efficiency. -->` at the boundary.
+- Keep CLAUDE.md under 200 lines (WARN). Over 350 lines is a FAIL — significant token cost per call.
+- Don't auto-load `.claude/lessons.md` — keep lessons on-demand via `/claudna:lessons`.
+- Don't add instructions to edit CLAUDE.md mid-session — defer edits to session boundaries (`/claudna:session-handoff`).
+- Don't add instructions to switch models or tools mid-session — both invalidate the entire prompt cache.
+- If using `.claude/rules/`, ensure each file has `paths:` frontmatter (not `globs:`) to scope when each rule loads.
+
 **Do NOT:**
 - Leave `[bracket placeholders]` in the output
 - Remove static sections the user didn't ask about
@@ -177,3 +185,22 @@ docs: initialize project configuration (CLAUDE.md, CHANGELOG.md, .claude/, docum
 - **Keep static sections intact and ordered first.** The Workflow Orchestration, Core Principles, Self-Improvement Loop, and Task Management sections are universal clauDNA conventions. They must appear before project-specific dynamic sections for cache efficiency.
 - **Architecture must be real.** Scan the actual directory tree. Don't write a placeholder tree structure.
 - **CHANGELOG must reflect real history.** Use `git log` and `git tag`. Don't invent entries.
+
+---
+
+## Optional: Notification Setup (macOS)
+
+During Step 8, if the user is on macOS, mention notification options:
+
+**iTerm2 (recommended):** Profiles → Terminal → check "Send notification when idle" (set idle time to ~5 seconds). iTerm2 will alert when any terminal tab is waiting for input.
+
+**Hook-based:** The clauDNA plugin ships a notification hook in `plugin-hooks/hooks.json` that fires a macOS notification when Claude needs input. It activates automatically when the plugin is enabled.
+
+**Manual trigger:** `osascript -e 'display notification "Message" with title "Claude Code"'`
+
+**iTerm2 tab management tips:**
+- Right-click tab → "Edit Tab Title" to name Claude sessions
+- Right-click tab → "Tab Color" to color-code worktrees/tasks
+- Profiles → General → Badge → `\(session.path)` for directory badges
+
+This is informational context — do not block initialization on notification setup.

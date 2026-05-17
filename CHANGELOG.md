@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `/claudna:skill-health` — diagnostic skill that checks plugin installation state: version currency, hook wiring, skill integrity, dependency availability, and telemetry configuration. Degrades gracefully without network access. (#63)
+
+### Removed
+- `/claudna:snowflake-cutover` — off-mission one-shot playbook, never merged to main. (#43)
+- `/claudna:cache-audit` — cache efficiency guidance folded into `/claudna:init-project` Step 3. (#44)
+- `/claudna:notifications` — notification setup content folded into `/claudna:init-project` as optional guidance. (#45)
 - `requires` optional frontmatter field for skill dependency manifests. Each entry declares a `cli` tool (with optional `>=X.Y` version constraint) or `env` variable needed at runtime, plus an optional `reason`. Validated by `validate-skills.py` and `integration-test.py`.
 - `check_dependencies()` runtime function in `skill_checks.py` -- verifies required tools exist on PATH and env vars are set.
 - Populated `requires` for 20 skills with external CLI dependencies: dbt, vercel-*, modal-*, railway-*, neon-*, gh-dependent skills (commit-push-pr, review-pr, file-github-issue, github-activity-report, tech-debt, repo-health), and find-skills.

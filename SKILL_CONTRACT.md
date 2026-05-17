@@ -41,7 +41,7 @@ Hard rules:
 | `allowed-tools` | string OR list | Tool names / Bash patterns. Two equivalent forms are accepted: comma-separated string (`Bash(git *), Bash(gh *), Read`) or YAML list (`- Bash(git *)` / `- Bash(gh *)`). Required for skills that need tool gating beyond the user's default permissions. Patterns must use the canonical form `Bash(cmd *)` — the colon syntax `Bash(cmd:*)` is deprecated and validator-rejected. Unknown tool *names* are not rejected (the surface evolves), but unparseable entries are. |
 | `argument-hint` | string | Hint shown to the user when they type `/<skill>`. Convention: `[--flag] [positional-arg]`. Required if the skill accepts arguments. |
 | `requires` | list | External dependencies the skill needs at runtime. Each entry is a mapping with exactly one of `cli` (tool name, optionally with `>=X.Y` version constraint) or `env` (environment variable name), plus an optional `reason` string. Skills with no external dependencies omit the field. See schema below. |
-| `user-invocable` | boolean | Defaults to `true`. Set to `false` for context-only skills (loaded by name reference, not invoked as `/skill`). Currently only `notifications` uses this. |
+| `user-invocable` | boolean | Defaults to `true`. Set to `false` for context-only skills (loaded by name reference, not invoked as `/skill`). |
 
 ### Frontmatter example
 
@@ -88,7 +88,7 @@ Skills that only use built-in Claude Code tools (Read, Write, Bash, Grep, etc.) 
 The body is markdown. There is no rigid template, but the following conventions hold across the canonical set:
 
 1. **Lead with a one-line restatement** of what the skill does. Useful for the agent loading the file.
-2. **`## Procedure`** is the standard heading for the executable steps. Skills that don't fit a linear procedure (`/notes`, `/notifications`) use other headings.
+2. **`## Procedure`** is the standard heading for the executable steps. Skills that don't fit a linear procedure (`/notes`) use other headings.
 3. **Numbered steps** when ordering matters. Subagent-driven skills often have an explicit `EnterPlanMode` step early.
 4. **Reference long supporting material via filename** rather than inlining (`See subagent-prompts.md in this skill directory`). This keeps `SKILL.md` scannable; the orchestrator reads the file, subagents read the deep references at runtime.
 5. **Hard gates** — when a step blocks proceeding without evidence, mark it with `<HARD-GATE>` tags or "Iron Law" language. See `/implement-plan`, `/review-changes`, `/review-pr` for examples.
