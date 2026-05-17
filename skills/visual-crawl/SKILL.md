@@ -423,7 +423,7 @@ For each route at desktop viewport, extract via Playwright JavaScript evaluation
 Load design token reference from (in priority order):
 1. `--tokens <path>` argument if provided
 2. Project's `tokens.json`, `tailwind.config.js/ts`, CSS custom properties (`:root` vars)
-3. `design-hard-rules.md` in this skill's directory (fallback defaults)
+3. `design-token-rules.md` in this skill's directory (fallback defaults)
 
 Compare observed vs reference:
 - **Font families** not in the design system
