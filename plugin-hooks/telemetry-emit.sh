@@ -55,7 +55,7 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 BOT="${BOT_NAME:-interactive}"
 
 # Check for error indicators in tool output (simple heuristic)
-OUTCOME="success"
+SUCCESS="true"
 if command -v jq &>/dev/null; then
     TOOL_OUTPUT=$(printf '%s' "$EVENT" | jq -r '.tool_output // empty' 2>/dev/null || true)
 else
@@ -64,7 +64,7 @@ fi
 if [ -n "$TOOL_OUTPUT" ]; then
     case "$TOOL_OUTPUT" in
         *[Ee]rror*|*[Ff]ailed*|*[Ee]xception*|*ERROR*|*FAILED*)
-            OUTCOME="error"
+            SUCCESS="false"
             ;;
     esac
 fi
@@ -73,23 +73,23 @@ fi
 SESSION_ID="${CLAUDE_SESSION_ID:-$$}"
 
 # Write JSONL line — Claudosseum ingestion contract:
-# {"ts", "bot", "type", "source": "vitals", "data": {"skill", "duration_ms", "outcome", "session_id"}}
+# {"ts", "bot", "type", "source": "vitals", "data": {"skill_slug", "duration_ms", "success", "session_id"}}
 if command -v jq &>/dev/null; then
     printf '%s\n' "$(jq -cn \
         --arg ts "$TIMESTAMP" \
         --arg bot "$BOT" \
         --arg type "skill_invocation" \
         --arg source "vitals" \
-        --arg skill "$SKILL_NAME" \
+        --arg skill_slug "$SKILL_NAME" \
         --argjson duration_ms "null" \
-        --arg outcome "$OUTCOME" \
+        --argjson success "$SUCCESS" \
         --arg session_id "$SESSION_ID" \
-        '{ts: $ts, bot: $bot, type: $type, source: $source, data: {skill: $skill, duration_ms: $duration_ms, outcome: $outcome, session_id: $session_id}}')" \
+        '{ts: $ts, bot: $bot, type: $type, source: $source, data: {skill_slug: $skill_slug, duration_ms: $duration_ms, success: $success, session_id: $session_id}}')" \
         >> "$TELEMETRY_PATH"
 else
     # Manual JSON construction (no jq available)
-    printf '{"ts":"%s","bot":"%s","type":"skill_invocation","source":"vitals","data":{"skill":"%s","duration_ms":null,"outcome":"%s","session_id":"%s"}}\n' \
-        "$TIMESTAMP" "$BOT" "$SKILL_NAME" "$OUTCOME" "$SESSION_ID" \
+    printf '{"ts":"%s","bot":"%s","type":"skill_invocation","source":"vitals","data":{"skill_slug":"%s","duration_ms":null,"success":%s,"session_id":"%s"}}\n' \
+        "$TIMESTAMP" "$BOT" "$SKILL_NAME" "$SUCCESS" "$SESSION_ID" \
         >> "$TELEMETRY_PATH"
 fi
 
