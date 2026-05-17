@@ -85,7 +85,7 @@ Once the user picks a repo, suggest the relevant skill (`/claudna:context-resume
 
 ## Output Targets
 
-This skill supports `--output github` and `--output session` in addition to the default `docs` target.
+This skill supports `--output github` and `--output session` in addition to the default `session` target.
 
 Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: use the structured issue body format (Section 4), check for duplicates (Section 4.5), apply labels (Section 4.3). Create one issue per repo with actionable findings (stale branches, failing CI, PRs needing review). Label with `auto-audit` and `repo-health`.
