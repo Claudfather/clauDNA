@@ -1,0 +1,63 @@
+name: Skill Request
+description: Propose a new skill for clauDNA
+labels: ["enhancement", "skill-request"]
+body:
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: What problem does this skill solve? What workflow does it improve?
+      placeholder: "When I'm debugging a production issue, I need to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: trigger
+    attributes:
+      label: When should it trigger?
+      description: "Describe the situation where a developer would reach for this skill. Think: what would the `/claudna:...` description say?"
+      placeholder: "Use when you need to ... after ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-output
+    attributes:
+      label: Expected output
+      description: What should the skill produce? (Report, file changes, PR, GitHub issues, etc.)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: Where does this skill fit?
+      options:
+        - Workflow
+        - Code Quality
+        - Product
+        - Knowledge
+        - Git
+        - Data & Infrastructure
+        - Platform Operations
+        - Utilities
+        - Other / Not sure
+    validations:
+      required: false
+
+  - type: textarea
+    id: prior-art
+    attributes:
+      label: Prior art
+      description: Are there existing tools, scripts, or workflows that do something similar?
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Anything else — mockups, examples, related issues.
+    validations:
+      required: false

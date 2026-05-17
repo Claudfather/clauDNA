@@ -1,0 +1,48 @@
+name: Improvement
+description: Suggest an improvement to an existing skill, hook, or agent
+labels: ["enhancement"]
+body:
+  - type: input
+    id: skill
+    attributes:
+      label: Skill or component
+      description: Which existing skill, hook, or agent should be improved?
+      placeholder: "/claudna:review-pr, plugin-hooks/auto-format, etc."
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's wrong or missing?
+      description: Describe the gap, limitation, or friction you've encountered.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed improvement
+      description: How should it work instead? Be as specific as you can.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope estimate
+      description: How big is this change?
+      options:
+        - Small (tweak to existing behavior)
+        - Medium (new capability within existing skill)
+        - Large (significant rework or new integration)
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Examples, screenshots, related issues, or workarounds you're using.
+    validations:
+      required: false
