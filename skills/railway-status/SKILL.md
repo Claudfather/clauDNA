@@ -2,6 +2,9 @@
 name: railway-status
 user-invocable: true
 description: "Use when you want an overview of your Railway project -- services, deployments, environments, and metrics."
+requires:
+  - cli: railway
+    reason: "Railway CLI for project inspection"
 ---
 
 # Railway Status

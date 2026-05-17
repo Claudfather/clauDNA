@@ -370,6 +370,61 @@ def check_description_uniqueness(
     return dupes
 
 
+def check_requires_consistency(
+    skill_name: str, fm: dict, body: str
+) -> tuple[list[str], list[str]]:
+    """Cross-check requires entries against allowed-tools and body content.
+
+    Warns when a skill uses Bash(tool *) in allowed-tools but doesn't declare
+    the tool in requires, since that's a likely missing dependency.
+    """
+    errors = []
+    warnings = []
+    requires = fm.get("requires")
+    if requires is None:
+        # No requires field -- check if the skill references external CLIs
+        # in allowed-tools that suggest it should have one
+        allowed = fm.get("allowed-tools")
+        if allowed:
+            tool_names = extract_tool_names(allowed)
+            bash_tools = set()
+            if isinstance(allowed, str):
+                entries = [e.strip() for e in allowed.split(",") if e.strip()]
+            elif isinstance(allowed, list):
+                entries = [e.strip() for e in allowed if isinstance(e, str)]
+            else:
+                entries = []
+            for entry in entries:
+                m = re.match(r"^Bash\((\w+)\s", entry)
+                if m:
+                    tool = m.group(1)
+                    # git is ubiquitous, skip it
+                    if tool not in ("git",):
+                        bash_tools.add(tool)
+            if bash_tools:
+                warnings.append(
+                    f"allowed-tools references external CLI(s) {sorted(bash_tools)} "
+                    f"but no `requires` field declared"
+                )
+        return errors, warnings
+
+    if not isinstance(requires, list):
+        return errors, warnings  # schema error caught by validate_requires
+
+    # Check for duplicate entries
+    seen = set()
+    for entry in requires:
+        if not isinstance(entry, dict):
+            continue
+        key = entry.get("cli") or entry.get("env")
+        if key and key in seen:
+            errors.append(f"duplicate requires entry: {key!r}")
+        elif key:
+            seen.add(key)
+
+    return errors, warnings
+
+
 def check_code_blocks(skill_name: str, body: str) -> tuple[list[str], list[str]]:
     """Validate syntax of fenced code blocks in skill body."""
     errors = []
@@ -470,6 +525,11 @@ def main() -> int:
 
         # 7. Code block syntax
         e, w = check_code_blocks(name, body)
+        errors.extend(e)
+        warnings.extend(w)
+
+        # 8. Requires consistency
+        e, w = check_requires_consistency(name, fm, body)
         errors.extend(e)
         warnings.extend(w)
 

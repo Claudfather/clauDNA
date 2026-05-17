@@ -12,7 +12,12 @@ from pathlib import Path
 import yaml
 
 REQUIRED_FIELDS = {"name", "description"}
-KNOWN_FIELDS = REQUIRED_FIELDS | {"allowed-tools", "argument-hint", "user-invocable"}
+KNOWN_FIELDS = REQUIRED_FIELDS | {
+    "allowed-tools",
+    "argument-hint",
+    "requires",
+    "user-invocable",
+}
 
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*$")
 DESC_MIN = 20
@@ -88,6 +93,113 @@ def validate_allowed_tools(value) -> list[str]:
     return errors
 
 
+REQUIRES_ENTRY_TYPES = {"cli", "env"}
+
+# Regex for version constraints: >=1.0, >=3.10, >=2.0.0, etc.
+VERSION_CONSTRAINT_RE = re.compile(r"^>=\d+(\.\d+){0,2}$")
+
+
+def validate_requires(value) -> list[str]:
+    """Validate the requires field (list of dependency objects).
+
+    Each entry must be a dict with exactly one of 'cli' or 'env' (string),
+    and an optional 'reason' (string). cli entries may include a version
+    constraint suffix (e.g. 'gh>=2.0').
+    """
+    errors: list[str] = []
+    if not isinstance(value, list):
+        errors.append(f"requires must be a list, got {type(value).__name__}")
+        return errors
+
+    for i, entry in enumerate(value):
+        prefix = f"requires[{i}]"
+        if not isinstance(entry, dict):
+            errors.append(f"{prefix} must be a mapping, got {type(entry).__name__}")
+            continue
+
+        # Exactly one of cli or env
+        dep_keys = [k for k in entry if k in REQUIRES_ENTRY_TYPES]
+        extra_keys = [
+            k for k in entry if k not in REQUIRES_ENTRY_TYPES and k != "reason"
+        ]
+        if len(dep_keys) == 0:
+            errors.append(f"{prefix} must have 'cli' or 'env' key")
+        elif len(dep_keys) > 1:
+            errors.append(f"{prefix} must have exactly one of 'cli' or 'env', got both")
+
+        for k in extra_keys:
+            errors.append(f"{prefix} has unknown key {k!r} (allowed: cli, env, reason)")
+
+        # Validate value types
+        for k in dep_keys:
+            v = entry[k]
+            if not isinstance(v, str) or not v.strip():
+                errors.append(f"{prefix}.{k} must be a non-empty string")
+            elif k == "cli":
+                # Parse optional version constraint: name>=version
+                m = re.match(r"^([A-Za-z0-9_][A-Za-z0-9_.+-]*)(.*)$", v)
+                if not m:
+                    errors.append(f"{prefix}.cli: invalid tool name {v!r}")
+                elif m.group(2):
+                    constraint = m.group(2)
+                    if not VERSION_CONSTRAINT_RE.match(constraint):
+                        errors.append(
+                            f"{prefix}.cli: invalid version constraint {constraint!r} "
+                            f"(expected >=X.Y or >=X.Y.Z)"
+                        )
+
+        reason = entry.get("reason")
+        if reason is not None and not isinstance(reason, str):
+            errors.append(
+                f"{prefix}.reason must be a string, got {type(reason).__name__}"
+            )
+
+    return errors
+
+
+def check_dependencies(requires: list[dict]) -> list[dict]:
+    """Check whether required dependencies are available on PATH.
+
+    Returns a list of dicts with keys: type, name, available, reason.
+    Entries with available=False are missing dependencies.
+
+    This is a runtime check (not CI validation) -- call it when deciding
+    whether a skill can run on the current system.
+    """
+    import shutil
+
+    results = []
+    for entry in requires:
+        if "cli" in entry:
+            raw = entry["cli"]
+            # Strip version constraint for PATH lookup
+            tool = re.match(r"^([A-Za-z0-9_][A-Za-z0-9_.+-]*)", raw)
+            name = tool.group(1) if tool else raw
+            results.append(
+                {
+                    "type": "cli",
+                    "name": name,
+                    "spec": raw,
+                    "available": shutil.which(name) is not None,
+                    "reason": entry.get("reason", ""),
+                }
+            )
+        elif "env" in entry:
+            import os
+
+            var = entry["env"]
+            results.append(
+                {
+                    "type": "env",
+                    "name": var,
+                    "spec": var,
+                    "available": bool(os.environ.get(var)),
+                    "reason": entry.get("reason", ""),
+                }
+            )
+    return results
+
+
 def validate_skill_md(skill_md: Path, dir_name: str | None = None) -> list[str]:
     """Validate a SKILL.md file against the skill contract.
 
@@ -153,6 +265,10 @@ def validate_skill_md(skill_md: Path, dir_name: str | None = None) -> list[str]:
     # allowed-tools rules
     if "allowed-tools" in fm:
         errors.extend(validate_allowed_tools(fm["allowed-tools"]))
+
+    # requires rules
+    if "requires" in fm:
+        errors.extend(validate_requires(fm["requires"]))
 
     # argument-hint rules
     arg_hint = fm.get("argument-hint")

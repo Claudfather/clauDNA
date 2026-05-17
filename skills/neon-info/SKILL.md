@@ -2,6 +2,11 @@
 name: neon-info
 user-invocable: true
 description: "Use when you want a quick overview of your Neon PostgreSQL database -- connection status, tables, sizes, and branches."
+requires:
+  - cli: neonctl
+    reason: "Neon CLI for project and branch listing"
+  - cli: psql
+    reason: "PostgreSQL client for connection checks"
 ---
 
 # Neon Info

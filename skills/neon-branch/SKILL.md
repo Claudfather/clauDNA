@@ -3,6 +3,11 @@ name: neon-branch
 user-invocable: true
 description: "Use when you need to create, list, delete, or reset Neon database branches for safe experimentation."
 argument-hint: "[branch action: create, list, delete, reset]"
+requires:
+  - cli: neonctl
+    reason: "Neon CLI for branch management"
+  - cli: psql
+    reason: "PostgreSQL client for branch connection testing"
 ---
 
 # Neon Branch

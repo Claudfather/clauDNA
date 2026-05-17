@@ -2,6 +2,9 @@
 name: repo-health
 user-invocable: true
 description: "Use when you want a birds-eye view across multiple repositories to decide where to spend your time."
+requires:
+  - cli: gh
+    reason: "GitHub CLI for repo stats and PR listing"
 ---
 
 # Repo Health
