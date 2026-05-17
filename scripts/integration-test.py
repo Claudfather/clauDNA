@@ -386,7 +386,6 @@ def check_requires_consistency(
         # in allowed-tools that suggest it should have one
         allowed = fm.get("allowed-tools")
         if allowed:
-            tool_names = extract_tool_names(allowed)
             bash_tools = set()
             if isinstance(allowed, str):
                 entries = [e.strip() for e in allowed.split(",") if e.strip()]
@@ -398,8 +397,8 @@ def check_requires_consistency(
                 m = re.match(r"^Bash\((\w+)\s", entry)
                 if m:
                     tool = m.group(1)
-                    # git is ubiquitous, skip it
-                    if tool not in ("git",):
+                    # universally-available commands per SKILL_CONTRACT
+                    if tool not in ("git", "curl", "jq"):
                         bash_tools.add(tool)
             if bash_tools:
                 warnings.append(
