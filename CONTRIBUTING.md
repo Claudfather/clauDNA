@@ -105,6 +105,7 @@ python3 -m pytest tests/
 - **Descriptive title.** Use conventional commits: `feat:`, `fix:`, `docs:`, `chore:`.
 - **Fill out the PR template.** The checkboxes are there for a reason.
 - **Version bumps.** If your change affects what users get (new skill, changed behavior, hook change), bump `version` in `.claude-plugin/plugin.json`. Marketplace users only receive updates on version bumps. Bug fixes to docs or tests don't need a bump.
+- **CI must pass.** All four CI checks (skill validation, manifest validation, changelog check, lint) must pass before merge. The `main` branch has branch protection rules that enforce this.
 
 ## Release Process
 
