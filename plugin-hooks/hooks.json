@@ -31,6 +31,16 @@
         ]
       }
     ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/plugin-hooks/precompact-reflect.sh"
+          }
+        ]
+      }
+    ],
     "Notification": [
       {
         "hooks": [
