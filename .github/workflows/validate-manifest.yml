@@ -1,0 +1,30 @@
+name: Validate plugin manifest
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".claude-plugin/**"
+      - "plugin-hooks/hooks.json"
+      - "scripts/validate-manifest.py"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".claude-plugin/**"
+      - "plugin-hooks/hooks.json"
+      - "scripts/validate-manifest.py"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need tags for version regression check
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate manifest files
+        run: python scripts/validate-manifest.py
