@@ -202,12 +202,9 @@ The marketplace install is managed by Claude Code: plugins live under `~/.claude
 
 ## Contributing
 
-1. Edit files in `skills/`, `agents/`, or `plugin-hooks/` (source of truth).
-2. Test locally with `claude --plugin-dir /path/to/claudna` (loads the plugin for one session).
-3. Run `python3 scripts/validate-skills.py` — CI enforces the same.
-4. Bump `version` in `.claude-plugin/plugin.json` (marketplace users only get updates on version bumps).
-5. Update `CHANGELOG.md`.
-6. Submit PR — after merge, users update via `/plugin update claudna@Claudfather`.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full guide — contribution levels, development workflow, testing requirements, and PR expectations.
+
+Quick version: branch off `main`, make your change, run `python3 scripts/validate-skills.py`, update CHANGELOG.md, open a PR.
 
 ## Documentation
 
