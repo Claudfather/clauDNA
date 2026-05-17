@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Repo doc layout migrated to `documentation/` per the standard.** clauDNA now follows its own [`documentation/specs/repo-documentation-standard.md`](./documentation/specs/repo-documentation-standard.md) (formerly at `docs/specs/`). All three files moved via `git mv` to preserve history: `SKILL_AUTHORING_GUIDE.md` → `documentation/guides/`, two specs → `documentation/specs/`. Scaffolded the full `documentation/` tree (`planning/{phases,tech_debt,security,access-paths,product-vision,investigations}`, `decisions/`, `archive/`) with `.gitkeep` markers so the repo dogfoods what `/claudna:init-project` produces for downstream projects. Updated in-repo references in `README.md` (×2), `skills/init-project/SKILL.md`, and relative links inside the moved `SKILL_AUTHORING_GUIDE.md`. Ecosystem-wide alignment tracked at [Claudfather/.github#2](https://github.com/Claudfather/.github/issues/2) and [Claudfather/Claudlobby#269](https://github.com/Claudfather/Claudlobby/issues/269).
+
 ### Added
 - **Validator behavioral checks** — three new enforcement rules in `scripts/validate-skills.py` (#25):
   - Skills claiming `--output github` in `argument-hint` must reference `output-guide.md` in the body (hard error).

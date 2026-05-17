@@ -122,7 +122,7 @@ If the user provided a clear description in Step 2, write a real mission stateme
 
 ### Step 7: Scaffold documentation/
 
-If `documentation/planning/` doesn't exist, create the standard planning structure. This is the shared directory layout that planning and audit skills write to (see `docs/specs/repo-documentation-standard.md` for the full spec).
+If `documentation/planning/` doesn't exist, create the standard planning structure. This is the shared directory layout that planning and audit skills write to (see `documentation/specs/repo-documentation-standard.md` for the full spec).
 
 Create these directories with `.gitkeep` files:
 
