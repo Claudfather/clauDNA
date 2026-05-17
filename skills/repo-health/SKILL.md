@@ -1,7 +1,8 @@
 ---
 name: repo-health
 user-invocable: true
-description: "Use when you want a birds-eye view across multiple repositories to decide where to spend your time."
+description: "Use when you want a birds-eye view across multiple repositories to decide where to spend your time. Supports --output github to create issues and --output session for chat-only analysis."
+argument-hint: "[--output github|session] [parent-directory]"
 requires:
   - cli: gh
     reason: "GitHub CLI for repo stats and PR listing"
@@ -12,6 +13,15 @@ requires:
 Birds-eye view across multiple repositories. Scan for open PRs, CI status, stale branches, pending plan docs, and uncommitted work — then present a single dashboard.
 
 **Reference:** `health-checks.md` — detailed check definitions, commands, and example output formats.
+
+## Arguments
+
+Parse `$ARGUMENTS` at invocation:
+- `--output github`: Write findings and plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
+- `--output session`: Present findings in chat only, no persistence.
+- Remaining text is a parent directory path to scan. If provided, skip the discovery prompt.
+
+Default (no flag): Write planning docs to `documentation/planning/`.
 
 ## Procedure
 
@@ -68,6 +78,19 @@ After the main dashboard, run a quick hygiene scan. Skip entirely if everything 
 ### Step 6: Handoff
 
 Once the user picks a repo, suggest the relevant skill (`/claudna:context-resume`, `/claudna:review-pr`, `/claudna:implement-plan`). If it's a different directory, tell the user to switch there first.
+
+---
+
+---
+
+## Output Targets
+
+This skill supports `--output github` and `--output session` in addition to the default `docs` target.
+
+Follow the output guide at `skills/_shared/output-guide.md`:
+- For `github`: use the structured issue body format (Section 4), check for duplicates (Section 4.5), apply labels (Section 4.3). Create one issue per repo with actionable findings (stale branches, failing CI, PRs needing review). Label with `auto-audit` and `repo-health`.
+- For `session`: present findings in chat, stay in Plan Mode (Section 5)
+- For `docs` (default): write the dashboard and priority recommendations to `documentation/planning/repo-health/<session_name>_<YYYY-MM-DD>/`
 
 ---
 
