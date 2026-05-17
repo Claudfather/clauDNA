@@ -24,7 +24,13 @@ SESSION_ID=""
 if command -v jq &>/dev/null; then
     SESSION_ID=$(printf '%s' "$EVENT" | jq -r '.session_id // empty' 2>/dev/null || true)
 fi
-SESSION_ID="${SESSION_ID:-${CLAUDE_SESSION_ID:-$$}}"
+SESSION_ID="${SESSION_ID:-${CLAUDE_SESSION_ID:-}}"
+
+# No stable session ID available — fail-open to avoid infinite block loop
+# ($$ changes per subprocess invocation, so marker files would never match)
+if [ -z "$SESSION_ID" ]; then
+    exit 0
+fi
 
 MARKER_DIR="${TMPDIR:-/tmp}"
 MARKER="${MARKER_DIR}/claudna-reflected-${SESSION_ID}"
