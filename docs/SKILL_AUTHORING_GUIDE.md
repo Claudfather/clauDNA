@@ -62,8 +62,10 @@ That's the minimum. The full field reference:
 | `name` | Yes | string | Must match the directory name exactly. `kebab-case`. |
 | `description` | Yes | string | 20-500 characters. Start with "Use when...". This surfaces in the skill picker — be specific enough that the loader can decide relevance. |
 | `allowed-tools` | No | string or list | Restricts which tools the skill can use. Omit to allow all tools. Use when the skill runs dangerous commands and you want to whitelist specific patterns. |
-| `argument-hint` | No | string | Shown when the user types `/claudna:<name>`. Convention: `[--flag] [positional-arg]`. |
+| `argument-hint` | No | string | Shown when the user types `/claudna:<name>`. Convention: `[--flag] [positional-arg]`. Strongly recommended when the skill accepts arguments. |
 | `user-invocable` | No | boolean | Defaults to `true`. Set to `false` for context-only skills loaded by reference, not invoked as a slash command. |
+
+The validator rejects unknown fields. Only the five fields listed above are accepted in frontmatter.
 
 **`allowed-tools` examples:**
 
@@ -138,6 +140,14 @@ python3 scripts/validate-skills.py
 ```
 
 Fix any violations. The validator checks frontmatter fields, name matching, description length, body length (minimum 200 characters), and stale hardcoded paths.
+
+### 4b. Bump Version and Validate Manifest
+
+Bump `version` in `.claude-plugin/plugin.json` — marketplace users only receive updates on version bumps. Then verify the manifest is valid:
+
+```bash
+python3 scripts/validate-manifest.py
+```
 
 ### 5. Test Locally
 

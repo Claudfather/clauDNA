@@ -214,7 +214,7 @@ Quick version: branch off `main`, make your change, run `python3 scripts/validat
 | [CLAUDE.md](./CLAUDE.md) | Operating rules for agents extending clauDNA |
 | [SKILL_CONTRACT.md](./SKILL_CONTRACT.md) | The binding contract every skill must satisfy. Enforced in CI by `scripts/validate-skills.py` |
 | [SETUP_GUIDE.md](./SETUP_GUIDE.md) | Deep-dive setup — settings.json bootstrap, headless/CI provisioning, Snowflake key-pair auth, troubleshooting |
-| [SKILL_AUTHORING_GUIDE](./docs/SKILL_AUTHORING_GUIDE.md) | How to write, test, and submit a skill — patterns, examples, anti-patterns |
+| [SKILL_AUTHORING_GUIDE.md](./docs/SKILL_AUTHORING_GUIDE.md) | How to write, test, and submit a skill — patterns, examples, anti-patterns |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | Contribution workflow — bug reports, PRs, testing requirements |
 | [CLAUDE_MD_TEMPLATE.md](./CLAUDE_MD_TEMPLATE.md) | Template for project-level `CLAUDE.md` files (used by `/claudna:init-project`) |
 | [CHANGELOG.md](./CHANGELOG.md) | All notable changes |
