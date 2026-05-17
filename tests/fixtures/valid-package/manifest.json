@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0.0",
+  "promotion": {
+    "promoted_at": "2026-05-16T14:30:00Z",
+    "promoted_by": "claudosseum-gate",
+    "gate_type": "auto_with_human_confirm",
+    "human_approver": null
+  },
+  "skill": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "slug": "example-review",
+    "name": "Example Review",
+    "version": "1.0.0",
+    "category": {
+      "domain": "code-review",
+      "function": "pr",
+      "slug": "code-review-pr"
+    },
+    "content_hash": "sha256:300683fc262de5e8b15408d97552727e82659704906183bfc2bb8641655c3d2f"
+  },
+  "criteria_snapshot": {
+    "elo_rating": 1487,
+    "battles": 8,
+    "win_rate": 0.75,
+    "wins": 6,
+    "losses": 2,
+    "draws": 0,
+    "mean_judge_confidence": 72,
+    "min_battle_confidence": 58,
+    "invocations": 127,
+    "success_rate": 0.92,
+    "distinct_users": 5,
+    "days_in_production": 14
+  },
+  "lineage": {
+    "parent_candidates": [],
+    "evolution_depth": 0,
+    "original_source_type": "community_submission",
+    "original_source_url": "https://github.com/user/skills-repo"
+  },
+  "claudna": {
+    "target_version": "0.4.0",
+    "replaces_skill": null,
+    "is_update": false
+  }
+}
