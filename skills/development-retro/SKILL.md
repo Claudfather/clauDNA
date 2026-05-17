@@ -1,7 +1,8 @@
 ---
 name: development-retro
 user-invocable: true
-description: "Use when a PR has been merged, a development session is ending, or the user asks what else you noticed — surfaces journey-specific observations, systemic patterns, and friction points from the implementation process."
+description: "Use when a PR has been merged, a development session is ending, or the user asks what else you noticed — surfaces journey-specific observations, systemic patterns, and friction points from the implementation process. Supports --output github to create issues and --output session for chat-only analysis."
+argument-hint: "[--output github|session]"
 allowed-tools: Bash(git *), Bash(gh *), Read, Glob, Grep
 ---
 
@@ -10,6 +11,14 @@ allowed-tools: Bash(git *), Bash(gh *), Read, Glob, Grep
 Surface observations from the implementation journey — things you noticed *while doing the work* that fell outside the PR's scope.
 
 **This is NOT a code review.** Code review finds bugs in the diff. A retro surfaces insights from the journey: patterns you noticed across files, friction you experienced, inconsistencies you worked around, areas you suspect have similar issues but didn't verify.
+
+## Arguments
+
+Parse `$ARGUMENTS` at invocation:
+- `--output github`: Write findings and plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
+- `--output session`: Present findings in chat only, no persistence.
+
+Default (no flag): Present retro in chat (session-only by default).
 
 ## When to Use
 
@@ -130,6 +139,19 @@ Omit any section that genuinely has nothing — but challenge yourself before sk
 - Observations could have been made by scanning the code without doing the PR work
 
 **The test:** Could someone who *didn't* do this work have written your retro just by reading the codebase? If yes, it's code review, not a retro. Reframe.
+
+---
+
+## Output Targets
+
+This skill supports `--output github` and `--output session` in addition to the default `session` target.
+
+Follow the output guide at `skills/_shared/output-guide.md`:
+- For `github`: use the structured issue body format (Section 4), check for duplicates (Section 4.5), apply labels (Section 4.3). Create one issue per systemic pattern or breadcrumb trail that warrants follow-up work. Label with `auto-audit` and `tech-debt` or `enhancement` as appropriate.
+- For `session` (default): present findings in chat, stay in Plan Mode (Section 5)
+- For `docs`: write the retro to `documentation/planning/retros/<session_name>_<YYYY-MM-DD>/`
+
+---
 
 ## Common Rationalizations
 
