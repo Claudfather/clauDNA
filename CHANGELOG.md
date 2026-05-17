@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **PreCompact reflect hook** (`plugin-hooks/precompact-reflect.sh`) — auto-triggers `/claudna:reflect` before context compaction so session learnings get captured before they're lost. Blocks first compaction attempt, instructs Claude to reflect, then allows the retry. Opt-out: `CLAUDNA_PRECOMPACT_REFLECT=0`. (#27)
 - **Validator behavioral checks** — three new enforcement rules in `scripts/validate-skills.py` (#25):
   - Skills claiming `--output github` in `argument-hint` must reference `output-guide.md` in the body (hard error).
   - Skills claiming `--auto` in `argument-hint` must not contain `AskUserQuestion` in the body (hard error).
