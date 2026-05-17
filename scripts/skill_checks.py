@@ -66,15 +66,11 @@ def validate_allowed_tools(value) -> list[str]:
         entries = []
         for i, entry in enumerate(value):
             if not isinstance(entry, str):
-                errors.append(
-                    f"allowed-tools[{i}] must be a string, got {type(entry).__name__}"
-                )
+                errors.append(f"allowed-tools[{i}] must be a string, got {type(entry).__name__}")
                 continue
             entries.append(entry.strip())
     else:
-        errors.append(
-            f"allowed-tools must be a string or list, got {type(value).__name__}"
-        )
+        errors.append(f"allowed-tools must be a string or list, got {type(value).__name__}")
         return errors
 
     for entry in entries:
@@ -119,9 +115,7 @@ def validate_requires(value) -> list[str]:
 
         # Exactly one of cli or env
         dep_keys = [k for k in entry if k in REQUIRES_ENTRY_TYPES]
-        extra_keys = [
-            k for k in entry if k not in REQUIRES_ENTRY_TYPES and k != "reason"
-        ]
+        extra_keys = [k for k in entry if k not in REQUIRES_ENTRY_TYPES and k != "reason"]
         if len(dep_keys) == 0:
             errors.append(f"{prefix} must have 'cli' or 'env' key")
         elif len(dep_keys) > 1:
@@ -144,15 +138,12 @@ def validate_requires(value) -> list[str]:
                     constraint = m.group(2)
                     if not VERSION_CONSTRAINT_RE.match(constraint):
                         errors.append(
-                            f"{prefix}.cli: invalid version constraint {constraint!r} "
-                            f"(expected >=X.Y or >=X.Y.Z)"
+                            f"{prefix}.cli: invalid version constraint {constraint!r} (expected >=X.Y or >=X.Y.Z)"
                         )
 
         reason = entry.get("reason")
         if reason is not None and not isinstance(reason, str):
-            errors.append(
-                f"{prefix}.reason must be a string, got {type(reason).__name__}"
-            )
+            errors.append(f"{prefix}.reason must be a string, got {type(reason).__name__}")
 
     return errors
 
@@ -200,6 +191,80 @@ def check_dependencies(requires: list[dict]) -> list[dict]:
     return results
 
 
+def _parse_allowed_tools_entries(value) -> list[str]:
+    """Extract individual tool entries from an allowed-tools value."""
+    if isinstance(value, str):
+        return [e.strip() for e in value.split(",") if e.strip()]
+    elif isinstance(value, list):
+        return [e.strip() for e in value if isinstance(e, str)]
+    return []
+
+
+def check_output_github_reference(fm: dict, body: str) -> list[str]:
+    """If argument-hint contains '--output github', body must reference output-guide.md."""
+    errors: list[str] = []
+    arg_hint = fm.get("argument-hint", "")
+    if not isinstance(arg_hint, str):
+        return errors
+    if "--output github" in arg_hint:
+        if "output-guide" not in body:
+            errors.append(
+                "argument-hint claims '--output github' but body does not reference "
+                "output-guide.md (expected: skills/_shared/output-guide.md)"
+            )
+    return errors
+
+
+def check_auto_no_ask_user(fm: dict, body: str) -> list[str]:
+    """If argument-hint contains '--auto', body must not contain AskUserQuestion."""
+    errors: list[str] = []
+    arg_hint = fm.get("argument-hint", "")
+    if not isinstance(arg_hint, str):
+        return errors
+    if "--auto" in arg_hint:
+        if "AskUserQuestion" in body:
+            errors.append(
+                "argument-hint claims '--auto' (non-interactive) but body contains "
+                "'AskUserQuestion' -- contradicts non-interactive contract"
+            )
+    return errors
+
+
+def check_allowed_tools_usage(fm: dict, body: str) -> list[str]:
+    """Warn if allowed-tools declares a tool never mentioned in body.
+
+    Returns a list of warning strings (advisory, not CI-blocking).
+    """
+    warnings: list[str] = []
+    if "allowed-tools" not in fm:
+        return warnings
+
+    entries = _parse_allowed_tools_entries(fm["allowed-tools"])
+    for entry in entries:
+        # Extract the tool name (e.g. "Bash" from "Bash(git *)", "Read" from "Read")
+        m = re.match(r"^([A-Za-z]+)(\(.*\))?$", entry)
+        if not m:
+            continue
+        tool_name = m.group(1)
+        pattern = m.group(2)  # e.g. "(git *)" or None
+
+        # For Bash(cmd *) patterns, check for the command name in body
+        if tool_name == "Bash" and pattern:
+            inner = pattern[1:-1].strip()  # strip parens
+            # Extract the command: first word before space or *
+            cmd = inner.split()[0].rstrip("*") if inner else ""
+            if cmd:
+                # Check if command is referenced anywhere in body
+                if cmd not in body:
+                    warnings.append(f"allowed-tools declares 'Bash({inner})' but '{cmd}' is never mentioned in body")
+        else:
+            # Plain tool name (Read, Glob, Edit, etc.)
+            if tool_name not in body:
+                warnings.append(f"allowed-tools declares '{tool_name}' but it is never mentioned in body")
+
+    return warnings
+
+
 def validate_skill_md(skill_md: Path, dir_name: str | None = None) -> list[str]:
     """Validate a SKILL.md file against the skill contract.
 
@@ -233,9 +298,7 @@ def validate_skill_md(skill_md: Path, dir_name: str | None = None) -> list[str]:
     # Unknown fields
     for field in fm:
         if field not in KNOWN_FIELDS:
-            errors.append(
-                f"frontmatter has unknown field {field!r} (allowed: {sorted(KNOWN_FIELDS)})"
-            )
+            errors.append(f"frontmatter has unknown field {field!r} (allowed: {sorted(KNOWN_FIELDS)})")
 
     # name rules
     fm_name = fm.get("name")
@@ -246,9 +309,7 @@ def validate_skill_md(skill_md: Path, dir_name: str | None = None) -> list[str]:
             if not NAME_RE.match(fm_name):
                 errors.append(f"name {fm_name!r} must match {NAME_RE.pattern}")
             if dir_name is not None and fm_name != dir_name:
-                errors.append(
-                    f"name {fm_name!r} does not match directory name {dir_name!r}"
-                )
+                errors.append(f"name {fm_name!r} does not match directory name {dir_name!r}")
 
     # description rules
     desc = fm.get("description")
@@ -278,16 +339,12 @@ def validate_skill_md(skill_md: Path, dir_name: str | None = None) -> list[str]:
     # user-invocable rules
     user_invocable = fm.get("user-invocable")
     if user_invocable is not None and not isinstance(user_invocable, bool):
-        errors.append(
-            f"user-invocable must be a boolean, got {type(user_invocable).__name__}"
-        )
+        errors.append(f"user-invocable must be a boolean, got {type(user_invocable).__name__}")
 
     # body length
     body_chars = len(body.strip())
     if body_chars < BODY_MIN:
-        errors.append(
-            f"body too short ({body_chars} chars, min {BODY_MIN}) -- looks like a stub"
-        )
+        errors.append(f"body too short ({body_chars} chars, min {BODY_MIN}) -- looks like a stub")
 
     # Stale hardcoded path check
     name = fm_name if isinstance(fm_name, str) else dir_name
@@ -296,4 +353,30 @@ def validate_skill_md(skill_md: Path, dir_name: str | None = None) -> list[str]:
             if STALE_PATH_RE.search(line):
                 errors.append(f"stale hardcoded path: {line.strip()}")
 
+    # Behavioral checks (hard errors)
+    errors.extend(check_output_github_reference(fm, body))
+    errors.extend(check_auto_no_ask_user(fm, body))
+
     return errors
+
+
+def warn_skill_md(skill_md: Path) -> list[str]:
+    """Return advisory warnings for a SKILL.md (not CI-blocking).
+
+    Args:
+        skill_md: Path to the SKILL.md file.
+
+    Returns:
+        List of warning strings (empty = clean).
+    """
+    if not skill_md.is_file():
+        return []
+    try:
+        parsed = parse_frontmatter(skill_md)
+    except ValueError:
+        return []
+    if parsed is None:
+        return []
+
+    fm, body = parsed
+    return check_allowed_tools_usage(fm, body)
