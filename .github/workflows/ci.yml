@@ -24,6 +24,22 @@ jobs:
       - name: Run integration tests
         run: python3 scripts/integration-test.py
 
+  validate-agents:
+    name: Validate agents
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Validate agent contract
+        run: python3 scripts/validate-agents.py
+
   validate-manifest:
     name: Validate manifest
     runs-on: ubuntu-latest

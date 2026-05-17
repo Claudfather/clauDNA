@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Skills claiming `--auto` in `argument-hint` must not contain `AskUserQuestion` in the body (hard error).
   - Skills with `allowed-tools` entries not mentioned in the body emit advisory `[WARN]` (non-blocking, catches stale tool declarations).
 - `/claudna:skill-health` — diagnostic skill that checks plugin installation state: version currency, hook wiring, skill integrity, dependency availability, and telemetry configuration. Degrades gracefully without network access. (#63)
+- `AGENT_CONTRACT.md` + `scripts/validate-agents.py` + `.github/workflows/validate-agents.yml` — agents get the same contract/validator/CI gate pattern as skills. Validates frontmatter (name, description, model, memory, tools, background, isolation), body length, name-filename match, and duplicate detection. All 8 existing agents pass. (#26)
 - **Unified CI workflow** (`.github/workflows/ci.yml`) — gates PRs with four jobs: skill validation, manifest validation, changelog check (new [Unreleased] content required), and Python lint via ruff. Added `ruff.toml` config.
 
 ### Removed
