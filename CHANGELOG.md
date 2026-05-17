@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `check_dependencies()` runtime function in `skill_checks.py` -- verifies required tools exist on PATH and env vars are set.
 - Populated `requires` for 20 skills with external CLI dependencies: dbt, vercel-*, modal-*, railway-*, neon-*, gh-dependent skills (commit-push-pr, review-pr, file-github-issue, github-activity-report, tech-debt, repo-health), and find-skills.
 - Unit tests for `validate_requires()` and `check_dependencies()` in `tests/test_requires.py`.
+- `/claudna:skill-scaffold` — interactive scaffolding wizard that generates a new skill directory with valid frontmatter, body skeleton, and optional subagent reference stubs. Validates output passes `validate-skills.py` before presenting. (#49)
 
 ## [0.2.0] - 2026-05-11
 
