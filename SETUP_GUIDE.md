@@ -17,9 +17,10 @@ If all you need is "install clauDNA", read the README. Come here when something 
 4. [Headless / CI / Docker Provisioning](#4-headless--ci--docker-provisioning)
 5. [Snowflake Key-Pair Authentication](#5-snowflake-key-pair-authentication)
 6. [Shell Configuration](#6-shell-configuration)
-7. [Troubleshooting](#7-troubleshooting)
-8. [Appendix A: Boris Cherny's Key Tips](#appendix-a-boris-chernys-key-tips)
-9. [Appendix B: Workflow Orchestration Principles](#appendix-b-workflow-orchestration-principles)
+7. [Telemetry](#7-telemetry)
+8. [Troubleshooting](#8-troubleshooting)
+9. [Appendix A: Boris Cherny's Key Tips](#appendix-a-boris-chernys-key-tips)
+10. [Appendix B: Workflow Orchestration Principles](#appendix-b-workflow-orchestration-principles)
 
 ---
 
@@ -499,7 +500,55 @@ The `/claudna:worktree` skill manages this interactively if you'd rather not mem
 
 ---
 
-## 7. Troubleshooting
+## 7. Telemetry
+
+clauDNA can emit lightweight telemetry events when skills are invoked. Events are **local-only** -- written to a JSONL file on disk. clauDNA does not phone home. The fleet observability system (Claudlobby) can optionally push these events to Claudosseum.
+
+### What's collected
+
+Each event records:
+
+| Field | Value |
+|-------|-------|
+| `event` | `"skill_invocation"` |
+| `skill` | Skill name (e.g., `claudna:review-pr`) |
+| `ts` | ISO 8601 timestamp (UTC) |
+| `bot` | `BOT_NAME` env var, or `"interactive"` |
+| `duration_ms` | `null` (not available in PostToolUse hooks) |
+| `success` | `true` / `false` (heuristic based on error indicators in output) |
+
+No prompts, tool arguments, file paths, or PII are captured.
+
+### Where events go
+
+Events are appended as JSONL to:
+
+```
+~/.claude/telemetry/skill-events.jsonl
+```
+
+Override the path with `CLAUDNA_TELEMETRY_PATH`.
+
+### Enabling / disabling
+
+| Context | Default | How to change |
+|---------|---------|---------------|
+| Interactive users | **Off** | Set `CLAUDNA_TELEMETRY=1` to enable |
+| Fleet bots | **On** (Claudlobby sets `CLAUDNA_TELEMETRY=1`) | Set `CLAUDNA_TELEMETRY=0` to disable |
+
+The hook checks `CLAUDNA_TELEMETRY` on every invocation and exits immediately if it's not `1`. There is no startup cost when telemetry is off.
+
+### Auto-pruning
+
+Entries older than 30 days are pruned automatically. Pruning runs opportunistically (roughly every 100th write) to avoid adding latency to normal skill invocations.
+
+### Integration with fleet observability
+
+Claudlobby's fleet observability system can read `skill-events.jsonl` and optionally push events to Claudosseum for fleet-wide dashboards. See Claudlobby's observability documentation for configuration.
+
+---
+
+## 8. Troubleshooting
 
 ### Snowflake: "JWT token is invalid"
 
