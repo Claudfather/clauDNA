@@ -21,3 +21,6 @@ jobs:
 
       - name: Run skill validator
         run: python scripts/validate-skills.py
+
+      - name: Run integration tests
+        run: python scripts/integration-test.py
