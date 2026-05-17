@@ -124,4 +124,4 @@ Be respectful, constructive, and assume good intent. We're building tools that m
 
 ## Questions?
 
-Open a [discussion](https://github.com/Claudfather/clauDNA/discussions) or ask in an issue. No question is too small.
+Open an [issue](https://github.com/Claudfather/clauDNA/issues) — no question is too small.
