@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `/claudna:skill-health` — diagnostic skill that checks plugin installation state: version currency, hook wiring, skill integrity, dependency availability, and telemetry configuration. Degrades gracefully without network access. (#63)
+- `AGENT_CONTRACT.md` + `scripts/validate-agents.py` + `.github/workflows/validate-agents.yml` — agents get the same contract/validator/CI gate pattern as skills. Validates frontmatter (name, description, model, memory, tools, background, isolation), body length, name-filename match, and duplicate detection. All 8 existing agents pass. (#26)
 - **Unified CI workflow** (`.github/workflows/ci.yml`) — gates PRs with four jobs: skill validation, manifest validation, changelog check (new [Unreleased] content required), and Python lint via ruff. Added `ruff.toml` config.
 
 ### Removed
