@@ -1,0 +1,16 @@
+{
+  "period": {
+    "from": "2026-05-01",
+    "to": "2026-05-16"
+  },
+  "invocations": 127,
+  "success_rate": 0.92,
+  "failure_rate": 0.08,
+  "distinct_users": 5,
+  "median_duration_ms": 3200,
+  "p95_duration_ms": 8400,
+  "invocations_by_day": [
+    { "date": "2026-05-01", "count": 8 },
+    { "date": "2026-05-02", "count": 12 }
+  ]
+}

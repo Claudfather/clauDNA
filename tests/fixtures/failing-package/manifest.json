@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0.0",
+  "promotion": {
+    "promoted_at": "not-a-date",
+    "promoted_by": "test",
+    "gate_type": "manual"
+  },
+  "skill": {
+    "id": "uuid",
+    "slug": "bad-skill",
+    "name": "Bad Skill",
+    "version": "0.1.0",
+    "category": {
+      "domain": "test",
+      "function": "test",
+      "slug": "test-test"
+    },
+    "content_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "criteria_snapshot": {
+    "elo_rating": 1200,
+    "battles": 3,
+    "win_rate": 0.45,
+    "wins": 2,
+    "losses": 3,
+    "draws": 0,
+    "mean_judge_confidence": 50,
+    "min_battle_confidence": 30,
+    "invocations": 20,
+    "success_rate": 0.70,
+    "distinct_users": 1,
+    "days_in_production": 3
+  },
+  "claudna": {
+    "target_version": "0.4.0",
+    "replaces_skill": null,
+    "is_update": false
+  }
+}

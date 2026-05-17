@@ -1,0 +1,9 @@
+{
+  "period": {
+    "from": "2026-05-10",
+    "to": "2026-05-13"
+  },
+  "invocations": 20,
+  "success_rate": 0.70,
+  "distinct_users": 1
+}
