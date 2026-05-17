@@ -3,6 +3,9 @@ name: neon-query
 user-invocable: true
 description: "Use when you need to run SQL queries against Neon PostgreSQL or explore database schema and data."
 argument-hint: "[SQL query or exploration request]"
+requires:
+  - cli: psql
+    reason: "PostgreSQL client for query execution"
 ---
 
 # Neon Query

@@ -14,6 +14,9 @@ allowed-tools:
   - Grep
   - Agent
   - WebFetch
+requires:
+  - cli: "gh"
+    reason: "GitHub API access for fetching repo contents and file trees"
 ---
 
 # Heist — Raid a Repo for Good Ideas

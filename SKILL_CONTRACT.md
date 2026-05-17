@@ -40,6 +40,7 @@ Hard rules:
 |---|---|---|
 | `allowed-tools` | string OR list | Tool names / Bash patterns. Two equivalent forms are accepted: comma-separated string (`Bash(git *), Bash(gh *), Read`) or YAML list (`- Bash(git *)` / `- Bash(gh *)`). Required for skills that need tool gating beyond the user's default permissions. Patterns must use the canonical form `Bash(cmd *)` — the colon syntax `Bash(cmd:*)` is deprecated and validator-rejected. Unknown tool *names* are not rejected (the surface evolves), but unparseable entries are. |
 | `argument-hint` | string | Hint shown to the user when they type `/<skill>`. Convention: `[--flag] [positional-arg]`. Required if the skill accepts arguments. |
+| `requires` | list | External dependencies the skill needs at runtime. Each entry is a mapping with exactly one of `cli` (tool name, optionally with `>=X.Y` version constraint) or `env` (environment variable name), plus an optional `reason` string. Skills with no external dependencies omit the field. See schema below. |
 | `user-invocable` | boolean | Defaults to `true`. Set to `false` for context-only skills (loaded by name reference, not invoked as `/skill`). Currently only `notifications` uses this. |
 
 ### Frontmatter example
@@ -50,8 +51,35 @@ name: tech-debt
 description: "Use when you want to find and plan remediation of technical debt in the codebase. Supports --output github to create issues and --output session for chat-only analysis."
 argument-hint: "[--auto] [--output github|session] [focus-area]"
 allowed-tools: Bash(git *), Bash(gh *), Edit, Read, Grep, Glob
+requires:
+  - cli: gh>=2.0
+    reason: "GitHub API operations (issues, PRs)"
 ---
 ```
+
+### `requires` entry schema
+
+Each entry in the `requires` list must be a mapping with:
+
+| Key | Required | Type | Description |
+|---|---|---|---|
+| `cli` | One of `cli`/`env` | string | CLI tool name, optionally with `>=X.Y` version constraint. The tool must exist on `$PATH` for the skill to function. |
+| `env` | One of `cli`/`env` | string | Environment variable that must be set (non-empty) for the skill to function. |
+| `reason` | No | string | Human-readable explanation of why this dependency is needed. |
+
+Exactly one of `cli` or `env` must be present per entry. Examples:
+
+```yaml
+requires:
+  - cli: gh>=2.0
+    reason: "GitHub API operations"
+  - cli: vercel
+    reason: "Deployment management"
+  - env: VERCEL_TOKEN
+    reason: "Vercel authentication"
+```
+
+Skills that only use built-in Claude Code tools (Read, Write, Bash, Grep, etc.) and universally-available commands (git, curl, jq) do not need a `requires` field.
 
 ---
 

@@ -3,6 +3,9 @@ name: vercel-logs
 user-invocable: true
 description: "Use when you need to view, filter, or debug Vercel deployment logs."
 argument-hint: "[deployment URL or filter]"
+requires:
+  - cli: vercel
+    reason: "Vercel CLI for log access"
 ---
 
 # Vercel Logs
