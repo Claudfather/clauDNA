@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate-skills:
+    name: Validate skills
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Validate skill contract
+        run: python3 scripts/validate-skills.py
+
+      - name: Run integration tests
+        run: python3 scripts/integration-test.py
+
+  validate-manifest:
+    name: Validate manifest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate plugin manifest
+        run: python3 scripts/validate-manifest.py
+
+  changelog-check:
+    name: Changelog check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify CHANGELOG.md has new Unreleased content
+        run: |
+          if ! grep -q '## \[Unreleased\]' CHANGELOG.md; then
+            echo "::error::CHANGELOG.md missing [Unreleased] section"
+            exit 1
+          fi
+
+          # Extract [Unreleased] content from the PR branch
+          pr_content=$(sed -n '/^## \[Unreleased\]/,/^## \[/{ /^## \[/!p; }' CHANGELOG.md)
+
+          # Extract [Unreleased] content from main
+          git show origin/main:CHANGELOG.md > /tmp/changelog-main.md 2>/dev/null || true
+          main_content=$(sed -n '/^## \[Unreleased\]/,/^## \[/{ /^## \[/!p; }' /tmp/changelog-main.md 2>/dev/null || echo "")
+
+          if [ "$pr_content" = "$main_content" ]; then
+            echo "::error::CHANGELOG.md [Unreleased] section has no new content compared to main"
+            exit 1
+          fi
+
+          echo "Changelog has new unreleased content"
+
+  lint:
+    name: Lint Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Lint scripts and tests
+        run: ruff check scripts/ tests/
