@@ -74,7 +74,7 @@ Generate `CLAUDE.md` using the template at [references/CLAUDE_MD_TEMPLATE.md](re
 
 **For large projects** (200+ lines after customization): Consider creating `.claude/rules/` files with `paths:` frontmatter to scope domain-specific rules to matching files. Keep CLAUDE.md under 200 lines — only universal rules and safety constraints.
 
-**Cache efficiency guidelines** (these affect prompt cache hit rates across every API call):
+**Cache efficiency guidelines** (these affect prompt cache hit rates across every API call). For detailed scoring criteria (PASS/WARN/FAIL for each check), see [cache-checks.md](cache-checks.md) in this skill directory.
 - Static sections first, dynamic sections last. Add `<!-- Static sections above, project-specific sections below. Keep this order for prompt cache efficiency. -->` at the boundary.
 - Keep CLAUDE.md under 200 lines (WARN). Over 350 lines is a FAIL — significant token cost per call.
 - Don't auto-load `.claude/lessons.md` — keep lessons on-demand via `/claudna:lessons`.
