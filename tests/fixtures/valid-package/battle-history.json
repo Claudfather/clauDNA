@@ -1,0 +1,18 @@
+{
+  "total_battles": 8,
+  "record": { "wins": 6, "losses": 2, "draws": 0 },
+  "elo_trajectory": [
+    { "battle_id": "uuid-1", "date": "2026-05-02", "elo_before": 1200, "elo_after": 1232, "outcome": "win", "opponent_elo": 1200 },
+    { "battle_id": "uuid-2", "date": "2026-05-05", "elo_before": 1232, "elo_after": 1278, "outcome": "win", "opponent_elo": 1245 },
+    { "battle_id": "uuid-3", "date": "2026-05-07", "elo_before": 1278, "elo_after": 1320, "outcome": "win", "opponent_elo": 1290 },
+    { "battle_id": "uuid-4", "date": "2026-05-09", "elo_before": 1320, "elo_after": 1298, "outcome": "loss", "opponent_elo": 1350 },
+    { "battle_id": "uuid-5", "date": "2026-05-10", "elo_before": 1298, "elo_after": 1360, "outcome": "win", "opponent_elo": 1310 },
+    { "battle_id": "uuid-6", "date": "2026-05-12", "elo_before": 1360, "elo_after": 1410, "outcome": "win", "opponent_elo": 1380 },
+    { "battle_id": "uuid-7", "date": "2026-05-14", "elo_before": 1410, "elo_after": 1390, "outcome": "loss", "opponent_elo": 1440 },
+    { "battle_id": "uuid-8", "date": "2026-05-15", "elo_before": 1390, "elo_after": 1487, "outcome": "win", "opponent_elo": 1420 }
+  ],
+  "notable_battles": [],
+  "evolution_chain": [
+    { "generation": 0, "source": "community_submission", "candidate_id": "550e8400-e29b-41d4-a716-446655440000" }
+  ]
+}

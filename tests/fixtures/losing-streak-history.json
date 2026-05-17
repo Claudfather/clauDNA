@@ -1,0 +1,11 @@
+{
+  "total_battles": 5,
+  "record": { "wins": 2, "losses": 3, "draws": 0 },
+  "elo_trajectory": [
+    { "battle_id": "uuid-1", "date": "2026-05-02", "elo_before": 1200, "elo_after": 1280, "outcome": "win", "opponent_elo": 1200 },
+    { "battle_id": "uuid-2", "date": "2026-05-05", "elo_before": 1280, "elo_after": 1360, "outcome": "win", "opponent_elo": 1300 },
+    { "battle_id": "uuid-3", "date": "2026-05-07", "elo_before": 1360, "elo_after": 1330, "outcome": "loss", "opponent_elo": 1400 },
+    { "battle_id": "uuid-4", "date": "2026-05-09", "elo_before": 1330, "elo_after": 1300, "outcome": "loss", "opponent_elo": 1380 },
+    { "battle_id": "uuid-5", "date": "2026-05-11", "elo_before": 1300, "elo_after": 1270, "outcome": "loss", "opponent_elo": 1350 }
+  ]
+}
