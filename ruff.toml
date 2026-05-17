@@ -1,0 +1,8 @@
+line-length = 120
+
+[lint]
+select = ["E", "F", "W"]
+
+[lint.per-file-ignores]
+# Tests use sys.path.insert before imports and have long inline test data
+"tests/*.py" = ["E402", "E501"]

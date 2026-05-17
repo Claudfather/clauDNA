@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `/claudna:skill-health` — diagnostic skill that checks plugin installation state: version currency, hook wiring, skill integrity, dependency availability, and telemetry configuration. Degrades gracefully without network access. (#63)
+- **Unified CI workflow** (`.github/workflows/ci.yml`) — gates PRs with four jobs: skill validation, manifest validation, changelog check (new [Unreleased] content required), and Python lint via ruff. Added `ruff.toml` config.
 
 ### Removed
 - `/claudna:snowflake-cutover` — off-mission one-shot playbook, never merged to main. (#43)
