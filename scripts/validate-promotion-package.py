@@ -329,6 +329,17 @@ def validate_battle_history(battle_history_path: Path) -> CheckResult:
                     f"below promotion threshold of {ARENA_THRESHOLDS['elo_rating']}"
                 )
 
+        # Losing streak check: last 3 battles must include at least 1 win.
+        # Spec: "Last 3" by completedAt DESC; trajectory is ordered chronologically,
+        # so take the tail. Tie-break by id is inherent in the ordering.
+        tail = trajectory[-3:] if len(trajectory) >= 3 else trajectory
+        tail_outcomes = [b.get("outcome") for b in tail if isinstance(b, dict)]
+        if len(tail_outcomes) >= 3 and "win" not in tail_outcomes:
+            result.fail(
+                f"active losing streak: last {len(tail_outcomes)} battles "
+                f"have no wins ({tail_outcomes})"
+            )
+
     return result
 
 

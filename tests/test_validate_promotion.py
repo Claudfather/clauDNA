@@ -303,6 +303,17 @@ class TestBattleHistory:
         finally:
             shutil.rmtree(pkg.parent)
 
+    def test_losing_streak_fails(self):
+        result = validate_battle_history(FIXTURES / "losing-streak-history.json")
+        assert not result.passed
+        assert any("losing streak" in e for e in result.errors)
+
+    def test_no_losing_streak_in_valid(self):
+        # Valid package ends with a win — should not trigger streak check
+        result = validate_battle_history(VALID_PKG / "battle-history.json")
+        assert result.passed
+        assert not any("losing streak" in e for e in result.errors)
+
 
 # --- Telemetry summary ---
 
