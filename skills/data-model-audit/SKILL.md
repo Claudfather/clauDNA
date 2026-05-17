@@ -1,7 +1,8 @@
 ---
 name: data-model-audit
 user-invocable: true
-description: "Use when you want to audit how well a data model serves its application — traces code paths to database interactions, maps intent to schema, and identifies mismatches, gaps, and optimization opportunities."
+description: "Use when you want to audit how well a data model serves its application — traces code paths to database interactions, maps intent to schema, and identifies mismatches, gaps, and optimization opportunities. Supports --output github to create issues and --output session for chat-only analysis."
+argument-hint: "[--output github|session] [focus-area]"
 ---
 
 # Data Model Audit
@@ -9,6 +10,15 @@ description: "Use when you want to audit how well a data model serves its applic
 Audit how well a Python/Postgres application's data model serves its codebase — traces code paths to DB interactions, maps intent to schema, finds where the model fights the application.
 
 **Persona:** Senior data architect who reads code. Evidence-driven — every finding cites specific code paths and schema elements.
+
+## Arguments
+
+Parse `$ARGUMENTS` at invocation:
+- `--output github`: Write findings and plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
+- `--output session`: Present findings in chat only, no persistence.
+- Remaining text is the focus area (e.g., `src/models/` or `auth tables`). If provided, scope the audit to that area.
+
+Default (no flag): Present findings in chat (diagnostic skill — no file output by default).
 
 ## Procedure
 
@@ -77,6 +87,19 @@ If convergence summary is insufficient, read specific sections of the research f
 Print structured report: scope summary, code-to-schema map, ranked findings table, detailed findings with evidence/recommendations, total summary with top recommendation.
 
 **Report structure and finding template:** See `gap-analysis-categories.md`.
+
+---
+
+---
+
+## Output Targets
+
+This skill supports `--output github` and `--output session` in addition to the default `session` target.
+
+Follow the output guide at `skills/_shared/output-guide.md`:
+- For `github`: use the structured issue body format (Section 4), check for duplicates (Section 4.5), apply labels (Section 4.3). Create one issue per ranked finding (Schema Gap, Structural Friction, Performance Anti-pattern, etc.). Label with `auto-audit` and the finding category.
+- For `session` (default): present findings in chat, stay in Plan Mode (Section 5)
+- For `docs`: write the full ranked findings report to `documentation/planning/data-model-audit/<session_name>_<YYYY-MM-DD>/`
 
 ---
 

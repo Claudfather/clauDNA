@@ -1,7 +1,8 @@
 ---
 name: weigh-development-paths
 user-invocable: true
-description: "Use when at a development junction with multiple viable approaches — architecture choices, refactoring strategies, where to put new code, or which pattern to follow. Triggers on 'which approach', 'how should I', 'Option A vs B', or any point where the next step isn't obvious and the wrong choice creates rework."
+description: "Use when at a development junction with multiple viable approaches — architecture choices, refactoring strategies, where to put new code, or which pattern to follow. Triggers on 'which approach', 'how should I', 'Option A vs B', or any point where the next step isn't obvious and the wrong choice creates rework. Supports --output github to create issues and --output session for chat-only analysis."
+argument-hint: "[--output github|session] [junction-description]"
 ---
 
 # Weigh Development Paths
@@ -9,6 +10,15 @@ description: "Use when at a development junction with multiple viable approaches
 Structured multi-dimensional evaluation for development junctions.
 
 **Enter Plan Mode.** Call `EnterPlanMode` to enter deliberation mode. All analysis is read-only — plan mode enforces this. If the user declines plan mode, proceed normally.
+
+## Arguments
+
+Parse `$ARGUMENTS` at invocation:
+- `--output github`: Write findings and plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
+- `--output session`: Present findings in chat only, no persistence.
+- Remaining text is the junction description or context.
+
+Default (no flag): Present analysis in chat (session-only by default).
 
 ## When to Use
 
@@ -87,6 +97,19 @@ State your recommendation with:
 - **Evaluating only your preferred option in depth** — If your non-preferred options get one-sentence assessments while your pick gets paragraphs, you are advocating, not analyzing.
 - **Ignoring the codebase** — Read the actual code and plans before filling the matrix. Your assessments must reflect what exists, not what you imagine.
 - **Over-engineering in the name of "future-proofing"** — Future-proofing means accommodating *likely* changes, not building for every hypothetical. The most future-proof code is often the simplest.
+
+---
+
+## Output Targets
+
+This skill supports `--output github` and `--output session` in addition to the default `session` target.
+
+Follow the output guide at `skills/_shared/output-guide.md`:
+- For `github`: use the structured issue body format (Section 4), check for duplicates (Section 4.5), apply labels (Section 4.3). Create one issue documenting the junction analysis — include the comparison matrix, holistic assessment, and recommendation. Label with `auto-audit` and `enhancement`.
+- For `session` (default): present findings in chat, stay in Plan Mode (Section 5)
+- For `docs`: write the full analysis to `documentation/planning/decisions/<session_name>_<YYYY-MM-DD>/`
+
+---
 
 ## When NOT to Use This
 
