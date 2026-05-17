@@ -20,6 +20,15 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/plugin-hooks/auto-format.sh"
           }
         ]
+      },
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/plugin-hooks/telemetry-emit.sh"
+          }
+        ]
       }
     ],
     "Notification": [
