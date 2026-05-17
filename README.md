@@ -32,7 +32,7 @@ For bots, CI runners, and Docker images, drop a `settings.json` with `enabledPlu
 
 | Directory | Count | Contents |
 |-----------|-------|----------|
-| `skills/` | 53 | 52 user-invocable slash commands + 1 context-only skill (`notifications`) |
+| `skills/` | 52 | User-invocable slash commands |
 | `agents/` | 8 | `snowflake-analyst`, `dbt-engineer`, `neon-analyst`, `modal-ops`, `railway-ops`, `vercel-ops`, `code-reviewer`, `spec-reviewer` |
 | `plugin-hooks/` | 3 active + 1 opt-in | Auto-format on Write/Edit, pretooluse permission expansion, macOS notifications. (`statusline.sh` is opt-in — see [SETUP_GUIDE §3.2](./SETUP_GUIDE.md#32-statusline-optional).) Named `plugin-hooks/` to avoid a Claude Code bug that deletes any project-root `hooks/` directory between tool calls. |
 
@@ -65,7 +65,6 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:tech-de
 | `/lessons` | Capture and review lessons from corrections |
 | `/verify-completion` | Verify work is actually complete before claiming success |
 | `/frontend-performance-audit` | Trace re-render cascades, identify fetch/state/observer issues |
-| `/cache-audit` | Check if CLAUDE.md and project config hurt prompt cache efficiency |
 | `/access-path-audit` | Audit cross-cutting concern consistency across system interfaces (API, CLI, MCP, Slack) |
 | `/visual-crawl` | Autonomous visual crawl — discover routes, screenshot at 3 viewports, file issues for findings |
 
@@ -125,7 +124,6 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:tech-de
 | Skill | Description |
 |-------|-------------|
 | `/notes` | Persistent notes across sessions |
-| `/notifications` | Configure macOS or iTerm2 notifications for Claude Code sessions |
 | `/find-skills` | Discover and install new agent skills |
 | `/heist` | Raid a GitHub repo for skills, config patterns, and novel approaches |
 | `/init-project` | Set up CLAUDE.md, CHANGELOG.md, and .claude/ for a new or existing project |
