@@ -427,6 +427,9 @@ def main() -> int:
 
         parsed = parse_frontmatter(skill_md)
         if parsed is None:
+            all_errors.setdefault(name, []).append(
+                "SKILL.md has no valid YAML frontmatter (must start with --- ... ---)"
+            )
             continue
 
         fm, body = parsed
