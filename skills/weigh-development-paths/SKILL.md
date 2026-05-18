@@ -14,7 +14,7 @@ Structured multi-dimensional evaluation for development junctions.
 ## Arguments
 
 Parse `$ARGUMENTS` at invocation:
-- `--auto`: Non-interactive synthesis mode. Suppresses Plan Mode and AskUserQuestion. Requires a context bundle path or inline bundle in `$ARGUMENTS`. Emits the structured-result shape from `skills/_shared/orchestration-guide.md` §10.C with a refined plan in `artifacts.refined_plan`. See "Autonomous Mode" section below.
+- `--auto`: Non-interactive synthesis mode. Suppresses Plan Mode and all interactive user-question gates. Requires a context bundle path or inline bundle in `$ARGUMENTS`. Emits the structured-result shape from `skills/_shared/orchestration-guide.md` §10.C with a refined plan in `artifacts.refined_plan`. See "Autonomous Mode" section below.
 - `--output github`: Write findings and plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
 - Remaining text: the junction description (interactive mode) or path to a context bundle file (--auto mode).
@@ -149,7 +149,7 @@ When `--auto` is set, this skill operates as a non-interactive synthesis engine 
 When `--auto` is active:
 
 1. **Do NOT call `EnterPlanMode`.** The caller manages mode.
-2. **Do NOT call `AskUserQuestion`.** Synthesize machine recommendations directly.
+2. **Do NOT issue interactive user-question prompts.** Synthesize machine recommendations directly. Any tool that would halt for user input is forbidden in this mode.
 3. Parse the bundle.
 4. For each open finding AND each open matrix decision, treat it as a junction:
    - Generate candidate options (from the bundle when provided; synthesize otherwise).
