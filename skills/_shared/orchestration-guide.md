@@ -335,6 +335,25 @@ When `--auto` is set (see orchestration guide Section 10):
 4. Return structured summary for audit tracking
 ```
 
+### For implementation skills (Tier 3)
+
+The rules above describe planning skills that produce GitHub Issues. Implementation skills (Tier 3 per §13: `/claudna:implement-plan`, and any future skill that produces PRs from existing plans) follow a parallel `--auto` contract with these differences:
+
+- **Implies producing a PR, not an issue.** Does NOT imply `--output github`. The terminal artifact is an open PR on the work item's source branch.
+- **Never merges.** The merge gate is unconditionally skipped in `--auto`. A human ratifies the PR.
+- **Requires a target work item.** `--auto` MUST be invoked with `--source github <#>` or an explicit plan path. Picker / browse modes are disallowed.
+- **Trusts the caller has vetted the plan.** Interactive challenge rounds are replaced by either (a) trust (the upstream planning skill ran adversarial-review at creation time per §5.3 of the design) or (b) machine synthesis via `/claudna:weigh-development-paths --auto` per design §5.5.2. The skill does not stop to ask the user.
+- **"Feels wrong" exits with `outcome: blocked`** with a populated `blocker_description` field, instead of stopping for user discussion.
+- **Emits the structured result shape (§10.C below)** at the end of the run.
+
+Skills MUST add to their Arguments section:
+
+```
+- `--auto`: Fully non-interactive mode. Required target work item via `--source github <#>` or explicit plan path. Never merges. See orchestration guide §10 (Tier-3 sub-section).
+```
+
+And add an "Autonomous Mode (--auto)" section at the end of their procedure mirroring planning-skill structure but documenting the Tier-3 specifics.
+
 ### Skills that support `--auto`
 
 | Skill | Auto-viable? | Notes |
@@ -348,6 +367,9 @@ When `--auto` is set (see orchestration guide Section 10):
 | `/claudna:product-vision` | ⚠️ Limited | Vision without user input produces generic ideas. Use only with tight scope. |
 | `/claudna:design-review` | ❌ No | Requires screenshots, deployed URL, visual judgment |
 | `/claudna:session-handoff` | ✅ Yes | Already implemented |
+| `/claudna:implement-plan` | ✅ Yes | **Tier 3.** Phase 3 of the autonomous-mode rollout. Consumes plans/issues, produces PRs, never merges. |
+| `/claudna:weigh-development-paths` | ✅ Yes | **Composable.** Phase 1 adds `--auto` for chained use from `/implement-plan --auto`. Returns refined plan. |
+| `/claudna:adversarial-review` | ✅ Yes | **Composable.** `--dispatch` mode is non-interactive when invoked from another skill. Returns structured critique findings. |
 
 ---
 
