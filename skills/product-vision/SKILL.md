@@ -171,7 +171,29 @@ When `--auto` is set:
 4. Use focus area from `$ARGUMENTS` as scope. If none, explore full codebase.
 5. Create GitHub Issues for all ideas scored 🟢 or 🟡
 6. Do NOT write PROJECT_MISSION.md — just include proposed mission in summary
-7. Return structured summary for tracking
+7. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+
+```json
+{
+  "skill": "product-vision",
+  "outcome": "completed",
+  "artifacts": {
+    "issues_created": ["..."],
+    "compound_plays_identified": 3,
+    "one_hop_features": 7,
+    "two_hop_features": 4,
+    "deprecation_candidates": 2,
+    "mission_proposed": false
+  },
+  "summary": "<2-3 line digest of compound plays and top features>",
+  "next": null,
+  "errors": [],
+  "blocker_description": null
+}
+```
+
+- `mission_proposed` is `true` when no PROJECT_MISSION.md existed and one was synthesized; the proposed text remains in chat per existing rule (not written to disk in --auto).
+- `outcome` is `completed` on success.
 
 ---
 
