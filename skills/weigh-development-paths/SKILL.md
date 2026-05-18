@@ -2,7 +2,7 @@
 name: weigh-development-paths
 user-invocable: true
 description: "Use when at a development junction with multiple viable approaches — architecture choices, refactoring strategies, where to put new code, or which pattern to follow. Triggers on 'which approach', 'how should I', 'Option A vs B', or any point where the next step isn't obvious and the wrong choice creates rework. Supports --output github to create issues and --output session for chat-only analysis."
-argument-hint: "[--output github|session] [junction-description]"
+argument-hint: "[--auto] [--output github|session] [junction-description-or-bundle-path]"
 ---
 
 # Weigh Development Paths
@@ -14,9 +14,10 @@ Structured multi-dimensional evaluation for development junctions.
 ## Arguments
 
 Parse `$ARGUMENTS` at invocation:
+- `--auto`: Non-interactive synthesis mode. Suppresses Plan Mode and AskUserQuestion. Requires a context bundle path or inline bundle in `$ARGUMENTS`. Emits the structured-result shape from `skills/_shared/orchestration-guide.md` §10.C with a refined plan in `artifacts.refined_plan`. See "Autonomous Mode" section below.
 - `--output github`: Write findings and plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
-- Remaining text is the junction description or context.
+- Remaining text: the junction description (interactive mode) or path to a context bundle file (--auto mode).
 
 Default (no flag): Present analysis in chat (session-only by default).
 
@@ -116,3 +117,80 @@ Follow the output guide at `skills/_shared/output-guide.md`:
 - One option is clearly correct — just do it
 - The decision is trivial (naming, formatting, minor placement)
 - You are procrastinating instead of building — if the analysis feels like stalling, it probably is
+
+---
+
+## Autonomous Mode (`--auto`)
+
+When `--auto` is set, this skill operates as a non-interactive synthesis engine called from another skill (typically `/claudna:implement-plan --auto` per design §5.5.2) or directly from an orchestrator.
+
+### Input contract
+
+`$ARGUMENTS` after the `--auto` flag MUST contain a path to a context bundle file OR the bundle content inline. The bundle is a markdown document with these sections:
+
+```markdown
+## Plan
+<the plan body being refined>
+
+## Open Adversarial Findings
+- [<concern_area>][<severity>] <finding summary> — <recommendation>
+- ...
+
+## Open Matrix Decisions
+- [<category>] <question> — Options: A) ..., B) ..., C) ...
+- ...
+
+## Codebase Comparison Artifacts (optional)
+<file paths, function names, dependency notes from Step 2 of implement-plan>
+```
+
+### Procedure
+
+When `--auto` is active:
+
+1. **Do NOT call `EnterPlanMode`.** The caller manages mode.
+2. **Do NOT call `AskUserQuestion`.** Synthesize machine recommendations directly.
+3. Parse the bundle.
+4. For each open finding AND each open matrix decision, treat it as a junction:
+   - Generate candidate options (from the bundle when provided; synthesize otherwise).
+   - Run the 7-dimensional analysis from the interactive procedure (do not skip dimensions).
+   - Synthesize a recommendation. Capture a "Synthesis Rationale" stating which dimensions drove the choice.
+5. Assemble a refined plan: take the original plan body and replace/augment each ambiguous section with the synthesis result. Mark each formerly-open item as RESOLVED with the rationale inline.
+6. If any decision genuinely cannot be resolved without human input (insufficient evidence in any dimension), do NOT guess. List it as unresolved and exit `outcome: blocked` with that list in `blocker_description`.
+
+### Output (structured result)
+
+Emit a single fenced JSON block as the FINAL output. Format:
+
+```json
+{
+  "skill": "weigh-development-paths",
+  "outcome": "completed",
+  "artifacts": {
+    "refined_plan_path": "<path written to disk, or null if inline only>",
+    "refined_plan": "<full markdown body of the refined plan>",
+    "decisions_resolved": 5,
+    "decisions_unresolved": 0,
+    "synthesis_rationales": [
+      {
+        "decision": "<original open question or finding>",
+        "chosen_option": "<the synthesized choice>",
+        "dimensions": ["<dim that drove it>", "..."]
+      }
+    ]
+  },
+  "summary": "<2-3 line digest>",
+  "next": null,
+  "errors": [],
+  "blocker_description": null
+}
+```
+
+If outcome is `blocked`, `decisions_unresolved` > 0 and `blocker_description` lists the unresolvable decisions.
+
+### Restrictions in `--auto` mode
+
+- Do NOT write to the original plan file unless explicitly given a write path in the bundle.
+- Do NOT open Plan Mode.
+- Do NOT ask questions.
+- Do NOT print anything after the JSON block.
