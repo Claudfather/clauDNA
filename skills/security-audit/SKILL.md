@@ -179,3 +179,23 @@ When `--auto` is set (see orchestration guide Section 10):
 5. Skip LOW/INFO findings unless particularly noteworthy
 6. Return structured summary for audit tracking
 7. **Security-specific:** Never include actual secret values in issue bodies. Mask as `sk-****`.
+8. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+
+```json
+{
+  "skill": "security-audit",
+  "outcome": "completed",
+  "artifacts": {
+    "issues_created": ["https://github.com/org/repo/issues/123", "..."],
+    "findings_by_severity": {"critical": 0, "high": 2, "medium": 5, "low": 3},
+    "session_dir": "documentation/planning/security/<session>/"
+  },
+  "summary": "<2-3 line digest>",
+  "next": null,
+  "errors": [],
+  "blocker_description": null
+}
+```
+
+- `outcome` is `completed` on success, `partial` if some issue creates failed, `blocked` if the scan couldn't run.
+- Secret values MUST remain masked in `summary` and all artifact fields.
