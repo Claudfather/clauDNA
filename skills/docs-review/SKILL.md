@@ -189,4 +189,29 @@ When `--auto` is set (see orchestration guide Section 10):
 4. Auto-mark development plan statuses
 5. Auto-archive fully completed plans
 6. Create GitHub Issues for gaps that require human judgment (new docs to write, structural decisions)
-7. Return structured summary for audit tracking
+7. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+
+```json
+{
+  "skill": "docs-review",
+  "outcome": "completed",
+  "artifacts": {
+    "issues_created": ["https://github.com/org/repo/issues/789", "..."],
+    "files_changed": 3,
+    "lines_added": 12,
+    "lines_removed": 5,
+    "branch": "<branch if commits were pushed, or null>",
+    "auto_fixes_committed": ["docs/architecture.md", "README.md"],
+    "gaps_filed_as_issues": 2,
+    "plans_archived": 1
+  },
+  "summary": "<2-3 line digest of fixes and gaps>",
+  "next": null,
+  "errors": [],
+  "blocker_description": null
+}
+```
+
+- Inline auto-fixes are reflected in `files_changed`, `lines_added`, `lines_removed`, `auto_fixes_committed`.
+- Gaps that needed human judgment are reflected in `issues_created` and `gaps_filed_as_issues`.
+- `outcome` is `completed` on full success; `partial` if some auto-fixes were attempted but failed (record in `errors`).

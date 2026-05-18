@@ -157,3 +157,33 @@ Other skills should trigger `/claudna:session-handoff --auto` at natural end-of-
 - **With `--auto`, never ask.** Auto-fix verifiable issues, skip ambiguous ones, save learnings, write handoff. Zero interaction.
 - **Validate before capture.** Step 0 always runs before Steps 1-4. Don't save new state on top of stale state.
 - **Handoff file is ephemeral.** Not a log. Overwritten each session.
+
+---
+
+## Structured Result Emission (`--auto` only)
+
+When `--auto` is set, emit the structured-result shape per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+
+```json
+{
+  "skill": "session-handoff",
+  "outcome": "completed",
+  "artifacts": {
+    "handoff_path": "~/.claude/notes/projects/<slug>/claudna:context-resume.md",
+    "memories_pruned": 2,
+    "memories_updated": 1,
+    "learnings_saved": 3,
+    "changelog_entries_added": 0,
+    "plans_archived": 0
+  },
+  "summary": "<2-3 line digest>",
+  "next": null,
+  "errors": [],
+  "blocker_description": null
+}
+```
+
+- `outcome` is `completed` on success; `partial` if any step failed (record in `errors`).
+- `handoff_path` is required (it's the skill's primary artifact).
+
+Interactive mode (no `--auto`) does NOT emit the JSON block — it presents human-readable confirmation messages as today.

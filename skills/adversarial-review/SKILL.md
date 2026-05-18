@@ -15,11 +15,24 @@ You are a critical thinker, not an advocate. Your job is to find the weaknesses,
 
 Parse `$ARGUMENTS` at invocation:
 - **First positional arg:** Path to the plan document. If omitted, prompt for it.
-- `--dispatch`: Multi-reviewer mode — spawn parallel subagents with different review angles (see Phase 3). Without this flag, perform a single consolidated review.
+- `--dispatch`: Multi-reviewer mode AND non-interactive mode. Spawns parallel subagents with different review angles AND suppresses all interactive elements (no Plan Mode, no AskUserQuestion). Returns the structured-result shape from §10.C of `skills/_shared/orchestration-guide.md` with critique findings in `artifacts.findings`. Use this mode when invoking adversarial-review from another skill or from an orchestrator. Without this flag, perform a single consolidated review interactively.
 - `--output github`: Write findings as GitHub Issues. See `skills/_shared/output-guide.md`.
 - `--output session`: Present findings in chat only (default).
 
 ---
+
+## --dispatch (non-interactive) mode
+
+When `--dispatch` is passed (typically when invoked as a subagent from another skill or an orchestrator):
+
+- **Do NOT call `EnterPlanMode`.** The caller has its own Plan Mode lifecycle.
+- **Do NOT call `AskUserQuestion`.** The caller is not a human; questions cannot be answered.
+- **Do NOT prompt for clarification.** If the plan is too ambiguous to review, exit `outcome: blocked` with a populated `blocker_description`.
+- Spawn parallel critic subagents per Phase 3.
+- Aggregate critic findings into the structured-result shape.
+- Emit the structured-result JSON block as the final output and stop.
+
+When `--dispatch` is NOT passed, follow the full interactive procedure below (Plan Mode, single consolidated review, user-facing presentation).
 
 ## Phase 1: Understand the Plan
 
@@ -324,3 +337,36 @@ This skill synthesizes established techniques from decision science and strategi
 - **10th Man Rule** — Israeli Military Intelligence doctrine (mandatory dissent when consensus is unanimous)
 - **Steel-Manning** — Daniel Dennett (restate criticism in its strongest form before responding)
 - **PR/FAQ** — Amazon Working Backwards (press release test for value clarity)
+
+---
+
+## Structured Result Emission (`--dispatch` only)
+
+After Phase 3 aggregation, emit a single fenced JSON block as the FINAL output. No text after this block. Format per `skills/_shared/orchestration-guide.md` §10.C:
+
+```json
+{
+  "skill": "adversarial-review",
+  "outcome": "completed",
+  "artifacts": {
+    "findings_count": 5,
+    "findings": [
+      {
+        "concern_area": "error-handling",
+        "severity": "high",
+        "summary": "Plan doesn't account for the 429 retry case in the upstream API.",
+        "recommendation": "Add explicit retry-with-backoff to Step 4."
+      }
+    ],
+    "plan_path": "<path or issue URL that was reviewed>"
+  },
+  "summary": "<2-3 line digest of findings>",
+  "next": null,
+  "errors": [],
+  "blocker_description": null
+}
+```
+
+If review cannot proceed (e.g., plan body is empty or unreadable), emit `outcome: blocked` with `blocker_description` explaining what would unblock it (e.g., "plan body lacks an Implementation Plan section; run a planning skill to populate it first").
+
+`concern_area` values should align with the matrix categories in `skills/implement-plan/challenge-round-questions.md` where possible (architecture, testing, dependencies, error-handling, etc.) so downstream skills can fold findings into the challenge round.

@@ -161,4 +161,22 @@ When `--auto` is set (see orchestration guide Section 10):
 2. Run codebase reconnaissance (Step 1B) automatically with scope from `$ARGUMENTS`
 3. Auto-generate enhancement proposals from gap analysis (skip user selection)
 4. Create GitHub Issues for all proposals ranked High or Medium impact
-5. Return structured summary for audit tracking
+5. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+
+```json
+{
+  "skill": "product-enhance",
+  "outcome": "completed",
+  "artifacts": {
+    "issues_created": ["https://github.com/org/repo/issues/123", "..."],
+    "proposals_ranked": 8,
+    "session_dir": "documentation/planning/phases/<session>/"
+  },
+  "summary": "<2-3 line digest of proposals filed>",
+  "next": null,
+  "errors": [],
+  "blocker_description": null
+}
+```
+
+- `outcome` is `completed` on success, `blocked` if codebase reconnaissance can't run.

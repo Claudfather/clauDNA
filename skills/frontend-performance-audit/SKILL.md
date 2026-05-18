@@ -117,4 +117,23 @@ When `--auto` is set (see orchestration guide Section 10):
 2. Page/flow **must** be provided in `$ARGUMENTS` (bail if missing — this skill can't auto-detect what to audit)
 3. Skip the user confirmation gate between scan and remediation
 4. Create GitHub Issues for all findings, grouped by cascade chain
-5. Return structured summary for audit tracking
+5. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+
+```json
+{
+  "skill": "frontend-performance-audit",
+  "outcome": "completed",
+  "artifacts": {
+    "issues_created": ["..."],
+    "cascade_chains_found": 2,
+    "page_audited": "<route or flow>",
+    "session_dir": "documentation/planning/performance/<session>/"
+  },
+  "summary": "<2-3 line digest>",
+  "next": null,
+  "errors": [],
+  "blocker_description": null
+}
+```
+
+- `outcome` is `completed` on success, `blocked` if the page/flow wasn't provided (this skill cannot auto-detect; see existing rule #2 in Autonomous Mode).

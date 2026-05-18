@@ -235,4 +235,23 @@ When `--auto` is set (see orchestration guide Section 10):
 3. Implies `--output github`
 4. Use focus area from `$ARGUMENTS` as scope. If none provided, scan full codebase but limit to top 10 findings.
 5. Create GitHub Issues per the output guide (`--output github`) for all findings above LOW severity
-6. Return structured summary for audit tracking
+6. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+
+```json
+{
+  "skill": "tech-debt",
+  "outcome": "completed",
+  "artifacts": {
+    "issues_created": ["https://github.com/org/repo/issues/123", "..."],
+    "session_dir": "documentation/planning/tech_debt/<session>/",
+    "files_changed": 0
+  },
+  "summary": "<2-3 line digest of N findings, M issues filed>",
+  "next": "<follow-up hint or null>",
+  "errors": [],
+  "blocker_description": null
+}
+```
+
+- `outcome` should be `completed` on a successful run, `partial` if some issues failed to create (gh CLI errors), `blocked` if the scan couldn't run (e.g., no git repo).
+- `next` may suggest follow-up like `"Apply /claudna:implement-plan --source github <#> --auto to highest-severity issue"`.

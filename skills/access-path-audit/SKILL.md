@@ -287,4 +287,24 @@ When `--auto` is set (see orchestration guide Section 10):
 3. Use focus area from `$ARGUMENTS` as scope. If none provided, scan full system.
 4. Create GitHub Issues for all Category A and B findings (CRITICAL and HIGH immediately, MEDIUM batched)
 5. Skip Category C (appropriate differences) and Category D at LOW severity
-6. Return structured summary for audit tracking
+6. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+
+```json
+{
+  "skill": "access-path-audit",
+  "outcome": "completed",
+  "artifacts": {
+    "issues_created": ["..."],
+    "findings_by_category": {"A": 1, "B": 2, "C": 4, "D": 1},
+    "paths_analyzed": ["HTTP", "CLI", "MCP"],
+    "session_dir": "documentation/planning/access-paths/<session>/"
+  },
+  "summary": "<2-3 line digest>",
+  "next": null,
+  "errors": [],
+  "blocker_description": null
+}
+```
+
+- `outcome` is `completed` on success, `blocked` if fewer than 2 access paths exist (skill bails per existing rule).
+- Category C ("appropriate differences") count is included in artifacts even though no issues are filed for them, to demonstrate audit thoroughness.
