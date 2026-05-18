@@ -354,6 +354,56 @@ Skills MUST add to their Arguments section:
 
 And add an "Autonomous Mode (--auto)" section at the end of their procedure mirroring planning-skill structure but documenting the Tier-3 specifics.
 
+### Structured Result Shape
+
+Every `--auto` run emits a single fenced JSON block as its final output (the last content before the run ends). The orchestrator (e.g., claudlobby's `autonomous-runner` skill) parses this block. Skills must NOT print anything after it.
+
+```json
+{
+  "skill": "<skill name, e.g. 'implement-plan'>",
+  "outcome": "completed | bypassed | needs-input | blocked | partial",
+  "artifacts": {
+    "issues_created": ["https://github.com/org/repo/issues/123"],
+    "pr_url": "https://github.com/org/repo/pull/456",
+    "files_changed": 3,
+    "lines_added": 47,
+    "lines_removed": 12,
+    "branch": "implement/some-slug"
+  },
+  "summary": "<2-4 line human-readable summary for Telegram report-back>",
+  "next": "<orchestrator hint for what to schedule next, or null>",
+  "errors": [],
+  "blocker_description": null
+}
+```
+
+#### Field rules
+
+- `skill` (required): the skill's name as it appears in frontmatter.
+- `outcome` (required): exactly one of the five values listed. Skills MUST NOT invent new outcome strings.
+- `artifacts` (required): an object. Keys are skill-dependent — planning skills include `issues_created`; implementation skills include `pr_url`. Both are optional fields within `artifacts`. Skills SHOULD include `files_changed`, `lines_added`, `lines_removed`, `branch` when they touch code.
+- `summary` (required): 2-4 lines of plain text. No markdown. For Telegram report-back.
+- `next` (optional, may be null): a one-sentence hint for the orchestrator.
+- `errors` (required, may be empty): array of strings describing non-fatal issues encountered during the run.
+- `blocker_description` (required when outcome is `blocked` or `needs-input`, null otherwise): one or two sentences explaining what blocks the work and what would unblock it.
+
+#### Outcome semantics
+
+| Outcome | Meaning | Retry safe? |
+|---|---|---|
+| `completed` | Work landed; PR or issues exist as expected. | n/a (don't retry) |
+| `bypassed` | Explicit decision not to work this item (heavy-refactor tripwire, scope-exceeded). | No — needs policy change |
+| `needs-input` | Cannot proceed without a human decision (ambiguous design, conflicting plans). A comment was posted on the source. | No — needs human action first |
+| `blocked` | Attempted work but couldn't complete due to environment failure or unresolved internal contradiction. | Yes in principle, but treat as suspect until investigated |
+| `partial` | Some progress made, but not the full outcome. | Yes — followup needed |
+
+#### Emission rules
+
+- The JSON block MUST be the final output of the `--auto` run. No text after.
+- The JSON block MUST be valid (parseable by `json.loads`).
+- The block MUST be fenced with ```` ```json ```` (the language hint matters — orchestrators key off it).
+- The skill SHOULD log the block to stdout, not to a side-channel.
+
 ### Skills that support `--auto`
 
 | Skill | Auto-viable? | Notes |
