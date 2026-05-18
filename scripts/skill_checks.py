@@ -230,6 +230,36 @@ def check_auto_no_ask_user(fm: dict, body: str) -> list[str]:
     return errors
 
 
+_STRUCTURED_RESULT_PATTERNS = [
+    re.compile(r"structured[\s\-]result", re.IGNORECASE),
+    re.compile(r"§10\.C"),
+    re.compile(r"orchestration-guide\.md.{0,30}10\.C"),
+]
+
+
+def check_structured_result_emission(fm: dict, body: str) -> list[str]:
+    """If argument-hint contains '--auto', body must reference structured-result emission.
+
+    Skills declaring --auto support must emit the §10.C structured-result JSON
+    block as their final output. This check verifies the body documents that
+    contract by mentioning 'structured result' / 'structured-result' / '§10.C' /
+    a reference to orchestration-guide.md §10.C.
+    """
+    errors: list[str] = []
+    arg_hint = fm.get("argument-hint", "")
+    if not isinstance(arg_hint, str):
+        return errors
+    if "--auto" not in arg_hint:
+        return errors
+    if not any(p.search(body) for p in _STRUCTURED_RESULT_PATTERNS):
+        errors.append(
+            "argument-hint claims '--auto' but body does not reference structured-result "
+            "emission (expected mention of 'structured result' / '§10.C' / "
+            "orchestration-guide.md §10.C)"
+        )
+    return errors
+
+
 def check_allowed_tools_usage(fm: dict, body: str) -> list[str]:
     """Warn if allowed-tools declares a tool never mentioned in body.
 
@@ -356,6 +386,7 @@ def validate_skill_md(skill_md: Path, dir_name: str | None = None) -> list[str]:
     # Behavioral checks (hard errors)
     errors.extend(check_output_github_reference(fm, body))
     errors.extend(check_auto_no_ask_user(fm, body))
+    errors.extend(check_structured_result_emission(fm, body))
 
     return errors
 
