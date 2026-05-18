@@ -499,7 +499,31 @@ When `--auto` is set:
 3. Implies `--output github`
 4. Must have `--url` or `--local` (cannot prompt for URL)
 5. Create GitHub Issues for all findings at Medium priority or above
-6. Return structured summary for tracking
+6. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+
+```json
+{
+  "skill": "visual-crawl",
+  "outcome": "completed",
+  "artifacts": {
+    "issues_created": ["..."],
+    "routes_crawled": 12,
+    "screenshots_taken": 36,
+    "console_errors": 3,
+    "dead_links": 1,
+    "interaction_failures": 0,
+    "design_token_violations": 5,
+    "scratch_dir": "/tmp/visual-crawl-<timestamp>/"
+  },
+  "summary": "<2-3 line digest>",
+  "next": null,
+  "errors": [],
+  "blocker_description": null
+}
+```
+
+- `outcome` is `completed` on success, `blocked` if base URL is unreachable or no routes were discovered.
+- `--deep` mode produces additional artifacts; if --deep was used, add `deep_findings: N` to artifacts.
 
 `--auto` and `--deep` can be combined: `--auto --deep --url https://app.example.com` runs a full interactive crawl with issue filing, no human in the loop.
 
