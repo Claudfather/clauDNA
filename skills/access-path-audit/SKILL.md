@@ -218,6 +218,27 @@ After creating issues, present the batch summary and return issue URLs for audit
 
 ---
 
+## Phase 2.5: Adversarial Review Pass
+
+After Plan agents return with their metadata summaries (and `00_ACCESS_PATH_AUDIT.md` is written), run adversarial review on each remediation doc.
+
+For each remediation doc in `documentation/planning/access-paths/<session>/<NN>_*.md` and `00_ACCESS_PATH_AUDIT.md`:
+
+1. Dispatch a `general-purpose` subagent per `skills/_shared/subagent-prompts/adversarial-chain.md`. Substitute `<DOC_PATH>`.
+
+2. Collect structured-result JSON. Append `## Adversarial Review Findings` section.
+
+### Access-path-specific concern areas
+
+For access-path remediation plans, critics SHOULD flag:
+- `architecture` — does the fix move a concern to the correct layer (transport vs. domain)?
+- `compatibility` — does pushing a concern into the domain core break any access path that depended on transport-layer behavior?
+- `security` — does the refactor weaken or strengthen the security posture per-path?
+
+Parallel dispatch and `--output github` adaptation: see `skills/tech-debt/SKILL.md` Phase 2.5.
+
+---
+
 ## Phase 3: Summary & Handoff
 
 After generating all remediation docs, present a final summary:

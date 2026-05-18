@@ -84,6 +84,27 @@ After generating docs: **"Plans are ready for review. Run `/claudna:implement-pl
 
 ---
 
+## Phase 4.5: Adversarial Review Pass
+
+Before handing off to `/implement-plan`, run adversarial review on each remediation doc.
+
+For each phase doc in `documentation/planning/performance/<session>/<NN>_*.md` and `00_PERF_AUDIT.md`:
+
+1. Dispatch a `general-purpose` subagent per `skills/_shared/subagent-prompts/adversarial-chain.md`. Substitute `<DOC_PATH>`.
+
+2. Collect structured-result JSON. Append `## Adversarial Review Findings` section.
+
+### Performance-specific concern areas
+
+For frontend-performance plans, critics SHOULD flag:
+- `performance` — does the proposed fix actually address the measured bottleneck, or is it speculative?
+- `compatibility` — does the fix break any framework guarantees (e.g., Suspense boundaries, React 18 transitions)?
+- `architecture` — does the fix introduce architectural changes (e.g., new caching layers) that should be split into a separate plan?
+
+Parallel dispatch and `--output github` adaptation: same as Phase 1 contract — see `skills/tech-debt/SKILL.md` Phase 2.5.
+
+---
+
 ## Notes
 
 - **Symptom first, then trace.** Start from the symptom, trace backwards. Focused beats broad.

@@ -4,6 +4,16 @@
 
 Review every aspect of the plan through the lens of the Engineering Principles (`engineering-principles.md`). For each concern, **ask the user directly** — don't silently accept or reject.
 
+## Note: Concern-Area Alignment
+
+The categories in this matrix correspond to the `concern_area` vocabulary used by `/claudna:adversarial-review --dispatch` findings (defined in `skills/_shared/subagent-prompts/adversarial-chain.md`).
+
+When Step 3A of `/claudna:implement-plan` processes an open adversarial finding, it routes questions to the matrix category matching the finding's `concern_area`. For example, a finding with `concern_area: error-handling` triggers questions from this matrix's error-handling–adjacent categories.
+
+If a finding's `concern_area` does not have a direct matrix category, fall back to the closest one (e.g., `compatibility` findings often map to architecture or dependencies matrix questions). Add new matrix categories here as needed when adversarial-review surfaces patterns the matrix doesn't cover.
+
+---
+
 ## Question Matrix
 
 | Area | Question to ask |

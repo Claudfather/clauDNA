@@ -87,10 +87,19 @@ def get_agent_names() -> set[str]:
 
 
 def get_shared_files() -> set[str]:
-    """Return set of filenames in skills/_shared/."""
+    """Return set of filenames in skills/_shared/, recursing into subdirectories.
+
+    Top-level files are returned as bare names (e.g., "output-guide.md"); files
+    inside subdirectories are returned as relative paths (e.g.,
+    "subagent-prompts/adversarial-chain.md") so references can match either form.
+    """
     if not SHARED_DIR.is_dir():
         return set()
-    return {p.name for p in SHARED_DIR.iterdir() if p.is_file()}
+    files: set[str] = set()
+    for p in SHARED_DIR.rglob("*"):
+        if p.is_file():
+            files.add(str(p.relative_to(SHARED_DIR)))
+    return files
 
 
 def get_skill_files(skill_dir: Path) -> set[str]:
@@ -185,11 +194,19 @@ def resolve_reference(ref: str, skill_dir: Path) -> Path | None:
 
     # Absolute-style: skills/_shared/filename.md
     if ref.startswith("skills/_shared/"):
-        return REPO_ROOT / ref
+        candidate = REPO_ROOT / ref
+        return candidate if candidate.is_file() else None
 
     # Also handle _shared/ without skills/ prefix
     if ref.startswith("_shared/"):
-        return SKILLS_DIR / ref
+        candidate = SKILLS_DIR / ref
+        return candidate if candidate.is_file() else None
+
+    # Cross-skill reference: skills/<other-skill>/<file>.md
+    if ref.startswith("skills/"):
+        candidate = REPO_ROOT / ref
+        if candidate.is_file():
+            return candidate
 
     # Relative with subdirectory: references/filename.md
     candidate = skill_dir / ref

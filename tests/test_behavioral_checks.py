@@ -183,7 +183,11 @@ class TestValidateSkillMdBehavioral:
             'argument-hint: "[--auto] [--output github|session]"\n'
             "allowed-tools: Bash(git *), Read\n"
         )
-        body = "Run git commands. Read files. See output-guide.md for formatting. " + "x" * 200
+        body = (
+            "Run git commands. Read files. See output-guide.md for formatting. "
+            "When --auto, emit the structured-result shape per orchestration-guide.md §10.C. "
+            + "x" * 200
+        )
         path = self._write_skill(fm, body)
         try:
             errors = validate_skill_md(path, dir_name="test-skill")

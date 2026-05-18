@@ -90,7 +90,11 @@ digraph implement_plan {
     blockers [label="Blockers?" shape=diamond];
     report_blockers [label="STOP\nReport blockers" shape=doublecircle];
 
-    step3 [label="Step 3: Challenge Round\nAdaptive AskUserQuestion" shape=box];
+    step3a [label="Step 3A: Seed with\nadversarial findings\n(if present)" shape=box];
+    step3b [label="Step 3B: Matrix\nchallenge round" shape=box];
+    step6_5 [label="Step 6.5: Simplify\nif diff > threshold" shape=box];
+    simplify_pass [label="Verify\npasses?" shape=diamond];
+    simplify_revert [label="Revert simplify\ncommit" shape=box];
     update_plan [label="Update plan" shape=box];
     more_challenges [label="More\nchallenges?" shape=diamond];
     ready [label="Ready to\nbuild?" shape=diamond];
@@ -139,13 +143,14 @@ digraph implement_plan {
     next_item -> step2;
     step2 -> blockers;
     blockers -> report_blockers [label="yes"];
-    blockers -> step3 [label="no"];
-    step3 -> update_plan;
+    blockers -> step3a [label="no"];
+    step3a -> step3b;
+    step3b -> update_plan;
     update_plan -> more_challenges;
-    more_challenges -> step3 [label="yes"];
+    more_challenges -> step3b [label="yes"];
     more_challenges -> ready [label="no"];
     ready -> step4 [label="ready"];
-    ready -> step3 [label="revise"];
+    ready -> step3b [label="revise"];
     step4 -> step5_branch;
     step5_branch -> implement;
     implement -> feels_wrong;
@@ -160,9 +165,13 @@ digraph implement_plan {
     audit_pass -> fix_deliverable [label="no"];
     fix_deliverable -> step6a;
     step6b -> verify_pass;
-    verify_pass -> step7 [label="yes"];
+    verify_pass -> step6_5 [label="yes"];
     verify_pass -> fix_check [label="no"];
     fix_check -> step6b;
+    step6_5 -> simplify_pass;
+    simplify_pass -> step7 [label="yes"];
+    simplify_pass -> simplify_revert [label="no"];
+    simplify_revert -> step7;
     step7 -> user_gate;
     user_gate -> step8 [label="merge"];
     user_gate -> summary [label="stop"];
@@ -274,23 +283,61 @@ Use Explore subagents (Task tool) to verify: file paths, function names, before/
 
 Read `challenge-round-questions.md` for the question matrix and `red-flags-and-rationalizations.md` to guard against rubber-stamping.
 
-**Adaptive one-at-a-time flow using AskUserQuestion:**
+Step 3 has two sub-steps: **3A** seeds the round with any open adversarial-review findings from the plan body; **3B** runs the matrix-driven flow. 3A is skipped when no adversarial findings are present (ad-hoc plans, or plans where every finding was already resolved).
+
+#### Step 3A: Seed with open adversarial-review findings
+
+Open the plan body (the plan document or GitHub issue body). Search for a section titled `## Adversarial Review Findings`.
+
+**If the section exists and has OPEN items** (markdown checkboxes `- [ ]` rather than `- [x]`):
+
+1. Use an interactive question prompt. First question: **"Adversarial review flagged these unresolved concerns. Which to dig into?"**
+
+   Options: up to 3 most-severe findings (use the severity label from the bullet) + "All of them" + "None — ready to build".
+
+   If more than 3 findings are open, paginate: after the user picks from the first 3, present the next 3 in another turn until all are addressed or the user picks "None — ready to build."
+
+2. For each picked finding:
+   - Identify the finding's `concern_area` from the bullet text (e.g., `[high] architecture`).
+   - Drive matrix questions from `challenge-round-questions.md` scoped to that concern area. Generate options drawn from the codebase, just as in 3B.
+   - Process the user's answer. Update the plan body immediately — both the finding's resolution AND any plan-level changes the user's answer implies.
+   - Mark the finding's checkbox as resolved: `- [ ]` → `- [x]`. Add the user's decision as a sub-bullet below the finding.
+
+3. After all picked findings are addressed (or user chose "None — ready to build"), proceed to Step 3B for a full matrix pass.
+
+**If the section exists but has NO open items** (all resolved):
+
+Skip Step 3A. Note in chat: "Plan was reviewed adversarially at creation time; all findings already resolved. Proceeding to matrix challenge." Go to Step 3B.
+
+**If the section does NOT exist** (ad-hoc plan):
+
+Skip Step 3A. Note in chat: "No upstream adversarial review present (ad-hoc plan). Running full matrix challenge from scratch." Go to Step 3B.
+
+#### Step 3B: Matrix-driven challenge round
+
+This is the existing challenge-round flow, run AFTER Step 3A regardless of whether findings were resolved. The matrix may surface concerns adversarial-review didn't think to raise; an extra pass is cheap and catches real issues.
+
+**Adaptive one-at-a-time flow using interactive question prompts:**
 
 1. Analyze the plan against the codebase (Explore subagents — same as before)
 2. Generate the first challenge question based on the question matrix categories
-3. Present via AskUserQuestion with 2-4 **contextual options** drawn from the codebase — not generic "accept/reject" but concrete alternatives (e.g., "Extend existing Pydantic model" vs "Add new validation layer" vs "Keep both — defense in depth")
+3. Present an interactive question with 2-4 **contextual options** drawn from the codebase — not generic "accept/reject" but concrete alternatives (e.g., "Extend existing Pydantic model" vs "Add new validation layer" vs "Keep both — defense in depth")
 4. Process the user's answer. Update the plan document (or issue body) immediately if the answer changes the approach.
 5. Generate the next challenge, informed by the previous answer
 6. Repeat until:
    - All relevant categories from the question matrix have been probed
    - No more substantive challenges remain
    - User selects "Skip remaining challenges" (always include as an option)
-7. Final gate — AskUserQuestion: **"Ready to build?"** with options:
+7. Final gate — interactive question: **"Ready to build?"** with options:
    - "Ready to build" (proceed to Step 4)
-   - "I have more concerns" (loop back to Step 3)
+   - "I have more concerns" (loop back to Step 3B)
    - "Abort — not implementing this"
 
-**The question matrix still guides what to challenge** (architecture, testing, dependencies, error handling, etc.). The delivery mechanism changes — each question gets its own focused AskUserQuestion instead of a batch of 3-5 in chat.
+**The question matrix still guides what to challenge** (architecture, testing, dependencies, error handling, etc.). The delivery mechanism is one focused interactive question per topic.
+
+#### Note for `--auto` mode
+
+In `--auto` mode (added by Phase 3), Step 3 is replaced entirely by a synthesis pass (see §5.5.2 of the design spec). 3A and 3B describe interactive behavior only.
 
 ---
 
@@ -321,6 +368,55 @@ Apply `engineering-principles.md` ("Applying During Implementation" checklist). 
 **B. Verification Checklist** — Run the plan's checklist: tests, lint, types, docs, manual checks. Present results. Fix failures.
 
 ---
+
+### Step 6.5: Simplification Pass
+
+After Step 6 verification passes, evaluate whether the diff warrants a simplification pass via `/simplify`. /simplify reshapes recently changed code for clarity and removes incidental complexity. It operates non-interactively on the working tree.
+
+Follow the procedure in `skills/_shared/subagent-prompts/simplify-chain.md`.
+
+**Trigger condition:**
+
+Run:
+
+```bash
+git diff --stat <base-branch>...HEAD
+```
+
+Parse the output for total lines changed and file count. If EITHER:
+- Total lines added or removed > 50, OR
+- Files changed > 2
+
+then proceed with /simplify. Otherwise, skip to Step 7.
+
+**Procedure:**
+
+1. Invoke `/simplify` (no arguments — operates against the current working tree).
+2. After /simplify completes, stage and commit its edits as a separate commit:
+
+```bash
+git add -u
+git commit -m "refactor: simplify pass (post-verify)"
+```
+
+3. Re-run the Step 6 verification checklist (tests, lint, types).
+4. **If verification passes:** /simplify's changes stay. Proceed to Step 7. The PR body will reference both the implementation commit(s) and the simplification commit.
+5. **If verification fails (regression introduced by /simplify):**
+   - **Interactive mode:** Present the regression to the user via an interactive question with options:
+     - "Fix forward — debug the regression" (return to Step 5 to investigate)
+     - "Revert /simplify's commit" (run `git reset --hard HEAD~1`, proceed to Step 7 with the pre-simplify diff)
+     - "Abort — stop here"
+   - **`--auto` mode:** Revert /simplify's commit unconditionally:
+
+```bash
+git reset --hard HEAD~1
+```
+
+     Add a note for the eventual PR body (Step 7): "Simplification pass attempted; reverted due to verification regression: `<error summary>`." Proceed to Step 7 with the pre-simplify diff.
+
+**Why a separate commit for /simplify:** keeping the simplification in its own commit makes revert trivial and makes the PR history clear: implementation, then quality polish. Reviewers can quickly see what /simplify changed without disentangling it from implementation logic.
+
+**Skipping:** If the diff is below the threshold, the simplification pass is unnecessary — small changes rarely benefit from /simplify, and the runtime cost isn't justified.
 
 ### Step 7: PR & Status Update
 

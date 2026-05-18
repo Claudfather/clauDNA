@@ -127,6 +127,30 @@ Present findings as a list and ask the user which gaps to address:
 
 Execute the user's choices — create or update docs as requested.
 
+### Step 5.5: Adversarial Review Pass on Gap Proposals
+
+Before executing user choices to create/extend documentation, run adversarial review on each proposed new doc body (or extension content).
+
+For each gap-fix proposal (a new doc to create or an existing doc to extend):
+
+1. Write the proposed content to a temporary scratch file at `/tmp/docs-review-<timestamp>/proposals/<gap-slug>.md`.
+
+2. Dispatch a `general-purpose` subagent per `skills/_shared/subagent-prompts/adversarial-chain.md` against the scratch file.
+
+3. Collect findings. If `outcome: completed` and `artifacts.findings` is non-empty:
+   - For each finding, fold the recommendation into the proposed content before applying.
+   - Specifically: if a finding's `concern_area` is `compatibility` (e.g., "this onboarding step assumes Python 3.10 but project uses 3.8"), revise the content to match observed code reality.
+
+4. Present the revised proposals to the user via an interactive question prompt (interactive mode) or apply directly (--auto mode).
+
+### `--auto` mode adaptation
+
+In `--auto` mode, adversarial findings are folded silently. The summary report (Step 6 below) MUST mention how many adversarial findings were addressed during gap-proposal generation, in the `summary` field of the structured-result JSON.
+
+### Skipping
+
+If Step 5 identified zero gaps requiring new content, skip Step 5.5.
+
 ### Step 6: Summary Report
 
 Print a final report:

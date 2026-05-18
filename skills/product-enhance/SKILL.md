@@ -132,6 +132,22 @@ Present a `Product Enhancement Summary`, then direct user to `/claudna:implement
 
 ---
 
+### Step 5.5: Adversarial Review Pass
+
+Before presenting the Product Enhancement Summary, run adversarial review on each generated design doc.
+
+For each phase doc (path: `documentation/planning/phases/<session>/<NN>_*.md`) and `00_OVERVIEW.md`:
+
+1. Dispatch a `general-purpose` subagent per `skills/_shared/subagent-prompts/adversarial-chain.md`. Substitute `<DOC_PATH>`.
+
+2. Collect the structured-result JSON. Append `## Adversarial Review Findings` section to each doc.
+
+Run all dispatches in parallel via `run_in_background: true`; collect via `TaskOutput` one at a time.
+
+Apply in all modes (interactive, `--auto`). Skip only if Phase 5 generated zero docs.
+
+---
+
 ## Notes
 
 - **User gates everywhere.** Never auto-proceed between major steps.
