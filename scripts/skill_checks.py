@@ -411,3 +411,38 @@ def warn_skill_md(skill_md: Path) -> list[str]:
 
     fm, body = parsed
     return check_allowed_tools_usage(fm, body)
+
+
+def get_touched_skills() -> set[str] | None:
+    """Return skill dir names touched in this PR, or None if not in CI.
+
+    In CI (GITHUB_ACTIONS set), diffs against origin/main to find which
+    skill directories were modified. Returns None when running locally
+    so callers can treat all errors as blocking.
+    """
+    import os
+    import subprocess
+
+    if "GITHUB_ACTIONS" not in os.environ:
+        return None
+    result = subprocess.run(
+        ["git", "diff", "--name-only", "origin/main...HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        # If git diff fails (e.g. shallow clone), fall back to blocking all
+        return None
+    touched: set[str] = set()
+    for path in result.stdout.strip().splitlines():
+        # Match skills/<name>/... but not skills/_shared/...
+        if path.startswith("skills/") and "/" in path[len("skills/") :]:
+            skill_name = path.split("/")[1]
+            if skill_name != "_shared":
+                touched.add(skill_name)
+    # Also treat _shared changes as touching all skills, since shared
+    # files can break any skill's validation
+    for path in result.stdout.strip().splitlines():
+        if path.startswith("skills/_shared/"):
+            return None  # validate everything as blocking
+    return touched

@@ -6,6 +6,9 @@ conventions, cross-skill uniqueness, and agent/shared references.
 
 Run: python scripts/integration-test.py
 Exits non-zero on errors. Warnings are printed but don't block.
+
+In CI (GITHUB_ACTIONS set), only errors from PR-touched skills block.
+Untouched skill errors are reported as warnings for visibility.
 """
 
 from __future__ import annotations
@@ -16,6 +19,7 @@ import sys
 from pathlib import Path
 
 import yaml
+
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SKILLS_DIR = REPO_ROOT / "skills"
@@ -238,9 +242,7 @@ def extract_tool_names(allowed_tools) -> list[str]:
     return names
 
 
-def check_reference_resolution(
-    skill_name: str, skill_dir: Path, body: str
-) -> tuple[list[str], list[str]]:
+def check_reference_resolution(skill_name: str, skill_dir: Path, body: str) -> tuple[list[str], list[str]]:
     """Check that file references in the body resolve to actual files.
 
     Returns (errors, warnings).
@@ -266,9 +268,7 @@ def check_reference_resolution(
         # Flatten paths for comparison
         basename = Path(fname).name
         if basename not in referenced_files:
-            warnings.append(
-                f"orphaned file: `{fname}` exists but is not referenced in SKILL.md"
-            )
+            warnings.append(f"orphaned file: `{fname}` exists but is not referenced in SKILL.md")
 
     return errors, warnings
 
@@ -283,16 +283,12 @@ def check_tool_names(skill_name: str, fm: dict) -> tuple[list[str], list[str]]:
 
     for tool in extract_tool_names(allowed):
         if tool not in KNOWN_TOOLS:
-            warnings.append(
-                f"unknown tool `{tool}` in allowed-tools (may be valid if newly added)"
-            )
+            warnings.append(f"unknown tool `{tool}` in allowed-tools (may be valid if newly added)")
 
     return errors, warnings
 
 
-def check_body_structure(
-    skill_name: str, fm: dict, body: str
-) -> tuple[list[str], list[str]]:
+def check_body_structure(skill_name: str, fm: dict, body: str) -> tuple[list[str], list[str]]:
     """Check body conventions for user-invocable skills."""
     errors = []
     warnings = []
@@ -306,9 +302,7 @@ def check_body_structure(
     return errors, warnings
 
 
-def check_agent_references(
-    skill_name: str, body: str, agent_names: set[str]
-) -> tuple[list[str], list[str]]:
+def check_agent_references(skill_name: str, body: str, agent_names: set[str]) -> tuple[list[str], list[str]]:
     """Check that agent type references in skill bodies are valid."""
     errors = []
     warnings = []
@@ -321,16 +315,12 @@ def check_agent_references(
             continue
         # Check if it matches an agent file
         if agent_type not in agent_names:
-            warnings.append(
-                f"subagent_type `{agent_type}` does not match any agent in agents/"
-            )
+            warnings.append(f"subagent_type `{agent_type}` does not match any agent in agents/")
 
     return errors, warnings
 
 
-def check_shared_references(
-    skill_name: str, body: str, shared_files: set[str]
-) -> tuple[list[str], list[str]]:
+def check_shared_references(skill_name: str, body: str, shared_files: set[str]) -> tuple[list[str], list[str]]:
     """Check that _shared/ references resolve to actual files."""
     errors = []
     warnings = []
@@ -338,16 +328,12 @@ def check_shared_references(
     for m in re.finditer(r"skills/_shared/(\S+\.md)", body):
         fname = m.group(1).rstrip(")`")
         if fname not in shared_files:
-            errors.append(
-                f"broken shared reference: `skills/_shared/{fname}` not found"
-            )
+            errors.append(f"broken shared reference: `skills/_shared/{fname}` not found")
 
     return errors, warnings
 
 
-def check_argument_hint_output(
-    skill_name: str, fm: dict, body: str
-) -> tuple[list[str], list[str]]:
+def check_argument_hint_output(skill_name: str, fm: dict, body: str) -> tuple[list[str], list[str]]:
     """If argument-hint mentions --output, verify the body handles it."""
     errors = []
     warnings = []
@@ -357,11 +343,7 @@ def check_argument_hint_output(
 
     if "--output" in hint:
         # Body should mention --output handling or reference the output guide
-        if (
-            "--output" not in body
-            and "output-guide" not in body
-            and "output guide" not in body.lower()
-        ):
+        if "--output" not in body and "output-guide" not in body and "output guide" not in body.lower():
             warnings.append(
                 "argument-hint declares `--output` but body doesn't reference output handling or output-guide.md"
             )
@@ -387,9 +369,7 @@ def check_description_uniqueness(
     return dupes
 
 
-def check_requires_consistency(
-    skill_name: str, fm: dict, body: str
-) -> tuple[list[str], list[str]]:
+def check_requires_consistency(skill_name: str, fm: dict, body: str) -> tuple[list[str], list[str]]:
     """Cross-check requires entries against allowed-tools and body content.
 
     Warns when a skill uses Bash(tool *) in allowed-tools but doesn't declare
@@ -419,8 +399,7 @@ def check_requires_consistency(
                         bash_tools.add(tool)
             if bash_tools:
                 warnings.append(
-                    f"allowed-tools references external CLI(s) {sorted(bash_tools)} "
-                    f"but no `requires` field declared"
+                    f"allowed-tools references external CLI(s) {sorted(bash_tools)} but no `requires` field declared"
                 )
         return errors, warnings
 
@@ -457,9 +436,7 @@ def check_code_blocks(skill_name: str, body: str) -> tuple[list[str], list[str]]
             try:
                 json.loads(code)
             except json.JSONDecodeError as e:
-                warnings.append(
-                    f"invalid JSON in ```json block: {e.msg} (line {e.lineno})"
-                )
+                warnings.append(f"invalid JSON in ```json block: {e.msg} (line {e.lineno})")
 
         elif lang in ("bash", "sh"):
             # Check for common bash syntax issues: unmatched quotes
@@ -475,16 +452,24 @@ def check_code_blocks(skill_name: str, body: str) -> tuple[list[str], list[str]]
 
 
 def main() -> int:
+    from skill_checks import get_touched_skills
+
     if not SKILLS_DIR.is_dir():
         print(f"FAIL: skills directory not found at {SKILLS_DIR}", file=sys.stderr)
         return 2
 
+    touched = get_touched_skills()
+    ci_mode = touched is not None
+    if ci_mode:
+        if touched:
+            print(f"CI mode: scoping errors to {len(touched)} touched skill(s): {', '.join(sorted(touched))}\n")
+        else:
+            print("CI mode: no skills touched in this PR — all errors reported as warnings\n")
+
     agent_names = get_agent_names()
     shared_files = get_shared_files()
 
-    skill_dirs = sorted(
-        p for p in SKILLS_DIR.iterdir() if p.is_dir() and p.name not in SKIP_DIRS
-    )
+    skill_dirs = sorted(p for p in SKILLS_DIR.iterdir() if p.is_dir() and p.name not in SKIP_DIRS)
 
     all_errors: dict[str, list[str]] = {}
     all_warnings: dict[str, list[str]] = {}
@@ -557,15 +542,25 @@ def main() -> int:
     # Cross-skill: duplicate descriptions
     dupes = check_description_uniqueness(skills_data)
     for skill_a, skill_b, desc in dupes:
-        all_errors.setdefault(skill_b, []).append(
-            f'duplicate description with `{skill_a}`: "{desc}..."'
-        )
+        all_errors.setdefault(skill_b, []).append(f'duplicate description with `{skill_a}`: "{desc}..."')
 
     total = len(skill_dirs)
-    error_count = sum(len(v) for v in all_errors.values())
     warning_count = sum(len(v) for v in all_warnings.values())
 
-    # Print warnings (non-blocking)
+    # In CI mode, partition errors into blocking (touched) vs warnings (untouched)
+    if ci_mode:
+        blocking_errors: dict[str, list[str]] = {}
+        demoted_warnings: dict[str, list[str]] = {}
+        for name, errors in all_errors.items():
+            if name in touched:
+                blocking_errors[name] = errors
+            else:
+                demoted_warnings[name] = errors
+    else:
+        blocking_errors = all_errors
+        demoted_warnings = {}
+
+    # Print advisory warnings (never blocking)
     if all_warnings:
         print(f"WARN: {warning_count} warnings across {len(all_warnings)} skills\n")
         for name in sorted(all_warnings):
@@ -574,12 +569,23 @@ def main() -> int:
                 print(f"    ⚠ {w}")
             print()
 
-    # Print errors (blocking)
-    if all_errors:
-        print(f"FAIL: {error_count} errors across {len(all_errors)} skills\n")
-        for name in sorted(all_errors):
+    # Print demoted warnings from untouched skills (CI only, non-blocking)
+    if demoted_warnings:
+        demoted_count = sum(len(v) for v in demoted_warnings.values())
+        print(f"WARN: {demoted_count} errors across {len(demoted_warnings)} untouched skills (not blocking)\n")
+        for name in sorted(demoted_warnings):
             print(f"  {name}:")
-            for e in all_errors[name]:
+            for e in demoted_warnings[name]:
+                print(f"    ⚠ [untouched] {e}")
+            print()
+
+    # Print blocking errors
+    if blocking_errors:
+        blocking_count = sum(len(v) for v in blocking_errors.values())
+        print(f"FAIL: {blocking_count} errors across {len(blocking_errors)} skills\n")
+        for name in sorted(blocking_errors):
+            print(f"  {name}:")
+            for e in blocking_errors[name]:
                 print(f"    ✗ {e}")
             print()
         return 1

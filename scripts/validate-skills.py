@@ -3,6 +3,9 @@
 
 Run: python scripts/validate-skills.py
 Exits non-zero on any violation; prints a structured report.
+
+In CI (GITHUB_ACTIONS set), only errors from PR-touched skills block.
+Untouched skill errors are reported as warnings for visibility.
 """
 
 from __future__ import annotations
@@ -12,6 +15,7 @@ from pathlib import Path
 
 from skill_checks import (
     STALE_PATH_RE,
+    get_touched_skills,
     parse_frontmatter,
     validate_skill_md,
     warn_skill_md,
@@ -32,6 +36,14 @@ def main() -> int:
     if not SKILLS_DIR.is_dir():
         print(f"FAIL: skills directory not found at {SKILLS_DIR}", file=sys.stderr)
         return 2
+
+    touched = get_touched_skills()
+    ci_mode = touched is not None
+    if ci_mode:
+        if touched:
+            print(f"CI mode: scoping errors to {len(touched)} touched skill(s): {', '.join(sorted(touched))}\n")
+        else:
+            print("CI mode: no skills touched in this PR — all errors reported as warnings\n")
 
     skill_dirs = sorted(p for p in SKILLS_DIR.iterdir() if p.is_dir() and p.name not in SKIP_DIRS)
 
@@ -80,7 +92,20 @@ def main() -> int:
 
     total_skills = len(skill_dirs) - len(SKIP_SKILLS)
 
-    # Print warnings (non-blocking)
+    # In CI mode, partition errors into blocking (touched) vs warnings (untouched)
+    if ci_mode:
+        blocking_errors: dict[str, list[str]] = {}
+        demoted_warnings: dict[str, list[str]] = {}
+        for name, errors in all_errors.items():
+            if name in touched:
+                blocking_errors[name] = errors
+            else:
+                demoted_warnings[name] = errors
+    else:
+        blocking_errors = all_errors
+        demoted_warnings = {}
+
+    # Print advisory warnings (never blocking)
     if all_warnings:
         print(f"WARN: {len(all_warnings)} skill(s) have advisory warnings\n")
         for name in sorted(all_warnings):
@@ -89,14 +114,23 @@ def main() -> int:
                 print(f"    - [WARN] {w}")
             print()
 
-    if not all_errors:
-        print(f"OK: {total_skills} skills validated, no violations")
+    # Print demoted warnings from untouched skills (CI only, non-blocking)
+    if demoted_warnings:
+        print(f"WARN: {len(demoted_warnings)} untouched skill(s) have pre-existing violations (not blocking)\n")
+        for name in sorted(demoted_warnings):
+            print(f"  {name}:")
+            for err in demoted_warnings[name]:
+                print(f"    - [WARN:untouched] {err}")
+            print()
+
+    if not blocking_errors:
+        print(f"OK: {total_skills} skills validated, no blocking violations")
         return 0
 
-    print(f"FAIL: {len(all_errors)} of {total_skills} skills have violations\n")
-    for name in sorted(all_errors):
+    print(f"FAIL: {len(blocking_errors)} of {total_skills} skills have violations\n")
+    for name in sorted(blocking_errors):
         print(f"  {name}:")
-        for err in all_errors[name]:
+        for err in blocking_errors[name]:
             print(f"    - {err}")
         print()
     return 1

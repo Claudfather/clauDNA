@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **CI validate-skills scoped to PR-touched skills.** `validate-skills.py` and `integration-test.py` now detect CI via `GITHUB_ACTIONS` env var and only block on errors from skills modified in the PR. Untouched skill violations are reported as warnings for visibility but do not fail the build. Prevents pre-existing violations (e.g. a broken reference in an unrelated skill) from blocking every PR. `_shared/` changes still validate all skills as blocking. CI workflow updated with `fetch-depth: 0` so `git diff origin/main...HEAD` works.
+
 ### Changed
 - **Repo doc layout migrated to `documentation/` per the standard.** clauDNA now follows its own [`documentation/specs/repo-documentation-standard.md`](./documentation/specs/repo-documentation-standard.md) (formerly at `docs/specs/`). All three files moved via `git mv` to preserve history: `SKILL_AUTHORING_GUIDE.md` → `documentation/guides/`, two specs → `documentation/specs/`. Scaffolded the full `documentation/` tree (`planning/{phases,tech_debt,security,access-paths,product-vision,investigations}`, `decisions/`, `archive/`) with `.gitkeep` markers so the repo dogfoods what `/claudna:init-project` produces for downstream projects. Updated in-repo references in `README.md` (×2), `skills/init-project/SKILL.md`, and relative links inside the moved `SKILL_AUTHORING_GUIDE.md`. Ecosystem-wide alignment tracked at [Claudfather/.github#2](https://github.com/Claudfather/.github/issues/2) and [Claudfather/Claudlobby#269](https://github.com/Claudfather/Claudlobby/issues/269).
 
