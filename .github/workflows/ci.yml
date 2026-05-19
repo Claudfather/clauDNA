@@ -22,9 +22,13 @@ jobs:
 
       - name: Validate skill contract
         run: python3 scripts/validate-skills.py
+        env:
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
 
       - name: Run integration tests
         run: python3 scripts/integration-test.py
+        env:
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
 
   validate-agents:
     name: Validate agents

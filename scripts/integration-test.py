@@ -539,15 +539,19 @@ def main() -> int:
         if warnings:
             all_warnings[name] = warnings
 
-    # Cross-skill: duplicate descriptions
+    # Cross-skill: duplicate descriptions — attribute to both skills so
+    # CI scoping can block if either participant is touched.
+    cross_skill_errors: list[tuple[set[str], str, str]] = []  # (participants, target, msg)
     dupes = check_description_uniqueness(skills_data)
     for skill_a, skill_b, desc in dupes:
-        all_errors.setdefault(skill_b, []).append(f'duplicate description with `{skill_a}`: "{desc}..."')
+        cross_skill_errors.append(({skill_a, skill_b}, skill_a, f'duplicate description with `{skill_b}`: "{desc}..."'))
+        cross_skill_errors.append(({skill_a, skill_b}, skill_b, f'duplicate description with `{skill_a}`: "{desc}..."'))
 
     total = len(skill_dirs)
     warning_count = sum(len(v) for v in all_warnings.values())
 
-    # In CI mode, partition errors into blocking (touched) vs warnings (untouched)
+    # In CI mode, partition errors into blocking (touched) vs warnings (untouched).
+    # Cross-skill errors block if ANY participant is touched.
     if ci_mode:
         blocking_errors: dict[str, list[str]] = {}
         demoted_warnings: dict[str, list[str]] = {}
@@ -556,9 +560,16 @@ def main() -> int:
                 blocking_errors[name] = errors
             else:
                 demoted_warnings[name] = errors
+        for participants, target_skill, msg in cross_skill_errors:
+            if participants & touched:
+                blocking_errors.setdefault(target_skill, []).append(msg)
+            else:
+                demoted_warnings.setdefault(target_skill, []).append(msg)
     else:
         blocking_errors = all_errors
         demoted_warnings = {}
+        for _participants, target_skill, msg in cross_skill_errors:
+            blocking_errors.setdefault(target_skill, []).append(msg)
 
     # Print advisory warnings (never blocking)
     if all_warnings:

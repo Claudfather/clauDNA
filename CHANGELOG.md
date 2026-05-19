@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Cross-skill CI attribution bug.** Duplicate-name and duplicate-description checks now attribute errors to BOTH participating skills. In CI scoping mode, cross-skill errors block if ANY participant is PR-touched — previously, alphabetical ordering could land the error on only the untouched skill, silently demoting it to a warning.
+- **Git diff fallback now logs a warning.** When `get_touched_skills()` falls back to full validation due to a failed `git diff`, it prints the reason and stderr to help diagnose CI environment issues.
+
+### Added
+- **Full-validation escape hatch.** Set `FULL_VALIDATE=1` env var or add a `full-validate` label to the PR to force full blocking validation regardless of touched-skill scoping. Useful for release-gating.
+
 ## [0.4.0] - 2026-05-18
 ### Changed (BREAKING)
 - **Renamed `/context-resume` → `/session-resume`.** Sibling change required in any caller (notably Claudlobby's `/restart`, tracked at https://github.com/Claudfather/Claudlobby/issues/223).

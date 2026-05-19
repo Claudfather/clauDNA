@@ -419,19 +419,43 @@ def get_touched_skills() -> set[str] | None:
     In CI (GITHUB_ACTIONS set), diffs against origin/main to find which
     skill directories were modified. Returns None when running locally
     so callers can treat all errors as blocking.
+
+    Escape hatches for full validation in CI:
+    - Set env var FULL_VALIDATE=1
+    - Add a [full-validate] label to the PR (detected via PR_LABELS env var)
+
+    Note: setting GITHUB_ACTIONS=true locally activates CI scoping behavior.
+    This is by design for local testing, but be aware it changes which errors
+    block vs. warn.
     """
     import os
     import subprocess
+    import sys
 
     if "GITHUB_ACTIONS" not in os.environ:
         return None
+
+    # Escape hatch: force full blocking validation
+    if os.environ.get("FULL_VALIDATE") == "1":
+        print("FULL_VALIDATE=1: running full blocking validation", file=sys.stderr)
+        return None
+    pr_labels = os.environ.get("PR_LABELS", "")
+    if "full-validate" in pr_labels:
+        print("[full-validate] label detected: running full blocking validation", file=sys.stderr)
+        return None
+
     result = subprocess.run(
         ["git", "diff", "--name-only", "origin/main...HEAD"],
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
-        # If git diff fails (e.g. shallow clone), fall back to blocking all
+        print(
+            f"WARNING: git diff failed (exit {result.returncode}), falling back to full "
+            f"blocking validation. This typically means a shallow clone or missing "
+            f"origin/main ref. stderr: {result.stderr.strip()}",
+            file=sys.stderr,
+        )
         return None
     touched: set[str] = set()
     for path in result.stdout.strip().splitlines():
@@ -440,8 +464,12 @@ def get_touched_skills() -> set[str] | None:
             skill_name = path.split("/")[1]
             if skill_name != "_shared":
                 touched.add(skill_name)
-    # Also treat _shared changes as touching all skills, since shared
-    # files can break any skill's validation
+    # _shared/ files are referenced by many skills (orchestration guides, output
+    # contracts, subagent prompts). A change there can break any skill's behavioral
+    # checks (e.g. check_output_github_reference, check_structured_result_emission).
+    # Full validation is the safe default — don't "optimize" this to only validate
+    # skills that textually reference the changed _shared/ file, because the
+    # dependency graph is implicit and hard to trace statically.
     for path in result.stdout.strip().splitlines():
         if path.startswith("skills/_shared/"):
             return None  # validate everything as blocking

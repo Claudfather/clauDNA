@@ -49,6 +49,10 @@ def main() -> int:
 
     all_errors: dict[str, list[str]] = {}
     all_warnings: dict[str, list[str]] = {}
+    # Cross-skill errors: list of (involved_skills, error_msg) — block if ANY
+    # participant is touched, preventing attribution bugs where alphabetical
+    # ordering causes the error to land on the wrong (untouched) skill.
+    cross_skill_errors: list[tuple[set[str], str, str]] = []  # (participants, target_skill, msg)
     seen_names: dict[str, str] = {}  # name -> dir
 
     for skill_dir in skill_dirs:
@@ -69,7 +73,10 @@ def main() -> int:
                 fm_name = parsed[0].get("name")
                 if isinstance(fm_name, str):
                     if fm_name in seen_names:
-                        errors.append(f"duplicate frontmatter name {fm_name!r} (also used by {seen_names[fm_name]})")
+                        other = seen_names[fm_name]
+                        msg = f"duplicate frontmatter name {fm_name!r}"
+                        cross_skill_errors.append(({name, other}, name, f"{msg} (also used by {other})"))
+                        cross_skill_errors.append(({name, other}, other, f"{msg} (also used by {name})"))
                     else:
                         seen_names[fm_name] = name
 
@@ -92,7 +99,10 @@ def main() -> int:
 
     total_skills = len(skill_dirs) - len(SKIP_SKILLS)
 
-    # In CI mode, partition errors into blocking (touched) vs warnings (untouched)
+    # In CI mode, partition errors into blocking (touched) vs warnings (untouched).
+    # Cross-skill errors (e.g. duplicate names) block if ANY participant is touched,
+    # preventing the bug where alphabetical ordering attributes the error to only
+    # one skill — if that skill happens to be untouched, the error silently demotes.
     if ci_mode:
         blocking_errors: dict[str, list[str]] = {}
         demoted_warnings: dict[str, list[str]] = {}
@@ -101,9 +111,18 @@ def main() -> int:
                 blocking_errors[name] = errors
             else:
                 demoted_warnings[name] = errors
+        # Cross-skill errors: block if any participant is touched
+        for participants, target_skill, msg in cross_skill_errors:
+            if participants & touched:
+                blocking_errors.setdefault(target_skill, []).append(msg)
+            else:
+                demoted_warnings.setdefault(target_skill, []).append(msg)
     else:
         blocking_errors = all_errors
         demoted_warnings = {}
+        # In local mode, cross-skill errors are always blocking
+        for _participants, target_skill, msg in cross_skill_errors:
+            blocking_errors.setdefault(target_skill, []).append(msg)
 
     # Print advisory warnings (never blocking)
     if all_warnings:
