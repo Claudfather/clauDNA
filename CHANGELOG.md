@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (BREAKING)
+- **Renamed `/context-resume` → `/session-resume`.** Sibling change required in any caller (notably Claudlobby's `/restart`, tracked at https://github.com/Claudfather/Claudlobby/issues/223).
+- **`/session-handoff` and `/session-resume` redesigned for per-cwd scope.** Handoff now lives at `<cwd>/.claude/session.md` (not `~/.claude/notes/projects/<slug>/context-resume.md`). Identity is the cwd, not a derived slug. Legacy files are imported once on first `/session-resume` in a given cwd and then deleted.
+- **`/session-handoff` no longer touches `~/.claude/`.** Memory validation, notes/lessons capture, MEMORY.md pruning, and CHANGELOG backfill are removed. Use `/lessons` and `/notes` for cross-session knowledge until the Claudron-write skill ships.
+- **Both skills now accept `--auto`.** Headless mode for Claudlobby bots and any other automated caller. Callers that wrap these skills (e.g., Claudlobby's `/restart`) should accept their own `--auto` flag and forward it, keeping the headless contract end-to-end.
+- **Schema version 2** for `session.md`: per-item ISO-8601 timestamps, regenerated `State` section, evidence + TTL reaper run on every read and write.
+
+### Migration
+Legacy `~/.claude/notes/projects/<slug>/context-resume.md` files are imported on first `/session-resume` in their corresponding cwd. Files for projects you never reopen will sit until manually deleted (the `/repo-health` orphan check covers this). 30 days post-release, the legacy import path itself will be removed.
+
+Spec: `documentation/planning/2026-05-15-session-handoff-resume-redesign-design.md`
+
 ### Fixed
 - **CI validate-skills scoped to PR-touched skills.** `validate-skills.py` and `integration-test.py` now detect CI via `GITHUB_ACTIONS` env var and only block on errors from skills modified in the PR. Untouched skill violations are reported as warnings for visibility but do not fail the build. Prevents pre-existing violations (e.g. a broken reference in an unrelated skill) from blocking every PR. `_shared/` changes still validate all skills as blocking. CI workflow updated with `fetch-depth: 0` so `git diff origin/main...HEAD` works.
 

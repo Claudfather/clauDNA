@@ -77,9 +77,7 @@ After the main dashboard, run a quick hygiene scan. Skip entirely if everything 
 
 ### Step 6: Handoff
 
-Once the user picks a repo, suggest the relevant skill (`/claudna:context-resume`, `/claudna:review-pr`, `/claudna:implement-plan`). If it's a different directory, tell the user to switch there first.
-
----
+Once the user picks a repo, suggest the relevant skill (`/session-resume`, `/review-pr`, `/implement-plan`). If it's a different directory, tell the user to switch there first.
 
 ---
 

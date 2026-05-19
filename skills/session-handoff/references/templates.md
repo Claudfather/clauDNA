@@ -1,45 +1,47 @@
-# Handoff File Template
+# Handoff File Format — `<cwd>/.claude/session.md`
 
-Write the handoff file using this structured format. Optimized for agent consumption by `/claudna:context-resume`.
+Schema version: 2. Written by `/session-handoff`, read by `/session-resume`. Optimized for agent consumption.
 
 ```markdown
-# Context Resume: <project-name>
-
-session_date: YYYY-MM-DD
-branch: <current-branch>
-working_tree: <clean | dirty — list modified files if dirty>
-stashes: <count or 0>
-
-## Activity
-
-- <one-line commit summaries, prefixed with short hash>
-- PR #N: <title> (<state>)
-- Plan: <doc-path> <status-change>
-
-## Decisions
-
-- <decision made and rationale, one per line>
-
-## Open Questions
-
-- <blockers, unknowns, pending inputs>
-
-## Next Steps
-
-- <what the next session should start with>
-- <pending plan phases if applicable>
-- <uncommitted work note if applicable>
+---
+cwd: <absolute path to current working directory>
+last_updated: <ISO-8601 UTC, e.g. 2026-05-15T14:30:00Z>
+schema_version: 2
+---
 
 ## State
-
+branch: <current branch>
+working_tree: <clean | dirty: N modified, N untracked, N staged>
+stashes: <count>
 open_prs:
   - "#N <title> (<state>)"
-branches: <list of active feature branches>
+in_flight_branches:
+  - <branch-name>
+
+## Activity
+- <ISO-8601 UTC> — <one-line summary, prefix with short hash if from a commit>
+
+## Decisions
+- <ISO-8601 UTC> — <decision and rationale>
+
+## Open Questions
+- <ISO-8601 UTC> — <blocker, unknown, pending input>
+
+## Next Steps
+- <ISO-8601 UTC> — <what the next session should start with>
 ```
 
-## Format Notes
+## Format rules
 
-- Use flat key-value pairs where possible — easier for the resuming agent to parse.
-- Keep each section to 3-7 bullet points max. If a section has nothing, omit it entirely.
-- The Decisions and Open Questions sections come from session observation. If the user provided explicit input, include it. If not, infer from the git history and PR activity.
-- Never pad with filler content. Empty sections are better than vague ones.
+- Every bullet under Activity / Decisions / Open Questions / Next Steps starts with an ISO-8601 UTC timestamp followed by ` — ` (em-dash with spaces). The reaper parses on this format.
+- `State` is regenerated on every write — never preserves prior content.
+- Empty sections may be omitted.
+- A bullet may carry a `(stale-flagged YYYY-MM-DD)` suffix added by the reaper. On the next pass, if the soft-drop conditions still hold, the bullet is dropped.
+- A bullet may carry a `[pin]` suffix added by the user to opt out of soft drops.
+- Maximum 10 bullets per section. If a section grows past 10, the reaper drops oldest-first regardless of TTL.
+
+## Migration from schema_version: 1
+
+Legacy files at `~/.claude/notes/projects/<slug>/context-resume.md` use schema_version: 1 (no per-item timestamps; bullets in plain `- text` form; frontmatter with `session_date` only).
+
+When `/session-resume` imports a v1 file, it assigns the file's `session_date` as the timestamp for every imported item, then runs the reaper. Most v1 items will hard-drop on first reap because they exceed TTL (Activity > 7d, etc.) — which is the correct behavior.

@@ -65,7 +65,7 @@ Phase files use: `NN_<phase-slug>.md` (e.g., `01_input-validation.md`).
 
 ## 5. Status Markers
 
-Embed these in plan documents. They are machine-read by `/claudna:context-resume`, `/claudna:session-handoff`, and `/claudna:implement-plan`:
+Embed these in plan documents. They are machine-read by `/claudna:session-resume`, `/claudna:session-handoff`, and `/claudna:implement-plan`:
 
 | Marker | Meaning |
 |--------|---------|
@@ -97,7 +97,7 @@ These are not archived — they're living documents that evolve with the codebas
 
 ## 8. Reading Documentation State
 
-Skills that scan documentation state (e.g., `/claudna:context-resume`, `/claudna:session-handoff`, `/claudna:repo-health`):
+Skills that scan documentation state (e.g., `/claudna:session-resume`, `/claudna:session-handoff`, `/claudna:repo-health`):
 
 ```bash
 # Find in-progress plans

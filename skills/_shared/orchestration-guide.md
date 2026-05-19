@@ -477,7 +477,7 @@ When multiple skills could apply to a task, invoke them in tier order. Process s
 | 3 | **Implementation** | implement-plan, review-changes, review-pr, quick-commit, commit-push-pr | Execute plans, review code, commit and ship PRs |
 | 4 | **Deployment & Ops** | railway-deploy, vercel-deploy, modal-deploy, railway-status, vercel-status, modal-status, railway-logs, vercel-logs, modal-logs, dbt, neon-branch, neon-info, neon-query | Deploy, monitor, query infrastructure |
 
-**Utility skills** (context-resume, session-handoff, lessons, notes, find-skills, docs-review, repo-health, worktree) are not tiered -- they are invoked on demand for session management, not as part of a build workflow.
+**Utility skills** (session-handoff, session-resume, lessons, notes, find-skills, cache-audit, docs-review, repo-health, worktree, clauDNA-migrate, notifications) are not tiered -- they are invoked on demand for session management, not as part of a build workflow.
 
 ### Rules
 

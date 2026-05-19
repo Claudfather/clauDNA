@@ -44,7 +44,7 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:tech-de
 
 | Skill | Description |
 |-------|-------------|
-| `/context-resume` | Pick up where you left off — scans git, PRs, plans, handoff notes |
+| `/session-resume` | Pick up where you left off — scans git, PRs, plans, handoff notes |
 | `/session-handoff` | End-of-session capture — decisions, learnings, next steps |
 | `/repo-health` | Multi-repo dashboard — open PRs, CI status, stale branches |
 | `/implement-plan` | Execute a design doc or GitHub Issue — browse, pick, challenge, build, test, PR |
@@ -138,7 +138,7 @@ The skills form a pipeline:
 Morning
 ───────────────────────────────────────────────────
   /claudna:repo-health           → See what needs attention across all repos
-  /claudna:context-resume        → Pick a repo, get a 30-second briefing
+  /claudna:session-resume        → Pick a repo, get a 30-second briefing
 
 Planning (when starting new work)
 ───────────────────────────────────────────────────
@@ -162,10 +162,10 @@ Reviewing
 End of Day
 ───────────────────────────────────────────────────
   /claudna:session-handoff       → Capture decisions, learnings, next steps
-                                   → Writes handoff file for tomorrow's /claudna:context-resume
+                                   → Writes handoff file for tomorrow's /claudna:session-resume
 ```
 
-**First time?** Start with `/claudna:repo-health` to see your repos, then `/claudna:context-resume` in any project.
+**First time?** Start with `/claudna:repo-health` to see your repos, then `/claudna:session-resume` in any project.
 
 ## Agents
 
