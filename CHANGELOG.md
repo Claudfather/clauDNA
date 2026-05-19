@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-18
 ### Changed (BREAKING)
 - **Renamed `/context-resume` → `/session-resume`.** Sibling change required in any caller (notably Claudlobby's `/restart`, tracked at https://github.com/Claudfather/Claudlobby/issues/223).
 - **`/session-handoff` and `/session-resume` redesigned for per-cwd scope.** Handoff now lives at `<cwd>/.claude/session.md` (not `~/.claude/notes/projects/<slug>/context-resume.md`). Identity is the cwd, not a derived slug. Legacy files are imported once on first `/session-resume` in a given cwd and then deleted.
