@@ -97,8 +97,8 @@ Print structured report: scope summary, code-to-schema map, ranked findings tabl
 This skill supports `--output github` and `--output session` in addition to the default `session` target.
 
 Follow the output guide at `skills/_shared/output-guide.md`:
-- For `github`: use the structured issue body format (Section 4), check for duplicates (Section 4.5), apply labels (Section 4.3). Create one issue per ranked finding (Schema Gap, Structural Friction, Performance Anti-pattern, etc.). Label with `auto-audit` and the finding category.
-- For `session` (default): present findings in chat, stay in Plan Mode (Section 5)
+- For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Create one issue per ranked finding (Schema Gap, Structural Friction, Performance Anti-pattern, etc.). Label with `auto-audit` and the finding category.
+- For `session` (default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
 - For `docs`: write the full ranked findings report to `documentation/planning/data-model-audit/<session_name>_<YYYY-MM-DD>/`
 
 ---

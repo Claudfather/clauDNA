@@ -86,8 +86,8 @@ Once the user picks a repo, suggest the relevant skill (`/session-resume`, `/rev
 This skill supports `--output github` and `--output session` in addition to the default `docs` target.
 
 Follow the output guide at `skills/_shared/output-guide.md`:
-- For `github`: use the structured issue body format (Section 4), check for duplicates (Section 4.5), apply labels (Section 4.3). Create one issue per repo with actionable findings (stale branches, failing CI, PRs needing review). Label with `auto-audit` and `repo-health`.
-- For `session`: present findings in chat, stay in Plan Mode (Section 5)
+- For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Create one issue per repo with actionable findings (stale branches, failing CI, PRs needing review). Label with `auto-audit` and `repo-health`.
+- For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
 - For `docs` (default): write the dashboard and priority recommendations to `documentation/planning/repo-health/<session_name>_<YYYY-MM-DD>/`
 
 ---

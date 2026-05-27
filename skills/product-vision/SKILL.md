@@ -200,8 +200,8 @@ When `--auto` is set:
 ## Output Targets
 
 Follow the output guide at `skills/_shared/output-guide.md`:
-- For `github`: structured issue body (Section 4), dedup check (Section 4.5), labels (Section 4.3)
-- For `session`: present in chat, stay in Plan Mode (Section 5)
+- For `github`: write each finding/play as a doc (frontmatter + Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish dedups and applies labels from `tags:`
+- For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
 - For `docs` (default): write to `documentation/planning/product-vision/<session_name>_<YYYY-MM-DD>/`
 
 ---

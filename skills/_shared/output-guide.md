@@ -2,19 +2,23 @@
 
 Shared reference for planning skills that support `--output <target>`. Skills reference this file at `skills/_shared/output-guide.md`.
 
+**Author writes content → `/claudna:publish` enforces + routes.** Skills are *authors*: they run their analysis and produce a markdown doc with valid frontmatter and the house-style body skeleton (defined below). They never call `gh` themselves. `/claudna:publish` is the *publisher*: it validates the doc against this spec, dedups per-medium, and routes it to the chosen edition. This guide is the canonical house-style spec — skills read it for *what to produce*, and `/claudna:publish` reads it for *what to enforce*.
+
 ---
 
 ## 1. Overview
 
-Planning skills support three output targets. The target controls **where** results are written, not **what** is produced — all targets receive the same level of detail.
+Planning skills support three output targets. The target controls **where** the doc lands, not **what** is produced — all targets receive the same doc at the same level of detail.
 
-| Target | Flag | Behavior |
-|---|---|---|
-| `docs` | (default, no flag needed) | Write phased planning docs to `documentation/planning/` |
-| `github` | `--output github` | Write full plans as GitHub Issue bodies |
-| `session` | `--output session` | Present in chat only, no persistence |
+| Target | Flag | Routing | Behavior |
+|---|---|---|---|
+| `docs` | (default, no flag needed) | _written directly_ | Write phased planning docs to `documentation/planning/<skill>/<session>_<date>/` (as today) |
+| `github` | `--output github` | `/claudna:publish --to github-issue` | Create a GitHub issue from the doc |
+| `session` | `--output session` | `/claudna:publish --to session` | Print the doc body back into the chat, no persistence |
 
-**All targets use Plan Mode** for the deliberation phase. The target only affects where the final artifact lands.
+**The `github` and `session` targets route through `/claudna:publish`.** The default `docs` target still writes phased planning docs to `documentation/planning/` directly — unifying it through publish's `--to disk` adapter is **deferred**, because publish's disk adapter targets the shared-docs vault (`shared/planning/active/`), a different destination than per-project `documentation/planning/`. Reconciling the two is its own change.
+
+**All targets use Plan Mode** for the deliberation phase.
 
 ### Activation
 
@@ -35,42 +39,38 @@ The user activates a non-default target by:
 Regardless of output target, every skill must:
 
 1. **Run the full analysis pipeline.** No phases are skipped based on output target. The scan, analysis, and plan generation phases all execute identically.
-2. **Produce implementation-ready detail.** Every finding must include: before/after code examples, step-by-step instructions, verification checklist, and "What NOT To Do" guidance. See orchestration guide Section 5 for the full phase doc structure.
-3. **Use Plan Mode for deliberation.** Enter Plan Mode before analysis begins. Exit Plan Mode when transitioning to output writing.
+2. **Produce a publishable doc.** Each unit of output is a markdown file with the frontmatter (Section 3) and the body skeleton (Section 4) below. Every finding includes before/after code examples, step-by-step instructions, a verification checklist, and "What NOT To Do" guidance.
+3. **Delegate GitHub/session output to `/claudna:publish`.** Never run `gh issue create` / `gh pr create` directly. For `--output github` or `--output session`, invoke `/claudna:publish <file> --to <edition>` (mapping in Section 1) — publish handles validation, dedup, labels, and the destination. For the default `docs` target, write the doc to `documentation/planning/` directly (see Section 1 note).
+4. **Use Plan Mode for deliberation.** Enter Plan Mode before analysis begins. Exit Plan Mode when transitioning to writing the doc + publishing.
 
 The output target is a persistence decision, not a quality decision.
 
 ---
 
-## 3. Target: `docs` (Default)
+## 3. The Publishable Doc — Frontmatter
 
-Write phased planning documents to the project's `documentation/planning/` directory. This is the current default behavior — no changes from existing skill workflows.
+Every doc an author hands to `/claudna:publish` carries YAML frontmatter. Publish validates these (and rejects malformed docs):
 
-**Session directory structure:**
-```
-documentation/planning/<subdirectory>/<session_name>_<YYYY-MM-DD>/
-├── 00_OVERVIEW.md (or 00_TECH_DEBT.md, etc.)
-├── 01_<phase-slug>.md
-├── 02_<phase-slug>.md
-└── ...
-```
-
-**References:**
-- Phase doc structure: orchestration guide Section 5
-- Archive convention: orchestration guide Section 8
-- Subdirectory per skill: orchestration guide Section 8
-
-**Subagent workflow:** Follow the Plan Agent → Disk pattern in orchestration guide Section 3. Plan agents write docs directly to the output directory.
+| Field | Rule |
+|-------|------|
+| `title` | Issue/page title. For findings use the format in Section 4.2. |
+| `type` | One of: `plan`, `decision`, `knowledge`, `runbook`, `audit`, `review`. Audits/reviews/plans require the body skeleton in Section 4.1. |
+| `status` | Valid for the type (`audit`/`review`: `draft`\|`completed`; `plan`: `draft`\|`active`\|`completed`\|`superseded`; etc.) |
+| `owner` | The skill or user that produced it. |
+| `created` | `YYYY-MM-DD`. |
+| `tags` | Labels to apply (github-issue edition maps these → `--label`). Use the taxonomy in Section 4.3. |
+| `repos` | Target repo(s); a single value lets the github/disk adapters infer destination. |
+| `links` | Publish writes the destination URL back here after publishing. |
 
 ---
 
-## 4. Target: `github`
+## 4. House Style for GitHub Issues (`--output github` → `--to github-issue`)
 
-Write full implementation plans as GitHub Issue bodies. Each issue maps to one phase (one PR's worth of work), matching the "one PR per doc" convention.
+Each issue maps to one phase (one PR's worth of work), matching the "one PR per doc" convention. The author writes the doc; `/claudna:publish --to github-issue` creates the issue from it.
 
 ### 4.1. Issue Body Format
 
-The issue body uses a **structured format** that maps 1:1 to the phase doc structure (orchestration guide Section 5). This structure is a contract — it must be parseable by `--source github` in `/claudna:implement-plan`.
+The body uses a **structured format** that maps 1:1 to the phase doc structure (orchestration guide Section 5). This structure is a contract — it must be parseable by `--source github` in `/claudna:implement-plan`, and `/claudna:publish` validates its presence for `type: audit|review|plan` before publishing.
 
 ```markdown
 ## Summary
@@ -124,9 +124,9 @@ The issue body uses a **structured format** that maps 1:1 to the phase doc struc
 - Related issues: #NNN, #NNN (if any)
 ```
 
-**Important:** The `## Implementation Plan` section with its `### Steps` subsection is what distinguishes a full-detail issue from a findings-only issue. When `/claudna:implement-plan --source github` reads an issue, it checks for this section to determine whether the issue is implementation-ready.
+**Important:** The `## Implementation Plan` section with its `### Steps` subsection is what distinguishes a full-detail issue from a findings-only issue. `/claudna:publish` rejects an `audit`/`review`/`plan` doc that lacks it, and `/claudna:implement-plan --source github` checks for it to decide whether an issue is implementation-ready.
 
-### 4.2. Issue Title
+### 4.2. Issue Title (the `title:` frontmatter field)
 
 ```
 [<type>] <concise description> — <file or area>
@@ -140,9 +140,9 @@ Type prefixes:
 - `[design]` — Design/UX issues
 - `[docs]` — Documentation gaps
 
-### 4.3. Labels
+### 4.3. Labels (the `tags:` frontmatter field)
 
-Apply these labels (create if they don't exist):
+Put these in `tags:`; `/claudna:publish` applies them as issue labels (creating any that don't exist):
 
 | Label | When |
 |-------|------|
@@ -159,43 +159,34 @@ Apply these labels (create if they don't exist):
 
 ### 4.4. Severity-to-Priority Mapping
 
-Skills that use severity systems map to issue priority:
+Skills that use severity systems map severity to a `priority:*` tag:
 
-| Severity | Issue Priority | Action |
-|----------|---------------|--------|
+| Severity | Priority tag | Action |
+|----------|--------------|--------|
 | CRITICAL | `priority:critical` | Create issue immediately, flag to user |
 | HIGH | `priority:high` | Create issue |
 | MEDIUM | `priority:medium` | Create issue |
 | LOW | `priority:low` | Create issue (may batch with related findings) |
 | INFO | — | Skip unless particularly noteworthy |
 
-### 4.5. Deduplication — Check Before Creating
+### 4.5. Deduplication (handled by `/claudna:publish`)
 
-**Before creating any issue, search for duplicates.** This is mandatory.
+The author does **not** dedup. The `github-issue` adapter of `/claudna:publish` searches for existing open issues before creating, and applies these rules:
 
-Use `gh` CLI:
-```
-gh issue list --repo <owner>/<repo> --search "<key terms>" --state open --limit 20
-```
+- **Exact match** (same file, same finding): Skip; report the existing issue URL.
+- **Related but different** (same area, different finding): Create and add `Related: #NNN`.
+- **Similar pattern, different location**: Prefer one umbrella issue listing all locations.
+- **Previously closed**: If it recurred, reopen with a comment; if a new instance, create referencing the old.
 
-Search for:
-- The specific file or function name involved
-- The category of finding (e.g., "tech debt", "SQL injection", "N+1 query")
-- Key symptoms or error messages
-
-**Decision rules:**
-- **Exact match** (same file, same finding): Skip. Do not create a duplicate.
-- **Related but different** (same area, different finding): Create new issue and reference the related one with "Related: #NNN".
-- **Similar pattern, different location** (e.g., same vulnerability in different files): Create one umbrella issue listing all locations, OR add a comment to an existing umbrella issue if one exists.
-- **Previously closed**: If a closed issue covers the same finding, check if it was actually fixed. If the problem recurred, reopen with a comment explaining the recurrence. If it's a new instance, create a new issue referencing the old one.
+(Disk dedup = compare-and-warn on an existing file; session has no dedup.)
 
 ### 4.6. Batch Creation Pattern
 
-When creating multiple issues from a single audit:
+When a single audit yields multiple docs:
 
-1. **Create issues sequentially**, not in parallel — this avoids race conditions in dupe checking
-2. **Log each created issue** — collect issue numbers and URLs for the summary
-3. **Create a summary comment or issue** at the end linking all created issues:
+1. **Publish sequentially**, not in parallel — this lets publish's dedup see prior creations.
+2. **Collect each returned URL** for the summary.
+3. **Produce a summary doc** at the end linking all created issues and publish it too (or present in session):
 
 ```markdown
 ## Audit Summary: <skill-name> — <area> (<date>)
@@ -209,49 +200,41 @@ Created <N> issues from this audit:
 Skipped <M> findings (duplicates of existing issues).
 ```
 
-4. **Return the summary** to the orchestrator for user presentation and audit tracking
+4. **Return the summary** to the orchestrator for user presentation and audit tracking.
 
-### 4.7. Subagent Workflow for `--output github`
+### 4.7. Subagent Workflow
 
 When using subagents to generate plans:
 
-1. **Research agents** work identically to the `docs` path — write research to scratch directory, return summaries.
-2. **Plan agents** write their output to the scratch directory as temporary files (same structure as phase docs).
-3. **The orchestrator** reads Plan agent metadata summaries, then creates GitHub issues from the temporary files using `gh issue create`.
+1. **Research agents** write research to a scratch directory and return summaries.
+2. **Plan agents** write each doc (frontmatter + skeleton) to the scratch directory.
+3. **The orchestrator** invokes `/claudna:publish <scratch-file> --to github-issue --repo <repo>` per doc — it never reads the full doc or calls `gh` itself.
 
-This preserves the context window management benefits (orchestrator never reads full docs) while routing output to GitHub instead of `documentation/planning/`.
+This preserves context-window management (the orchestrator works from metadata summaries) while routing output through the single publisher.
 
 ### 4.8. Error Handling
 
-- If `gh` is not authenticated or the repo is not accessible, fall back to presenting findings in chat and ask the user to create issues manually.
-- If label creation fails (permissions), create the issue without labels and note this in the summary.
-- If issue creation fails for any reason, log the failure and continue with remaining issues. Present failures in the summary.
+`/claudna:publish` reports adapter errors verbatim (auth failure, missing repo, label-creation failure). If publish reports it cannot reach GitHub, fall back to `--to session` (present the doc in chat) and tell the user to publish later. Continue with remaining docs and surface failures in the summary.
 
 ---
 
-## 5. Target: `session`
+## 5. Target: `session` (`--to session`)
 
-Present findings and plans in the chat session only. No files or issues are created.
+Present the doc in the chat session only — no files or issues. The skill runs the full analysis pipeline and produces the same publishable doc as other targets, then hands it to `/claudna:publish <file> --to session`, which prints the body back to chat. Plan Mode remains active throughout (the skill does not exit Plan Mode to persist anything).
 
-**Behavior:**
-- The skill runs its full analysis pipeline (identical to other targets)
-- Findings are presented in chat with the same level of detail
-- Plan Mode remains active throughout — the skill does NOT exit Plan Mode to write output
-- The session ends with a summary of findings and recommendations
+**When to use:** "Think with me" sessions — exploratory audits, second opinions, or scoping before committing to remediation.
 
-**When to use:** "Think with me" sessions where the user wants analysis without creating artifacts. Useful for exploratory audits, second opinions, or scoping exercises before committing to a full remediation effort.
-
-**Limitation:** `--output session` is incompatible with `--auto` (auto requires non-interactive output).
+**Limitation:** incompatible with `--auto` (auto requires non-interactive persistence).
 
 ---
 
 ## 6. Integration with Audit Tracker
 
-When running in automated/rolling audit mode (`--auto`), after creating issues:
+When running in automated/rolling audit mode (`--auto`), after publishing:
 
-1. Collect all created issue URLs
-2. Return them to the calling workflow for logging in the local audit tracker
-3. The audit tracker records: repo, directory, audit type, date, issue URLs, summary
+1. Collect all issue URLs returned by `/claudna:publish`.
+2. Return them to the calling workflow for logging in the local audit tracker.
+3. The audit tracker records: repo, directory, audit type, date, issue URLs, summary.
 
 This enables the "stale area" detection that drives the rolling audit rotation.
 
@@ -261,21 +244,24 @@ This enables the "stale area" detection that drives the rolling audit rotation.
 
 In the skill's Arguments section:
 ```
-- `--output github`: Write findings and plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
+- `--output github`: Write findings and plans as GitHub Issues (via /claudna:publish). See output guide (`skills/_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
-- Default (no flag): Write planning docs to `documentation/planning/`.
+- Default (no flag): Write planning docs to disk.
 ```
 
-In the skill's output section (replacing "Alternative: GitHub Issues Output"):
+In the skill's output section:
 ```
 ## Output Targets
 
 This skill supports `--output github` and `--output session` in addition to the default `docs` target.
 
-Follow the output guide at `skills/_shared/output-guide.md`:
-- For `github`: use the structured issue body format (Section 4), check for duplicates (Section 4.5), apply labels (Section 4.3)
-- For `session`: present findings in chat, stay in Plan Mode (Section 5)
-- For `docs` (default): follow the subagent workflow in the orchestration guide
+Produce each unit of output as a markdown doc with frontmatter + the body skeleton in
+`skills/_shared/output-guide.md`, then delegate to `/claudna:publish`:
+- `--output github` → `/claudna:publish <file> --to github-issue --repo <repo>` (Section 4)
+- `--output session` → `/claudna:publish <file> --to session` (Section 5)
+- `docs` (default) → write to `documentation/planning/<skill>/<session>_<date>/` directly (publish-disk unification deferred, see Section 1)
+
+Never call `gh` directly for GitHub output — `/claudna:publish` owns validation, dedup, labels, and routing.
 
 [Skill-specific output notes, if any]
 ```

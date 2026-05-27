@@ -196,8 +196,8 @@ Could a new engineer onboard from these docs alone?
 This skill supports `--output github` and `--output session` in addition to the default inline-fix behavior.
 
 Follow the output guide at `skills/_shared/output-guide.md`:
-- For `github`: use the structured issue body format (Section 4), check for duplicates (Section 4.5), apply labels (Section 4.3). Apply `docs` label. Auto-fix verifiable inaccuracies first, then create issues for gaps requiring human judgment.
-- For `session`: present findings in chat, stay in Plan Mode (Section 5)
+- For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Apply `docs` label. Auto-fix verifiable inaccuracies first, then create issues for gaps requiring human judgment.
+- For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
 - Default: fix docs inline and ask about gaps (current behavior)
 
 After creating issues, present the batch summary and return issue URLs for audit tracking.

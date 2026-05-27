@@ -19,6 +19,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from skill_checks import (
     check_allowed_tools_usage,
     check_auto_no_ask_user,
+    check_no_raw_gh_commands,
     check_output_github_reference,
     validate_skill_md,
     warn_skill_md,
@@ -88,6 +89,72 @@ class TestAutoNoAskUser:
     def test_argument_hint_not_string(self):
         fm = {"argument-hint": 42}
         assert check_auto_no_ask_user(fm, "AskUserQuestion") == []
+
+
+# --- check_no_raw_gh_commands ---
+
+
+class TestNoRawGhCommands:
+    def test_clean_body(self):
+        assert check_no_raw_gh_commands({}, "This skill analyzes things and writes a doc.") == []
+
+    def test_raw_gh_issue_create_fails(self):
+        body = "Then run: gh issue create --title 'foo' --body 'bar'"
+        errors = check_no_raw_gh_commands({}, body)
+        assert len(errors) == 1
+        assert "gh issue create" in errors[0]
+        assert "claudna:publish" in errors[0]
+
+    def test_raw_gh_pr_create_fails(self):
+        body = "Create the PR: gh pr create --base main --title 'x'"
+        errors = check_no_raw_gh_commands({}, body)
+        assert len(errors) == 1
+        assert "gh pr create" in errors[0]
+
+    def test_raw_gh_issue_comment_fails(self):
+        body = "Post a summary: gh issue comment 123 --body 'done'"
+        errors = check_no_raw_gh_commands({}, body)
+        assert len(errors) == 1
+        assert "gh issue comment" in errors[0]
+
+    def test_raw_gh_pr_comment_fails(self):
+        body = "Drop a note: gh pr comment 7 --body 'see review'"
+        errors = check_no_raw_gh_commands({}, body)
+        assert len(errors) == 1
+        assert "gh pr comment" in errors[0]
+
+    def test_delegation_prose_passes(self):
+        # A line that names the command but points to publish is delegation guidance.
+        body = "Never run `gh issue create` yourself -- delegate to /claudna:publish."
+        assert check_no_raw_gh_commands({}, body) == []
+
+    def test_issue_consumption_not_flagged(self):
+        # Reading/editing issues (implement-plan) is not output publishing.
+        body = "Fetch via gh issue view 5; gh issue list --state open; gh label create foo"
+        assert check_no_raw_gh_commands({}, body) == []
+
+    def test_allowlisted_skill_passes_via_validate(self):
+        # publish/file-github-issue/commit-push-pr may use gh directly.
+        body = "# Publish\n\nCreate it with gh issue create --repo o/r --title t.\n" + "x" * 200
+        with tempfile.TemporaryDirectory() as d:
+            skill = Path(d) / "SKILL.md"
+            skill.write_text(
+                '---\nname: publish\ndescription: "Output adapter that publishes docs '
+                'to destinations."\n---\n' + body
+            )
+            errors = validate_skill_md(skill, dir_name="publish")
+            assert not any("delegate GitHub output" in e for e in errors)
+
+    def test_non_allowlisted_skill_fails_via_validate(self):
+        body = "# Audit\n\nWhen done, gh issue create --repo o/r --title t.\n" + "x" * 200
+        with tempfile.TemporaryDirectory() as d:
+            skill = Path(d) / "SKILL.md"
+            skill.write_text(
+                '---\nname: my-audit\ndescription: "Audits the codebase for problems '
+                'and reports them."\n---\n' + body
+            )
+            errors = validate_skill_md(skill, dir_name="my-audit")
+            assert any("gh issue create" in e for e in errors)
 
 
 # --- check_allowed_tools_usage ---

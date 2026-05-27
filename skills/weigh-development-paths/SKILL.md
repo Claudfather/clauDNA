@@ -106,8 +106,8 @@ State your recommendation with:
 This skill supports `--output github` and `--output session` in addition to the default `session` target.
 
 Follow the output guide at `skills/_shared/output-guide.md`:
-- For `github`: use the structured issue body format (Section 4), check for duplicates (Section 4.5), apply labels (Section 4.3). Create one issue documenting the junction analysis — include the comparison matrix, holistic assessment, and recommendation. Label with `auto-audit` and `enhancement`.
-- For `session` (default): present findings in chat, stay in Plan Mode (Section 5)
+- For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Create one issue documenting the junction analysis — include the comparison matrix, holistic assessment, and recommendation. Label with `auto-audit` and `enhancement`.
+- For `session` (default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
 - For `docs`: write the full analysis to `documentation/planning/decisions/<session_name>_<YYYY-MM-DD>/`
 
 ---

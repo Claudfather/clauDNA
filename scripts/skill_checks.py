@@ -26,6 +26,20 @@ BODY_MIN = 200
 STALE_PATH_RE = re.compile(r"~/\.claude/(skills|commands|agents)/")
 STALE_PATH_SKIP_SKILLS = {"cleanup-legacy-install"}
 
+# Skills must delegate GitHub output to /claudna:publish, never call `gh` directly.
+# These three are the gh-endpoint skills where direct `gh` use is the whole point.
+RAW_GH_ALLOWED_SKILLS = {"publish", "file-github-issue", "commit-push-pr"}
+# Scope: issue/PR *creation* and *comment* verbs (output written to GitHub). We
+# intentionally do NOT gate edit/view/list verbs (e.g. `gh issue edit --add-label`,
+# `gh issue view`) — those are issue *consumption* / label management, used legitimately
+# by consumer skills like implement-plan.
+_RAW_GH_PATTERNS = [
+    re.compile(r"\bgh\s+issue\s+create\b"),
+    re.compile(r"\bgh\s+pr\s+create\b"),
+    re.compile(r"\bgh\s+issue\s+comment\b"),
+    re.compile(r"\bgh\s+pr\s+comment\b"),
+]
+
 
 def parse_frontmatter(path: Path) -> tuple[dict, str] | None:
     """Return (frontmatter_dict, body) or None if no frontmatter."""
@@ -295,6 +309,38 @@ def check_allowed_tools_usage(fm: dict, body: str) -> list[str]:
     return warnings
 
 
+def check_no_raw_gh_commands(fm: dict, body: str) -> list[str]:
+    """Skills must delegate GitHub output to /claudna:publish, not call `gh` directly.
+
+    Flags executable 'gh issue create', 'gh pr create', or 'gh issue comment' in a
+    skill body. Lines that reference /claudna:publish are treated as delegation prose
+    and skipped (e.g. "don't run gh issue create -- use /claudna:publish"). Issue
+    consumption (gh issue view/list/edit, gh label create) is not flagged.
+
+    The allowlist of gh-endpoint skills (RAW_GH_ALLOWED_SKILLS) is applied by the
+    caller, not here. Returns a list of error strings (empty = valid).
+    """
+    errors: list[str] = []
+    for raw in body.splitlines():
+        line = raw.strip()
+        # Coarse heuristic: a line that names the publisher is treated as delegation
+        # prose (e.g. "don't run gh issue create -- use /claudna:publish"). This means a
+        # line that genuinely runs `gh` AND mentions publish would slip through; accepted
+        # as a low-risk tradeoff for a prose check.
+        if "claudna:publish" in line:
+            continue
+        for pat in _RAW_GH_PATTERNS:
+            m = pat.search(line)
+            if m:
+                errors.append(
+                    f"raw '{m.group(0)}' in body -- skills must delegate GitHub output to "
+                    "/claudna:publish (--to github-issue), not invoke `gh` directly. "
+                    "See skills/_shared/output-guide.md."
+                )
+                break
+    return errors
+
+
 def validate_skill_md(skill_md: Path, dir_name: str | None = None) -> list[str]:
     """Validate a SKILL.md file against the skill contract.
 
@@ -387,6 +433,8 @@ def validate_skill_md(skill_md: Path, dir_name: str | None = None) -> list[str]:
     errors.extend(check_output_github_reference(fm, body))
     errors.extend(check_auto_no_ask_user(fm, body))
     errors.extend(check_structured_result_emission(fm, body))
+    if name not in RAW_GH_ALLOWED_SKILLS:
+        errors.extend(check_no_raw_gh_commands(fm, body))
 
     return errors
 

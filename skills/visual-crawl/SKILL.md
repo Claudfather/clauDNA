@@ -464,12 +464,7 @@ Priority mapping:
 
 **If `--output github` or `--auto`:**
 
-Create GitHub Issues per output guide (`skills/_shared/output-guide.md`):
-- One issue per finding (or group related findings on same page)
-- Include screenshot attachments (desktop + mobile for visual bugs)
-- Apply labels: `auto-audit`, `visual-crawl`, category label, priority label
-- Dedup against existing open issues (Section 4.5 of output guide)
-- Create batch summary issue linking all findings
+Write each finding as a doc (frontmatter + the Section 4 body skeleton; one per finding, or group related findings) with `tags:` `auto-audit`, `visual-crawl`, a category label and a priority label, plus any screenshot paths. Then delegate each to `/claudna:publish <file> --to github-issue --repo <repo>` — publish dedups and applies labels. Finish with a batch summary doc linking all findings (Section 4.6 of the output guide).
 
 **If `--output session`:**
 
@@ -545,5 +540,5 @@ When `--auto` is set:
 ## Output Targets
 
 Follow the output guide at `skills/_shared/output-guide.md`:
-- For `github` (default): structured issue body (Section 4), dedup check (Section 4.5), labels (Section 4.3). Apply `visual-crawl` label + category-specific label.
-- For `session`: present findings in chat, stay in Plan Mode (Section 5)
+- For `github` (default): write each finding as a doc (frontmatter + Section 4 body skeleton) with `tags:` including `visual-crawl` + a category label, then delegate to `/claudna:publish <file> --to github-issue --repo <repo>` (publish dedups + labels).
+- For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)

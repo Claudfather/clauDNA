@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`/claudna:publish` is now the single output sink for GitHub/session output.** Analysis skills author a markdown doc; publish validates house style (deep, per-`type:` skeleton with a hard gate on `## Implementation Plan` + `### Steps`), dedups per-medium, and routes to a github-issue or the chat session. Added a `session` adapter. `output-guide.md` and the 14 analysis skills now delegate GitHub output to publish instead of embedding `gh issue create`. The default `docs` target still writes to `documentation/planning/` directly — unifying it through publish's disk adapter is deferred.
+
+### Added
+- **CI guard `check_no_raw_gh_commands`.** `validate_skill_md` now blocks executable `gh issue/pr create` and `gh issue/pr comment` in a skill body (allowlist: `publish`, `file-github-issue`, `commit-push-pr`), enforcing that skills delegate GitHub output to `/claudna:publish`.
+
 ### Fixed
 - **Cross-skill CI attribution bug.** Duplicate-name and duplicate-description checks now attribute errors to BOTH participating skills. In CI scoping mode, cross-skill errors block if ANY participant is PR-touched — previously, alphabetical ordering could land the error on only the untouched skill, silently demoting it to a warning.
 - **Git diff fallback now logs a warning.** When `get_touched_skills()` falls back to full validation due to a failed `git diff`, it prints the reason and stderr to help diagnose CI environment issues.
