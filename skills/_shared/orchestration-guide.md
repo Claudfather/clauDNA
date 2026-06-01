@@ -83,8 +83,8 @@ The orchestrator constructs a prompt for each Plan agent that includes:
 ```
 ## Setup
 
-1. Read skills/_shared/orchestration-guide.md — follow Section 4
-   (Quality Standards) and Section 5 (Phase Doc Structure) exactly.
+1. Read skills/_shared/planning-standard.md — follow the Quality
+   Standard and Phase Doc Structure exactly.
 2. Read the research file(s) at: /tmp/<skill>-<timestamp>/research/<slug>.md
 3. [Any skill-specific quality requirements, inlined by the calling skill]
 
@@ -117,49 +117,15 @@ Do NOT return the full document content.
 
 ## 4. Quality Standards
 
-These plans will be handed off to a **junior engineering team for implementation**. The plans are the sole artifact for knowledge transfer — the junior team will not have access to the original author for clarification. Therefore:
+See `skills/_shared/planning-standard.md` for the full quality standard. All plan output — phase docs, master docs, GitHub Issue bodies — must meet this standard.
 
-- **Extreme attention to detail is mandatory.** Every file path, every function name, every import statement must be explicit. Never say "update the imports" without showing exactly which imports change and how.
-- **Reference code explicitly.** Don't describe changes abstractly — show the exact code that exists today and the exact code it should become.
-- **Eliminate ambiguity.** If there are two ways to do something, pick one and explain why. Don't leave decisions to the implementer.
-- **Ensure separation of concerns.** Each PR should touch a distinct set of files. Verify that no two phases modify the same files unless there is an explicit dependency between them.
-- **Prevent parallel conflicts.** Identify which phases can safely run in parallel (touch disjoint files) and which must be sequential. Document this clearly.
-- **Include context generously.** Explain *why* each change is being made, not just *what* to change. The junior team needs to understand the reasoning to make good judgment calls during implementation.
-
-**Note:** Individual skills may specify additional domain-specific quality requirements. Plan agents must follow BOTH these shared standards AND any skill-specific additions provided in their launch prompt.
+Plan agents must read `planning-standard.md` from disk alongside this guide.
 
 ---
 
 ## 5. Phase Doc Structure
 
-Each phase doc represents **exactly 1 PR** and must include, at minimum, these sections:
-
-1. **Header** — PR title, risk level, estimated effort, files created/modified/deleted
-2. **Context** — Why this change matters. Link back to user intent and the gap it addresses.
-3. **Dependencies** — Which phases must be completed first, and which phases this unlocks
-4. **Detailed Implementation Plan**
-   - Explicit code references: file paths, line numbers, function names, class names
-   - Before/after code examples showing exact changes
-   - Step-by-step instructions leaving zero ambiguity
-   - New files to create with their full initial content or detailed skeleton
-5. **Test Plan**
-   - New tests to write (with descriptions of what they verify)
-   - Existing tests to modify
-   - Coverage expectations
-   - Manual verification steps
-6. **Documentation Updates**
-   - README changes
-   - API doc changes
-   - Inline comment updates
-   - User-facing documentation (if applicable)
-7. **Stress Testing & Edge Cases**
-   - Edge cases to handle
-   - Load/performance considerations (if relevant)
-   - Error scenarios and expected behavior
-8. **Verification Checklist** — tests to run, commands to execute, things to manually check
-9. **"What NOT To Do" Section** — common pitfalls, anti-patterns, things that look right but are wrong
-
-**Note:** Some skills have domain-specific sections that replace or augment items above (e.g., Visual Specification and Accessibility Checklist for design-review, or Root Cause Explanation and cascade diagrams for frontend-performance-audit). When a skill specifies custom sections, Plan agents should use those in place of or in addition to the defaults.
+See `skills/_shared/planning-standard.md` for the required phase doc structure (9 mandatory sections). Skills with domain-specific sections specify those in their own SKILL.md — they layer on top of the shared structure.
 
 ---
 
@@ -272,10 +238,10 @@ When a skill's doc generation step (typically the final step) delegates to Plan 
 
 > **Follow the subagent workflow defined in the orchestration guide (`skills/_shared/orchestration-guide.md`):**
 > - Plan Agent → Disk pattern (Section 3)
-> - Quality standards (Section 4)
-> - Phase doc structure (Section 5)
+> - Quality standards and phase doc structure (`skills/_shared/planning-standard.md`)
 > - Context window management (Section 6)
 > - Archive convention (Section 8)
+> - Pre-handoff adversarial review (`skills/_shared/pre-handoff-checklist.md`)
 >
 > Plan agents read research from the session's scratch directory, write docs directly to the output directory, and return only a metadata summary.
 >

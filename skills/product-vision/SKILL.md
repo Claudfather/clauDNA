@@ -206,6 +206,12 @@ Follow the output guide at `skills/_shared/output-guide.md`:
 
 ---
 
+## Pre-Handoff
+
+Before presenting output (all modes), run the adversarial review gate per `skills/_shared/pre-handoff-checklist.md` on each generated doc. Plan output must meet the quality standard in `skills/_shared/planning-standard.md`.
+
+---
+
 ## Notes
 
 - **Architecture-grounded, not blue-sky.** Every idea must trace to existing code that makes it feasible.

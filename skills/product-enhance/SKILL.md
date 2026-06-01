@@ -126,7 +126,7 @@ Compare Step 2 answers against Step 1B findings via **Explore subagents** (disk-
 
 ### Step 5: Generate Phased Design Docs
 
-Output to `documentation/planning/phases/<session_name>_<YYYY-MM-DD>/`, prefixed `01_`, `02_` by implementation order. `00_OVERVIEW.md`: context, dependency graph, parallel phases, total effort. Archive per Section 8; Plan agents per Section 9, reading from scratch research dir.
+Output to `documentation/planning/phases/<session_name>_<YYYY-MM-DD>/`, prefixed `01_`, `02_` by implementation order. `00_OVERVIEW.md`: context, dependency graph, parallel phases, total effort. Archive per Section 8; Plan agents per Section 9, reading from scratch research dir. Plan agents must also read `skills/_shared/planning-standard.md`.
 
 Present a `Product Enhancement Summary`, then direct user to `/claudna:implement-plan`. **This skill produces plans, not code.**
 
@@ -134,17 +134,7 @@ Present a `Product Enhancement Summary`, then direct user to `/claudna:implement
 
 ### Step 5.5: Adversarial Review Pass
 
-Before presenting the Product Enhancement Summary, run adversarial review on each generated design doc.
-
-For each phase doc (path: `documentation/planning/phases/<session>/<NN>_*.md`) and `00_OVERVIEW.md`:
-
-1. Dispatch a `general-purpose` subagent per `skills/_shared/subagent-prompts/adversarial-chain.md`. Substitute `<DOC_PATH>`.
-
-2. Collect the structured-result JSON. Append `## Adversarial Review Findings` section to each doc.
-
-Run all dispatches in parallel via `run_in_background: true`; collect via `TaskOutput` one at a time.
-
-Apply in all modes (interactive, `--auto`). Skip only if Phase 5 generated zero docs.
+Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. Run on each phase doc in `documentation/planning/phases/<session>/<NN>_*.md` and `00_OVERVIEW.md`. Apply in all modes.
 
 ---
 

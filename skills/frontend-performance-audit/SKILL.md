@@ -78,7 +78,7 @@ Ask the user for a short session name (e.g., `explain-page-flicker`). Output to 
 
 **Remediation Docs (01_, 02_, etc.)** — Group related findings into single PRs. Each doc = exactly 1 PR containing: header (title, severity, effort, files), findings addressed, dependencies, root cause explanation with cascade chain, detailed implementation plan (file paths, line numbers, before/after code), verification checklist (DevTools + manual repro + build/test), and "What NOT To Do" section.
 
-**Subagent workflow:** Follow orchestration guide Section 9. Plan agents read research from scratch directory. Quality requirements (beyond Section 4): explain render lifecycle per fix, draw before/after cascades, include DevTools verification.
+**Subagent workflow:** Follow orchestration guide Section 9. Plan agents must also read `skills/_shared/planning-standard.md`. Quality requirements beyond the shared standard: explain render lifecycle per fix, draw before/after cascades, include DevTools verification.
 
 After generating docs: **"Plans are ready for review. Run `/claudna:implement-plan` on the session directory to execute them."**
 
@@ -86,22 +86,14 @@ After generating docs: **"Plans are ready for review. Run `/claudna:implement-pl
 
 ## Phase 4.5: Adversarial Review Pass
 
-Before handing off to `/implement-plan`, run adversarial review on each remediation doc.
-
-For each phase doc in `documentation/planning/performance/<session>/<NN>_*.md` and `00_PERF_AUDIT.md`:
-
-1. Dispatch a `general-purpose` subagent per `skills/_shared/subagent-prompts/adversarial-chain.md`. Substitute `<DOC_PATH>`.
-
-2. Collect structured-result JSON. Append `## Adversarial Review Findings` section.
+Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. Run on each phase doc in `documentation/planning/performance/<session>/<NN>_*.md` and `00_PERF_AUDIT.md`.
 
 ### Performance-specific concern areas
 
-For frontend-performance plans, critics SHOULD flag:
+Prioritize these `concern_area` values:
 - `performance` — does the proposed fix actually address the measured bottleneck, or is it speculative?
 - `compatibility` — does the fix break any framework guarantees (e.g., Suspense boundaries, React 18 transitions)?
 - `architecture` — does the fix introduce architectural changes (e.g., new caching layers) that should be split into a separate plan?
-
-Parallel dispatch and `--output github` adaptation: same as Phase 1 contract — see `skills/tech-debt/SKILL.md` Phase 2.5.
 
 ---
 

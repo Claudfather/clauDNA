@@ -201,7 +201,7 @@ Each doc represents **exactly 1 PR** and must include:
 
 #### Subagent Workflow
 
-Follow Section 9 of the orchestration guide (`skills/_shared/orchestration-guide.md`). Scratch directory: `/tmp/access-path-audit-<YYYY-MM-DD_HHMMSS>/research/`. Plan agents read research from this directory.
+Follow Section 9 of the orchestration guide (`skills/_shared/orchestration-guide.md`). Plan agents must also read `skills/_shared/planning-standard.md` for quality standards and phase doc structure. Scratch directory: `/tmp/access-path-audit-<YYYY-MM-DD_HHMMSS>/research/`.
 
 ---
 
@@ -220,22 +220,14 @@ After creating issues, present the batch summary and return issue URLs for audit
 
 ## Phase 2.5: Adversarial Review Pass
 
-After Plan agents return with their metadata summaries (and `00_ACCESS_PATH_AUDIT.md` is written), run adversarial review on each remediation doc.
-
-For each remediation doc in `documentation/planning/access-paths/<session>/<NN>_*.md` and `00_ACCESS_PATH_AUDIT.md`:
-
-1. Dispatch a `general-purpose` subagent per `skills/_shared/subagent-prompts/adversarial-chain.md`. Substitute `<DOC_PATH>`.
-
-2. Collect structured-result JSON. Append `## Adversarial Review Findings` section.
+Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. Run on each remediation doc in `documentation/planning/access-paths/<session>/<NN>_*.md` and `00_ACCESS_PATH_AUDIT.md`.
 
 ### Access-path-specific concern areas
 
-For access-path remediation plans, critics SHOULD flag:
+Prioritize these `concern_area` values:
 - `architecture` — does the fix move a concern to the correct layer (transport vs. domain)?
 - `compatibility` — does pushing a concern into the domain core break any access path that depended on transport-layer behavior?
 - `security` — does the refactor weaken or strengthen the security posture per-path?
-
-Parallel dispatch and `--output github` adaptation: see `skills/tech-debt/SKILL.md` Phase 2.5.
 
 ---
 

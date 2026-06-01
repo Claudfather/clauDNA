@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`skills/_shared/planning-standard.md`.** Extracted the "handoff to junior engineering team" quality contract and phase doc structure from `orchestration-guide.md` (Sections 4-5). Single source of truth for plan quality standards.
+- **`skills/_shared/pre-handoff-checklist.md`.** Extracted the adversarial review gate that was duplicated across 6 skills. Defines when to run `/adversarial-review`, how to invoke it, what passes, and how to fold findings.
+
 ### Changed
+- **`orchestration-guide.md` now focuses on dispatch mechanics.** Sections 4-5 replaced with cross-references to `planning-standard.md`. Content unchanged; location consolidated.
+- **8 skills now reference shared `planning-standard.md` and `pre-handoff-checklist.md`** instead of inlining quality standards and adversarial review procedures: `tech-debt`, `security-audit`, `frontend-performance-audit`, `product-enhance`, `access-path-audit`, `docs-review`, `product-vision`, `design-review`. Skill-specific concern areas preserved inline.
 - **`/claudna:publish` is now the single output sink for GitHub/session output.** Analysis skills author a markdown doc; publish validates house style (deep, per-`type:` skeleton with a hard gate on `## Implementation Plan` + `### Steps`), dedups per-medium, and routes to a github-issue or the chat session. Added a `session` adapter. `output-guide.md` and the 14 analysis skills now delegate GitHub output to publish instead of embedding `gh issue create`. The default `docs` target still writes to `documentation/planning/` directly — unifying it through publish's disk adapter is deferred.
 
 ### Added

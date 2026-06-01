@@ -9,7 +9,7 @@ argument-hint: "[--auto] [--output github|session] [scope-path]"
 
 Rigorously audit project documentation against the actual codebase. Update inaccuracies, mark development plan statuses, archive stale docs, and identify gaps — ensuring full handoff-readiness.
 
-**Framing principle:** This project is being handed off to another engineering team. There must be zero gaps. Any engineer who picks up the codebase should be able to fully understand it, have complete context, and confidently edit and enhance the codebase without asking the original team a single question.
+**Framing principle:** This project is being handed off to another engineering team. There must be zero gaps. Any engineer who picks up the codebase should be able to fully understand it, have complete context, and confidently edit and enhance the codebase without asking the original team a single question. See `skills/_shared/planning-standard.md` for the shared quality standard that all plan output must meet.
 
 ## Arguments
 
@@ -129,27 +129,17 @@ Execute the user's choices — create or update docs as requested.
 
 ### Step 5.5: Adversarial Review Pass on Gap Proposals
 
-Before executing user choices to create/extend documentation, run adversarial review on each proposed new doc body (or extension content).
+Follow `skills/_shared/pre-handoff-checklist.md` for the general procedure. For docs-review, the workflow is adapted:
 
-For each gap-fix proposal (a new doc to create or an existing doc to extend):
+1. Write each gap-fix proposal to a temporary scratch file at `/tmp/docs-review-<timestamp>/proposals/<gap-slug>.md`.
 
-1. Write the proposed content to a temporary scratch file at `/tmp/docs-review-<timestamp>/proposals/<gap-slug>.md`.
+2. Run the pre-handoff checklist against each scratch file.
 
-2. Dispatch a `general-purpose` subagent per `skills/_shared/subagent-prompts/adversarial-chain.md` against the scratch file.
+3. Fold findings into the proposed content before applying. Specifically: if a finding's `concern_area` is `compatibility` (e.g., "this onboarding step assumes Python 3.10 but project uses 3.8"), revise the content to match observed code reality.
 
-3. Collect findings. If `outcome: completed` and `artifacts.findings` is non-empty:
-   - For each finding, fold the recommendation into the proposed content before applying.
-   - Specifically: if a finding's `concern_area` is `compatibility` (e.g., "this onboarding step assumes Python 3.10 but project uses 3.8"), revise the content to match observed code reality.
+4. Present the revised proposals to the user (interactive mode) or apply directly (`--auto` mode).
 
-4. Present the revised proposals to the user via an interactive question prompt (interactive mode) or apply directly (--auto mode).
-
-### `--auto` mode adaptation
-
-In `--auto` mode, adversarial findings are folded silently. The summary report (Step 6 below) MUST mention how many adversarial findings were addressed during gap-proposal generation, in the `summary` field of the structured-result JSON.
-
-### Skipping
-
-If Step 5 identified zero gaps requiring new content, skip Step 5.5.
+In `--auto` mode, adversarial findings are folded silently. The summary report (Step 6) MUST mention how many adversarial findings were addressed, in the `summary` field of the structured-result JSON.
 
 ### Step 6: Summary Report
 

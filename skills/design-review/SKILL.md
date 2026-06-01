@@ -120,6 +120,12 @@ Tell user: **"Run `/claudna:implement-plan` on the phase directory to start buil
 
 ---
 
+## Pre-Handoff
+
+Before presenting output (all modes), run the adversarial review gate per `skills/_shared/pre-handoff-checklist.md` on each generated doc. Plan output must meet the quality standard in `skills/_shared/planning-standard.md`.
+
+---
+
 ## Notes
 
 - **User gates** at every step -- never auto-proceed.
