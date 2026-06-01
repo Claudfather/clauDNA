@@ -153,12 +153,14 @@ updated: <YYYY-MM-DD>
 
 Before presenting or committing the plan, run these checks:
 
-1. **Mission alignment** — Does every phase serve the north star in PROJECT_MISSION.md? Flag any phase that's tangential.
-2. **Extension check** — For every new component proposed, is there an existing abstraction (factory, registry, base class, shared pattern) it should extend rather than build adjacent to? This is the #1 cause of parallel slop. Search the codebase.
-3. **Fork completeness** — Every decision fork has options, a lean, and a ratifier? No hidden forks buried in phase descriptions?
-4. **Claim verification** — Every factual claim about current state is verified against the codebase? File paths exist? Column names match? API endpoints are real?
-5. **Validation testability** — Can each validation criterion be objectively checked? "Works correctly" is not testable. "Returns 200 with valid JSON matching schema X" is.
-6. **Dependency chain** — Are phases correctly ordered? Could any phases run in parallel that are listed as sequential?
+1. **Quality standard** — Verify the plan meets `skills/_shared/planning-standard.md`. Every file path, function name, and code reference must be explicit. Ambiguity is a defect.
+2. **Mission alignment** — Does every phase serve the north star in PROJECT_MISSION.md? Flag any phase that's tangential.
+3. **Extension check** — For every new component proposed, is there an existing abstraction (factory, registry, base class, shared pattern) it should extend rather than build adjacent to? This is the #1 cause of parallel slop. Search the codebase.
+4. **Fork completeness** — Every decision fork has options, a lean, and a ratifier? No hidden forks buried in phase descriptions?
+5. **Claim verification** — Every factual claim about current state is verified against the codebase? File paths exist? Column names match? API endpoints are real?
+6. **Validation testability** — Can each validation criterion be objectively checked? "Works correctly" is not testable. "Returns 200 with valid JSON matching schema X" is.
+7. **Dependency chain** — Are phases correctly ordered? Could any phases run in parallel that are listed as sequential?
+8. **Adversarial review gate** — Run `/adversarial-review --auto` on the plan per `skills/_shared/pre-handoff-checklist.md`. Fold findings into an `## Adversarial Review Findings` section. This is the pre-handoff stress test — surface blind spots before the plan leaves the author's hands.
 
 ---
 
