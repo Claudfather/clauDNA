@@ -117,9 +117,9 @@ This aligns with clauDNA's PROJECT_MISSION.md north star ("curated quality over 
 
 ## Phases
 
-### Phase 1: Foundation — `/forge` Hardening + Decision Fork Protocol (2.5 person-days, ~1 week elapsed)
+### Phase 1: Foundation — `/forge` Hardening + Decision Fork Protocol
 
-The `/forge` skill exists but lacks `--auto` mode and a dispatch prompt. The decision-fork-lifecycle protocol doesn't exist. Both are prerequisites for `/ironclad`. Sub-items 1a+1b (clauDNA) can run in parallel with 1c+1d (claudlobby), compressing 2.5 person-days into ~1 week elapsed.
+The `/forge` skill exists but lacks `--auto` mode and a dispatch prompt. The decision-fork-lifecycle protocol doesn't exist. Both are prerequisites for `/ironclad`.
 
 #### 1a. `/forge --auto` Structured-Result Contract
 
@@ -134,7 +134,7 @@ Add `--auto` mode to `/forge` following the existing contract pattern in `skills
     "fork_count": N,
     "forks_open": N,
     "phases": N,
-    "total_effort_weeks": N,
+    "complexity_profile": {"S": N, "M": N, "L": N, "XL": N},
     "risks_high": N
   },
   "summary": "<1-2 sentence plan summary>",
@@ -146,13 +146,9 @@ Add `--auto` mode to `/forge` following the existing contract pattern in `skills
 
 This enables orchestrators to invoke `/forge` non-interactively and consume its output programmatically.
 
-**Effort:** 0.5 day. Pattern is well-established.
-
 #### 1b. `forge-chain.md` Subagent Dispatch Prompt
 
 Create `skills/_shared/subagent-prompts/forge-chain.md` — a dispatch prompt for orchestrators to invoke `/forge --auto` as a subagent, parallel to the existing `adversarial-chain.md`.
-
-**Effort:** 0.5 day.
 
 #### 1c. Decision Fork Lifecycle Protocol (claudlobby)
 
@@ -164,8 +160,6 @@ Create `library/protocols/decision-fork-lifecycle.md` in claudlobby. Governs:
 - **Reopen:** any reviewer can reopen a locked fork with new evidence via `[FORK-REOPEN F<N>] <reason>`
 - **Convergence gate:** a plan is "ironclad" when all forks are locked and no reopens are pending
 
-**Effort:** 1 day. Protocol design + documentation.
-
 #### 1d. PR Comment Hygiene Protocol (claudlobby)
 
 Create `library/protocols/pr-comment-hygiene.md` in claudlobby. Governs:
@@ -176,11 +170,9 @@ Create `library/protocols/pr-comment-hygiene.md` in claudlobby. Governs:
 - **No orphans:** every comment must be resolved (replied to or marked resolved) before convergence
 - **Bot attribution:** comments from review bots include `[<bot-name>]` prefix for traceability
 
-**Effort:** 0.5 day.
+### Phase 2: Review Lens Skills
 
-### Phase 2: Review Lens Skills (9.5 person-days, ~1.5 weeks elapsed with 2 engineers)
-
-Five new clauDNA skills that each provide a single focused review lens. Each reads a plan (markdown file or PR diff) and emits structured findings. Skills are independent — parallelizable across 2-3 engineers. At 2 engineers, 9.5 person-days compress to ~1.5 weeks elapsed.
+Five new clauDNA skills that each provide a single focused review lens. Each reads a plan (markdown file or PR diff) and emits structured findings. All five skills are independent — fully parallelizable across engineers.
 
 #### 2a. `/align-to-mission`
 
@@ -192,8 +184,6 @@ Reads the plan + `PROJECT_MISSION.md` (or repo's equivalent). For each phase/del
 Output: list of alignment findings (aligned, tangential, misaligned) per phase, with recommendations.
 
 Supports `--auto` for fleet dispatch. Structured result: `{ findings: [{phase, alignment, detail}], overall: "aligned|drift|misaligned" }`.
-
-**Effort:** 2 days.
 
 #### 2b. `/extension-check`
 
@@ -208,8 +198,6 @@ Output: list of extension findings per proposed component.
 
 Supports `--auto`. Structured result: `{ findings: [{component, existing_pattern, recommendation}], parallel_path_count: N }`.
 
-**Effort:** 2 days.
-
 #### 2c. `/precedent-check`
 
 Searches git history, closed PRs, closed issues, and `documentation/planning/` for prior art related to the plan's scope. For each match:
@@ -220,8 +208,6 @@ Searches git history, closed PRs, closed issues, and `documentation/planning/` f
 Output: list of precedents with relevance assessment.
 
 Supports `--auto`. Structured result: `{ precedents: [{source, summary, relevance, lesson}], novel_ground: ["<areas with no precedent>"] }`.
-
-**Effort:** 2 days.
 
 #### 2d. `/plan-health-audit`
 
@@ -238,8 +224,6 @@ This is the "is this plan ready to implement?" gate.
 
 Supports `--auto`. Structured result: `{ health: "ready|needs-work|blocked", issues: [{section, issue, severity}], forks_open: N, risks_unmitigated: N }`.
 
-**Effort:** 1.5 days.
-
 #### 2e. `/cost-benefit`
 
 For each phase in a plan, estimates:
@@ -253,9 +237,7 @@ Helps prioritize phases and identify low-ROI work that should be cut.
 
 Supports `--auto`. Structured result: `{ phases: [{phase, cost, benefit, roi}], recommendation: "<cut/reorder suggestions>" }`.
 
-**Effort:** 2 days.
-
-### Phase 3: `/ironclad` Fleet Orchestrator (1.5 weeks)
+### Phase 3: `/ironclad` Fleet Orchestrator
 
 #### 3a. `/ironclad` Skill (claudlobby)
 
@@ -278,8 +260,6 @@ Create `library/skills/ironclad/SKILL.md` in claudlobby. This is the fleet-level
 
 **Dispatch strategy:** use all available worker bots, max 4 parallel dispatches. If fewer bots available, run lenses sequentially on a single bot.
 
-**Effort:** 4 days. Most complexity is in dispatch orchestration and result collection.
-
 #### 3b. Plan Synthesis Protocol (claudlobby)
 
 Create `library/protocols/plan-synthesis.md` in claudlobby. Governs:
@@ -288,8 +268,6 @@ Create `library/protocols/plan-synthesis.md` in claudlobby. Governs:
 - Conflict resolution when two lenses disagree (e.g., cost-benefit says cut phase 3, align-to-mission says it's critical)
 - How the plan author (or manager) resolves conflicts and locks forks
 - Iteration limit: max 3 `/ironclad` cycles before escalating to human for manual resolution
-
-**Effort:** 1 day.
 
 #### 3c. `/ironclad --auto` Mode
 
@@ -310,21 +288,15 @@ Non-interactive mode for programmatic invocation (e.g., from a CI pipeline or hi
 }
 ```
 
-**Effort:** 1 day (pattern established by Phase 1a).
-
-### Phase 4: Integration + End-to-End Pipeline (1 week)
+### Phase 4: Integration + End-to-End Pipeline
 
 #### 4a. `/forge` → `/ironclad` Handoff
 
 When `/forge --output github` creates a plan PR, it should emit a suggestion: "Run `/ironclad <pr-url>` for multi-bot fleet review." In `--auto` mode, the structured result includes the PR URL so an orchestrator can chain `/ironclad` automatically.
 
-**Effort:** 0.5 day.
-
 #### 4b. `/ironclad` → `/implement-plan` Handoff
 
 When `/ironclad` declares a plan converged, it should emit a suggestion: "Plan is ironclad. Run `/implement-plan <plan-path>` to execute." In `--auto` mode, the structured result includes the plan path for chaining.
-
-**Effort:** 0.5 day.
 
 #### 4c. End-to-End Pipeline Test
 
@@ -337,16 +309,12 @@ Run the full pipeline on a real planning scenario:
 
 Verify: findings are accurate, forks lock correctly, convergence detection works, handoffs chain properly.
 
-**Effort:** 2 days (includes fixing issues found).
-
 #### 4d. Documentation + Changelog
 
 - Update `CHANGELOG.md` with new skills and protocols
 - Update `README.md` skill inventory
 - Add planning ecosystem overview to `documentation/`
 - Cross-reference from `skills/_shared/orchestration-guide.md`
-
-**Effort:** 1 day.
 
 ## Decision Forks
 
@@ -437,27 +405,29 @@ Verify: findings are accurate, forks lock correctly, convergence detection works
 | End-to-end pipeline completes: `/forge` → `/ironclad` → `/implement-plan` | Integration test: full pipeline on a real planning scenario (Phase 4c) |
 | No regression in existing skills | CI: full test suite passes |
 
-## Estimated Effort
+## Complexity and Sequencing
 
-| Phase | Person-days | Elapsed (with parallelization) |
-|-------|-------------|-------------------------------|
-| Phase 1: Foundation (/forge hardening + protocols) | 2.5 days | ~1 week (1a+1b parallel with 1c+1d) |
-| Phase 2: Review lens skills (5 new clauDNA skills) | 9.5 days | ~1.5 weeks (2-3 engineers in parallel) |
-| Phase 3: /ironclad fleet orchestrator | 6 days | ~1.5 weeks |
-| Phase 4: Integration + end-to-end pipeline | 4 days | ~1 week |
-| **Total** | **22 person-days** | **~5 weeks elapsed** |
+| Phase | Size | Depends on | Parallel with |
+|-------|------|-----------|---------------|
+| 1a. `/forge --auto` contract | S | — | 1b, 1c, 1d |
+| 1b. `forge-chain.md` dispatch prompt | S | — | 1a, 1c, 1d |
+| 1c. Decision fork lifecycle protocol | M | — | 1a, 1b, 1d |
+| 1d. PR comment hygiene protocol | S | — | 1a, 1b, 1c |
+| 2a. `/align-to-mission` | M | 1a (contract pattern) | 2b, 2c, 2d, 2e |
+| 2b. `/extension-check` | M | 1a | 2a, 2c, 2d, 2e |
+| 2c. `/precedent-check` | M | 1a | 2a, 2b, 2d, 2e |
+| 2d. `/plan-health-audit` | M | 1a | 2a, 2b, 2c, 2e |
+| 2e. `/cost-benefit` | M | 1a | 2a, 2b, 2c, 2d |
+| 3a. `/ironclad` skill | L | 1c, 1d, 2a-2e | 3b |
+| 3b. Plan synthesis protocol | M | 1c | 3a |
+| 3c. `/ironclad --auto` mode | S | 3a | — |
+| 4a. `/forge` → `/ironclad` handoff | S | 3a | 4b |
+| 4b. `/ironclad` → `/implement-plan` handoff | S | 3a | 4a |
+| 4c. End-to-end pipeline test | L | 4a, 4b | — |
+| 4d. Documentation + changelog | S | 4c | — |
 
-The person-day totals are the sum of sub-item estimates. Elapsed calendar time assumes parallelization: Phase 1 clauDNA work (1a+1b) runs alongside claudlobby protocol work (1c+1d). Phase 2 skills are independent and split across 2 engineers. Phases 1 and 2 can partially overlap (protocol design in Phase 1 doesn't block skill implementation in Phase 2 after 1a/1b are done). Phase 3 requires Phase 1 protocols and Phase 2 skills. Phase 4 requires everything.
+**Critical path:** 1a → 2a-2e (any one) → 3a → 3c → 4a → 4c → 4d
 
-## Dispatch Recommendation
+**Maximum parallelism:** Phase 1 is fully parallel (4 items across 2 repos). Phase 2 is fully parallel (5 independent skills). Phase 3a+3b overlap. Phase 4a+4b overlap.
 
-**Execution order:**
-1. Phase 1a + 1b (clauDNA: `/forge --auto` + dispatch prompt) — unblocks everything
-2. Phase 1c + 1d (claudlobby: protocols) — can run in parallel with 2a-2e
-3. Phase 2a-2e (clauDNA: review lens skills) — parallelize across engineers, 2-3 at a time
-4. Phase 3a-3c (claudlobby: `/ironclad`) — after Phase 1 protocols + Phase 2 skills land
-5. Phase 4a-4d (integration) — after Phase 3
-
-**Parallelization:** Phase 2 skills are independent of each other — assign to different engineers. Phase 1c/1d (protocols) can run alongside Phase 2.
-
-**Engineer assignment:** Phase 1-2 (clauDNA skills) suit an engineer familiar with the `--auto` contract and SKILL_CONTRACT.md. Phase 3 (claudlobby `/ironclad`) suits an engineer familiar with fleet dispatch and tmux orchestration.
+**Repo split:** Phase 1a+1b and all of Phase 2 are clauDNA. Phase 1c+1d, 3a-3c are claudlobby. Phase 4 spans both. Assign by repo familiarity.

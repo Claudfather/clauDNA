@@ -94,10 +94,10 @@ updated: <YYYY-MM-DD>
 ## Phases
 <Sequential phases with clear boundaries. Each phase should deliver standalone value.>
 
-### Phase N: <Name> (<effort estimate>)
+### Phase N: <Name>
 <For each phase:>
 #### Na. <Sub-deliverable>
-<What to build, how it works, effort estimate.>
+<What to build, how it works.>
 
 ## Decision Forks
 
@@ -126,12 +126,9 @@ updated: <YYYY-MM-DD>
 ## Validation Strategy
 <How do we know this plan worked? Acceptance criteria, test strategy, metrics.>
 
-## Estimated Effort
-<Table: phase | effort>
-<Total with calendar estimate.>
-
-## Dispatch Recommendation
-<Suggested execution order, parallelization opportunities, engineer assignment guidance.>
+## Complexity and Sequencing
+<Table: phase | size (S/M/L/XL) | depends on | parallel with>
+<Dependency order, parallelization opportunities, critical path.>
 ```
 
 ### Decision Fork Discipline
@@ -147,7 +144,7 @@ updated: <YYYY-MM-DD>
 - **Vague phases** — "Phase 2: Build the thing" is not a plan. Each phase names specific deliverables.
 - **Missing current state** — Plans that start from assumptions instead of verified codebase state drift immediately.
 - **No decision forks** — If there are zero forks, either the plan is trivially simple (don't need /forge) or the author hasn't thought hard enough.
-- **Effort without phases** — "Total: 6 weeks" with no breakdown is a guess, not a plan.
+- **Unsized phases** — every phase needs a relative size (S/M/L/XL). Phases without sizing can't be sequenced or parallelized.
 - **Companion plan references without cross-validation** — If you reference another plan, verify it exists and the cross-reference is bidirectional.
 
 ---
@@ -171,7 +168,7 @@ Before presenting or committing the plan, run these checks:
 
 Present the plan in chat with a summary:
 - Plan title and goal (1-2 sentences)
-- Phase count and total effort estimate
+- Phase count and complexity profile (how many S/M/L/XL)
 - Fork count and how many are open vs locked
 - Key risks (top 3)
 - Recommended next step (usually: "open a docs PR and run /ironclad for multi-lens review")
@@ -185,7 +182,7 @@ Follow `skills/_shared/output-guide.md` for house-style validation and routing. 
 3. Commit with message: `docs(planning): <title> — forged plan v0`
 4. Open a PR with:
    - Title: `docs(planning): <title>`
-   - Body: summary (goal, phases, fork count, effort, key risks)
+   - Body: summary (goal, phases, fork count, complexity profile, key risks)
    - Label: `planning` (if label exists)
 5. Report the PR URL
 
@@ -201,7 +198,7 @@ Emit structured-result JSON per `skills/_shared/orchestration-guide.md` §10 (St
     "fork_count": N,
     "forks_open": N,
     "phases": N,
-    "total_effort_weeks": N,
+    "complexity_profile": {"S": N, "M": N, "L": N, "XL": N},
     "risks_high": N
   },
   "summary": "<1-2 sentence plan summary>",
