@@ -160,7 +160,7 @@ Before presenting or committing the plan, run these checks:
 5. **Claim verification** — Every factual claim about current state is verified against the codebase? File paths exist? Column names match? API endpoints are real?
 6. **Validation testability** — Can each validation criterion be objectively checked? "Works correctly" is not testable. "Returns 200 with valid JSON matching schema X" is.
 7. **Dependency chain** — Are phases correctly ordered? Could any phases run in parallel that are listed as sequential?
-8. **Adversarial review gate** — Run `/adversarial-review --auto` on the plan per `skills/_shared/pre-handoff-checklist.md`. Fold findings into an `## Adversarial Review Findings` section. This is the pre-handoff stress test — surface blind spots before the plan leaves the author's hands.
+8. **Adversarial review gate** — Run the adversarial review gate per `skills/_shared/pre-handoff-checklist.md` (subagent dispatch via `adversarial-chain.md`). Fold findings into an `## Adversarial Review Findings` section. This is the pre-handoff stress test — surface blind spots before the plan leaves the author's hands.
 
 ---
 
