@@ -117,16 +117,17 @@ This aligns with clauDNA's PROJECT_MISSION.md north star ("curated quality over 
 
 ## Phases
 
-### Phase 1: Foundation — `/forge` Hardening + Decision Fork Protocol (1 week)
+### Phase 1: Foundation — `/forge` Hardening + Decision Fork Protocol (2.5 person-days, ~1 week elapsed)
 
-The `/forge` skill exists but lacks `--auto` mode and a dispatch prompt. The decision-fork-lifecycle protocol doesn't exist. Both are prerequisites for `/ironclad`.
+The `/forge` skill exists but lacks `--auto` mode and a dispatch prompt. The decision-fork-lifecycle protocol doesn't exist. Both are prerequisites for `/ironclad`. Sub-items 1a+1b (clauDNA) can run in parallel with 1c+1d (claudlobby), compressing 2.5 person-days into ~1 week elapsed.
 
 #### 1a. `/forge --auto` Structured-Result Contract
 
-Add `--auto` mode to `/forge` following the existing contract pattern in `skills/_shared/orchestration-guide.md` §10.C. The structured-result JSON:
+Add `--auto` mode to `/forge` following the existing contract pattern in `skills/_shared/orchestration-guide.md` §10 (Structured Result Shape). The structured-result JSON:
 
 ```json
 {
+  "skill": "forge",
   "outcome": "completed",
   "artifacts": {
     "plan_path": "<path-to-plan-file>",
@@ -136,7 +137,10 @@ Add `--auto` mode to `/forge` following the existing contract pattern in `skills
     "total_effort_weeks": N,
     "risks_high": N
   },
-  "summary": "<1-2 sentence plan summary>"
+  "summary": "<1-2 sentence plan summary>",
+  "next": null,
+  "errors": [],
+  "blocker_description": null
 }
 ```
 
@@ -174,9 +178,9 @@ Create `library/protocols/pr-comment-hygiene.md` in claudlobby. Governs:
 
 **Effort:** 0.5 day.
 
-### Phase 2: Review Lens Skills (1.5 weeks)
+### Phase 2: Review Lens Skills (9.5 person-days, ~1.5 weeks elapsed with 2 engineers)
 
-Five new clauDNA skills that each provide a single focused review lens. Each reads a plan (markdown file or PR diff) and emits structured findings.
+Five new clauDNA skills that each provide a single focused review lens. Each reads a plan (markdown file or PR diff) and emits structured findings. Skills are independent — parallelizable across 2-3 engineers. At 2 engineers, 9.5 person-days compress to ~1.5 weeks elapsed.
 
 #### 2a. `/align-to-mission`
 
@@ -435,15 +439,15 @@ Verify: findings are accurate, forks lock correctly, convergence detection works
 
 ## Estimated Effort
 
-| Phase | Effort |
-|-------|--------|
-| Phase 1: Foundation (/forge hardening + protocols) | 1 week |
-| Phase 2: Review lens skills (5 new clauDNA skills) | 1.5 weeks |
-| Phase 3: /ironclad fleet orchestrator | 1.5 weeks |
-| Phase 4: Integration + end-to-end pipeline | 1 week |
-| **Total** | **5 weeks** |
+| Phase | Person-days | Elapsed (with parallelization) |
+|-------|-------------|-------------------------------|
+| Phase 1: Foundation (/forge hardening + protocols) | 2.5 days | ~1 week (1a+1b parallel with 1c+1d) |
+| Phase 2: Review lens skills (5 new clauDNA skills) | 9.5 days | ~1.5 weeks (2-3 engineers in parallel) |
+| Phase 3: /ironclad fleet orchestrator | 6 days | ~1.5 weeks |
+| Phase 4: Integration + end-to-end pipeline | 4 days | ~1 week |
+| **Total** | **22 person-days** | **~5 weeks elapsed** |
 
-Calendar estimate: ~5 weeks of engineering time. Phases 1 and 2 can partially overlap (protocol design in Phase 1 doesn't block skill implementation in Phase 2 after 1a/1b are done). Phase 3 requires Phase 1 protocols and Phase 2 skills. Phase 4 requires everything.
+The person-day totals are the sum of sub-item estimates. Elapsed calendar time assumes parallelization: Phase 1 clauDNA work (1a+1b) runs alongside claudlobby protocol work (1c+1d). Phase 2 skills are independent and split across 2 engineers. Phases 1 and 2 can partially overlap (protocol design in Phase 1 doesn't block skill implementation in Phase 2 after 1a/1b are done). Phase 3 requires Phase 1 protocols and Phase 2 skills. Phase 4 requires everything.
 
 ## Dispatch Recommendation
 

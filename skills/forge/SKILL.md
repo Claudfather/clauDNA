@@ -1,7 +1,7 @@
 ---
 name: forge
 user-invocable: true
-description: "Scaffold a multi-section planning document for a workstream, feature, or initiative. Produces a structured plan with decision forks, phasing, validation strategy, risks, and companion plan references. The output is a docs PR (single markdown file) ready for multi-lens review and iterative hardening. Use before /implement-plan when the scope is large enough to need a plan. Use with /ironclad (claudlobby) for fleet-orchestrated review cycles."
+description: "Use when planning a workstream that spans multiple PRs, involves decision forks, or needs structured phasing before implementation. Produces a structured plan with decision forks, phasing, validation strategy, risks, and companion plan references. The output is a docs PR (single markdown file) ready for multi-lens review and iterative hardening. Use before /implement-plan when the scope is large enough to need a plan. Use with /ironclad (claudlobby) for fleet-orchestrated review cycles."
 argument-hint: "[topic-or-issue-url] [--output github|session] [--auto]"
 ---
 
@@ -191,9 +191,10 @@ Follow `skills/_shared/output-guide.md` for house-style validation and routing. 
 
 ### --auto
 
-Emit structured-result JSON per `skills/_shared/orchestration-guide.md` §10.C:
+Emit structured-result JSON per `skills/_shared/orchestration-guide.md` §10 (Structured Result Shape):
 ```json
 {
+  "skill": "forge",
   "outcome": "completed",
   "artifacts": {
     "plan_path": "<path-to-plan-file>",
@@ -203,6 +204,9 @@ Emit structured-result JSON per `skills/_shared/orchestration-guide.md` §10.C:
     "total_effort_weeks": N,
     "risks_high": N
   },
-  "summary": "<1-2 sentence plan summary>"
+  "summary": "<1-2 sentence plan summary>",
+  "next": "<orchestrator hint, e.g. 'run /ironclad <pr-url> for fleet review', or null>",
+  "errors": [],
+  "blocker_description": null
 }
 ```
