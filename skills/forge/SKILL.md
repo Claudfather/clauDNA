@@ -178,6 +178,8 @@ Present the plan in chat with a summary:
 
 ### --output github
 
+Follow `skills/_shared/output-guide.md` for house-style validation and routing. For `/forge`, the output is a planning doc (not an issue), so write directly to the planning directory rather than routing through `/claudna:publish`.
+
 1. Create a branch: `<author>/forge-<slugified-title>`
 2. Write the plan to `documentation/planning/<date>-<slug>.md` (or the repo's established planning directory if different)
 3. Commit with message: `docs(planning): <title> — forged plan v0`
