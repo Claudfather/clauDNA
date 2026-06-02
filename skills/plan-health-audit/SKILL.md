@@ -111,18 +111,36 @@ Mismatches are `major` findings -- the table and the phases have drifted.
 
 **Check type: deterministic.**
 
-For each decision fork defined under `## Decision Forks`:
+**Purpose:** Validate that each fork has the structural fields needed for the decision-fork-lifecycle protocol. A locked fork with all fields present is the desired end state -- it means the decision was made. Do NOT generate findings for well-formed forks regardless of their status. Only emit findings when fields are genuinely missing.
+
+The standard `/forge` fork format is:
+
+```markdown
+### Fork F1: <Title>
+- **Context:** <Why this fork exists>
+- **Options:**
+  - **(a)** <Option A> — <trade-off>
+  - **(b)** <Option B> — <trade-off>
+- **Lean:** <Recommended option and why>
+- **Ratifier:** <Who locks this>
+- **Status:** open | locked
+- **Evidence:** <Link to analysis or lock comment> (optional for open forks)
+```
+
+For each decision fork defined under `## Decision Forks`, check that these structural fields are present:
 
 | Field | Required | Finding if Missing |
 |-------|----------|-------------------|
 | Fork ID (F1, F2, ...) | Yes | `minor` -- can't be referenced in discussions |
 | Context | Yes | `major` -- reviewers can't understand the fork without context |
-| Options (at least 2) | Yes | `critical` -- a fork with one option is not a fork |
+| Options (at least 2) | Yes | `critical` -- a fork with fewer than 2 listed options is not a fork |
 | Lean | Yes | `major` -- the plan must express a recommendation |
 | Ratifier | Yes | `major` -- unratified forks block convergence |
 | Status (open/locked) | Yes | `minor` -- defaults to open, but should be explicit |
 
-Also count:
+A fork that has all six fields present generates **zero findings** -- it is structurally complete. This is true whether the fork is open or locked. Locked forks with complete structure are healthy; do not flag them.
+
+Also count (for the Health Summary):
 - Total forks
 - Open vs. locked forks
 - Forks missing any of the above fields
@@ -179,7 +197,15 @@ Count total references checked and broken references for the health summary.
 
 **Check type: deterministic.**
 
-Count sections whose only content is "None identified" (or equivalent: "N/A", "None", "Not applicable").
+Count mandatory sections (from Step 3) whose entire body — all content between this section's heading and the next H2 — consists solely of a dismissive placeholder. A section counts as "none-identified" if its body, after trimming whitespace, matches any of these exact phrases (case-insensitive):
+
+- "None identified"
+- "None"
+- "N/A"
+- "Not applicable"
+- "TBD"
+
+A section with ANY additional text beyond the placeholder (e.g., "None identified — will revisit in Phase 2") does NOT count. It has real content, even if thin.
 
 - 0-2 sections: normal. Some plans genuinely have no companion plans or no decision forks.
 - 3+ sections: `major` finding. The plan is likely undercooked -- the author skimmed rather than researched. This echoes `/forge`'s own self-audit check.
@@ -222,7 +248,7 @@ After Step 11, emit a single markdown document with YAML frontmatter as the FINA
 
 For this skill, set `lens: plan-health-audit` in frontmatter. All other fields, severity vocabulary, body sections (Blockers/Risks/Gaps/Questions/Observations), concern area values, and blocked/failed output shape are defined in the contract.
 
-Append a final `## Health Summary` section after Observations (this is the only section this skill adds beyond the contract's standard sections):
+**Lens-specific extension:** This skill appends a `## Health Summary` section after the contract's standard sections (Blockers through Observations). This is a declared extension -- it does not replace or modify any contract section. Other lens skills should not parse or depend on it.
 
 ```markdown
 ## Health Summary
