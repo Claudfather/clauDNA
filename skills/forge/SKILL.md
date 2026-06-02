@@ -161,6 +161,17 @@ Before presenting or committing the plan, run these checks:
 6. **Validation testability** — Can each validation criterion be objectively checked? "Works correctly" is not testable. "Returns 200 with valid JSON matching schema X" is.
 7. **Dependency chain** — Are phases correctly ordered? Could any phases run in parallel that are listed as sequential?
 8. **Adversarial review gate** — Run the adversarial review gate per `skills/_shared/pre-handoff-checklist.md`. Fold findings into an `## Adversarial Review Findings` section. This is the pre-handoff stress test — surface blind spots before the plan leaves the author's hands.
+9. **None-identified density** — If 3 or more sections contain only "None identified", the plan is likely undercooked. Return to Phase 1 Research and dig deeper before proceeding.
+
+### Skip Temptations
+
+| Excuse | Reality |
+|--------|---------|
+| "This section is genuinely empty" | Maybe — but 3+ empty sections means you skimmed, not researched. Go back to Phase 1 and read the actual code, git history, and closed issues. |
+| "Phase 1 research is good enough without reading the actual code" | Plans based on assumed architecture drift on contact with reality. If you didn't `Read` the files you're planning to change, your Current State section is fiction. |
+| "The plan is obvious, no decision forks needed" | If zero forks survive scrutiny, the plan is either trivially simple (don't need /forge) or the author hasn't considered the perspectives of reviewers, implementers, and operators. |
+| "Self-audit passed, no need for adversarial review" | Self-audit catches structural issues. Adversarial review catches blind spots — things the author can't see because they wrote the plan. Both run. Always. |
+| "Validation criteria are implied by the phases" | "Works correctly" is not testable. Every criterion must be objectively checkable by someone who didn't write the plan. If you can't write a verification command, the criterion is vague. |
 
 ---
 
