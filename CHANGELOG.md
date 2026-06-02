@@ -8,9 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Phase 2 plan: ironclad review lens skills.** `documentation/planning/2026-06-02-phase2-ironclad-lens-skills.md` — forged plan for six lens skills (`/first-principles`, `/align-to-mission`, `/extension-check`, `/precedent-check`, `/plan-health-audit`, `/cost-benefit`) that `/ironclad` dispatches for multi-angle plan hardening. All emit markdown with YAML frontmatter per the `--dispatch` contract (PR #130). First dogfood input for `/ironclad`. All three decision forks ratified during `/ironclad` cycle 1.
 - **`skills/_shared/planning-standard.md`.** Extracted the "handoff to junior engineering team" quality contract and phase doc structure from `orchestration-guide.md` (Sections 4-5). Single source of truth for plan quality standards.
 - **`skills/_shared/pre-handoff-checklist.md`.** Extracted the adversarial review gate that was duplicated across 6 skills. Defines when to run `/adversarial-review`, how to invoke it, what passes, and how to fold findings.
 - **`/forge` skill.** Plan architect skill that scaffolds structured planning documents with decision forks, phasing, validation strategy, risks, and companion plan references. Supports `--output github` (docs PR) and `--auto` (structured-result JSON). Designed as the entry point to the plan-hardening pipeline (`/forge` → `/ironclad`).
+- **CI guard `check_no_raw_gh_commands`.** `validate_skill_md` now blocks executable `gh issue/pr create` and `gh issue/pr comment` in a skill body (allowlist: `publish`, `file-github-issue`, `commit-push-pr`), enforcing that skills delegate GitHub output to `/claudna:publish`.
+- **Full-validation escape hatch.** Set `FULL_VALIDATE=1` env var or add a `full-validate` label to the PR to force full blocking validation regardless of touched-skill scoping. Useful for release-gating.
 
 ### Changed
 - **New `skills/_shared/contracts/` directory for cross-skill integration schemas.** Moved `synthesis-contract.md` into `contracts/`; updated all references in `implement-plan`, `weigh-development-paths`, planning docs. Added `lens-result-contract.md` — single source of truth for all lens skill `--dispatch` output format consumed by `/ironclad`. Defines frontmatter fields (`lens`, `worker`, `pr_url`, `plan-path`, `started`, `completed`, `status`, `severity`), body sections (Blockers/Risks/Gaps/Questions/Observations), severity vocabulary, and blocked/failed output shape. `/adversarial-review` now references this contract instead of inlining its own format.
@@ -21,15 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **8 skills now reference shared `planning-standard.md` and `pre-handoff-checklist.md`** instead of inlining quality standards and adversarial review procedures: `tech-debt`, `security-audit`, `frontend-performance-audit`, `product-enhance`, `access-path-audit`, `docs-review`, `product-vision`, `design-review`. Skill-specific concern areas preserved inline.
 - **`/claudna:publish` is now the single output sink for GitHub/session output.** Analysis skills author a markdown doc; publish validates house style (deep, per-`type:` skeleton with a hard gate on `## Implementation Plan` + `### Steps`), dedups per-medium, and routes to a github-issue or the chat session. Added a `session` adapter. `output-guide.md` and the 14 analysis skills now delegate GitHub output to publish instead of embedding `gh issue create`. The default `docs` target still writes to `documentation/planning/` directly — unifying it through publish's disk adapter is deferred.
 
-### Added
-- **CI guard `check_no_raw_gh_commands`.** `validate_skill_md` now blocks executable `gh issue/pr create` and `gh issue/pr comment` in a skill body (allowlist: `publish`, `file-github-issue`, `commit-push-pr`), enforcing that skills delegate GitHub output to `/claudna:publish`.
-
 ### Fixed
 - **Cross-skill CI attribution bug.** Duplicate-name and duplicate-description checks now attribute errors to BOTH participating skills. In CI scoping mode, cross-skill errors block if ANY participant is PR-touched — previously, alphabetical ordering could land the error on only the untouched skill, silently demoting it to a warning.
 - **Git diff fallback now logs a warning.** When `get_touched_skills()` falls back to full validation due to a failed `git diff`, it prints the reason and stderr to help diagnose CI environment issues.
-
-### Added
-- **Full-validation escape hatch.** Set `FULL_VALIDATE=1` env var or add a `full-validate` label to the PR to force full blocking validation regardless of touched-skill scoping. Useful for release-gating.
 
 ## [0.4.0] - 2026-05-18
 ### Changed (BREAKING)
