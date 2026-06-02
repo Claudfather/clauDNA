@@ -109,7 +109,7 @@ Follow Section 9 of the orchestration guide (`skills/_shared/orchestration-guide
 
 ## Phase 2.5: Adversarial Review Pass
 
-Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. Run on each remediation doc in `documentation/planning/security/<session>/<NN>_*.md` and the master `00_SECURITY_AUDIT.md`. Apply in all output modes and `--auto`.
+Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. The adversarial-review `--dispatch` output is markdown with YAML frontmatter per `skills/_shared/contracts/lens-result-contract.md` — parse `status` from frontmatter and findings from body sections. Run on each remediation doc in `documentation/planning/security/<session>/<NN>_*.md` and the master `00_SECURITY_AUDIT.md`. Apply in all output modes and `--auto`.
 
 ### Security-specific rules
 

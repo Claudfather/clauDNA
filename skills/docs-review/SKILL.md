@@ -129,7 +129,7 @@ Execute the user's choices — create or update docs as requested.
 
 ### Step 5.5: Adversarial Review Pass on Gap Proposals
 
-Follow `skills/_shared/pre-handoff-checklist.md` for the general procedure. For docs-review, the workflow is adapted:
+Follow `skills/_shared/pre-handoff-checklist.md` for the general procedure. The adversarial-review `--dispatch` output is markdown with YAML frontmatter per `skills/_shared/contracts/lens-result-contract.md` — parse `status` from frontmatter and findings from body sections. For docs-review, the workflow is adapted:
 
 1. Write each gap-fix proposal to a temporary scratch file at `/tmp/docs-review-<timestamp>/proposals/<gap-slug>.md`.
 
@@ -139,7 +139,7 @@ Follow `skills/_shared/pre-handoff-checklist.md` for the general procedure. For 
 
 4. Present the revised proposals to the user (interactive mode) or apply directly (`--auto` mode).
 
-In `--auto` mode, adversarial findings are folded silently. The summary report (Step 6) MUST mention how many adversarial findings were addressed, in the `summary` field of the structured-result JSON.
+In `--auto` mode, adversarial findings are folded silently. The summary report (Step 6) MUST mention how many adversarial findings were addressed, in the `summary` field of the `--auto` structured result (§10.C).
 
 ### Step 6: Summary Report
 

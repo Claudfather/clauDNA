@@ -90,7 +90,7 @@ If invoked with `--auto` and any ambiguous source, exit immediately with the str
 
 Per design §5.5.2, when Step 2 (Codebase Comparison) completes in `--auto`, replace the interactive challenge round with a machine synthesis pass that delegates to `/claudna:weigh-development-paths --auto`.
 
-The producer/consumer schema between the two skills is documented at `skills/_shared/synthesis-contract.md`. Step 3-AUTO below packages a context bundle, dispatches the synthesizer, and parses its structured result per that contract.
+The producer/consumer schema between the two skills is documented at `skills/_shared/contracts/synthesis-contract.md`. Step 3-AUTO below packages a context bundle, dispatches the synthesizer, and parses its structured result per that contract.
 
 ### Output (structured result)
 
@@ -538,7 +538,7 @@ Read `challenge-round-questions.md` for the question matrix and `red-flags-and-r
 
 #### Step 3-AUTO: Synthesis pass (`--auto` only)
 
-Per design §5.5.2 and the canonical Autonomous Mode reference earlier in this skill, replace the interactive challenge round with a machine synthesis pass that delegates to `/claudna:weigh-development-paths --auto`. The producer/consumer schema between the two skills is canonical at `skills/_shared/synthesis-contract.md`.
+Per design §5.5.2 and the canonical Autonomous Mode reference earlier in this skill, replace the interactive challenge round with a machine synthesis pass that delegates to `/claudna:weigh-development-paths --auto`. The producer/consumer schema between the two skills is canonical at `skills/_shared/contracts/synthesis-contract.md`.
 
 1. **Create scratch directory.** Use the Write tool to create a file at `/tmp/implement-plan-<YYYY-MM-DD_HHMMSS>/synthesis-bundle.md`. The Write tool creates parent directories automatically.
 
@@ -585,12 +585,12 @@ Apply the skill with --auto mode against the context bundle at:
   /tmp/implement-plan-<timestamp>/synthesis-bundle.md
 
 Return ONLY the structured-result JSON block per the skill's emission contract
-(canonical schema: skills/_shared/synthesis-contract.md).
+(canonical schema: skills/_shared/contracts/synthesis-contract.md).
 Do NOT enter Plan Mode. Do NOT issue interactive user-input prompts.
 Do NOT write to any plan file — the orchestrator handles that.
 ```
 
-6. **Parse the subagent's structured result** per `skills/_shared/synthesis-contract.md`.
+6. **Parse the subagent's structured result** per `skills/_shared/contracts/synthesis-contract.md`.
 
    Use the Read tool to read the subagent's final output (it should be a single fenced JSON block). Parse it.
 

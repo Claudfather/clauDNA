@@ -216,7 +216,7 @@ Follow Section 9 of the orchestration guide (`skills/_shared/orchestration-guide
 
 ## Phase 2.5: Adversarial Review Pass
 
-Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. Run on each phase doc in `documentation/planning/tech_debt/<session>/<NN>_*.md` and the master `00_TECH_DEBT.md`. Apply in all output modes and `--auto`.
+Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. The adversarial-review `--dispatch` output is markdown with YAML frontmatter per `skills/_shared/contracts/lens-result-contract.md` — parse `status` from frontmatter and findings from body sections. Run on each phase doc in `documentation/planning/tech_debt/<session>/<NN>_*.md` and the master `00_TECH_DEBT.md`. Apply in all output modes and `--auto`.
 
 ---
 

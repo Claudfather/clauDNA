@@ -160,7 +160,7 @@ When `--auto` is active:
 
 ### Output (structured result)
 
-The canonical schema for this output is `skills/_shared/synthesis-contract.md`. When this skill is invoked as the synthesis producer (typically by `/claudna:implement-plan --auto`), the consumer parses against that contract. If you change the shape here, update `skills/_shared/synthesis-contract.md` in the same commit.
+The canonical schema for this output is `skills/_shared/contracts/synthesis-contract.md`. When this skill is invoked as the synthesis producer (typically by `/claudna:implement-plan --auto`), the consumer parses against that contract. If you change the shape here, update `skills/_shared/contracts/synthesis-contract.md` in the same commit.
 
 Emit a single fenced JSON block as the FINAL output. Format:
 

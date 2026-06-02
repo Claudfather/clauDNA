@@ -28,7 +28,7 @@ This aligns with clauDNA's PROJECT_MISSION.md north star ("curated quality over 
 
 **Existing shared infrastructure:**
 - `skills/_shared/orchestration-guide.md` — multi-agent coordination patterns (scratch dirs, research→disk→plan agent, context window management).
-- `skills/_shared/synthesis-contract.md` — producer/consumer schema between `/weigh-development-paths --auto` and `/implement-plan --auto`.
+- `skills/_shared/contracts/synthesis-contract.md` — producer/consumer schema between `/weigh-development-paths --auto` and `/implement-plan --auto`.
 - `skills/_shared/output-guide.md` — house-style for planning/audit output (frontmatter, issue body skeleton, labels).
 - `skills/_shared/subagent-prompts/adversarial-chain.md` — dispatch prompt for chaining `/adversarial-review --dispatch`.
 

@@ -342,75 +342,10 @@ This skill synthesizes established techniques from decision science and strategi
 
 ## Structured Result Emission (`--dispatch` only)
 
-After Phase 3 aggregation, emit a single markdown document with YAML frontmatter as the FINAL output. No text after this document. The consumer (e.g., ironclad in claudlobby) writes this output to a file path for synthesis.
+After Phase 3 aggregation, emit a single markdown document with YAML frontmatter as the FINAL output. No text after this document. The consumer (e.g., `/ironclad` in claudlobby) writes this output to a file path for synthesis.
 
-### Format
+**Format:** Follow the canonical schema at `skills/_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all lens skill `--dispatch` output.
 
-````markdown
----
-lens: adversarial-review
-severity: critical
-pr: null
-plan-path: <path or issue URL that was reviewed>
-timestamp: <ISO 8601, e.g. 2026-06-02T14:30:00Z>
-outcome: completed
----
-
-## Blockers
-
-- **[critical] error-handling**: Plan doesn't account for the 429 retry case in the upstream API.
-  - **Recommendation:** Add explicit retry-with-backoff to Step 4.
-
-## Risks
-
-- **[major] architecture**: Service boundary between ingestion and processing is unclear; coupling risk during Phase 2.
-  - **Recommendation:** Define the interface contract before implementation starts.
-
-## Gaps
-
-- **[minor] testing**: No integration test plan for the new webhook endpoint.
-  - **Recommendation:** Add webhook integration tests to Phase 3 test plan.
-
-## Questions
-
-- **[minor] scope**: Plan references "future auth migration" without specifying whether this work blocks or is independent.
-
-## Observations
-
-- **[info] dependencies**: lodash is used for a single deep-merge — could be replaced with structuredClone.
-````
-
-### Field definitions
-
-**Frontmatter fields:**
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| `lens` | yes | Always `adversarial-review` |
-| `severity` | yes | Highest severity across all findings: `critical`, `major`, `minor`, or `info` |
-| `pr` | no | PR URL if reviewing a PR-linked plan, otherwise `null` |
-| `plan-path` | yes | Filesystem path or issue URL that was reviewed |
-| `timestamp` | yes | ISO 8601 UTC timestamp of when the review completed |
-| `outcome` | yes | One of: `completed`, `blocked`, `partial` |
-
-**Severity vocabulary:** `critical` > `major` > `minor` > `info`. One tag per finding. If a finding spans two severity levels, use the higher one.
-
-**Body sections:** Blockers, Risks, Gaps, Questions, Observations — matching the verdict categories from Phase 6. Each finding is a bullet with a `[severity]` tag and `concern_area` prefix. Omit empty sections.
+For this skill, set `lens: adversarial-review` in frontmatter. All other fields, severity vocabulary, body sections (Blockers/Risks/Gaps/Questions/Observations), concern area values, and blocked/failed output are defined in the contract.
 
 **`concern_area` values** should align with the matrix categories in `skills/implement-plan/challenge-round-questions.md` where possible (architecture, testing, dependencies, error-handling, performance, security, data-integrity, compatibility, observability, scope) so downstream skills can fold findings into the challenge round.
-
-### Blocked outcome
-
-If review cannot proceed (e.g., plan body is empty or unreadable), emit a minimal document:
-
-```markdown
----
-lens: adversarial-review
-severity: null
-plan-path: <path>
-timestamp: <ISO 8601>
-outcome: blocked
----
-
-Review could not proceed: plan body lacks an Implementation Plan section. Run a planning skill to populate it first.
-```
