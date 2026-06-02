@@ -1,7 +1,7 @@
 ---
 name: forge
 user-invocable: true
-description: "Use when planning a workstream that spans multiple PRs, involves decision forks, or needs structured phasing before implementation. Produces a structured plan with decision forks, phasing, validation strategy, risks, and companion plan references. The output is a docs PR (single markdown file) ready for multi-lens review and iterative hardening. Use before /implement-plan when the scope is large enough to need a plan. Use with /ironclad (claudlobby) for fleet-orchestrated review cycles."
+description: "Use when planning a workstream that spans multiple PRs, involves decision forks, or needs structured phasing before implementation. Use before /implement-plan when the scope is large enough to need a plan. Use with /ironclad (claudlobby) for fleet-orchestrated review cycles. Also applies when writing a technical spec, design document, initiative roadmap, or pre-implementation proposal."
 argument-hint: "[topic-or-issue-url] [--output github|session] [--auto]"
 ---
 
