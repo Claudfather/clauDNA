@@ -15,7 +15,7 @@ You are a critical thinker, not an advocate. Your job is to find the weaknesses,
 
 Parse `$ARGUMENTS` at invocation:
 - **First positional arg:** Path to the plan document. If omitted, prompt for it.
-- `--dispatch`: Multi-reviewer mode AND non-interactive mode. Spawns parallel subagents with different review angles AND suppresses all interactive elements (no Plan Mode, no AskUserQuestion). Returns the structured-result shape from §10.C of `skills/_shared/orchestration-guide.md` with critique findings in `artifacts.findings`. Use this mode when invoking adversarial-review from another skill or from an orchestrator. Without this flag, perform a single consolidated review interactively.
+- `--dispatch`: Multi-reviewer mode AND non-interactive mode. Spawns parallel subagents with different review angles AND suppresses all interactive elements (no Plan Mode, no AskUserQuestion). Emits a markdown document with YAML frontmatter containing structured findings (see Structured Result Emission below). Use this mode when invoking adversarial-review from another skill or from an orchestrator (e.g., ironclad). Without this flag, perform a single consolidated review interactively.
 - `--output github`: Write findings as GitHub Issues. See `skills/_shared/output-guide.md`.
 - `--output session`: Present findings in chat only (default).
 
@@ -29,8 +29,8 @@ When `--dispatch` is passed (typically when invoked as a subagent from another s
 - **Do NOT call `AskUserQuestion`.** The caller is not a human; questions cannot be answered.
 - **Do NOT prompt for clarification.** If the plan is too ambiguous to review, exit `outcome: blocked` with a populated `blocker_description`.
 - Spawn parallel critic subagents per Phase 3.
-- Aggregate critic findings into the structured-result shape.
-- Emit the structured-result JSON block as the final output and stop.
+- Aggregate critic findings into the structured markdown format.
+- Emit the markdown document (YAML frontmatter + body) as the final output and stop.
 
 When `--dispatch` is NOT passed, follow the full interactive procedure below (Plan Mode, single consolidated review, user-facing presentation).
 
@@ -285,13 +285,13 @@ What should be removed? (via negativa)]
 ### Summary Table
 | Finding | Category | Severity | Action Needed |
 |---------|----------|----------|---------------|
-| ... | Blocker/Risk/Gap/Question | High/Medium/Low | ... |
+| ... | Blocker/Risk/Gap/Question | critical/major/minor/info | ... |
 ```
 
 ### Output Targets
 
 - `--output session` (default): Present the review in chat.
-- `--output github`: Create one umbrella issue ("Adversarial Review: [Plan Title]") with the full review body, plus individual issues for each Blocker and high-severity Risk.
+- `--output github`: Create one umbrella issue ("Adversarial Review: [Plan Title]") with the full review body, plus individual issues for each Blocker and critical-severity Risk.
 
 ---
 
@@ -342,31 +342,75 @@ This skill synthesizes established techniques from decision science and strategi
 
 ## Structured Result Emission (`--dispatch` only)
 
-After Phase 3 aggregation, emit a single fenced JSON block as the FINAL output. No text after this block. Format per `skills/_shared/orchestration-guide.md` §10.C:
+After Phase 3 aggregation, emit a single markdown document with YAML frontmatter as the FINAL output. No text after this document. The consumer (e.g., ironclad in claudlobby) writes this output to a file path for synthesis.
 
-```json
-{
-  "skill": "adversarial-review",
-  "outcome": "completed",
-  "artifacts": {
-    "findings_count": 5,
-    "findings": [
-      {
-        "concern_area": "error-handling",
-        "severity": "high",
-        "summary": "Plan doesn't account for the 429 retry case in the upstream API.",
-        "recommendation": "Add explicit retry-with-backoff to Step 4."
-      }
-    ],
-    "plan_path": "<path or issue URL that was reviewed>"
-  },
-  "summary": "<2-3 line digest of findings>",
-  "next": null,
-  "errors": [],
-  "blocker_description": null
-}
+### Format
+
+````markdown
+---
+lens: adversarial-review
+severity: critical
+pr: null
+plan-path: <path or issue URL that was reviewed>
+timestamp: <ISO 8601, e.g. 2026-06-02T14:30:00Z>
+outcome: completed
+---
+
+## Blockers
+
+- **[critical] error-handling**: Plan doesn't account for the 429 retry case in the upstream API.
+  - **Recommendation:** Add explicit retry-with-backoff to Step 4.
+
+## Risks
+
+- **[major] architecture**: Service boundary between ingestion and processing is unclear; coupling risk during Phase 2.
+  - **Recommendation:** Define the interface contract before implementation starts.
+
+## Gaps
+
+- **[minor] testing**: No integration test plan for the new webhook endpoint.
+  - **Recommendation:** Add webhook integration tests to Phase 3 test plan.
+
+## Questions
+
+- **[minor] scope**: Plan references "future auth migration" without specifying whether this work blocks or is independent.
+
+## Observations
+
+- **[info] dependencies**: lodash is used for a single deep-merge — could be replaced with structuredClone.
+````
+
+### Field definitions
+
+**Frontmatter fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `lens` | yes | Always `adversarial-review` |
+| `severity` | yes | Highest severity across all findings: `critical`, `major`, `minor`, or `info` |
+| `pr` | no | PR URL if reviewing a PR-linked plan, otherwise `null` |
+| `plan-path` | yes | Filesystem path or issue URL that was reviewed |
+| `timestamp` | yes | ISO 8601 UTC timestamp of when the review completed |
+| `outcome` | yes | One of: `completed`, `blocked`, `partial` |
+
+**Severity vocabulary:** `critical` > `major` > `minor` > `info`. One tag per finding. If a finding spans two severity levels, use the higher one.
+
+**Body sections:** Blockers, Risks, Gaps, Questions, Observations — matching the verdict categories from Phase 6. Each finding is a bullet with a `[severity]` tag and `concern_area` prefix. Omit empty sections.
+
+**`concern_area` values** should align with the matrix categories in `skills/implement-plan/challenge-round-questions.md` where possible (architecture, testing, dependencies, error-handling, performance, security, data-integrity, compatibility, observability, scope) so downstream skills can fold findings into the challenge round.
+
+### Blocked outcome
+
+If review cannot proceed (e.g., plan body is empty or unreadable), emit a minimal document:
+
+```markdown
+---
+lens: adversarial-review
+severity: null
+plan-path: <path>
+timestamp: <ISO 8601>
+outcome: blocked
+---
+
+Review could not proceed: plan body lacks an Implementation Plan section. Run a planning skill to populate it first.
 ```
-
-If review cannot proceed (e.g., plan body is empty or unreadable), emit `outcome: blocked` with `blocker_description` explaining what would unblock it (e.g., "plan body lacks an Implementation Plan section; run a planning skill to populate it first").
-
-`concern_area` values should align with the matrix categories in `skills/implement-plan/challenge-round-questions.md` where possible (architecture, testing, dependencies, error-handling, etc.) so downstream skills can fold findings into the challenge round.

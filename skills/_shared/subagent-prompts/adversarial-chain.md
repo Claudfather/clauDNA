@@ -18,26 +18,35 @@ Operate non-interactively per the skill's `--dispatch` mode rules:
 
 Spawn parallel critic subagents per the skill's Phase 3 dispatch procedure.
 
-Return ONLY the structured-result JSON block per skills/_shared/orchestration-guide.md §10.C. Format:
+Return ONLY the structured markdown document per the adversarial-review SKILL.md "Structured Result Emission" section. Format:
 
-{
-  "skill": "adversarial-review",
-  "outcome": "completed",
-  "artifacts": {
-    "findings_count": <N>,
-    "findings": [
-      {"concern_area": "...", "severity": "...", "summary": "...", "recommendation": "..."},
-      ...
-    ],
-    "plan_path": "<DOC_PATH>"
-  },
-  "summary": "<digest>",
-  "next": null,
-  "errors": [],
-  "blocker_description": null
-}
+---
+lens: adversarial-review
+severity: <highest severity across findings: critical/major/minor/info>
+pr: null
+plan-path: "<DOC_PATH>"
+timestamp: <ISO 8601 UTC>
+outcome: completed
+---
 
-If the plan body cannot be reviewed (empty, malformed), emit outcome: blocked with blocker_description.
+## Blockers
+
+- **[<severity>] <concern_area>**: <summary>
+  - **Recommendation:** <recommendation>
+
+## Risks
+...
+
+## Gaps
+...
+
+## Questions
+...
+
+## Observations
+...
+
+Omit empty sections. If the plan body cannot be reviewed (empty, malformed), emit outcome: blocked with the reason in the body.
 ```
 
 Substitute `<DOC_PATH>` with the actual filesystem path or issue URL.
@@ -63,7 +72,7 @@ Use one value per finding (the dominant area). If a finding spans two areas, pic
 
 After the subagent returns, the calling planning skill:
 
-1. Parses `artifacts.findings`.
+1. Parses the markdown output — reads YAML frontmatter for `outcome` and `severity`, then extracts findings from the body sections (Blockers, Risks, Gaps, Questions, Observations).
 2. If `outcome` is not `completed`, log the issue and skip folding for that doc.
 3. Uses the Edit tool to append (or create) an `## Adversarial Review Findings` section in the plan doc. The section format:
 
@@ -79,7 +88,7 @@ These concerns were raised by /claudna:adversarial-review at plan-creation time.
   - **Recommendation:** <recommendation>
 ```
 
-Findings sorted by severity (critical → high → medium → low → info).
+Findings sorted by severity (critical → major → minor → info).
 
 4. The section becomes part of the plan body. Downstream consumers (interactive `/implement-plan` Step 3A, or `--auto` synthesis pass) read it and resolve items.
 
