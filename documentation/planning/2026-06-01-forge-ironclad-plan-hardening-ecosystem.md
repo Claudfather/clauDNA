@@ -405,6 +405,16 @@ Verify: findings are accurate, forks lock correctly, convergence detection works
 | End-to-end pipeline completes: `/forge` → `/ironclad` → `/implement-plan` | Integration test: full pipeline on a real planning scenario (Phase 4c) |
 | No regression in existing skills | CI: full test suite passes |
 
+## Adversarial Review Findings
+
+Findings from the 4-lens contract compliance review (2026-06-01). This section makes the exemplar plan eat its own dogfood per `/forge` Phase 3 step 8.
+
+- [x] **Description trap identified.** Frontmatter `description:` included output-summary sentences ("Produces a structured plan...") that duplicate the body and don't help activation. Fixed: trimmed to triggering conditions only, added keyword synonyms.
+- [x] **Skip-temptation table added.** Phase 3 Self-Audit lacked a rationalization guardrail — models can self-rationalize past every check. Fixed: added 5-row excuse/reality table covering the most common shortcuts.
+- [x] **None-identified guardrail added.** Plans with 3+ "None identified" sections likely skimmed Phase 1 Research. Fixed: added check 9 to Self-Audit as a density gate.
+- [x] **`--output github` deviation documented.** The output guide defines `--output github` as "GitHub Issue via `/claudna:publish`", but /forge uses it to mean "docs PR". The deviation is intentional (plans are not issues) and documented in the skill body. Advisory — no change needed, but future output-guide revision should acknowledge this pattern.
+- [ ] **`--auto` template JSON uses bare `N` placeholders.** The structured-result JSON template is not parseable by `json.loads` due to `"fork_count": N`. §10 emission rules require valid JSON. Deferred: the template is instructional, not runtime output — runtime invocations emit real integers. Low severity.
+
 ## Complexity and Sequencing
 
 | Phase | Size | Depends on | Parallel with |
