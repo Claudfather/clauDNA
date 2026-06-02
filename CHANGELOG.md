@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **`skills/_shared/planning-standard.md`.** Extracted the "handoff to junior engineering team" quality contract and phase doc structure from `orchestration-guide.md` (Sections 4-5). Single source of truth for plan quality standards.
 - **`skills/_shared/pre-handoff-checklist.md`.** Extracted the adversarial review gate that was duplicated across 6 skills. Defines when to run `/adversarial-review`, how to invoke it, what passes, and how to fold findings.
+- **`/forge` skill.** Plan architect skill that scaffolds structured planning documents with decision forks, phasing, validation strategy, risks, and companion plan references. Supports `--output github` (docs PR) and `--auto` (structured-result JSON). Designed as the entry point to the plan-hardening pipeline (`/forge` → `/ironclad`).
 
 ### Changed
 - **`pre-handoff-checklist.md` simplified to invoke `/adversarial-review --dispatch` directly.** Removed the subagent dispatch wrapper and `adversarial-chain.md` reference — the skill's `--dispatch` mode already handles context isolation, parallel critics, and structured-result emission internally. Inlined the findings format and concern-area vocabulary so the checklist is self-contained.
