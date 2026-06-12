@@ -9,9 +9,7 @@
       "name": "claudna",
       "source": {
         "source": "github",
-        "repo": "Claudfather/clauDNA",
-        "commit": "3e13373f02a8a52a102a4f541ca8450fa98e0aec",
-        "sha": "3e13373f02a8a52a102a4f541ca8450fa98e0aec"
+        "repo": "Claudfather/clauDNA"
       },
       "description": "Curated Claude Code skills, agents, and hooks.",
       "category": "developer-tools"
