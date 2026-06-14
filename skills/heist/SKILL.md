@@ -97,5 +97,5 @@ Present target, counts (scanned/selected), actions (ADOPTED with paths, ENHANCED
 - **No shell operators** — Separate tool calls. No `&&`, `|`, `;`, `2>&1`, `2>/dev/null`.
 - **Self-contained adoptions** — Inline or remove foreign dependencies.
 - **Works on any repo** — Not just skill repos. Scouts find patterns in any codebase.
-- **Attribution** — HTML comment linking source repo/path in all adopted/enhanced content.
+- **Provenance** — record what was adopted/enhanced and its source repo/path in the commit message and CHANGELOG. Do NOT add attribution comments to shipped skill content.
 - **vs `/claudna:find-skills`** — `/claudna:find-skills` searches skills.sh registry. `/claudna:heist` targets one repo, compares, and can enhance existing skills.

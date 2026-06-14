@@ -71,7 +71,7 @@ Source: https://github.com/org/repo — [specific file path]
 > - `## Procedure` with numbered steps
 > - User gates between major phases
 > - No shell operators in Bash commands (no `&&`, `|`, `;`)
-> - Add attribution at the bottom: `<!-- Adopted from https://github.com/org/repo — path -->`
+> - Do NOT add an attribution comment to the file. Include the source repo + path in your return summary so the orchestrator can credit it in the commit message and CHANGELOG.
 >
 > **Critical:** Produce a self-contained skill. If the foreign skill references other skills from its repo, inline or remove those dependencies.
 >
@@ -92,7 +92,7 @@ Source: https://github.com/org/repo — [specific file path]
 > **Rules:**
 > - Add specific improvements identified in the comparison — do not rewrite the whole skill
 > - Preserve existing structure and conventions
-> - Add attribution comment where borrowed content is added: `<!-- Enhanced with ideas from https://github.com/org/repo -->`
+> - Do NOT add an attribution comment. Note the source in your return summary so it can be credited in the commit message and CHANGELOG.
 > - Do NOT remove existing content unless it's clearly superseded
 >
 > Return a summary of what you changed and why.
