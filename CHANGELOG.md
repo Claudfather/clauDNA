@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- **`/verify-completion` sharpened with five transplants from the built-in Claude Code `/verify` skill (via `/heist`).** The two skills are complementary, not duplicates: `/verify-completion` is the completion-claim *gate* (a fork of superpowers' `verification-before-completion`), while `/verify` (built into the CLI binary, not a clauDNA skill) is the runtime-observation *protocol*. Folded in: (1) an **evidence-matches-claim hierarchy** — behavioral claims ("feature works", "bug fixed") require running the app at its surface, not a green test suite, while mechanical claims ("tests pass", "build clean") require that command's fresh output; (2) a **BLOCKED outcome** — "couldn't verify because X" is an honest non-claim, not done; (3) the **"when in doubt, FAIL"** error-asymmetry principle; (4) a **"Verify the Full Change"** section — establish the full diff range (`git diff @{u}..`, `gh pr diff`), not a stale or partial tree; (5) a **cross-reference to `/verify`** clarifying the gate-vs-protocol division of labor. Adversarial edge-case probing, the structured report format, and remote-evidence delivery were deliberately left in `/verify` to keep the gate lean.
 
 ## [0.6.0] - 2026-06-14
 ### Added
