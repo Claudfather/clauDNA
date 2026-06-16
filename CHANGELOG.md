@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **ADR 001 — shelve per-skill cheap-model subagent delegation.** `documentation/decisions/001-shelve-per-skill-model-delegation.md` records the decision *not* to build per-skill Haiku delegation for mechanical skills (`name-session` / `notes` / `lessons` / `skill-health`): subagent dispatch overhead exceeds the offloaded work for small single-shot skills, and the mechanism (skill→custom-agent dispatch; frontmatter `model:` actually pinning the subagent's model) is unproven in-repo. Documents the better alternative (agent-level model tiering on heavy read-only fan-out agents) and an explicit revisit trigger. First entry in `documentation/decisions/`.
+
 ### Changed
 - **forge↔ironclad unification: one §4.1 GitHub-Issue substrate, driven by `/claudna:publish`, hardened by an `/ironclad` loop ([#155](https://github.com/Claudfather/clauDNA/issues/155)).** A multi-skill renovation aligning `/forge` and `/ironclad` to the package-wide plan contract:
   - **`/forge` authors through `/claudna:publish` instead of a bespoke docs PR.** `--output github` → a §4.1 GitHub Issue (the canonical, iterable plan body); new `--output docs` → a PR-reviewable plan directory; both via publish, so forge is no longer the only planning skill off the shared substrate. Repositioned as the general-purpose authoring lens alongside the targeted lenses (`/tech-debt`, `/security-audit`, …).
