@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- **forge↔ironclad unification: one §4.1 GitHub-Issue substrate, driven by `/claudna:publish`, hardened by an `/ironclad` loop ([#155](https://github.com/Claudfather/clauDNA/issues/155)).** A multi-skill renovation aligning `/forge` and `/ironclad` to the package-wide plan contract:
+  - **`/forge` authors through `/claudna:publish` instead of a bespoke docs PR.** `--output github` → a §4.1 GitHub Issue (the canonical, iterable plan body); new `--output docs` → a PR-reviewable plan directory; both via publish, so forge is no longer the only planning skill off the shared substrate. Repositioned as the general-purpose authoring lens alongside the targeted lenses (`/tech-debt`, `/security-audit`, …).
+  - **forge's Plan Document Structure rewritten to the §4.1 skeleton.** Per-phase §4.1 docs (one phase = one issue/PR) plus an epic/overview doc carrying forge's distinctive sections (Decision Forks, Architecture, Complexity & Sequencing). Multi-phase → epic + per-phase issues (F7).
+  - **forge Phase-3 self-audit slimmed to a structural pre-flight.** The review panel — including `adversarial-review` — now runs only in `/ironclad`, not duplicated inline in forge.
+  - **`forge --reforge <issue>` added** — the loop's author step: folds the Issue's accumulated lens/collaborator comments into the §4.1 body, preserves `[FORK-LOCK]`'d content, snapshots the prior body as a comment, and posts `[FORK-LOCK]` markers.
+  - **`/ironclad` generalized from PRs to plan Issues + implementation PRs, and gained `--loops N`** (Phase 10): dispatch lenses → findings as comments → `forge --reforge` folds them → convergence check, repeating up to N cycles or until converged. ironclad never authors the body (it dispatches forge). Legacy plan-on-a-PR pathway retired; impl-PR review kept (F4). `--auto` fields `pr_url`/`pr_type` → `target_url`/`target_type`, added `loops_run`.
 
 ## [0.6.1] - 2026-06-14
 ### Changed

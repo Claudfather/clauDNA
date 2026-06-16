@@ -1,7 +1,7 @@
 ---
 name: ironclad
-description: "Use when a PR needs structured multi-lens review before merge. Applies to plan PRs (post-/forge), implementation PRs, and mixed PRs."
-argument-hint: "<pr-url> [--auto]"
+description: "Use to harden a plan or review a PR with a panel of independent lenses. Primary target: a §4.1 plan Issue (post-/forge) — `--loops N` runs hardening cycles (dispatch lenses → comments → forge --reforge folds them → convergence). Also reviews implementation PRs. Subagent-only."
+argument-hint: "<issue-or-pr-url> [--loops N] [--auto]"
 requires:
   - cli: gh
     reason: "Reads PR diff and metadata, scans PR comments for fork state, and posts the aggregated review comment via the GitHub API."
@@ -9,7 +9,7 @@ requires:
 
 # Ironclad
 
-`/ironclad` runs a panel of independent review lenses against a pull request, aggregates their findings into one comment, and reports whether the PR is converged — no open blockers, and (for plan PRs) all decision forks locked.
+`/ironclad` runs a panel of independent review lenses against a **§4.1 plan Issue** or a **pull request**, aggregates their findings into comments, and reports whether the target is converged — no open blockers, and (for plans) all decision forks locked. For a plan Issue it is the *hardening loop*: `--loops N` repeats dispatch → fold (via `forge --reforge`) → convergence-check until converged or N cycles run. For an implementation PR it is a single review pass (no re-forge). It never authors the plan body itself — it dispatches `/forge` to.
 
 This skill is **subagent-only**: each lens runs as a parallel `general-purpose` subagent on the current machine. Fleet deployments override the dispatch step via a compositor-injected protocol (see the dispatch preamble below); the skill itself contains no fleet concepts (no tmux, no `[BOTREPORT]`, no `fleet-state.json`).
 
@@ -33,27 +33,29 @@ Run `gh auth status`. If the GitHub CLI is not authenticated, stop immediately w
 
 ## Procedure
 
-### Phase 1: Read the PR and classify
+### Phase 1: Read the target and classify
 
-1. Extract `owner/repo` and the PR number from the `<pr-url>` argument.
-2. Fetch the diff with `gh pr diff <pr-url>` and metadata with `gh pr view <pr-url> --json title,body`.
+1. Determine target type from the URL: `/issues/<n>` → **plan Issue**; `/pull/<n>` → **PR**. Extract `owner/repo` and the number.
+2. Fetch it:
+   - **Issue:** `gh issue view <url> --json title,body,comments`. The body is the §4.1 plan; comments are the feedback ledger (prior-cycle lens findings and `[FORK-LOCK]` markers).
+   - **PR:** `gh pr diff <url>` and `gh pr view <url> --json title,body,comments`.
 3. **Classify:**
-   - **Plan PR** — the diff modifies plan markdown (under `docs/`, `planning/`, `documentation/`, or `shared/planning/`) with plan structure (phases, decision forks). Read the full plan content **and any files it links to** (transitive reference reading) so lenses see the complete picture.
-   - **Implementation PR** — the diff modifies source, config, scripts, or tests.
-   - **Mixed** — both; all lenses apply and convergence follows the plan rules.
-4. Record the PR title, type, and a one-line summary.
+   - **Plan** (an Issue, or a per-phase plan doc) — read the full §4.1 body **and anything it links to** (transitive reference reading) so lenses see the complete picture. Loopable: eligible for `--loops` + `forge --reforge`. (The legacy plan-on-a-PR pathway is retired; plans live on Issues.)
+   - **Implementation PR** — the diff modifies source, config, scripts, or tests. Review-only (no re-forge).
+   - **Mixed PR** — both; all lenses apply, convergence follows the plan rules, review-only.
+4. Record the target title, type, and a one-line summary.
 
-If the PR cannot be fetched, report the error verbatim and stop.
+If the target cannot be fetched, report the error verbatim and stop.
 
 ### Phase 2: Prepare the scratch directory
 
 Create a scratch directory at `/tmp/ironclad-<YYYY-MM-DD_HHMMSS>/` (referred to as `<scratch>` below). Use the Write tool to create files inside it (auto-creates parents, so no `mkdir`, per the scratch-dir convention in `skills/_shared/orchestration-guide.md`). Write `<scratch>/source.md` with the PR metadata, type, and the full (transitively-resolved) plan or diff summary the lenses will review. Lay out per-lens result paths as `<scratch>/lenses/<lens>/result.md`.
 
-**Cycle is always `1` in subagent mode** — `/tmp` is ephemeral, so there is no prior-run state to scan.
+**Cycle** starts at `1`. With `--loops N` on a plan Issue the procedure repeats (Phase 10) for up to `N` cycles; cross-cycle state lives in the **Issue's comments** (prior lens findings, `[FORK-LOCK]` markers) and the re-forged body — not `/tmp`, which stays ephemeral.
 
 ### Phase 3: Select lenses
 
-Subagents are always available — there is no executor-availability step. Pick the lenses that apply from the PR type:
+Subagents are always available — there is no executor-availability step. Pick the lenses that apply from the target type:
 
 | Lens | Skill | Applies to | Status |
 |------|-------|-----------|--------|
@@ -64,7 +66,7 @@ Subagents are always available — there is no executor-availability step. Pick 
 | Plan Health Audit | `plan-health-audit` | plan, mixed | Active |
 | Cost-Benefit | `cost-benefit` | plan, implementation, mixed | Active |
 
-Dispatch only the lenses whose **Applies to** matches the PR type. New lenses plug in by adding a row.
+Dispatch only the lenses whose **Applies to** matches the target type. New lenses plug in by adding a row.
 
 ### Phase 4: Dispatch lenses as parallel subagents
 
@@ -96,7 +98,7 @@ Read every `<scratch>/lenses/<lens>/result.md`. Deduplicate: findings sharing th
 
 ### Phase 8: Post the aggregated comment
 
-Post a **single** aggregated comment to the PR. A PR comment is an issue comment in GitHub's API; write the markdown body to a temp file (with the Write tool) and post it with `-F body=@<file>` so multi-line markdown stays intact:
+Post a **single** aggregated comment to the target (Issue or PR). A PR comment is an issue comment in GitHub's API; write the markdown body to a temp file (with the Write tool) and post it with `-F body=@<file>` so multi-line markdown stays intact:
 
 ```
 gh api --method POST repos/<owner>/<repo>/issues/<pr-number>/comments -F body=@<body-file>
@@ -121,15 +123,34 @@ Prior-comment minimization is skipped in subagent mode (cycle is always 1).
 
 ### Phase 9: Convergence check
 
-Decide whether the PR is converged:
+Decide whether the target is converged:
 
-- **Plan or mixed PRs:** converged when there are **zero open Blockers** AND all decision forks are locked. Determine fork state by scanning the PR's comments (`gh pr view <pr-url> --json comments`) for `[FORK-LOCK F<N>]` and `[FORK-REOPEN F<N>]` markers — the most recent marker per fork wins. This scan is self-contained in this skill and needs no external protocol. In fleet contexts the `decision-fork-lifecycle` protocol adds richer fork management, but the basic check here stands alone for standalone users. Note the difference: standalone fork checking does not enforce ratifier identity or reopen validation — acceptable for a solo user doing everything themselves; a fleet gets the stricter rules from its protocol.
+- **Plans (Issue or mixed PR):** converged when there are **zero open Blockers** AND all decision forks are locked. Determine fork state by scanning the target's comments (`gh issue view <url> --json comments` for an Issue, `gh pr view <url> --json comments` for a PR) for `[FORK-LOCK F<N>]` and `[FORK-REOPEN F<N>]` markers — the most recent marker per fork wins. This scan is self-contained in this skill and needs no external protocol. In fleet contexts the `decision-fork-lifecycle` protocol adds richer fork management, but the basic check here stands alone for standalone users. Note the difference: standalone fork checking does not enforce ratifier identity or reopen validation — acceptable for a solo user doing everything themselves; a fleet gets the stricter rules from its protocol.
 - **Implementation PRs:** converged when there are **zero open Blockers**.
 - A partial lens failure does not block convergence.
 
 **If converged:** end the comment with the convergence line `[IRONCLAD] PR reviewed — no open blockers. Ready for implementation.`
 
 **If not converged:** state the open items — unresolved blockers, open forks, and any failed lenses — with counts, so the author knows exactly what remains.
+
+### Phase 10: Hardening loop (plan Issues, `--loops N`)
+
+For a **plan Issue** with `--loops N` (default `N=1`):
+
+1. After the convergence check (Phase 9), if **converged** or **N cycles have run**, stop and report.
+2. Otherwise fold this cycle's findings into the plan body by dispatching one `general-purpose` subagent:
+
+   ```
+   Read skills/forge/SKILL.md
+   Apply forge --reforge --dispatch to issue: <issue-url>
+   Fold the comments posted since the last cycle into the §4.1 body; preserve [FORK-LOCK]'d content;
+   snapshot the prior body as a comment before rewriting; re-publish via /claudna:publish.
+   Operate non-interactively: do not enter plan mode, do not prompt for input.
+   ```
+
+3. Increment the cycle and repeat from **Phase 3** (re-select and re-dispatch lenses against the updated body).
+
+`/ironclad` never edits the plan body itself — `forge --reforge` (in the dispatched subagent) is the only writer of the body; ironclad writes only comments and orchestrates. **Implementation and mixed PRs do not loop** (`--loops` is ignored): code is iterated by humans / `/implement-plan`, not by re-forge.
 
 ## `--auto` mode
 
@@ -140,10 +161,11 @@ With `--auto`, run the full procedure non-interactively (no plan mode, no prompt
   "skill": "ironclad",
   "outcome": "completed",
   "artifacts": {
-    "pr_url": "<pr-url>",
+    "target_url": "<issue-or-pr-url>",
     "comment_url": "<posted comment URL>",
-    "pr_type": "plan|implementation|mixed",
+    "target_type": "plan|implementation|mixed",
     "cycle": 1,
+    "loops_run": 1,
     "mode": "subagent",
     "lenses_run": 0,
     "lenses_failed": 0,
@@ -162,7 +184,7 @@ With `--auto`, run the full procedure non-interactively (no plan mode, no prompt
 
 ## Constraints
 
-- **Read-only on the PR's code.** Never edit files in the PR, never merge. The only write is the single aggregated review comment.
-- **Centralized posting.** Lenses write to the scratch dir; only `/ironclad` posts to the PR.
+- **Never authors the plan body.** ironclad writes only comments and dispatches `/forge --reforge` to author the body; it never edits PR code and never merges.
+- **Centralized posting.** Lenses write to the scratch dir; only `/ironclad` posts to the target.
 - **No self-review loops.** Do not dispatch `/ironclad` from within a lens.
 - **Idempotent.** Re-running posts a fresh aggregated comment; in subagent v1 (cycle 1) prior comments are left in place rather than minimized.
