@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **forge Phase-3 self-audit slimmed to a structural pre-flight.** The review panel — including `adversarial-review` — now runs only in `/ironclad`, not duplicated inline in forge.
   - **`forge --reforge <issue>` added** — the loop's author step: folds the Issue's accumulated lens/collaborator comments into the §4.1 body, preserves `[FORK-LOCK]`'d content, snapshots the prior body as a comment, and posts `[FORK-LOCK]` markers.
   - **`/ironclad` generalized from PRs to plan Issues + implementation PRs, and gained `--loops N`** (Phase 10): dispatch lenses → findings as comments → `forge --reforge` folds them → convergence check, repeating up to N cycles or until converged. ironclad never authors the body (it dispatches forge). Legacy plan-on-a-PR pathway retired; impl-PR review kept (F4). `--auto` fields `pr_url`/`pr_type` → `target_url`/`target_type`, added `loops_run`.
+  - **forge Phase-0 right-size gate + "why forge over plain plan mode" note (P5).** Advisory check that recommends plain plan mode or `/weigh-development-paths` when the topic meets ≤1 of the four criteria (multi-phase, multi-person, decision-heavy, high-stakes); `--auto` reports `right_size`. Never a hard block — it just stops forge from manufacturing ceremony around small work.
 
 ## [0.6.1] - 2026-06-14
 ### Changed

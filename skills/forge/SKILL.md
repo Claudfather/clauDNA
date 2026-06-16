@@ -34,6 +34,19 @@ You are about to start a workstream that is:
 
 This is for **workstream-level planning** — initiatives that span multiple PRs and weeks. Not for single-PR task scoping (use `/weigh-development-paths` for that) or implementation details (use `/implement-plan` after the plan is ratified).
 
+### Why forge over plain plan mode
+
+Plan mode is the *mechanism* — read-only research, then propose. Forge adds the *methodology and artifact* on top: the §4.1 contract that forces completeness, ratifiable **decision forks**, a durable Issue the team iterates, and a direct path into the `/ironclad` hardening loop and `/implement-plan`. If none of that gets used — single session, single implementer, no real forks — plain plan mode is the better, lighter choice. Forge earns its overhead only when the plan must survive review, coordinate people, and persist.
+
+## Phase 0: Right-Size Gate
+
+Over-applying forge is the fastest way to make it feel like ceremony. Before researching, score the topic against the four criteria above (multi-phase, multi-person, decision-heavy, high-stakes):
+
+- **0–1 met** → forge is likely the wrong tool. Recommend plain **plan mode** (a single-session task) or **`/weigh-development-paths`** (a single-PR architecture choice). In interactive mode, confirm with the user before continuing; in `--auto`, proceed but set `"right_size": "marginal"` in the result JSON.
+- **2+ met** → forge earns its weight. Proceed.
+
+**Advisory, never a hard block** — a user who knows they want a forge plan always continues. The gate exists only to stop forge from manufacturing false ceremony around work a lighter tool handles better.
+
 ## Phase 1: Research
 
 ### Step 1: Understand the Scope
@@ -205,6 +218,7 @@ Emit structured-result JSON per `skills/_shared/orchestration-guide.md` §10 (St
   "artifacts": {
     "published_url": "<issue/PR/doc URL returned by /claudna:publish>",
     "target": "github-issue|docs|session",
+    "right_size": "ok|marginal",
     "fork_count": N,
     "forks_open": N,
     "phases": N,
