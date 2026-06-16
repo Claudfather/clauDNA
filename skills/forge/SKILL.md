@@ -1,13 +1,15 @@
 ---
 name: forge
 user-invocable: true
-description: "Use when planning a workstream that spans multiple PRs, involves decision forks, or needs structured phasing before implementation. Use before /implement-plan when the scope is large enough to need a plan. Use with /ironclad (claudlobby) for fleet-orchestrated review cycles. Also applies when writing a technical spec, design document, initiative roadmap, or pre-implementation proposal."
-argument-hint: "[topic-or-issue-url] [--output github|session] [--auto]"
+description: "Use when planning a workstream that spans multiple PRs, involves decision forks, or needs structured phasing before implementation. The general-purpose planning lens: authors a §4.1 plan via /claudna:publish, which /ironclad --loops then hardens to convergence and /implement-plan builds. Also applies when writing a technical spec, design document, initiative roadmap, or pre-implementation proposal."
+argument-hint: "[topic-or-issue-url] [--output github|docs|session] [--auto]"
 ---
 
 # Forge
 
 You are a plan architect. Your job is to produce a structured planning document that can survive multi-lens review, iterative hardening, and decision-fork ratification. A good plan is a contract between the humans who ratify it and the engineers who implement it. A vague plan wastes more time than no plan — it creates false alignment.
+
+Forge is the *general-purpose* planning lens — reach for it when the lens is "build this specific thing," as opposed to the targeted lenses (`/tech-debt`, `/security-audit`, …). Like them, forge **authors** a plan in the shared §4.1 publishable-doc contract and hands it to `/claudna:publish` to persist; it never writes output itself. The published artifact is the substrate the `/ironclad` hardening loop iterates on.
 
 **Enter Plan Mode.** Call `EnterPlanMode`. All analysis is read-only during research phases. If declined, proceed by convention.
 
@@ -16,7 +18,8 @@ You are a plan architect. Your job is to produce a structured planning document 
 Parse `$ARGUMENTS` at invocation:
 - **First positional arg:** Topic description, issue URL, or path to an existing rough plan. If omitted, prompt for it.
 - `--auto`: Non-interactive mode. Suppresses Plan Mode and all interactive gates. Requires topic in `$ARGUMENTS`. Emits structured-result JSON and stops.
-- `--output github`: Create a docs PR with the plan as a single markdown file.
+- `--output github`: Publish the plan as a §4.1 GitHub Issue via `/claudna:publish --to github-issue` — the shared, implement-plan-ready contract. The Issue body is the canonical, iterable plan.
+- `--output docs`: Publish to disk via `/claudna:publish` — a PR-reviewable plan directory; choose this when git diffs matter (large or contentious plans).
 - `--output session`: Present the plan in chat only (default).
 
 Default (no flag): Interactive mode, session output.
@@ -67,76 +70,81 @@ For each risk, draft a mitigation. If no mitigation exists, flag it as an open r
 
 ### Plan Document Structure
 
-Every /forge plan follows this structure. All sections are mandatory. If a section is genuinely empty (e.g., no companion plans), write "None identified" — don't omit the heading.
+Forge authors in the **shared §4.1 publishable-doc contract** (`skills/_shared/output-guide.md` §3 frontmatter + §4.1 body) — the same contract `/tech-debt`, `/security-audit`, et al. emit — so `/claudna:publish` can route it and `/implement-plan` can consume it. Forge's distinctive sections (Decision Forks, Architecture, Sequencing) ride **alongside** the §4.1 skeleton as added sections; publish validates the skeleton's presence, not its exclusivity.
+
+Per **F7**, a multi-phase plan is **one epic/overview doc + one §4.1 doc per phase** (§4.1 is "one phase per issue"; this mirrors the disk `00_overview` + phase-docs pattern). A single-phase plan is one §4.1 doc.
+
+**Per-phase doc** — one phase = one issue / one PR's worth of work:
 
 ```markdown
 ---
-title: "<Plan Title>"
+title: "[plan] <phase deliverable> — <area>"
 type: plan
 status: draft
 owner: <author>
-tags: [<relevant-tags>]
 created: <YYYY-MM-DD>
-updated: <YYYY-MM-DD>
+tags: [<labels>]
+repos: <repo>
 ---
 
-# <Plan Title>
+## Summary
+<2-3 sentences: what this phase delivers and why it matters.>
 
-## Goal
-<2-3 sentences: what this plan achieves and why it matters. Reference PROJECT_MISSION.md alignment if applicable.>
+## Evidence
+<Verified file:line references for the current state this phase changes.>
 
-## Current State
-<What exists today. Be specific — file paths, table names, API endpoints. Claims here must be verified against the codebase.>
+## Implementation Plan
+### Dependencies
+<Phases/issues that must land first, or "None">
+### Blocks
+<Phases/issues this unlocks, or "None">
+### Steps
+<Zero-ambiguity steps: explicit file paths, before/after code, new-file skeletons.>
 
+## Test Plan
+<Tests to add or modify; manual verification steps.>
+
+## Verification Checklist
+- [ ] <objectively checkable criterion (a command or observable state)>
+
+## What NOT To Do
+<Pitfalls, anti-patterns, things that look right but are wrong.>
+
+## Context
+- Source skill: forge · Area: <dir/module> · Effort: <S/M/L/XL> · Risk: <Low/Med/High> · Priority: <Critical/High/Medium/Low>
+```
+
+**Epic / overview doc** — the same §4.1 skeleton at the workstream level (where `### Steps` is the ordered, linked phase list and `### Blocks` is the cross-phase dependency map), **plus** forge's distinctive sections:
+
+```markdown
 ## Architecture
-<Diagram or description of the target state. Show how components connect.>
-
-## Phases
-<Sequential phases with clear boundaries. Each phase should deliver standalone value.>
-
-### Phase N: <Name>
-<For each phase:>
-#### Na. <Sub-deliverable>
-<What to build, how it works.>
+<Target state; how the components connect.>
 
 ## Decision Forks
-
 ### Fork F1: <Title>
-- **Context:** <Why this fork exists>
-- **Options:**
-  - **(a)** <Option A> — <1-line trade-off>
-  - **(b)** <Option B> — <1-line trade-off>
-  - **(c)** <Option C> — <1-line trade-off> (if applicable)
-- **Lean:** <Which option the plan recommends and why>
-- **Ratifier:** <Who locks this — human, manager, or framework>
-- **Status:** open | locked
-- **Evidence:** <Link to analysis, PR comment, or conversation>
-
-<Repeat for each fork.>
+- **Context:** <why this fork exists>
+- **Options:** **(a)** <A> — <trade-off> · **(b)** <B> — <trade-off> · **(c)** <C> (if applicable)
+- **Lean:** <recommendation + why> · **Ratifier:** <who locks it> · **Status:** open | locked
+- **Evidence:** <analysis / the `[FORK-LOCK F1]` comment / conversation>
 
 ## Companion Plans
-<Cross-references to related planning documents. "None identified" if standalone.>
-
-## Dependencies
-<Table: dependency | blocks | risk level>
+<Related planning docs; "None identified" if standalone.>
 
 ## Risks
 <Table: risk | impact | mitigation>
 
-## Validation Strategy
-<How do we know this plan worked? Acceptance criteria, test strategy, metrics.>
-
 ## Complexity and Sequencing
-<Table: phase | size (S/M/L/XL) | depends on | parallel with>
-<Dependency order, parallelization opportunities, critical path.>
+<Table: phase | size (S/M/L/XL) | depends on | parallel with — and the critical path.>
 ```
+
+All §4.1 sections are mandatory — `/claudna:publish` rejects a `type: plan` doc missing the `## Implementation Plan` / `### Steps` skeleton. For the forge-specific sections, write "None identified" rather than omitting the heading.
 
 ### Decision Fork Discipline
 
 - Every fork gets an ID (F1, F2, ...) for reference in discussions
 - Options are mutually exclusive and collectively exhaustive
 - The "lean" is the plan's recommendation, not a decision — it's ratified by the designated ratifier
-- A locked fork includes the commit or message reference where it was ratified
+- A locked fork is ratified by posting `[FORK-LOCK F<N>]` (with ratifier + evidence) as an Issue/PR comment — the representation `/ironclad` scans for convergence — and mirroring `Status: locked` into the body. Reopen with `[FORK-REOPEN F<N>]`.
 - Forks that are obvious (one option clearly dominates) should still be documented — "obvious" to the author may not be obvious to the reviewer
 
 ### Anti-Patterns to Avoid
@@ -149,29 +157,17 @@ updated: <YYYY-MM-DD>
 
 ---
 
-## Phase 3: Self-Audit
+## Phase 3: Pre-flight (structural self-check)
 
-Before presenting or committing the plan, run these checks:
+Forge does **not** run the review panel — that's `/ironclad`'s job. `/ironclad <issue> --loops N` dispatches the lenses (`adversarial-review`, `first-principles`, `extension-check`, `precedent-check`, `plan-health-audit`, `cost-benefit`) as parallel subagents and drives convergence. Forge's pre-flight is only the minimal structural check that keeps cycle-1 ironclad from being wasted on trivial defects:
 
-1. **Quality standard** — Verify the plan meets `skills/_shared/planning-standard.md`. Every file path, function name, and code reference must be explicit. Ambiguity is a defect.
-2. **Mission alignment** — Does every phase serve the north star in PROJECT_MISSION.md? Flag any phase that's tangential.
-3. **Extension check** — For every new component proposed, is there an existing abstraction (factory, registry, base class, shared pattern) it should extend rather than build adjacent to? This is the #1 cause of parallel slop. Search the codebase.
-4. **Fork completeness** — Every decision fork has options, a lean, and a ratifier? No hidden forks buried in phase descriptions?
-5. **Claim verification** — Every factual claim about current state is verified against the codebase? File paths exist? Column names match? API endpoints are real?
-6. **Validation testability** — Can each validation criterion be objectively checked? "Works correctly" is not testable. "Returns 200 with valid JSON matching schema X" is.
-7. **Dependency chain** — Are phases correctly ordered? Could any phases run in parallel that are listed as sequential?
-8. **Adversarial review gate** — Run the adversarial review gate per `skills/_shared/pre-handoff-checklist.md`. Fold findings into an `## Adversarial Review Findings` section. This is the pre-handoff stress test — surface blind spots before the plan leaves the author's hands.
-9. **None-identified density** — If 3 or more sections contain only "None identified", the plan is likely undercooked. Return to Phase 1 Research and dig deeper before proceeding.
+1. **Skeleton present** — every §4.1 section exists in each doc (publish rejects a `plan` doc missing `## Implementation Plan` / `### Steps`).
+2. **Claims verified** — every `## Evidence` claim checks out against the codebase (paths exist, symbols match). Forge read the code in Phase 1; confirm it didn't drift.
+3. **Forks well-formed** — every `## Decision Forks` entry has options, a lean, a ratifier, and a status; locked forks carry their `[FORK-LOCK F<N>]` reference.
+4. **Phases sized & sequenced** — every phase has a size (S/M/L/XL) and a row in `## Complexity and Sequencing`.
+5. **Validation testable** — every `## Verification Checklist` item is objectively checkable (a command or observable state), not "works correctly".
 
-### Skip Temptations
-
-| Excuse | Reality |
-|--------|---------|
-| "This section is genuinely empty" | Maybe — but 3+ empty sections means you skimmed, not researched. Go back to Phase 1 and read the actual code, git history, and closed issues. |
-| "Phase 1 research is good enough without reading the actual code" | Plans based on assumed architecture drift on contact with reality. If you didn't `Read` the files you're planning to change, your Current State section is fiction. |
-| "The plan is obvious, no decision forks needed" | If zero forks survive scrutiny, the plan is either trivially simple (don't need /forge) or the author hasn't considered the perspectives of reviewers, implementers, and operators. |
-| "Self-audit passed, no need for adversarial review" | Self-audit catches structural issues. Adversarial review catches blind spots — things the author can't see because they wrote the plan. Both run. Always. |
-| "Validation criteria are implied by the phases" | "Works correctly" is not testable. Every criterion must be objectively checkable by someone who didn't write the plan. If you can't write a verification command, the criterion is vague. |
+Then publish (Phase 4) and hand to `/ironclad`. **Do not inline the lenses' work.** The deeper mission-alignment, extension, prior-art, and adversarial passes forge used to run itself now live in ironclad's panel — running them here too just doubles the cost and drifts from the panel's results.
 
 ---
 
@@ -184,20 +180,20 @@ Present the plan in chat with a summary:
 - Phase count and complexity profile (how many S/M/L/XL)
 - Fork count and how many are open vs locked
 - Key risks (top 3)
-- Recommended next step (usually: "open a docs PR and run /ironclad for multi-lens review")
+- Recommended next step (usually: "publish with `--output github`, then run `/ironclad <issue> --loops N` for multi-lens hardening")
 
-### --output github
+### --output github (and --output docs)
 
-Follow `skills/_shared/output-guide.md` for house-style validation and routing. For `/forge`, the output is a planning doc (not an issue), so write directly to the planning directory rather than routing through `/claudna:publish`.
+Forge is an *author*, not a publisher: it produces a §4.1 publishable doc and hands it to `/claudna:publish` — the same shared adapter every other planning skill uses (`skills/_shared/output-guide.md` §7). Forge never calls `gh` directly and never writes a bespoke planning PR.
 
-1. Create a branch: `<author>/forge-<slugified-title>`
-2. Write the plan to `documentation/planning/<date>-<slug>.md` (or the repo's established planning directory if different)
-3. Commit with message: `docs(planning): <title> — forged plan v0`
-4. Open a PR with:
-   - Title: `docs(planning): <title>`
-   - Body: summary (goal, phases, fork count, complexity profile, key risks)
-   - Label: `planning` (if label exists)
-5. Report the PR URL
+1. Write the plan as a publishable doc: house-style frontmatter (output-guide §3) + the §4.1 body skeleton (§4.1 — `## Summary`, `## Evidence`, `## Implementation Plan` with `### Dependencies`/`### Blocks`/`### Steps`, `## Test Plan`, `## Verification Checklist`, `## What NOT To Do`, `## Context`), plus a `## Decision Forks` section.
+2. **Multi-phase → epic + per-phase docs (F7).** §4.1 is "one phase per issue," so a multi-phase plan becomes an epic/overview doc plus one §4.1 doc per phase (mirrors the disk `00_overview` + phase-docs pattern). A single-phase plan may be one doc.
+3. Route to the requested target:
+   - `--output github` → `/claudna:publish <doc> --to github-issue --repo <repo>`
+   - `--output docs` → `/claudna:publish <doc>` (disk → a PR-reviewable plan directory)
+4. Report the published URL(s) that `/claudna:publish` returns.
+
+This is the substrate the hardening loop runs on: `/ironclad <issue> --loops N` stress-tests the published plan (lens findings posted as comments), and `forge --reforge <issue>` folds those comments back into the body — converged when there are no open blockers and all decision forks are locked.
 
 ### --auto
 
@@ -207,7 +203,8 @@ Emit structured-result JSON per `skills/_shared/orchestration-guide.md` §10 (St
   "skill": "forge",
   "outcome": "completed",
   "artifacts": {
-    "plan_path": "<path-to-plan-file>",
+    "published_url": "<issue/PR/doc URL returned by /claudna:publish>",
+    "target": "github-issue|docs|session",
     "fork_count": N,
     "forks_open": N,
     "phases": N,
@@ -215,8 +212,22 @@ Emit structured-result JSON per `skills/_shared/orchestration-guide.md` §10 (St
     "risks_high": N
   },
   "summary": "<1-2 sentence plan summary>",
-  "next": "<orchestrator hint, e.g. 'run /ironclad <pr-url> for fleet review', or null>",
+  "next": "<orchestrator hint, e.g. 'run /ironclad <issue-url> --loops N for fleet hardening', or null>",
   "errors": [],
   "blocker_description": null
 }
 ```
+
+---
+
+## Re-forge Mode (`forge --reforge <issue-url>`)
+
+The hardening loop's **author** step. `/ironclad` posts lens findings as comments on the plan's Issue; `--reforge` folds them back into the body. Invoked per cycle by `/ironclad --loops` as a `--dispatch` subagent (F5), or by hand.
+
+1. **Read the live Issue** — the body (canonical plan) plus every comment since the last re-forge: lens findings + collaborator input. Treat the Issue head as truth; never overwrite from a stale local copy.
+2. **Fold each open finding** — make the smallest body edit that resolves it, or, if it's a genuine choice, add/update a `## Decision Forks` entry. **Preserve locked content**: do not reopen a `[FORK-LOCK]`'d fork or rewrite a settled phase without a `[FORK-REOPEN F<N>]`.
+3. **Snapshot before rewrite** — post the prior body as a comment so the comment ledger is the version history (the diff you'd otherwise get from a PR; this is why F6 keeps disk/PR available when diffs matter more).
+4. **Lock decided forks** — when a fork is ratified, post `[FORK-LOCK F<N>]` (ratifier + evidence) and mirror `Status: locked` into the body.
+5. **Re-publish** the updated body via `/claudna:publish` (it updates the Issue in place). Report what changed this cycle.
+
+`--reforge` **never declares convergence** — it only authors. Convergence is `/ironclad`'s call: no open Blockers and all forks locked.
