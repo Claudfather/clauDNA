@@ -1,7 +1,7 @@
 ---
 name: learn
 user-invocable: true
-description: "Knowledge ingestion — pull content from external sources into the knowledge base"
+description: "Use when the user shares external content worth keeping — an article, repo, video transcript, or documentation — and it should be ingested into the shared knowledge base. For capturing insights from the current session, use /claudna:reflect."
 argument-hint: "<url|path|text> [--repo name] [--tags a,b] [--full] [--update]"
 ---
 

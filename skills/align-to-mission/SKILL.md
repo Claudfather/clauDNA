@@ -1,6 +1,6 @@
 ---
 name: align-to-mission
-description: "Use when you want to check whether every phase in a plan serves the project's stated mission. Catches scope creep, tangential work, misaligned success metrics, and aggregate drift from the north star."
+description: "Use when you want to check whether every phase in a plan serves the project's stated mission. Catches scope creep, tangential work, misaligned success metrics, and aggregate drift from the north star. Runs standalone or as a lens in the /claudna:ironclad review panel."
 argument-hint: "[plan-file-path] [--dispatch]"
 ---
 

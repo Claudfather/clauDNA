@@ -32,7 +32,7 @@ Hard rules:
 | Field | Type | Rules |
 |---|---|---|
 | `name` | string | Letters (any case), digits, and hyphens only. Must match the parent directory name exactly. Globally unique across the repo (no two skills share a `name`). Convention is `kebab-case`. |
-| `description` | string | One sentence describing when to use the skill. Begins with "Use when…" by convention. Length: 20–500 characters. Surfaces in the skill picker — keep it specific enough that the loader can decide relevance. |
+| `description` | string | When-to-use trigger statement — the routing surface the model reads when deciding whether to load the skill. Length: 20–500 characters. Grammar rules in §2.1 (trigger-first, no flag tokens, no workflow summaries, negative routing). |
 
 ### Optional fields
 
@@ -43,12 +43,25 @@ Hard rules:
 | `requires` | list | External dependencies the skill needs at runtime. Each entry is a mapping with exactly one of `cli` (tool name, optionally with `>=X.Y` version constraint) or `env` (environment variable name), plus an optional `reason` string. Skills with no external dependencies omit the field. See schema below. |
 | `user-invocable` | boolean | Defaults to `true`. Set to `false` for context-only skills (loaded by name reference, not invoked as `/skill`). |
 
+### 2.1. Description grammar
+
+The `description` is a routing surface: it is what the model reads when choosing which skill to load, so it must state *when to reach for the skill* — never how the skill works internally. Rules:
+
+1. **Trigger-first.** Open with the situation that calls for the skill: `Use when …`, `Use at …`, `Use before …`, `Use after …`. Descriptions that lead with a label or a capability summary hide the when-to-use signal. *(Advisory warning when missing.)*
+2. **No CLI flags.** Flag surfaces (`--auto`, `--output …`) belong in `argument-hint`. Any `--flag` token in a description is selection noise and a **hard error**.
+3. **No workflow summaries.** Never narrate the skill's internal process in the description ("dispatches lenses, folds comments, checks convergence"). A description that summarizes the workflow becomes a shortcut the model follows *instead of reading the body*.
+4. **Negative routing.** When a skill has a confusable sibling, disambiguate inside the description itself: `For uncommitted local changes, use /claudna:review-changes.` The pair should partition the intent space so the picker cannot land wrong.
+5. **Concrete anchors.** Temporal and state anchors ("Use when a PR has been merged…", "Use before starting substantive work…") and quoted trigger phrases ("Option A vs B") outperform topic labels. Include the symptoms and keywords a model would match on.
+6. **Rename breadcrumbs.** A skill that supersedes older skills says so at the end: `Replaces /product-brainstorm.` Old muscle memory still resolves.
+
+Cross-references use the `/claudna:<name>` form. Every `claudna:<name>` mention anywhere in a skill's markdown (or in `_shared/`) must resolve to an existing skill directory — dangling references are a **hard error** (see §5.1).
+
 ### Frontmatter example
 
 ```yaml
 ---
 name: tech-debt
-description: "Use when you want to find and plan remediation of technical debt in the codebase. Supports --output github to create issues and --output session for chat-only analysis."
+description: "Use when you want to find and plan remediation of technical debt in a codebase — duplication, dead code, fragile modules, outdated patterns. For a portfolio view across many repos, use /claudna:repo-health."
 argument-hint: "[--auto] [--output github|session] [focus-area]"
 allowed-tools: Bash(git *), Bash(gh *), Edit, Read, Grep, Glob
 requires:
@@ -129,8 +142,10 @@ Beyond frontmatter structure, the validator enforces behavioral consistency betw
 |---|---|---|---|
 | **`--output github` reference** | `argument-hint` contains `--output github` | Body must reference `output-guide` (matching `skills/_shared/output-guide.md`). | Skills claiming GitHub output must follow the shared output guide so consumers get consistent issue formatting. |
 | **`--auto` / `AskUserQuestion` conflict** | `argument-hint` contains `--auto` | Body must NOT contain the literal string `AskUserQuestion`. | `--auto` means non-interactive execution. `AskUserQuestion` blocks on user input, which contradicts the contract. |
+| **Description grammar** | always | `description` must not contain `--flag` tokens — CLI surfaces live in `argument-hint` (§2.1 rule 2). | The description is the model's routing surface; flag inventories add selection noise without trigger value. |
+| **Skill-reference integrity** | any `claudna:<name>` mention in a skill's markdown (SKILL.md + support files) or in `_shared/` | The referenced name must be an existing `skills/<name>/` directory. | Cross-references are how skills route to each other (negative triggers, pipeline hand-offs); a dangling reference silently breaks that routing. |
 
-Both checks produce hard errors that fail CI.
+All checks produce hard errors that fail CI.
 
 ### 5.2. Advisory warnings (non-blocking)
 
@@ -139,6 +154,7 @@ The validator also emits advisory warnings that surface potential staleness but 
 | Check | Trigger | Rule | Rationale |
 |---|---|---|---|
 | **`allowed-tools` body usage** | `allowed-tools` field is present | Each declared tool (or Bash command) should appear somewhere in the body text. Tools with zero mentions produce a `[WARN]`. | Catches stale `allowed-tools` lists where a tool was declared but the body no longer uses it. Some tools (e.g. `Read`, `Glob`) may be used implicitly — the warning is advisory, not CI-blocking. |
+| **Trigger-first description** | always | `description` should open with a trigger clause (`Use when …`, `Use at …`, `Use before …`, `Use after …`) per §2.1 rule 1. | Trigger-first descriptions make the picker's choice cheap; labels and capability summaries hide when-to-use. Advisory so legitimately atypical skills aren't blocked. |
 
 Warnings print in the validator output but do not affect the exit code.
 

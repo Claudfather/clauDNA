@@ -1,7 +1,7 @@
 ---
 name: data-model-audit
 user-invocable: true
-description: "Use when you want to audit how well a data model serves its application — traces code paths to database interactions, maps intent to schema, and identifies mismatches, gaps, and optimization opportunities. Supports --output github to create issues and --output session for chat-only analysis."
+description: "Use when an application's data model may be fighting the product — schema-to-intent mismatches, awkward code-to-database paths, redundant or missing structures — and you want a grounded audit of how well the model serves the code that uses it."
 argument-hint: "[--output github|session] [focus-area]"
 ---
 

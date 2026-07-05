@@ -1,7 +1,7 @@
 ---
 name: quick-commit
 user-invocable: true
-description: "Use when you want to quickly stage and commit all current changes with a conventional commit message."
+description: "Use when you want to quickly stage and commit all current changes with a conventional commit message, without pushing or opening a PR. For the full commit-push-PR flow, use /claudna:commit-push-pr."
 ---
 
 1. Run `git status` to see the current state

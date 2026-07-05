@@ -1,6 +1,6 @@
 ---
 name: cost-benefit
-description: "Use when you want to evaluate whether a plan's phases or a PR's changes justify their cost. Assesses engineering effort, maintenance burden, complexity, dependencies, and risk surface against user impact, mission alignment, future enablement, and tech debt reduction. Flags low-ROI work and suggests sequencing by value."
+description: "Use when you want to evaluate whether a plan's phases or a PR's changes justify their cost — engineering effort, maintenance burden, complexity, and risk surface weighed against user impact, mission alignment, and future enablement. Runs standalone or as a lens in the /claudna:ironclad review panel."
 argument-hint: "[plan-or-source-path] [--dispatch]"
 ---
 

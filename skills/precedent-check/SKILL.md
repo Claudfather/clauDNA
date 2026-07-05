@@ -1,6 +1,6 @@
 ---
 name: precedent-check
-description: "Use when you want to check whether a plan or implementation PR has prior art in the project's history. Searches git history, closed PRs, closed issues, and planning archives for previous attempts at the same problem — surfacing what was tried, what succeeded or failed, and whether the current plan learns from or repeats past approaches."
+description: "Use when you want to check whether a plan or implementation PR has prior art in the project's history — previous attempts at the same problem, what was tried, what succeeded or failed, and whether the current plan learns from or repeats the past. Runs standalone or as a lens in the /claudna:ironclad review panel."
 argument-hint: "[plan-or-source-path] [--dispatch]"
 ---
 

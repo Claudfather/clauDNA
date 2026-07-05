@@ -274,6 +274,79 @@ def check_structured_result_emission(fm: dict, body: str) -> list[str]:
     return errors
 
 
+# A `--` immediately followed by a letter is a CLI flag token (--auto, --output).
+# A spaced ` -- ` is prose (em-dash), which is fine.
+_DESC_FLAG_RE = re.compile(r"--[A-Za-z][A-Za-z-]*")
+
+
+def check_description_grammar(fm: dict, body: str) -> list[str]:
+    """Descriptions state triggering conditions; CLI mechanics belong in argument-hint.
+
+    The description is what the model reads when deciding whether to load a
+    skill. Flag inventories ('Supports --output github ...') add selection
+    noise without trigger value — the flags are already declared in
+    argument-hint. Errors on any --flag token in the description.
+    """
+    errors: list[str] = []
+    desc = fm.get("description")
+    if not isinstance(desc, str):
+        return errors
+    flags = sorted(set(_DESC_FLAG_RE.findall(desc)))
+    if flags:
+        errors.append(
+            f"description contains flag token(s) {', '.join(flags)} -- flag surfaces "
+            "belong in argument-hint; the description should state triggering "
+            "conditions only (see SKILL_CONTRACT.md description grammar)"
+        )
+    return errors
+
+
+def check_description_trigger_convention(fm: dict, body: str) -> list[str]:
+    """Warn when a description doesn't lead with a trigger clause.
+
+    Descriptions should open with the situation that calls for the skill
+    ('Use when ...', 'Use at ...', 'Use before ...'), not a label or a
+    summary of what the skill does. Advisory, not CI-blocking.
+    """
+    warnings: list[str] = []
+    desc = fm.get("description")
+    if not isinstance(desc, str) or not desc:
+        return warnings
+    if not desc.startswith("Use "):
+        preview = desc if len(desc) <= 60 else desc[:57] + "..."
+        warnings.append(
+            f'description does not lead with a trigger clause ("Use when ..."): {preview!r}'
+        )
+    return warnings
+
+
+# Matches claudna:<skill-name> references (with or without leading slash).
+# `claudna:<placeholder>` forms don't match: the char after the colon must be
+# alphanumeric, so authoring-doc placeholders like /claudna:<skill-name> pass.
+_SKILL_REF_RE = re.compile(r"\bclaudna:([A-Za-z0-9][A-Za-z0-9-]*)")
+
+
+def check_skill_references(text: str, valid_names: set[str]) -> list[str]:
+    """Every claudna:<name> mention must reference an existing skill.
+
+    Cross-references are how skills route to each other (negative triggers,
+    pipeline hand-offs); a dangling reference silently breaks that routing.
+    Duplicate mentions of the same unknown target are reported once.
+
+    Args:
+        text: Markdown content to scan (a skill body or support file).
+        valid_names: The set of existing skill directory names.
+
+    Returns:
+        List of error strings (empty = all references resolve).
+    """
+    unknown = {m.group(1) for m in _SKILL_REF_RE.finditer(text)} - valid_names
+    return [
+        f"reference to unknown skill 'claudna:{target}' -- no skills/{target}/ directory"
+        for target in sorted(unknown)
+    ]
+
+
 def check_allowed_tools_usage(fm: dict, body: str) -> list[str]:
     """Warn if allowed-tools declares a tool never mentioned in body.
 
@@ -430,6 +503,7 @@ def validate_skill_md(skill_md: Path, dir_name: str | None = None) -> list[str]:
                 errors.append(f"stale hardcoded path: {line.strip()}")
 
     # Behavioral checks (hard errors)
+    errors.extend(check_description_grammar(fm, body))
     errors.extend(check_output_github_reference(fm, body))
     errors.extend(check_auto_no_ask_user(fm, body))
     errors.extend(check_structured_result_emission(fm, body))
@@ -458,7 +532,9 @@ def warn_skill_md(skill_md: Path) -> list[str]:
         return []
 
     fm, body = parsed
-    return check_allowed_tools_usage(fm, body)
+    warnings = check_allowed_tools_usage(fm, body)
+    warnings.extend(check_description_trigger_convention(fm, body))
+    return warnings
 
 
 def get_touched_skills() -> set[str] | None:

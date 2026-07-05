@@ -1,7 +1,7 @@
 ---
 name: product-enhance
 user-invocable: true
-description: "Use when you have specific product issues to triage or want to discover enhancement opportunities through gap analysis. Supports --output github to create issues and --output session for chat-only analysis."
+description: "Use when you have specific product issues to triage or want to discover enhancement opportunities in an existing product through gap analysis. For exploring what a codebase could become, use /claudna:product-vision."
 argument-hint: "[--auto] [--output github|session] [focus-area]"
 ---
 

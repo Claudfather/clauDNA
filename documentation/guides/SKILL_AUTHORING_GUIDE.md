@@ -60,12 +60,24 @@ That's the minimum. The full field reference:
 | Field | Required | Type | Notes |
 |-------|----------|------|-------|
 | `name` | Yes | string | Must match the directory name exactly. `kebab-case`. |
-| `description` | Yes | string | 20-500 characters. Start with "Use when...". This surfaces in the skill picker — be specific enough that the loader can decide relevance. |
+| `description` | Yes | string | 20-500 characters. The routing surface the model reads when picking a skill — see "Writing the description" below. |
 | `allowed-tools` | No | string or list | Restricts which tools the skill can use. Omit to allow all tools. Use when the skill runs dangerous commands and you want to whitelist specific patterns. |
 | `argument-hint` | No | string | Shown when the user types `/claudna:<name>`. Convention: `[--flag] [positional-arg]`. Strongly recommended when the skill accepts arguments. |
+| `requires` | No | list | External runtime dependencies — each entry has exactly one of `cli` or `env`, plus an optional `reason`. See [SKILL_CONTRACT.md](../../SKILL_CONTRACT.md) for the schema. |
 | `user-invocable` | No | boolean | Defaults to `true`. Set to `false` for context-only skills loaded by reference, not invoked as a slash command. |
 
-The validator rejects unknown fields. Only the five fields listed above are accepted in frontmatter.
+The validator rejects unknown fields. Only the six fields listed above are accepted in frontmatter.
+
+#### Writing the description
+
+The `description` is the highest-leverage line in the skill: it is what the model reads when deciding which skill to load, and a description that misfires means the skill never runs (or runs when it shouldn't). The grammar is contract-bound ([SKILL_CONTRACT.md §2.1](../../SKILL_CONTRACT.md)) and validator-enforced. The craft version:
+
+- **Lead with the trigger, not the topic.** "Use when a frontend page has performance symptoms — flickering, slow loads, janky scroll" beats "Frontend performance analysis." Temporal anchors ("Use when a PR has been merged…", "Use before starting substantive work…") tell the model *at which moment* to reach for the skill.
+- **Describe the situation, never the procedure.** A description that summarizes the workflow ("dispatches lenses, folds findings, checks convergence") becomes a shortcut: the model follows the one-line summary instead of reading the body it abbreviates. State when; let the body say how.
+- **Keep flags out.** `Supports --output github and --auto` is argument documentation, not a trigger — it lives in `argument-hint`. The validator hard-errors on any `--flag` token in a description.
+- **Route away from confusable siblings.** If a user intent could plausibly land on two skills, partition it inside the descriptions: `/quick-commit` ends with "For the full commit-push-PR flow, use /claudna:commit-push-pr" and `/commit-push-pr` points back. The picker then cannot land wrong. Every `/claudna:<name>` reference is CI-checked to resolve.
+- **Use words the model would match on.** Symptoms ("flaky", "stale", "janky scroll"), quoted trigger phrases ("Option A vs B"), and concrete nouns outrank abstractions.
+- **Leave a breadcrumb on renames.** If the skill replaces older ones, end with `Replaces /old-name.` so old muscle memory still resolves.
 
 **`allowed-tools` examples:**
 

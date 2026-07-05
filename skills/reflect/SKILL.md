@@ -1,7 +1,7 @@
 ---
 name: reflect
 user-invocable: true
-description: "Knowledge synthesis — extract process learnings from the current session"
+description: "Use when a session produced process learnings worth keeping — after corrections, surprises, or hard-won fixes — and before compacting a long session. Distills session experience into shared knowledge. For ingesting external content, use /claudna:learn."
 argument-hint: "[--target local|shared] [--notes file]"
 ---
 

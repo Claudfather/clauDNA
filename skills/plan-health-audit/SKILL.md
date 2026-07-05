@@ -1,6 +1,6 @@
 ---
 name: plan-health-audit
-description: "Use when you want to check whether a /forge plan document is structurally complete, internally consistent, and ready for implementation. Catches missing sections, incomplete frontmatter, unsized phases, vague validation criteria, undocumented decision forks, and cross-reference gaps."
+description: "Use when you want to check whether a /claudna:forge plan is structurally complete, internally consistent, and ready for implementation — missing sections, unsized phases, vague validation criteria, undocumented decision forks. Runs standalone or as a lens in the /claudna:ironclad review panel."
 argument-hint: "[plan-file-path] [--dispatch]"
 ---
 

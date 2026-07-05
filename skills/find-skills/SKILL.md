@@ -1,7 +1,7 @@
 ---
 name: find-skills
 user-invocable: true
-description: "Use when the user asks about finding, discovering, or installing agent skills, or asks how to do something that might exist as an installable skill."
+description: "Use when the user asks about finding, discovering, or installing agent skills from the public ecosystem, or asks how to do something that might exist as an installable skill. For raiding a specific repo's patterns into clauDNA, use /claudna:heist."
 requires:
   - cli: npx
     reason: "Node package runner for skills CLI"

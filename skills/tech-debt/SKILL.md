@@ -1,7 +1,7 @@
 ---
 name: tech-debt
 user-invocable: true
-description: "Use when you want to find and plan remediation of technical debt in the codebase. Supports --output github to create issues and --output session for chat-only analysis."
+description: "Use when you want to find and plan remediation of technical debt in a codebase — duplication, dead code, fragile modules, outdated patterns. For a portfolio view across many repos, use /claudna:repo-health."
 argument-hint: "[--auto] [--output github|session] [focus-area]"
 requires:
   - cli: gh

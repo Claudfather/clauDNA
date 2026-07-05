@@ -1,6 +1,6 @@
 ---
 name: ironclad
-description: "Use to harden a plan or review a PR with a panel of independent lenses. Primary target: a §4.1 plan Issue (post-/forge) — `--loops N` runs hardening cycles (dispatch lenses → comments → forge --reforge folds them → convergence). Also reviews implementation PRs. Subagent-only."
+description: "Use to harden a plan or review a PR with a panel of independent lenses — primary target a §4.1 plan Issue produced by /claudna:forge; also reviews implementation PRs. Subagent-only: dispatch it, don't follow it inline."
 argument-hint: "<issue-or-pr-url> [--loops N] [--auto]"
 requires:
   - cli: gh

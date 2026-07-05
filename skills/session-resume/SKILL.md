@@ -1,7 +1,7 @@
 ---
 name: session-resume
 user-invocable: true
-description: "Use at the start of a new session to read <cwd>/.claude/session.md, reap stale items, scan live state, and brief the agent on where to pick up. Counterpart to /session-handoff. --auto for headless callers (Claudlobby bots)."
+description: "Use at the start of a new session to read <cwd>/.claude/session.md, reap stale items, scan live state, and brief the agent on where to pick up. Counterpart to /claudna:session-handoff."
 allowed-tools: Bash(git *), Bash(gh *), Bash(stat *), Bash(ls *), Bash(grep *), Bash(mv *), Bash(mkdir *), Read, Write, Glob
 argument-hint: "[--auto]"
 ---

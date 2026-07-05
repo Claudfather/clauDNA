@@ -1,7 +1,7 @@
 ---
 name: security-audit
 user-invocable: true
-description: "Use when you want to check the codebase for security vulnerabilities and get remediation plans. Supports --output github to create issues and --output session for chat-only analysis."
+description: "Use when you want to check the codebase for security vulnerabilities — injection, authentication and authorization flaws, secrets exposure, unsafe dependencies — and get remediation plans."
 argument-hint: "[--auto] [--output github|session] [focus-area]"
 ---
 

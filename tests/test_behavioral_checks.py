@@ -19,8 +19,11 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from skill_checks import (
     check_allowed_tools_usage,
     check_auto_no_ask_user,
+    check_description_grammar,
+    check_description_trigger_convention,
     check_no_raw_gh_commands,
     check_output_github_reference,
+    check_skill_references,
     validate_skill_md,
     warn_skill_md,
 )
@@ -261,6 +264,122 @@ class TestValidateSkillMdBehavioral:
             assert errors == []
         finally:
             path.unlink()
+
+
+# --- check_description_grammar ---
+
+
+class TestDescriptionGrammar:
+    def test_clean_trigger_description_passes(self):
+        fm = {"description": "Use when tests have race conditions or timing dependencies."}
+        assert check_description_grammar(fm, "body") == []
+
+    def test_flag_token_fails(self):
+        fm = {"description": "Audits the codebase. Supports --output github and --auto."}
+        errors = check_description_grammar(fm, "body")
+        assert len(errors) == 1
+        assert "--output" in errors[0]
+        assert "argument-hint" in errors[0]
+
+    def test_single_flag_token_fails(self):
+        fm = {"description": "Use at session end to write a handoff. --auto for headless callers."}
+        errors = check_description_grammar(fm, "body")
+        assert len(errors) == 1
+        assert "--auto" in errors[0]
+
+    def test_spaced_double_hyphen_em_dash_passes(self):
+        # " -- " used as an em-dash is prose, not a flag token.
+        fm = {"description": "Use when you need dbt commands -- build, test, compile -- against Snowflake."}
+        assert check_description_grammar(fm, "body") == []
+
+    def test_missing_description_ignored(self):
+        assert check_description_grammar({}, "body") == []
+
+    def test_non_string_description_ignored(self):
+        assert check_description_grammar({"description": 42}, "body") == []
+
+
+# --- check_description_trigger_convention (advisory) ---
+
+
+class TestDescriptionTriggerConvention:
+    def test_use_when_passes(self):
+        fm = {"description": "Use when a frontend page has performance symptoms."}
+        assert check_description_trigger_convention(fm, "body") == []
+
+    def test_use_at_passes(self):
+        fm = {"description": "Use at the end of a session to write a handoff file."}
+        assert check_description_trigger_convention(fm, "body") == []
+
+    def test_label_style_warns(self):
+        fm = {"description": "Knowledge ingestion -- pull content from external sources."}
+        warnings = check_description_trigger_convention(fm, "body")
+        assert len(warnings) == 1
+        assert "Use " in warnings[0]
+
+    def test_missing_description_ignored(self):
+        assert check_description_trigger_convention({}, "body") == []
+
+
+# --- check_skill_references ---
+
+
+class TestSkillReferences:
+    VALID = {"publish", "implement-plan", "review-pr"}
+
+    def test_known_reference_passes(self):
+        text = "Route the doc via /claudna:publish, then /claudna:implement-plan builds it."
+        assert check_skill_references(text, self.VALID) == []
+
+    def test_unknown_reference_fails(self):
+        text = "Hand off to /claudna:nonexistent-skill for the next step."
+        errors = check_skill_references(text, self.VALID)
+        assert len(errors) == 1
+        assert "nonexistent-skill" in errors[0]
+
+    def test_placeholder_not_matched(self):
+        # Authoring docs use /claudna:<skill-name> placeholders; not a real reference.
+        text = "Invoke it as /claudna:<skill-name> once created."
+        assert check_skill_references(text, self.VALID) == []
+
+    def test_repeated_unknown_reference_deduplicated(self):
+        text = "See /claudna:ghost-skill. Then /claudna:ghost-skill again. And /claudna:ghost-skill."
+        errors = check_skill_references(text, self.VALID)
+        assert len(errors) == 1
+
+    def test_bare_prefix_form_matched(self):
+        # `claudna:review-pr` without the leading slash still counts as a reference.
+        text = "The claudna:missing-thing skill handles that."
+        errors = check_skill_references(text, {"review-pr"})
+        assert len(errors) == 1
+        assert "missing-thing" in errors[0]
+
+
+# --- validate_skill_md picks up description grammar ---
+
+
+class TestValidateSkillMdDescriptionGrammar:
+    def test_flag_in_description_error_in_validate(self):
+        body = "x" * 250
+        with tempfile.TemporaryDirectory() as d:
+            skill = Path(d) / "SKILL.md"
+            skill.write_text(
+                '---\nname: test-skill\ndescription: "Use when auditing. Supports '
+                '--output github for issues."\n---\n' + body
+            )
+            errors = validate_skill_md(skill, dir_name="test-skill")
+            assert any("--output" in e for e in errors)
+
+    def test_clean_description_no_grammar_error(self):
+        body = "x" * 250
+        with tempfile.TemporaryDirectory() as d:
+            skill = Path(d) / "SKILL.md"
+            skill.write_text(
+                '---\nname: test-skill\ndescription: "Use when you want a compliant '
+                'description with no flag tokens."\n---\n' + body
+            )
+            errors = validate_skill_md(skill, dir_name="test-skill")
+            assert not any("argument-hint" in e for e in errors)
 
 
 # --- warn_skill_md integration ---

@@ -12,6 +12,8 @@ Found a skill that errors out, a hook that misfires, or incorrect documentation?
 
 Have a workflow that would benefit from a dedicated skill? [Open a skill request](https://github.com/Claudfather/clauDNA/issues/new?template=skill-request.yml). Describe the use case, when the skill should trigger, and what the output should look like.
 
+Before requesting, ask whether the capability could be a lens or mode inside an existing skill — clauDNA treats skills as thinking frameworks, not SKUs, and favors consolidation over new entries (see the Design Philosophy in the [README](./README.md#design-philosophy)).
+
 ### Suggest an Improvement
 
 See a way to make an existing skill better? [Open an improvement issue](https://github.com/Claudfather/clauDNA/issues/new?template=improvement.yml). Point to the skill, explain what's wrong or missing, and propose a fix.
