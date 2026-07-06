@@ -172,7 +172,7 @@ All §4.1 sections are mandatory — `/claudna:publish` rejects a `type: plan` d
 
 ## Phase 3: Pre-flight (structural self-check)
 
-Forge does **not** run the review panel — that's `/ironclad`'s job. `/ironclad <issue> --loops N` dispatches the lenses (`adversarial-review`, `first-principles`, `extension-check`, `precedent-check`, `plan-health-audit`, `cost-benefit`) as parallel subagents and drives convergence. Forge's pre-flight is only the minimal structural check that keeps cycle-1 ironclad from being wasted on trivial defects:
+Forge does **not** run the review panel — that's `/ironclad`'s job. `/ironclad <issue> --loops N` dispatches the lenses (`adversarial-review`, `align-to-mission`, `first-principles`, `extension-check`, `precedent-check`, `plan-health-audit`, `cost-benefit` — ironclad's Phase-3 table is the single source of truth) as parallel subagents and drives convergence. Forge's pre-flight is only the minimal structural check that keeps cycle-1 ironclad from being wasted on trivial defects:
 
 1. **Skeleton present** — every §4.1 section exists in each doc (publish rejects a `plan` doc missing `## Implementation Plan` / `### Steps`).
 2. **Claims verified** — every `## Evidence` claim checks out against the codebase (paths exist, symbols match). Forge read the code in Phase 1; confirm it didn't drift.
