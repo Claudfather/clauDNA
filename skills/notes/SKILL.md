@@ -1,7 +1,7 @@
 ---
 name: notes
 user-invocable: true
-description: "Use when you want to save, read, or organize persistent notes across Claude sessions."
+description: "Use when you want to save, read, or organize persistent notes across Claude sessions. For capturing corrections as reusable lessons, use /claudna:lessons."
 ---
 
 # Notes Manager

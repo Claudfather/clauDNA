@@ -1,7 +1,7 @@
 ---
 name: review-changes
 user-invocable: true
-description: "Use when you have uncommitted changes and want them reviewed before committing."
+description: "Use when you have uncommitted changes and want them reviewed before committing. For a pull request that is already open, use /claudna:review-pr."
 ---
 
 # Review Changes

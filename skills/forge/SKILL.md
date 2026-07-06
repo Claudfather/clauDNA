@@ -1,7 +1,7 @@
 ---
 name: forge
 user-invocable: true
-description: "Use when planning a workstream that spans multiple PRs, involves decision forks, or needs structured phasing before implementation. The general-purpose planning lens: authors a §4.1 plan via /claudna:publish, which /ironclad --loops then hardens to convergence and /implement-plan builds. Also applies when writing a technical spec, design document, initiative roadmap, or pre-implementation proposal."
+description: "Use when planning a workstream that spans multiple PRs, involves decision forks, or needs structured phasing before implementation — a technical spec, design document, initiative roadmap, or pre-implementation proposal. Not for single-PR changes with an obvious path; plain plan mode covers those."
 argument-hint: "[topic-or-issue-url] [--output github|docs|session] [--auto]"
 ---
 

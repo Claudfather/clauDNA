@@ -1,7 +1,7 @@
 ---
 name: product-vision
 user-invocable: true
-description: "Architecture-aware product vision — explores what a codebase could become by analyzing existing infrastructure, identifying 1-2 hop features, grouping compound plays, and aligning to a project mission. Replaces /product-brainstorm. Supports --auto and --output github."
+description: "Use when you want to explore what a codebase could become — candidate features one or two hops from existing infrastructure, compound plays, and a trajectory aligned to the project mission. For triaging known issues in an existing product, use /claudna:product-enhance. Replaces /product-brainstorm."
 argument-hint: "[--auto] [--output github|session] [focus-area]"
 ---
 

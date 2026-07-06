@@ -1,7 +1,7 @@
 ---
 name: publish
 user-invocable: true
-description: "Output adapter for shared docs. Takes a markdown file with frontmatter and publishes it to a destination: disk (shared docs directory), GitHub issue, GitHub PR description, the chat session, or a Notion page."
+description: "Use when a finished markdown document — plan, audit or review findings, retro, decision, or knowledge page — needs to reach its destination: shared docs on disk, a GitHub issue, a PR description, the chat session, or a Notion page. The single output sink: skills author content, publish delivers it."
 argument-hint: "<source-file> [--to disk|github-issue|github-pr|session|notion] [--repo <name>] [--dry-run]"
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: access-path-audit
 user-invocable: true
-description: "Use when you want to evaluate whether a system's interfaces (API, CLI, Slack, MCP, SDK, workers) consistently enforce cross-cutting concerns and whether those concerns live at the correct architectural layer. Supports --output github to create issues and --output session for chat-only analysis."
+description: "Use when you want to evaluate whether a system's interfaces (API, CLI, Slack, MCP, SDK, workers) consistently enforce cross-cutting concerns — auth, validation, rate limiting, logging — and whether those concerns live at the correct architectural layer."
 argument-hint: "[--auto] [--output github|session] [focus-area]"
 ---
 

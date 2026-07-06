@@ -1,7 +1,7 @@
 ---
 name: repo-health
 user-invocable: true
-description: "Use when you want a birds-eye view across multiple repositories to decide where to spend your time. Supports --output github to create issues and --output session for chat-only analysis."
+description: "Use when you want a birds-eye view across multiple repositories to decide where to spend your time — activity, staleness, CI health, and open work. For depth on a single codebase's debt, use /claudna:tech-debt."
 argument-hint: "[--output github|session] [parent-directory]"
 requires:
   - cli: gh

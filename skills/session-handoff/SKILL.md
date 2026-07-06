@@ -1,7 +1,7 @@
 ---
 name: session-handoff
 user-invocable: true
-description: "Use at the end of a session to write a per-cwd handoff file (<cwd>/.claude/session.md) capturing live state, activity, decisions, open questions, and next steps. Reaps stale items on write. Counterpart to /session-resume. --auto for headless callers."
+description: "Use at the end of a session to write a per-cwd handoff file (<cwd>/.claude/session.md) capturing live state, activity, decisions, open questions, and next steps. Reaps stale items on write. Counterpart to /claudna:session-resume."
 allowed-tools: Bash(git *), Bash(gh *), Bash(ls *), Bash(wc *), Bash(date *), Bash(grep *), Bash(mv *), Bash(mkdir *), Read, Write, Edit, Glob
 argument-hint: "[--auto]"
 ---

@@ -1,7 +1,7 @@
 ---
 name: weigh-development-paths
 user-invocable: true
-description: "Use when at a development junction with multiple viable approaches — architecture choices, refactoring strategies, where to put new code, or which pattern to follow. Triggers on 'which approach', 'how should I', 'Option A vs B', or any point where the next step isn't obvious and the wrong choice creates rework. Supports --output github to create issues and --output session for chat-only analysis."
+description: "Use when at a development junction with multiple viable approaches — architecture choices, refactoring strategies, where to put new code, or which pattern to follow. Triggers on 'which approach', 'how should I', 'Option A vs B', or any point where the next step isn't obvious and the wrong choice creates rework."
 argument-hint: "[--auto] [--output github|session] [junction-description-or-bundle-path]"
 ---
 

@@ -11,3 +11,5 @@
 *.p8
 *.pem
 *.key
+__pycache__/
+*.pyc

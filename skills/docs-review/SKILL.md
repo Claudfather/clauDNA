@@ -1,7 +1,7 @@
 ---
 name: docs-review
 user-invocable: true
-description: "Use when project documentation may be stale, inaccurate, or incomplete and needs a thorough audit against the codebase. Supports --auto for non-interactive audits, --output github for issue creation, and --output session for chat-only analysis."
+description: "Use when project documentation may be stale, inaccurate, or incomplete and needs a thorough audit against the codebase — READMEs that drifted, setup guides that no longer work, dead links, undocumented behavior."
 argument-hint: "[--auto] [--output github|session] [scope-path]"
 ---
 

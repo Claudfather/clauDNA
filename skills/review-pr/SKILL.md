@@ -1,7 +1,7 @@
 ---
 name: review-pr
 user-invocable: true
-description: "Use when you need to review a pull request -- yours or someone else's -- before merging."
+description: "Use when you need to review a pull request -- yours or someone else's -- before merging. For uncommitted local changes, use /claudna:review-changes."
 argument-hint: "[PR number or URL]"
 requires:
   - cli: gh

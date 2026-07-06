@@ -1,6 +1,6 @@
 ---
 name: extension-check
-description: "Use when you want to verify that a plan or implementation PR isn't duplicating existing codebase abstractions. For every new component proposed, checks whether an existing one should be extended instead. Catches parallel implementations, redundant patterns, naming convention drift, and codebase sprawl."
+description: "Use when you want to verify that a plan or implementation PR isn't duplicating existing codebase abstractions — parallel implementations, redundant patterns, naming drift, sprawl where an existing component should have been extended. Runs standalone or as a lens in the /claudna:ironclad review panel."
 argument-hint: "[plan-or-source-path] [--dispatch]"
 ---
 

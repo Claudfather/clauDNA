@@ -1,7 +1,7 @@
 ---
 name: worktree
 user-invocable: true
-description: "Use when you want to run multiple Claude sessions in parallel on different branches using git worktrees."
+description: "Use when starting feature work that needs isolation from the current workspace, or when running multiple Claude sessions in parallel on different branches — creates and manages git worktrees."
 ---
 
 # Git Worktree Manager

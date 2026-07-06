@@ -1,6 +1,6 @@
 ---
 name: first-principles
-description: "Use when you want to step back from a plan's proposed solution and assess whether the right problem is being solved the right way. Catches plans that extend suboptimal foundations, introduce accidental complexity, or miss simpler alternatives."
+description: "Use when you want to step back from a plan's proposed solution and assess whether the right problem is being solved the right way. Catches plans that extend suboptimal foundations, introduce accidental complexity, or miss simpler alternatives. Runs standalone or as a lens in the /claudna:ironclad review panel."
 argument-hint: "[plan-file-path] [--dispatch]"
 ---
 

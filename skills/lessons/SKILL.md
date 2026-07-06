@@ -1,7 +1,7 @@
 ---
 name: lessons
 user-invocable: true
-description: "Use when Claude has been corrected and the lesson should be captured, or when you want to review past lessons."
+description: "Use when Claude has been corrected and the lesson should be captured, or when you want to review past lessons. For freeform cross-session notes, use /claudna:notes."
 ---
 
 # Lessons Manager

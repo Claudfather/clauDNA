@@ -32,9 +32,15 @@ For bots, CI runners, and Docker images, drop a `settings.json` with `enabledPlu
 
 | Directory | Count | Contents |
 |-----------|-------|----------|
-| `skills/` | 52 | User-invocable slash commands |
+| `skills/` | 61 | User-invocable slash commands |
 | `agents/` | 8 | `snowflake-analyst`, `dbt-engineer`, `neon-analyst`, `modal-ops`, `railway-ops`, `vercel-ops`, `code-reviewer`, `spec-reviewer` |
-| `plugin-hooks/` | 3 active + 1 opt-in | Auto-format on Write/Edit, pretooluse permission expansion, macOS notifications. (`statusline.sh` is opt-in — see [SETUP_GUIDE §3.2](./SETUP_GUIDE.md#32-statusline-optional).) Named `plugin-hooks/` to avoid a Claude Code bug that deletes any project-root `hooks/` directory between tool calls. |
+| `plugin-hooks/` | 5 wired + 1 opt-in | Auto-format on Write/Edit, PreToolUse permission expansion, PreCompact reflect gate, opt-in skill telemetry, macOS notifications. (`statusline.sh` is opt-in — see [SETUP_GUIDE §3.2](./SETUP_GUIDE.md#32-statusline-optional).) Named `plugin-hooks/` to avoid a Claude Code bug that deletes any project-root `hooks/` directory between tool calls. |
+
+## Design Philosophy
+
+**Skills are thinking frameworks, not SKUs.** Before adding a new skill, ask: can this be a lens or mode inside an existing skill? Every skill description loads into every session, so fragmenting one capability into per-action skills bloats context and hides the framework the agent should be thinking in. Prefer one skill with modes over N near-duplicates — `/adversarial-review` runs single, dispatch, and respond modes; `/ironclad` fields an entire review panel through one entry point.
+
+**Descriptions are routing surfaces.** The `description` field is what the model reads when choosing a skill, so it states *when to reach for the skill*, never how the skill works internally: trigger conditions first, confusable siblings disambiguated in place ("For X, use /claudna:Y"), CLI flags documented only in `argument-hint`. The grammar is contract-bound and validator-enforced — see [SKILL_CONTRACT.md §2.1](./SKILL_CONTRACT.md).
 
 ## Skills
 

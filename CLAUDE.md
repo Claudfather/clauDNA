@@ -33,6 +33,11 @@ scripts/
 
 - **Bots / CI / Docker (declarative):** drop a `settings.json` with `enabledPlugins` + `extraKnownMarketplaces`, set `CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1`, run `claude -p`. Full recipe in [SETUP_GUIDE §4](./SETUP_GUIDE.md#4-headless--ci--docker-provisioning).
 
+## Design Philosophy
+
+- **Skills are thinking frameworks, not SKUs.** Before adding a skill, ask whether it can be a lens or mode inside an existing skill — consolidation over fragmentation. Every skill description loads into every session; each one must earn its context cost.
+- **Descriptions are routing surfaces.** State when to use the skill (trigger conditions first), name the confusable sibling ("For X, use /claudna:Y"), keep CLI flags in `argument-hint`, and never summarize the skill's workflow in its description — the model follows the summary instead of reading the body. Grammar is contract-bound: [SKILL_CONTRACT.md §2.1](./SKILL_CONTRACT.md).
+
 ## Rules
 
 ### Don't

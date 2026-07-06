@@ -15,6 +15,7 @@ from pathlib import Path
 
 from skill_checks import (
     STALE_PATH_RE,
+    collect_skill_reference_errors,
     get_touched_skills,
     parse_frontmatter,
     validate_skill_md,
@@ -46,6 +47,7 @@ def main() -> int:
             print("CI mode: no skills touched in this PR — all errors reported as warnings\n")
 
     skill_dirs = sorted(p for p in SKILLS_DIR.iterdir() if p.is_dir() and p.name not in SKIP_DIRS)
+    valid_names = {p.name for p in skill_dirs}
 
     all_errors: dict[str, list[str]] = {}
     all_warnings: dict[str, list[str]] = {}
@@ -80,6 +82,17 @@ def main() -> int:
                     else:
                         seen_names[fm_name] = name
 
+        # Cross-skill reference integrity: every claudna:<name> mention in this
+        # skill's markdown (SKILL.md + support files) must resolve to a real skill.
+        # Registered as cross-skill errors with the TARGET as a participant: a PR
+        # that deletes skills/<target>/ marks only <target> as touched, so
+        # referrer-keyed errors would demote to warnings in CI — exactly the
+        # deletion scenario this check exists to block.
+        for md_file in sorted(skill_dir.rglob("*.md")):
+            rel = md_file.relative_to(skill_dir)
+            for target, msg in collect_skill_reference_errors(md_file.read_text(), valid_names):
+                cross_skill_errors.append(({name, target}, name, f"{rel}: {msg}"))
+
         if errors:
             all_errors[name] = errors
 
@@ -88,14 +101,24 @@ def main() -> int:
         if warnings:
             all_warnings[name] = warnings
 
-    # Lint _shared files for stale paths
+    # Lint _shared files for stale paths and dangling skill references.
+    # _shared reference errors join cross_skill_errors keyed on the TARGET
+    # alone ("_shared/<file>" is never in the touched set, so referrer-keyed
+    # errors there would always demote in CI).
     shared_dir = SKILLS_DIR / "_shared"
     if shared_dir.is_dir():
-        for md_file in sorted(shared_dir.glob("*.md")):
+        for md_file in sorted(shared_dir.rglob("*.md")):
             text = md_file.read_text()
-            stale_lines = [line.strip() for line in text.splitlines() if STALE_PATH_RE.search(line)]
-            if stale_lines:
-                all_errors[f"_shared/{md_file.name}"] = [f"stale hardcoded path: {line}" for line in stale_lines]
+            shared_key = f"_shared/{md_file.relative_to(shared_dir)}"
+            stale_errors = [
+                f"stale hardcoded path: {line.strip()}"
+                for line in text.splitlines()
+                if STALE_PATH_RE.search(line)
+            ]
+            if stale_errors:
+                all_errors[shared_key] = stale_errors
+            for target, msg in collect_skill_reference_errors(text, valid_names):
+                cross_skill_errors.append(({target}, shared_key, msg))
 
     total_skills = len(skill_dirs) - len(SKIP_SKILLS)
 
