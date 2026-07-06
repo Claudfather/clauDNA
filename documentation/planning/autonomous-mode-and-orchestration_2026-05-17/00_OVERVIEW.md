@@ -1,7 +1,7 @@
 ---
 title: Autonomous Mode & Orchestration — Implementation Plan Overview
 type: plan
-status: draft
+status: ✅ COMPLETE
 owner: chrisrogers37
 created: 2026-05-17
 tags: [autonomous-mode, orchestration, planning, overview]
@@ -10,6 +10,14 @@ links: []
 ---
 
 # Autonomous Mode & Orchestration — Implementation Plan Overview
+
+> **✅ COMPLETE (verified 2026-07-06 docs audit).** All four phases shipped, three within a day or two of this plan's authoring:
+> - **Phase 1** (`01_phase1-contract-and-shape.md`) — ✅ 100%, PR #85, merged 2026-05-18 (next day). The §10.C structured-result contract is still load-bearing today — later skills that didn't exist yet (`/forge`, `/ironclad --auto`) adopted it. One divergence: `/adversarial-review --dispatch` moved from this plan's JSON shape to markdown+YAML frontmatter (PR #130, 2026-06-02) to feed `/ironclad`'s multi-lens convergence loop — a superseding wire format, not a gap.
+> - **Phase 2** (`02_phase2-discipline-chains.md`) — ✅ 100%, PR #86, merged 2026-05-18. Later DRY'd from ~40-line inline procedures per skill down to a shared `skills/_shared/pre-handoff-checklist.md` reference; functional contract unchanged.
+> - **Phase 3** (`03_phase3-implement-plan-auto.md`) — ✅ 100%, PR #87, merged 2026-05-19. Every deliverable verified present in `skills/implement-plan/SKILL.md`. One documentation gap: no on-record smoke-test results for Task 14's end-to-end chain test.
+> - **Phase 4** (`04_phase4-claudlobby-wrapper.md`) — ✅ ~90%, shipped in Claudlobby the same day via Claudfather/Claudlobby#278 and #279. One task (end-to-end validation deployment) deliberately deferred to open tracker issue **Claudfather/Claudlobby#294**.
+>
+> Strong candidate for archival to `documentation/archive/` as a directory once Claudlobby#294 is resolved or explicitly deprioritized — see each phase doc for full evidence.
 
 > **For implementing teams:** read `documentation/specs/2026-05-17-autonomous-mode-and-orchestration-design.md` before starting any phase. This overview names the phases, their deliverables, dependency order, and which repo each lives in.
 

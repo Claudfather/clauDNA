@@ -14,7 +14,7 @@ Every skill lives under `skills/<name>/`. The directory contents:
 |---|---|---|
 | `SKILL.md` | **Yes** | The skill itself — frontmatter + procedural body |
 | `<topic>.md` | Optional | Supporting reference files referenced from `SKILL.md` (e.g. `subagent-prompts.md`, `audit-checklist.md`, `severity-categories.md`) |
-| `references/` | Optional | Subdirectory for grouped reference material (used by `context-resume`, `session-handoff`) |
+| `references/` | Optional | Subdirectory for grouped reference material (used by `session-resume`, `session-handoff`) |
 
 Hard rules:
 - The directory **name** is the skill's slash-command name (e.g. `/tech-debt` lives at `skills/tech-debt/`).

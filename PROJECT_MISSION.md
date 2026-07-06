@@ -37,11 +37,13 @@ Materially smarter Claude Code with one install.
 
 ## Current sprint focus
 
-1. Restructure the repo to match Claude Code marketplace plugin requirements
-2. Audit existing skills for v0.1 inclusion — promote keepers, archive the rest
-3. Ship v0.1 of the marketplace plugin with manual curation
-4. Define the release cadence and changelog format
-5. Establish the input contract from Claudosseum: what does a "promoted skill" look like, and how does it land in clauDNA?
+> **Docs audit note (2026-07-06):** Items 1–4 are done — the repo is a working v0.6.1 marketplace plugin with 61 curated skills. This list reads as v0.1-era bring-up work; see the open question at the end of this file about what should replace it.
+
+1. ✅ COMPLETE — Restructure the repo to match Claude Code marketplace plugin requirements
+2. ✅ COMPLETE — Audit existing skills for v0.1 inclusion — promote keepers, archive the rest
+3. ✅ COMPLETE — Ship v0.1 of the marketplace plugin with manual curation (now at v0.6.1)
+4. ✅ COMPLETE — Define the release cadence and changelog format
+5. Establish the input contract from Claudosseum: what does a "promoted skill" look like, and how does it land in clauDNA? *(status unclear from this repo alone — may still be open, or may be tracked in Claudosseum's own repo)*
 
 > Standing permissions and approval gates for agents working in this repo live in [CLAUDE.md § Rules](./CLAUDE.md#rules).
 

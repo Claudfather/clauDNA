@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-10
 **Skill name:** `adversarial-review`
-**Directory:** `global/skills/adversarial-review/`
+**Directory:** `skills/adversarial-review/`
 **Pattern:** Read-only diagnostic with optional `--dispatch` for multi-reviewer mode, optional `--output github` for issue filing
 
 ## Purpose

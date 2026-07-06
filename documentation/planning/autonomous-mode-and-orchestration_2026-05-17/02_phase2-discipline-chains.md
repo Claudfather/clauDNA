@@ -1,13 +1,15 @@
 ---
 title: Phase 2 — clauDNA Discipline Chains
 type: plan
-status: draft
+status: ✅ COMPLETE
 owner: chrisrogers37
 created: 2026-05-17
 tags: [autonomous-mode, phase-2, adversarial-review, simplify, discipline-chains]
 repos: [clauDNA]
 links: []
 ---
+
+> **✅ COMPLETE (verified 2026-07-06 docs audit).** All 14 tasks shipped via PR #86 ("Phase 2: clauDNA discipline chains (adversarial-review + /simplify)", merged as `31accf6`; tracked as Claudfather/clauDNA#83 — see `CHANGELOG.md:100-109`). Every deliverable is present in the current codebase: `skills/_shared/subagent-prompts/adversarial-chain.md` and `simplify-chain.md` exist; all 6 planning skills (`tech-debt`, `security-audit`, `product-enhance`, `frontend-performance-audit`, `docs-review`, `access-path-audit`) have an "Adversarial Review Pass" section; `/implement-plan` has Step 3A/3B and Step 6.5; `challenge-round-questions.md` has the concern-area alignment note. **One shape change since shipping:** the later forge/ironclad unification (`skills/_shared/contracts/lens-result-contract.md`, PRs #130/#132) migrated `/adversarial-review --dispatch`'s output from the JSON `artifacts.findings` shape this plan specified to a markdown+YAML-frontmatter format, and extracted the 6 planning skills' inline "Adversarial Review Pass" procedure into a shared `skills/_shared/pre-handoff-checklist.md` (each skill's section is now a 2-3 line reference instead of the ~40-line inline block this plan wrote). The functional contract — findings fold into an `## Adversarial Review Findings` checklist that `/implement-plan` Step 3A / Step 3-AUTO consumes — is unchanged. See per-task notes below for specifics.
 
 # Phase 2 Implementation Plan — clauDNA Discipline Chains
 
@@ -54,6 +56,8 @@ links: []
 
 ## Task 1: Read source files
 
+**✅ COMPLETE** — prep step; confirmed by all downstream tasks (2-14) having shipped.
+
 **Files:**
 - Read: All Phase 2 files listed above (current state)
 - Read: `skills/_shared/orchestration-guide.md` (Phase 1 just updated it — review the §10.C structured result shape)
@@ -91,6 +95,8 @@ No commit for Task 1.
 ---
 
 ## Task 2: Create the shared adversarial-chain dispatch prompt
+
+**✅ COMPLETE, then reshaped** — `skills/_shared/subagent-prompts/adversarial-chain.md` exists (101 lines). The dispatch prompt's return format was later updated (`CHANGELOG.md:50-51`) from this task's JSON `artifacts.findings` shape to a markdown document with YAML frontmatter per `skills/_shared/contracts/lens-result-contract.md` (`adversarial-chain.md:21-52`). The "concern area vocabulary" and "folding findings into the plan body" sections this task designed are otherwise intact almost verbatim.
 
 **Files:**
 - Create: `skills/_shared/subagent-prompts/adversarial-chain.md`
@@ -233,6 +239,8 @@ EOF
 
 ## Task 3: Create the shared simplify-chain dispatch prompt
 
+**✅ COMPLETE** — `skills/_shared/subagent-prompts/simplify-chain.md` exists, content matches this task's spec near-verbatim. Note: it still references `AskUserQuestion` by name (line 40) even though `skills/implement-plan/SKILL.md` itself has since generalized to "interactive question prompt" wording — minor terminology drift, not a functional gap.
+
 **Files:**
 - Create: `skills/_shared/subagent-prompts/simplify-chain.md`
 
@@ -317,6 +325,8 @@ git commit -m "docs: add shared simplify-chain dispatch prompt"
 
 ## Task 4: Add adversarial-review chain to `tech-debt`
 
+**✅ COMPLETE, then DRY'd up** — `skills/tech-debt/SKILL.md:217-219` has `## Phase 2.5: Adversarial Review Pass`, now a 3-line reference to `skills/_shared/pre-handoff-checklist.md` rather than this task's ~45-line inline procedure. Same outcome (findings folded into the doc), less duplication.
+
 **Files:**
 - Modify: `skills/tech-debt/SKILL.md`
 
@@ -399,6 +409,8 @@ EOF
 
 ## Task 5: Add adversarial-review chain to `security-audit`
 
+**✅ COMPLETE, then DRY'd up** — `skills/security-audit/SKILL.md:110-112` has the same reference-to-`pre-handoff-checklist.md` pattern as Task 4.
+
 **Files:**
 - Modify: `skills/security-audit/SKILL.md`
 
@@ -465,6 +477,8 @@ git commit -m "feat(security-audit): add adversarial-review chain after plan gen
 
 ## Task 6: Add adversarial-review chain to `product-enhance`
 
+**✅ COMPLETE, then DRY'd up** — `skills/product-enhance/SKILL.md:135-137` (`### Step 5.5: Adversarial Review Pass`), same reference-to-`pre-handoff-checklist.md` pattern as Task 4.
+
 **Files:**
 - Modify: `skills/product-enhance/SKILL.md`
 
@@ -528,6 +542,8 @@ git commit -m "feat(product-enhance): add adversarial-review chain after design 
 ---
 
 ## Task 7: Add adversarial-review chain to `frontend-performance-audit`
+
+**✅ COMPLETE, then DRY'd up** — `skills/frontend-performance-audit/SKILL.md:87-89` (`## Phase 4.5: Adversarial Review Pass`), same reference-to-`pre-handoff-checklist.md` pattern as Task 4.
 
 **Files:**
 - Modify: `skills/frontend-performance-audit/SKILL.md`
@@ -602,6 +618,8 @@ git commit -m "feat(frontend-performance-audit): add adversarial-review chain af
 
 ## Task 8: Add adversarial-review chain to `docs-review`
 
+**✅ COMPLETE, then DRY'd up** — `skills/docs-review/SKILL.md:130-132` (`### Step 5.5: Adversarial Review Pass on Gap Proposals`), same reference-to-`pre-handoff-checklist.md` pattern as Task 4, with the docs-review-specific gap-proposal adaptation this task specified still called out inline.
+
 **Files:**
 - Modify: `skills/docs-review/SKILL.md`
 
@@ -674,6 +692,8 @@ git commit -m "feat(docs-review): add adversarial-review chain on gap proposals"
 
 ## Task 9: Add adversarial-review chain to `access-path-audit`
 
+**✅ COMPLETE, then DRY'd up** — `skills/access-path-audit/SKILL.md:221-223` (`## Phase 2.5: Adversarial Review Pass`), same reference-to-`pre-handoff-checklist.md` pattern as Task 4.
+
 **Files:**
 - Modify: `skills/access-path-audit/SKILL.md`
 
@@ -734,6 +754,8 @@ git commit -m "feat(access-path-audit): add adversarial-review chain after plan 
 ---
 
 ## Task 10: Revise `/implement-plan` Step 3 (split into 3A/3B per design §5.5.1)
+
+**✅ COMPLETE** — `skills/implement-plan/SKILL.md:643` (`#### Step 3A: Seed with open adversarial-review findings`) and `:671` (`#### Step 3B: Matrix-driven challenge round`) present, matching this task's design almost verbatim. (Phase 3 later added a "Step 3-AUTO" branch — `SKILL.md:539` — ahead of 3A/3B for `--auto` mode; additive, not a change to this task's interactive-mode work.)
 
 **Files:**
 - Modify: `skills/implement-plan/SKILL.md`
@@ -876,6 +898,8 @@ EOF
 
 ## Task 11: Add Step 6.5 (Simplification Pass) to `/implement-plan`
 
+**✅ COMPLETE** — `skills/implement-plan/SKILL.md:762-832` `### Step 6.5: Simplification Pass` present: trigger condition (>50 LOC or >2 files), separate-commit procedure, and interactive-vs-`--auto` regression handling all match this task's spec. (Phase 3 additively appended a "verification still fails after revert" edge case at `SKILL.md:819`.)
+
 **Files:**
 - Modify: `skills/implement-plan/SKILL.md`
 
@@ -983,6 +1007,8 @@ EOF
 ---
 
 ## Task 12: Update the implement-plan flowchart for new steps
+
+**✅ COMPLETE** — the DOT block in `skills/implement-plan/SKILL.md` contains `step3a`, `step3b`, `step6_5`, `simplify_pass`, `simplify_revert` nodes exactly as this task specifies (since merged with Phase 3's additional `--auto`-branch nodes into one combined flowchart).
 
 **Files:**
 - Modify: `skills/implement-plan/SKILL.md` (the graphviz Process Flow section)
@@ -1095,6 +1121,8 @@ git commit -m "docs(implement-plan): update flowchart for Step 3A/3B split and S
 
 ## Task 13: Update `challenge-round-questions.md` with concern-area alignment note
 
+**✅ COMPLETE** — `skills/implement-plan/challenge-round-questions.md:7` has `## Note: Concern-Area Alignment`, matching this task's text.
+
 **Files:**
 - Modify: `skills/implement-plan/challenge-round-questions.md`
 
@@ -1137,6 +1165,8 @@ git commit -m "docs(implement-plan): note concern-area alignment between matrix 
 
 ## Task 14: Update CHANGELOG.md
 
+**✅ COMPLETE** — `CHANGELOG.md:100-109` documents Phase 2 ("Discipline chains — Phase 2 of the autonomous-mode-and-orchestration rollout", Claudfather/clauDNA#83), in the engineer's own words rather than this task's suggested boilerplate, with a direct PR reference.
+
 **Files:**
 - Modify: `CHANGELOG.md`
 
@@ -1168,6 +1198,8 @@ git commit -m "docs(changelog): record Phase 2 discipline chain additions"
 ---
 
 ## Phase 2 Verification
+
+**✅ COMPLETE** — re-ran this section's own checks against the current repo (2026-07-06): `python3 scripts/validate-skills.py` → "OK: 61 skills validated, no blocking violations"; all 6 planning skills print `1` for `grep -c "Adversarial Review Pass"`; `grep -c` for `"Step 3A:"` / `"Step 3B:"` / `"Step 6.5:"` on `implement-plan/SKILL.md` each print `2` (heading + flowchart node label — stronger than the "expected: 1" this doc predicted, since Phase 3 later cross-referenced these steps too); both shared dispatch prompts exist. Shipped and merged as PR #86 (`31accf6`).
 
 - [ ] **Step 1: Run the validator**
 

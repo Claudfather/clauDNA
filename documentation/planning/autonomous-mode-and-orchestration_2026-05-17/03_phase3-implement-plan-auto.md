@@ -1,13 +1,15 @@
 ---
 title: Phase 3 — /implement-plan --auto mode
 type: plan
-status: draft
+status: ✅ COMPLETE
 owner: chrisrogers37
 created: 2026-05-17
 tags: [autonomous-mode, phase-3, implement-plan, synthesis-pass]
 repos: [clauDNA]
 links: []
 ---
+
+> **✅ COMPLETE (verified 2026-07-06 docs audit).** All 15 tasks shipped via PR #87 ("Phase 3: /implement-plan --auto mode", merged as `765b2c7`; tracked as Claudfather/clauDNA#84 — see `CHANGELOG.md:110-115`). `skills/implement-plan/SKILL.md` (933 lines) contains every deliverable this plan specifies: `--auto`/`--autonomous` argument, the canonical "Autonomous Mode" reference section, Step 1.5 sparse-issue refusal, Step 2.5 scope tripwire, Step 3-AUTO synthesis pass, Step 5/6.5 blocked/partial outcomes, Step 7 PR footer, Step 8 skip, Step 9 structured result, disallowed picker/queue paths, and a flowchart with all new `--auto` nodes wired in — grep-verified against every check this plan's own Verification section specifies. Two minor deviations from the original spec, both refinements rather than gaps: Step 2.5's tripwire condition changed from fixed numeric thresholds ("≥2x files") to qualitative judgment (`SKILL.md:484`); and `AskUserQuestion`/emoji references were generalized or dropped in the main skill body (though the shared `_shared/subagent-prompts/*.md` files still say `AskUserQuestion` verbatim — stale by comparison, see Phase 2's Task 3 note). One task (Task 14, smoke test) has no on-record evidence in this repo — see its note below. Otherwise this plan holds up cleanly against the shipped code.
 
 # Phase 3 Implementation Plan — /implement-plan `--auto` mode
 
@@ -60,6 +62,8 @@ links: []
 
 ## Task 1: Read source files
 
+**✅ COMPLETE** — prep step; confirmed by all downstream tasks (2-15) having shipped.
+
 - [ ] **Step 1: Read the design spec**
 
 Specifically §5.5 (overall --auto table), §5.5.1 (interactive Step 3A — already implemented in Phase 2, but understand what it produces), §5.5.2 (the synthesis pass).
@@ -92,6 +96,8 @@ No commit for Task 1.
 ---
 
 ## Task 2: Update frontmatter argument-hint and add `--auto` to Arguments section
+
+**✅ COMPLETE** — `skills/implement-plan/SKILL.md:5` (`argument-hint: "[--source github [number]] [--auto] [file-path-or-directory]"`) and the Arguments section (`SKILL.md:54`) both match this task's text almost verbatim.
 
 **Files:**
 - Modify: `skills/implement-plan/SKILL.md`
@@ -160,6 +166,8 @@ git commit -m "feat(implement-plan): add --auto argument to frontmatter and Argu
 ---
 
 ## Task 3: Add a top-level "Autonomous Mode (`--auto`)" section to the skill body
+
+**✅ COMPLETE** — `skills/implement-plan/SKILL.md:56-136` `## Autonomous Mode (`--auto`)` section present with required invocation shape, step-by-step table, synthesis-pass summary, output shape, and forbidden-operations list — matches this task's text closely. One indirection added since: the synthesis-pass description at `SKILL.md:93` now points to the canonical `skills/_shared/contracts/synthesis-contract.md` rather than inlining the schema a second time (that file was created by this same phase's Task 6, then relocated into `contracts/` by a later PR #132).
 
 **Files:**
 - Modify: `skills/implement-plan/SKILL.md`
@@ -337,6 +345,8 @@ EOF
 
 ## Task 4: Add Step 1.5 (Plan-detail check / sparse-issue refusal)
 
+**✅ COMPLETE** — `skills/implement-plan/SKILL.md:433-461` `### Step 1.5: Plan-Detail Check` present, matching this task's spec (including the exact `outcome: blocked` JSON example) almost verbatim.
+
 **Files:**
 - Modify: `skills/implement-plan/SKILL.md`
 
@@ -415,6 +425,8 @@ EOF
 ---
 
 ## Task 5: Add Step 2.5 (Scope-expansion tripwire)
+
+**✅ COMPLETE, condition refined** — `skills/implement-plan/SKILL.md:469-529` `### Step 2.5: Scope-Expansion Tripwire` present. The tripwire's trigger condition was loosened from this task's fixed numeric thresholds (≥2x files, 10+ callers, 20+ file cascade) to explicit qualitative judgment: "There are no fixed numeric thresholds; trust the comparison output" (`SKILL.md:484`). Everything else (JSON exit shape, issue comment, `needs-input` label) matches.
 
 **Files:**
 - Modify: `skills/implement-plan/SKILL.md`
@@ -531,6 +543,8 @@ EOF
 ---
 
 ## Task 6: Implement the `--auto` Step 3 synthesis pass
+
+**✅ COMPLETE** — `skills/implement-plan/SKILL.md:539-641` `#### Step 3-AUTO: Synthesis pass` present with all 6 steps (scratch dir, extract findings, generate matrix decisions, write bundle, dispatch subagent, parse completed/blocked/other) matching this task almost verbatim. Now cites `skills/_shared/contracts/synthesis-contract.md` (`SKILL.md:541,593`) as the canonical schema instead of restating it inline.
 
 **Files:**
 - Modify: `skills/implement-plan/SKILL.md`
@@ -728,6 +742,8 @@ EOF
 
 ## Task 7: Modify Step 5 for `--auto` ("feels wrong" → blocked outcome)
 
+**✅ COMPLETE** — `skills/implement-plan/SKILL.md:711-750` "Mode branch for 'feels wrong'" present, matches this task's spec including the JSON `outcome: blocked` shape and the "push the branch" instruction.
+
 **Files:**
 - Modify: `skills/implement-plan/SKILL.md`
 
@@ -803,6 +819,8 @@ git commit -m "feat(implement-plan): in --auto, 'feels wrong' exits outcome: blo
 
 ## Task 8: Modify Step 6.5 (Simplify) regression handling for `--auto`
 
+**✅ COMPLETE** — `skills/implement-plan/SKILL.md:807-828` includes the `verification_failed_after_revert` JSON block (line 819) exactly as this task specifies.
+
 **Files:**
 - Modify: `skills/implement-plan/SKILL.md`
 
@@ -872,6 +890,8 @@ git commit -m "feat(implement-plan): handle persistent verification failure post
 
 ## Task 9: Modify Step 7 (PR) tone for `--auto`
 
+**✅ COMPLETE, cosmetic diff** — `skills/implement-plan/SKILL.md:842-860` "Mode branch" present with the bot-footer text. The 🤖 emoji this task's draft used was dropped in the shipped body (`SKILL.md:851` reads "Opened by `/claudna:implement-plan --auto`." with no emoji) — consistent with this repo's own no-emoji-unless-asked convention; not a functional gap.
+
 **Files:**
 - Modify: `skills/implement-plan/SKILL.md`
 
@@ -930,6 +950,8 @@ git commit -m "feat(implement-plan): in --auto, add bot-opened footer to PR body
 
 ## Task 10: Skip Step 8 (Merge Gate) entirely in `--auto`
 
+**✅ COMPLETE** — `skills/implement-plan/SKILL.md:864-872` "SKIPPED ENTIRELY" present verbatim.
+
 **Files:**
 - Modify: `skills/implement-plan/SKILL.md`
 
@@ -979,6 +1001,8 @@ git commit -m "feat(implement-plan): skip Step 8 merge gate entirely in --auto"
 ---
 
 ## Task 11: Modify Step 9 (Summary) to emit structured result in `--auto`
+
+**✅ COMPLETE** — `skills/implement-plan/SKILL.md:886-922` present, JSON shape and emission rules match this task's spec almost verbatim.
 
 **Files:**
 - Modify: `skills/implement-plan/SKILL.md`
@@ -1059,6 +1083,8 @@ git commit -m "feat(implement-plan): emit §10.C structured result in --auto Ste
 ---
 
 ## Task 12: Disallow queue mode in `--auto`
+
+**✅ COMPLETE** — all three EXIT-blocked branches present: Path A directory-in-`--auto`, Path C no-args-in-`--auto`, Path D `--source github` without a number in `--auto` — grep-verified (`"directory source not supported in --auto"`, `"no source provided in --auto"`, `"without a number not supported in --auto"` each match once in `skills/implement-plan/SKILL.md`).
 
 **Files:**
 - Modify: `skills/implement-plan/SKILL.md`
@@ -1158,6 +1184,8 @@ git commit -m "feat(implement-plan): disallow picker/queue modes in --auto"
 ---
 
 ## Task 13: Update the flowchart for `--auto` branches
+
+**✅ COMPLETE** — the DOT block in `skills/implement-plan/SKILL.md` contains every node this task lists (`auto_mode`, `step1_5`, `sparse_check`, `sparse_blocked`, `step2_5`, `scope_check`, `scope_bypassed`, `step3_auto`, `synthesis_result`, `auto_needs_input`, `auto_blocked`, `feels_wrong_auto`, `simplify_partial`, `step7_auto_check`, `summary_auto`) with matching edges — grep-verified all present.
 
 **Files:**
 - Modify: `skills/implement-plan/SKILL.md`
@@ -1394,6 +1422,8 @@ git commit -m "docs(implement-plan): rewrite flowchart for --auto branches"
 
 ## Task 14: Smoke test the --auto path
 
+**⚠️ PARTIAL / UNVERIFIED** — the `--auto` path is fully implemented in the skill body (high-confidence static verification — see Tasks 2-13 above), but no "## Smoke Test Results" section exists anywhere in the repo (`grep -rn "Smoke Test Results" documentation/` only matches this task's own instruction text below, not a completed results section). Cannot confirm from this repo whether an end-to-end dogfooded run against a real GitHub issue ever happened, or happened but went undocumented. A new engineer picking this up should either run this task's smoke test now or confirm it happened via merged PR #87's description/comments on GitHub (outside this repo's visibility).
+
 **Files:**
 - Read: `skills/implement-plan/SKILL.md` (verification only)
 - Create: `scripts/test_implement_plan_auto.sh` (optional smoke test runner)
@@ -1470,6 +1500,8 @@ No commit in this task unless deviations require code fixes.
 
 ## Task 15: Update CHANGELOG.md
 
+**✅ COMPLETE** — `CHANGELOG.md:110-115` documents Phase 3 ("/implement-plan --auto mode — Phase 3 of the autonomous-mode-and-orchestration rollout", Claudfather/clauDNA#84) in the engineer's own words, with a direct PR reference and additional detail (e.g. the synthesis-contract.md file) beyond this task's suggested boilerplate.
+
 **Files:**
 - Modify: `CHANGELOG.md`
 
@@ -1504,6 +1536,8 @@ git commit -m "docs(changelog): record Phase 3 --auto additions to /implement-pl
 ---
 
 ## Phase 3 Verification
+
+**✅ COMPLETE, except Task 14's artifact** — re-ran this section's own checks against the current repo (2026-07-06): `python3 scripts/validate-skills.py` → "OK: 61 skills validated, no blocking violations"; `grep -c` for `"## Autonomous Mode"`, `"Step 1.5:"`, `"Step 2.5:"`, `"Step 3-AUTO:"`, `"SKIPPED ENTIRELY"` on `implement-plan/SKILL.md` all present (≥1, several =2 from flowchart + prose both referencing the step name). The smoke test (Step 3 of this Verification section) cannot be confirmed — see Task 14 note above. Shipped and merged as PR #87 (`765b2c7`).
 
 - [ ] **Step 1: Validator passes**
 

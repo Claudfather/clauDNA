@@ -1,13 +1,19 @@
 ---
 title: Phase 4 — claudlobby autonomous-runner Wrapper
 type: plan
-status: draft
+status: mostly complete (Claudlobby-side); validation deployment pending — Claudlobby#294
 owner: chrisrogers37
 created: 2026-05-17
 tags: [autonomous-mode, phase-4, claudlobby, autonomous-runner, wrapper]
 repos: [Claudlobby]
 links: []
 ---
+
+> **Mostly ✅ COMPLETE, Claudlobby-side (verified 2026-07-06 docs audit).** Every deliverable in this plan lives in the sibling Claudlobby repo, not clauDNA — ordinarily **UNVERIFIABLE FROM THIS REPO ALONE**. A live local checkout was available at `/Users/chris/Projects/claudlobby` (real git history, GitHub remote `Claudfather/Claudlobby`) for this audit; treat the findings below as a point-in-time spot-check, not something clauDNA's own CI/repo verifies going forward.
+>
+> **Timeline:** clauDNA Phases 1-3 (the prerequisite contract this phase depends on) merged 2026-05-17/18 (`d46699c`, `31accf6`, `765b2c7`). Claudlobby Phase 4 **Part A** (Tasks 1-5, schema layer — [Claudfather/Claudlobby#278](https://github.com/Claudfather/Claudlobby/issues/278)) and **Part B** (Tasks 6-9 + 11, skill body + docs — [Claudfather/Claudlobby#279](https://github.com/Claudfather/Claudlobby/issues/279)) both merged the same day, 2026-05-18 (`d98e7e0`, `a541004`) — within hours of clauDNA Phase 3 landing. **Task 10 (end-to-end validation deployment)** was deliberately descoped into its own tracked issue, **[Claudfather/Claudlobby#294 — "Phase 4 Part C — autonomous-runner validation deployment"](https://github.com/Claudfather/Claudlobby/issues/294), still OPEN** as of this audit. That is the one real gap — this phase is not abandoned or blocked; it shipped fast and the remainder is explicitly tracked.
+>
+> **Not superseded by the later ironclad-migration decision** (ratified 2026-06-03, ~2 weeks after this phase shipped — see `documentation/planning/2026-06-02-ironclad-migration-claudlobby-to-clauDNA.md`). That decision's principle — "clauDNA skills are subagent-only; fleet dispatch is a claudlobby concern injected at composition time" — is exactly what this phase already did: every fleet.yaml/dataclass/composer/telegram concept here lives in Claudlobby, never in clauDNA. This phase and `/ironclad`'s `fleet-dispatch-capability` override are two independent, complementary instances of the same boundary, not competing designs (see Task 10's marker below for how the two mechanisms differ). See per-task markers below for file-level evidence.
 
 # Phase 4 Implementation Plan — claudlobby `autonomous-runner` wrapper
 
@@ -30,6 +36,8 @@ links: []
 
 ## File Structure
 
+**Status roll-up:** ✅ COMPLETE for every row below except the validation-deployment overlay under `local/` (Task 10, PENDING). `claudlobby/loader.py` was not touched as planned — parsing landed in `config.py`'s `_coerce_bot` instead (see Task 3 marker). `docs/bot-archetypes.md` doesn't exist under that path in shipped Claudlobby; the archetype doc shipped as `library/skills/autonomous-runner/archetype.md` instead (see Task 9 marker). See per-task markers for citations.
+
 | File | Action | Notes |
 |---|---|---|
 | `library/skills/autonomous-runner/SKILL.md` | Create | The wrapper skill body |
@@ -47,6 +55,8 @@ links: []
 ---
 
 ## Task 1: Read source files and understand claudlobby internals
+
+**✅ COMPLETE (implied)** — no artifact of its own (this is a read-only orientation pass; "No commit for Task 1"), but Tasks 2-9/11 shipped with idiom-consistent code, so the orientation evidently happened.
 
 This phase is in an unfamiliar codebase (vs. Phases 1-3 in clauDNA). Do not skip the orientation pass.
 
@@ -136,6 +146,8 @@ No commit for Task 1.
 ---
 
 ## Task 2: Add `AutonomousRunnerConfig` dataclass and `BotConfig.autonomous_runner` field
+
+**✅ COMPLETE** — `claudlobby/config.py` (Claudlobby `main`, ~line 149-183) defines `AutonomousRunnerPicker`, `AutonomousRunnerBypass`, `AutonomousRunnerConfig` with field shapes matching this plan closely. Shipped in Phase 4 Part A (commit `d98e7e0`, [Claudfather/Claudlobby#278](https://github.com/Claudfather/Claudlobby/issues/278), merged 2026-05-18).
 
 **Files:**
 - Modify: `claudlobby/config.py`
@@ -318,6 +330,8 @@ EOF
 ---
 
 ## Task 3: Parse `autonomous_runner` in `loader.py`
+
+**✅ COMPLETE, architecture differs from plan** — parsing did not land in a separate `loader.py` function as this task specifies. Claudlobby's own CHANGELOG.md states the block is "parsed from `fleet.yaml` by `_coerce_bot`" — consolidated into `config.py` instead. Functionally equivalent to this task's goal (fleet.yaml → `AutonomousRunnerConfig`), just a different file than planned. `claudlobby/loader.py` itself has no autonomous-runner-specific code.
 
 **Files:**
 - Modify: `claudlobby/loader.py`
@@ -548,6 +562,8 @@ EOF
 ---
 
 ## Task 4: Validate `autonomous_runner` in `validator.py`
+
+**✅ COMPLETE** — `claudlobby/validator.py` validates the `autonomous_runner` block (CHANGELOG.md: "validated in `validate()`"). Tests landed in `tests/test_validator.py` rather than a dedicated `test_autonomous_runner_validator.py` file, but the shipped CHANGELOG claims "23 new tests across `test_config.py`, `test_validator.py`, `test_composer.py`" for Part A as a whole. A related `claudlobby/known_values.py` module appeared later (PR #391, "known-good value validation (Tier 2+3)") as a generalization of this kind of check.
 
 **Files:**
 - Modify: `claudlobby/validator.py`
@@ -813,6 +829,8 @@ EOF
 
 ## Task 5: Compose `autonomous_runner` config into the bot's CLAUDE.md
 
+**✅ COMPLETE** — Claudlobby's CHANGELOG.md confirms the block is "rendered into the bot's `CLAUDE.md` by `compose_claude_md`"; `templates/claude.md.j2` (grep-confirmed) contains the autonomous-runner rendering section. `claudlobby/composer.py` itself has no autonomous-runner-specific string match — plausibly because it passes the whole `bot` object through generically and the template does the `{% if bot.autonomous_runner %}` branching, needing no composer.py changes. Test coverage folded into `tests/test_composer.py` rather than a dedicated file.
+
 **Files:**
 - Modify: `claudlobby/composer.py`
 - Modify: `templates/claude.md.j2`
@@ -947,6 +965,8 @@ EOF
 
 ## Task 6: Create the risk-classifier subagent prompt template
 
+**✅ COMPLETE** — `library/skills/autonomous-runner/risk-classifier-prompt.md` exists in Claudlobby. Shipped in Phase 4 Part B (commit `a541004`, [Claudfather/Claudlobby#279](https://github.com/Claudfather/Claudlobby/issues/279), merged 2026-05-18).
+
 **Files:**
 - Create: `library/skills/autonomous-runner/risk-classifier-prompt.md`
 
@@ -1080,6 +1100,8 @@ EOF
 ---
 
 ## Task 7: Write the `autonomous-runner` skill body
+
+**✅ COMPLETE** — `library/skills/autonomous-runner/SKILL.md` exists (Phase 4 Part B, same as Task 6). Notably, the shipped skill invokes clauDNA skills through the Skill tool as plugin-namespaced commands (e.g. `/claudna:implement-plan --auto`) rather than the raw `<CLAUDNA_PATH>/skills/<name>/SKILL.md` filesystem-path pattern this plan's draft used in Steps 5/6 below — Claudlobby's CHANGELOG.md calls this out explicitly as a correction, not an oversight.
 
 **Files:**
 - Create: `library/skills/autonomous-runner/SKILL.md`
@@ -1413,6 +1435,8 @@ EOF
 
 ## Task 8: Update `fleet.yaml.example` with an autonomous-runner block
 
+**✅ COMPLETE** — `fleet.yaml.example` (Claudlobby `main`) has a commented `autonomous_runner` block plus a full `dbt-auto-bot` example bot entry, matching this task's example almost verbatim (including the `skill`/`cadence`/`target_repo`/`picker`/`bypass`/`on_outcome` shape).
+
 **Files:**
 - Modify: `fleet.yaml.example`
 
@@ -1472,6 +1496,8 @@ git commit -m "docs(example): add autonomous_runner example bot to fleet.yaml.ex
 ---
 
 ## Task 9: Add the "Autonomous Worker" bot archetype
+
+**✅ COMPLETE, different location than planned** — shipped as a standalone `library/skills/autonomous-runner/archetype.md` co-located with the skill, NOT as an appended section in `docs/bot-archetypes.md`. Claudlobby's actual docs convention (established by its own "canonical documentation structure" work, #149) uses `documentation/bot-archetypes.md`, which was left untouched — no "Autonomous Worker" entry there. `archetype.md` states the reasoning itself: "If/when other archetypes emerge..., promote shared archetype documentation to a top-level `library/archetypes/` category" — a deliberate improvement on this plan's single-shared-file design, not a gap.
 
 **Files:**
 - Modify: `docs/bot-archetypes.md`
@@ -1551,6 +1577,10 @@ git commit -m "docs(archetypes): add Autonomous Worker bot archetype"
 ---
 
 ## Task 10: Validation deployment
+
+**PENDING** — deliberately descoped into its own open issue: [Claudfather/Claudlobby#294 — "Phase 4 Part C — autonomous-runner validation deployment"](https://github.com/Claudfather/Claudlobby/issues/294), filed 2026-05-18 (same day as Parts A/B merged), still **OPEN** as of this 2026-07-06 audit. Claudlobby's CHANGELOG.md states plainly: "End-to-end validation deployment is deferred to Phase 4 Part C." No `local/<fleet-name>/` overlay and no real (non-`.example`) `fleet.yaml` with an `autonomous_runner` block were found in the current checkout, consistent with this never having run. This is the one genuinely incomplete piece of Phase 4 — not blocked technically (Phases 1-3 prerequisites are met, and the wrapper skill exists), just not yet executed/prioritized.
+
+**Re: the `/ironclad` fleet-override comparison** — `/ironclad`'s `fleet-dispatch-capability` protocol (see `documentation/planning/2026-06-02-ironclad-migration-claudlobby-to-clauDNA.md`) overrides an *existing* clauDNA skill's internal dispatch step at composition time, so the same command (`/ironclad`) behaves differently under a fleet vs. standalone. `autonomous-runner` is a different shape entirely: a wholly new Claudlobby-native skill that *wraps* clauDNA `--auto` skills (invoking them as subagents on a cadence, picking work, classifying risk, reporting to Telegram) — it doesn't override any clauDNA skill's dispatch. Both respect the same boundary (no fleet concepts inside clauDNA), but neither supersedes nor substitutes for the other; they solve different problems.
 
 **Files:**
 - Possibly create: a local fleet overlay under `local/<fleet-name>/`
@@ -1693,6 +1723,8 @@ No commit in this task unless deviations require code fixes (in which case commi
 
 ## Task 11: Update CHANGELOG.md
 
+**✅ COMPLETE** — Claudlobby's `CHANGELOG.md` has explicit "Phase 4 Part A" and "Phase 4 Part B" entries citing issues [#278](https://github.com/Claudfather/Claudlobby/issues/278) and [#279](https://github.com/Claudfather/Claudlobby/issues/279), and names the deferred validation deployment (Task 10 / issue #294) directly.
+
 **Files:**
 - Modify or create: `CHANGELOG.md` (in claudlobby)
 
@@ -1731,6 +1763,8 @@ git commit -m "docs(changelog): record Phase 4 autonomous-runner wrapper additio
 ---
 
 ## Phase 4 Verification
+
+**PARTIAL / mixed** — Step 1 (tests), Step 3 (docs in place), and Step 4 (push for review) are done: Parts A and B merged via [Claudfather/Claudlobby#278](https://github.com/Claudfather/Claudlobby/issues/278) and [#279](https://github.com/Claudfather/Claudlobby/issues/279). Step 2 (validation deployment completed) is the same open gap as Task 10 ([#294](https://github.com/Claudfather/Claudlobby/issues/294)). By this section's own stated bar — "the phase is not done if `autonomous-runner` cannot run end-to-end against a real fleet config" — Phase 4 is not fully done, though the large majority of the build (schema, skill body, docs, examples) is shipped and merged.
 
 - [ ] **Step 1: Full test suite passes**
 

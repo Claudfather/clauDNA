@@ -1,12 +1,14 @@
 ---
 title: "Build the /forge and /ironclad Plan-Hardening Skill Ecosystem"
 type: plan
-status: draft
+status: ✅ COMPLETE (superseded — see note)
 owner: alex
 tags: [planning, skills, orchestration, forge, ironclad, claudlobby, clauDNA]
 created: 2026-06-01
 updated: 2026-06-01
 ---
+
+> **✅ COMPLETE, then superseded (verified 2026-07-06 docs audit).** All four phases' clauDNA-side goals shipped: `/forge` gained `--auto`, all 6 review lenses exist (`skills/{first-principles,align-to-mission,extension-check,precedent-check,plan-health-audit,cost-benefit}/SKILL.md`), and `/ironclad` exists and dispatches them. However, the architecture diverged from this doc's design: `/ironclad` did not stay in claudlobby dispatching over tmux/fleet — a later migration (see companion `2026-06-02-ironclad-migration-claudlobby-to-clauDNA.md`) moved it into clauDNA as a subagent-only skill, and a still-later unification (tracked as epic #155, not covered by any doc in this planning directory) rebuilt both `/forge` and `/ironclad` on a shared "§4.1 Issue/publish substrate" with `--reforge` and `--loops N` — mechanisms this doc doesn't mention. Treat this doc as the **origin story**, not the current architecture; see `skills/forge/SKILL.md` and `skills/ironclad/SKILL.md` directly for what's actually shipped. Strong candidate for archival. Fork F1's lean (lenses in clauDNA, orchestration in claudlobby) was ultimately overtaken — orchestration moved to clauDNA too.
 
 # Build the /forge and /ironclad Plan-Hardening Skill Ecosystem
 
@@ -118,6 +120,7 @@ This aligns with clauDNA's PROJECT_MISSION.md north star ("curated quality over 
 ## Phases
 
 ### Phase 1: Foundation — `/forge` Hardening + Decision Fork Protocol
+**✅ COMPLETE (clauDNA-side), partially superseded.** 1a (`--auto` contract) shipped in `skills/forge/SKILL.md`, though the final JSON shape differs from this doc's sketch (evolved further with the §4.1 substrate). 1b (`forge-chain.md` dispatch file) was **not built as a separate file** — superseded by inline dispatch-prompt construction in `skills/ironclad/SKILL.md`'s Phase 10, which achieves the same goal without a standalone template file. 1c/1d (claudlobby protocols) are **UNVERIFIABLE FROM THIS REPO** — clauDNA has no visibility into the claudlobby repo.
 
 The `/forge` skill exists but lacks `--auto` mode and a dispatch prompt. The decision-fork-lifecycle protocol doesn't exist. Both are prerequisites for `/ironclad`.
 
@@ -171,6 +174,7 @@ Create `library/protocols/pr-comment-hygiene.md` in claudlobby. Governs:
 - **Bot attribution:** comments from review bots include `[<bot-name>]` prefix for traceability
 
 ### Phase 2: Review Lens Skills
+**✅ COMPLETE.** All five (plus a sixth, `/first-principles`, added per the companion Phase 2 doc) exist in `skills/` with `--dispatch` mode, verified present and non-trivial.
 
 Five new clauDNA skills that each provide a single focused review lens. Each reads a plan (markdown file or PR diff) and emits structured findings. All five skills are independent — fully parallelizable across engineers.
 
@@ -238,6 +242,7 @@ Helps prioritize phases and identify low-ROI work that should be cut.
 Supports `--auto`. Structured result: `{ phases: [{phase, cost, benefit, roi}], recommendation: "<cut/reorder suggestions>" }`.
 
 ### Phase 3: `/ironclad` Fleet Orchestrator
+**✅ COMPLETE, architecture changed.** `/ironclad` exists and works, but not as "claudlobby fleet skill dispatching to clauDNA lenses" as designed here — see the companion migration doc. It now lives in `skills/ironclad/SKILL.md` (clauDNA), is subagent-only by default (verified zero mentions of tmux/BOTREPORT/fleet-state.json in the shipped skill), and supports fleet override only via a compositor-injected protocol claudlobby-side (unverifiable from here).
 
 #### 3a. `/ironclad` Skill (claudlobby)
 
@@ -289,6 +294,7 @@ Non-interactive mode for programmatic invocation (e.g., from a CI pipeline or hi
 ```
 
 ### Phase 4: Integration + End-to-End Pipeline
+**✅ COMPLETE (mechanism), superseded (shape).** The forge↔ironclad handoff exists and is tighter than originally designed: `/ironclad <issue> --loops N` and `forge --reforge <issue>` form a closed hardening loop (dispatch → fold → convergence-check), not just a one-way suggestion. 4c (real end-to-end pipeline run) and 4d (README/CHANGELOG updates) are not independently verifiable as "run" from static docs, though CHANGELOG does carry detailed entries for the later unification work.
 
 #### 4a. `/forge` → `/ironclad` Handoff
 

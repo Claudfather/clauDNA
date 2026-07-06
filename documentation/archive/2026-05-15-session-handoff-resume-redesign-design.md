@@ -1,5 +1,5 @@
 ---
-status: DRAFT
+status: ✅ COMPLETE
 date: 2026-05-15
 owner: chris
 related_repos: clauDNA, Claudlobby, Claudron
@@ -7,6 +7,8 @@ breaking_change: true
 sibling_issues:
   - https://github.com/Claudfather/Claudlobby/issues/223
 ---
+
+> **✅ COMPLETE (verified 2026-07-06 docs audit).** Every clauDNA-side item in this design is shipped: `skills/session-resume/SKILL.md` exists, `skills/context-resume/` is gone, handoff writes to `<cwd>/.claude/session.md` with schema v2 and atomic writes, the reaper lives in `skills/_shared/reaper-rules.md`, legacy import is implemented in `skills/session-resume/SKILL.md`, and all internal cross-references (`orchestration-guide.md`, `repo-health/SKILL.md`, `README.md`, `CHANGELOG.md`) were updated. Strong candidate for archival to `documentation/archive/` — see companion `-plan.md` for per-task detail. The Claudlobby-side sibling issue (#223) is unverifiable from this repo.
 
 # Session Handoff & Resume Redesign
 

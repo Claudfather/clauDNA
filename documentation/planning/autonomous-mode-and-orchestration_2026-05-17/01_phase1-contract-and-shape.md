@@ -25,26 +25,39 @@ links: []
 
 ---
 
+## Audit Status (2026-07-06)
+
+**Overall: ✅ COMPLETE.** All 16 tasks below shipped in PR #85 ("Phase 1: Autonomous-mode contract & structured result shape", commit `d46699c`, merged **2026-05-18** — one day after this plan was authored). This audit re-verified every task against the codebase at HEAD (`feat/frameworks-not-skus-phase1`, 2026-07-06), roughly 7 weeks and many commits later, after Phase 2 (#86, same day), Phase 3 (#87, 2026-05-18), the session-handoff redesign (#88, 2026-05-18), the `/claudna:publish` output-routing consolidation (#115, 2026-05-27), and the forge/ironclad unification (#130, #132, 2026-06-02, and later) all landed on top of it.
+
+Headline findings:
+- Tasks 2, 3, 5, 6-14, 15, 16 are intact and still match this plan's specified text/shape almost verbatim — confirmed by `grep`/`git log` against each target file.
+- Task 4 is **✅ COMPLETE but superseded in shape**: `/claudna:adversarial-review --dispatch` no longer emits the §10.C JSON block this plan specifies. PR #130 (2026-06-02) changed it to emit markdown+YAML frontmatter per the newer `skills/_shared/contracts/lens-result-contract.md`, built to feed `/claudna:ironclad`'s multi-lens convergence loop — a consumer that didn't exist yet when this plan was written. CHANGELOG.md's own entry for that change notes: "The generic `--auto` JSON shape in orchestration-guide.md §10.C is unchanged" — i.e. a deliberate, scoped divergence for one consumer, not a regression of the general contract.
+- The §10.C JSON contract this phase defined has since been adopted by skills built *after* this plan shipped (`/claudna:forge`, `/claudna:ironclad --auto`) — evidence the contract succeeded as a durable convention rather than a one-off.
+
+Per-task detail and file:line citations are marked inline below.
+
+---
+
 ## File Structure
 
 Files modified or created in this phase:
 
-| File | Action | Notes |
-|---|---|---|
-| `skills/_shared/orchestration-guide.md` | Modify | Extend §10 with Tier-3 sub-section + structured-result shape |
-| `skills/adversarial-review/SKILL.md` | Modify | Make `--dispatch` imply non-interactive; emit structured findings |
-| `skills/weigh-development-paths/SKILL.md` | Modify | Add `--auto` mode; emit refined-plan structured result |
-| `skills/tech-debt/SKILL.md` | Modify | Append structured-result emission to "Autonomous Mode" section |
-| `skills/security-audit/SKILL.md` | Modify | Same |
-| `skills/product-enhance/SKILL.md` | Modify | Same |
-| `skills/frontend-performance-audit/SKILL.md` | Modify | Same |
-| `skills/docs-review/SKILL.md` | Modify | Same |
-| `skills/access-path-audit/SKILL.md` | Modify | Same |
-| `skills/product-vision/SKILL.md` | Modify | Same |
-| `skills/session-handoff/SKILL.md` | Modify | Same (no "--auto" section today, but has --auto behavior throughout) |
-| `skills/visual-crawl/SKILL.md` | Modify | Same |
-| `scripts/validate-skills.py` (optional) | Modify | Add a check: skills declaring `--auto` must have a "Structured Result Emission" section |
-| `CHANGELOG.md` | Modify | Add an entry summarizing the Phase 1 changes |
+| File | Action | Notes | Status (2026-07-06) |
+|---|---|---|---|
+| `skills/_shared/orchestration-guide.md` | Modify | Extend §10 with Tier-3 sub-section + structured-result shape | ✅ COMPLETE |
+| `skills/adversarial-review/SKILL.md` | Modify | Make `--dispatch` imply non-interactive; emit structured findings | ✅ COMPLETE but superseded — non-interactive behavior intact, but `--dispatch` output is now markdown+frontmatter (`lens-result-contract.md`), not §10.C JSON |
+| `skills/weigh-development-paths/SKILL.md` | Modify | Add `--auto` mode; emit refined-plan structured result | ✅ COMPLETE |
+| `skills/tech-debt/SKILL.md` | Modify | Append structured-result emission to "Autonomous Mode" section | ✅ COMPLETE |
+| `skills/security-audit/SKILL.md` | Modify | Same | ✅ COMPLETE |
+| `skills/product-enhance/SKILL.md` | Modify | Same | ✅ COMPLETE |
+| `skills/frontend-performance-audit/SKILL.md` | Modify | Same | ✅ COMPLETE |
+| `skills/docs-review/SKILL.md` | Modify | Same | ✅ COMPLETE |
+| `skills/access-path-audit/SKILL.md` | Modify | Same | ✅ COMPLETE |
+| `skills/product-vision/SKILL.md` | Modify | Same | ✅ COMPLETE |
+| `skills/session-handoff/SKILL.md` | Modify | Same (no "--auto" section today, but has --auto behavior throughout) | ✅ COMPLETE — re-homed into a numbered step by the #88 redesign, same shape |
+| `skills/visual-crawl/SKILL.md` | Modify | Same | ✅ COMPLETE |
+| `scripts/validate-skills.py` (optional) | Modify | Add a check: skills declaring `--auto` must have a "Structured Result Emission" section | ✅ COMPLETE — done, not skipped; live in CI today |
+| `CHANGELOG.md` | Modify | Add an entry summarizing the Phase 1 changes | ✅ COMPLETE — now under the dated `[0.4.0]` release, not `[Unreleased]` |
 
 ---
 
@@ -58,6 +71,8 @@ Files modified or created in this phase:
 ---
 
 ## Task 1: Read all source files
+
+> **Status: ✅ COMPLETE (implicit).** Read-only orientation task with no on-disk deliverable to verify directly. Confirmed by outcome: every downstream task (2-16) matches this plan's specified text, which would not be possible without this reading having happened.
 
 **Files:**
 - Read: `documentation/specs/2026-05-17-autonomous-mode-and-orchestration-design.md`
@@ -118,6 +133,8 @@ No commit for Task 1 — it's a read-only orientation task.
 
 **Files:**
 - Modify: `skills/_shared/orchestration-guide.md`
+
+> **Status: ✅ COMPLETE.** Verified live at `skills/_shared/orchestration-guide.md:304-321` — "### For implementation skills (Tier 3)" sub-section present, text matches this plan almost verbatim. Compatibility matrix rows added at lines 386-388 (`/claudna:implement-plan`, `/claudna:weigh-development-paths`, `/claudna:adversarial-review`). Shipped in PR #85 (2026-05-17); unchanged as of 2026-07-06 through several later refactors (#121 extracted `planning-standard.md`/`pre-handoff-checklist.md` from this same file without touching §10).
 
 - [ ] **Step 1: Locate the existing §10 structure**
 
@@ -230,6 +247,8 @@ EOF
 
 **Files:**
 - Modify: `skills/_shared/orchestration-guide.md`
+
+> **Status: ✅ COMPLETE.** Verified live at `skills/_shared/orchestration-guide.md:323-371` — "### Structured Result Shape" sub-section present with the exact JSON schema, field rules, outcome-semantics table, and emission rules specified here. This is the shape still referenced as canonical by `skills/_shared/contracts/synthesis-contract.md` ("General structured-result shape: `skills/_shared/orchestration-guide.md` §10.C") and by newer skills built after this plan shipped (`/claudna:forge`, `/claudna:ironclad --auto`). Shipped in PR #85 (2026-05-17).
 
 - [ ] **Step 1: Append the structured-result shape sub-section**
 
@@ -370,6 +389,8 @@ EOF
 
 **Goal:** When `--dispatch` is set, the skill MUST suppress Plan Mode entry, suppress AskUserQuestion calls, and emit the structured-result shape with critique findings. Without `--dispatch`, current interactive behavior is preserved.
 
+> **Status: ✅ COMPLETE but superseded (output shape changed).** The non-interactive-suppression half of this task is intact and unchanged: `skills/adversarial-review/SKILL.md:24-35` ("## --dispatch (non-interactive) mode") still says "Do NOT call `EnterPlanMode`" / "Do NOT call `AskUserQuestion`" / exit `outcome: blocked` on ambiguity, verbatim to what this task specified. **But the structured-result format it emits has changed.** As shipped here (PR #85), `--dispatch` emitted the §10.C JSON block with `artifacts.findings`. PR #130 (2026-06-02, "adversarial-review --dispatch emits markdown with frontmatter") replaced that with a markdown+YAML-frontmatter document per `skills/_shared/contracts/lens-result-contract.md` (see `skills/adversarial-review/SKILL.md:343-351`, "## Structured Result Emission (`--dispatch` only)") — built so `/claudna:ironclad` can aggregate findings from multiple lens skills in one pass. `CHANGELOG.md` documents this as a deliberate, scoped change: "The generic `--auto` JSON shape in orchestration-guide.md §10.C is unchanged." Net: the *behavioral* contract (non-interactive, structured, no user gates) this task wanted is fully honored; the *wire format* is not what this plan specifies — superseded by a richer consumer-specific contract that didn't exist yet in May.
+
 - [ ] **Step 1: Update the Arguments section to clarify `--dispatch` semantics**
 
 Find this text in `skills/adversarial-review/SKILL.md`:
@@ -500,6 +521,8 @@ EOF
 - Modify: `skills/weigh-development-paths/SKILL.md`
 
 **Goal:** Add a new `--auto` argument that takes a context bundle (open findings + matrix concerns + plan + codebase artifacts) and returns a refined plan via the structured-result shape. Suppresses Plan Mode and AskUserQuestion. Interactive mode unchanged.
+
+> **Status: ✅ COMPLETE.** Verified live at `skills/weigh-development-paths/SKILL.md:14-20` (Arguments) and `:123-198` ("## Autonomous Mode (`--auto`)" — input contract, procedure, output). Still emits the exact JSON shape this plan specifies (`refined_plan_path`, `refined_plan`, `decisions_resolved`, `decisions_unresolved`, `synthesis_rationales`). PR #132 (2026-06-02) extracted this shape into a standalone canonical file, `skills/_shared/contracts/synthesis-contract.md`, which this SKILL.md now points to as the source of truth (line 163) — a refactor, not a behavior change; the schema is unchanged. Consumed by `/claudna:implement-plan --auto` Step 3-AUTO per that contract.
 
 - [ ] **Step 1: Update the frontmatter argument-hint**
 
@@ -663,6 +686,8 @@ EOF
 **Files:**
 - Modify: `skills/tech-debt/SKILL.md`
 
+> **Status: ✅ COMPLETE.** Verified live at `skills/tech-debt/SKILL.md:236-262` — "## Autonomous Mode (--auto)" section step 6 emits the §10.C JSON block verbatim as specified. Unchanged through Phase 2 (#86), the `/claudna:publish` routing consolidation (#115), and the recent description-grammar pass (#165, 2026-07-05) that touched this file's frontmatter but not this section.
+
 - [ ] **Step 1: Append a structured-result emission step to the Autonomous Mode section**
 
 Find the existing section heading:
@@ -741,6 +766,8 @@ git commit -m "feat(tech-debt): emit §10.C structured result in --auto mode"
 **Files:**
 - Modify: `skills/security-audit/SKILL.md`
 
+> **Status: ✅ COMPLETE.** Verified live at `skills/security-audit/SKILL.md:184-212` — emission step 8 present with the §10.C shape (`findings_by_severity`, masked-secrets rule preserved). Unchanged since PR #85.
+
 - [ ] **Step 1: Append emission step to the Autonomous Mode section**
 
 Find the existing closing bullet of the Autonomous Mode section in `skills/security-audit/SKILL.md`. It currently reads:
@@ -805,6 +832,8 @@ git commit -m "feat(security-audit): emit §10.C structured result in --auto mod
 **Files:**
 - Modify: `skills/product-enhance/SKILL.md`
 
+> **Status: ✅ COMPLETE.** Verified live at `skills/product-enhance/SKILL.md:163-188` — emission step 5 present with the §10.C shape (`proposals_ranked`, etc.). Unchanged since PR #85.
+
 - [ ] **Step 1: Append emission step**
 
 Find the closing bullet of the Autonomous Mode section in `skills/product-enhance/SKILL.md`. It currently reads:
@@ -862,6 +891,8 @@ git commit -m "feat(product-enhance): emit §10.C structured result in --auto mo
 
 **Files:**
 - Modify: `skills/frontend-performance-audit/SKILL.md`
+
+> **Status: ✅ COMPLETE.** Verified live at `skills/frontend-performance-audit/SKILL.md:126-152` — emission step 5 present with the §10.C shape (`cascade_chains_found`, `page_audited`). Unchanged since PR #85.
 
 - [ ] **Step 1: Append emission step**
 
@@ -921,6 +952,8 @@ git commit -m "feat(frontend-performance-audit): emit §10.C structured result i
 
 **Files:**
 - Modify: `skills/docs-review/SKILL.md`
+
+> **Status: ✅ COMPLETE.** Verified live at `skills/docs-review/SKILL.md:197-231` — emission step 7 present with the dual-artifact shape this task calls for (`auto_fixes_committed` + `gaps_filed_as_issues`). A separate reference to §10.C at line 142 shows Phase 2's adversarial-review chain (added later, #86) folds its summary into the same structured result — the two phases composed cleanly. Unchanged since.
 
 - [ ] **Step 1: Append emission step**
 
@@ -989,6 +1022,8 @@ git commit -m "feat(docs-review): emit §10.C structured result in --auto mode"
 **Files:**
 - Modify: `skills/access-path-audit/SKILL.md`
 
+> **Status: ✅ COMPLETE.** Verified live at `skills/access-path-audit/SKILL.md:295-322` — emission step 6 present with the §10.C shape (`findings_by_category`, `paths_analyzed`). Unchanged since PR #85.
+
 - [ ] **Step 1: Append emission step**
 
 Find the closing bullet of the Autonomous Mode section:
@@ -1048,6 +1083,8 @@ git commit -m "feat(access-path-audit): emit §10.C structured result in --auto 
 
 **Files:**
 - Modify: `skills/product-vision/SKILL.md`
+
+> **Status: ✅ COMPLETE.** Verified live at `skills/product-vision/SKILL.md:165-196` — emission step 7 present with the §10.C shape (`compound_plays_identified`, `mission_proposed`). Unchanged since PR #85.
 
 - [ ] **Step 1: Append emission step**
 
@@ -1113,6 +1150,8 @@ git commit -m "feat(product-vision): emit §10.C structured result in --auto mod
 
 **Note:** `session-handoff` doesn't have a single "Autonomous Mode" section — its `--auto` behavior is woven throughout. Add a new closing section.
 
+> **Status: ✅ COMPLETE, later re-homed by a redesign.** Shipped as its own closing section in PR #85. PR #88 (2026-05-18, "Redesign /session-handoff + /session-resume: per-cwd, reaper-driven") restructured the whole skill into numbered steps; the emission logic now lives at `skills/session-handoff/SKILL.md:98-119` as "### 10. Structured-result emission (`--auto` only)" — same §10.C JSON shape (`handoff_path`, `items_reaped`, `items_added`), just moved to fit the new step-based procedure. Explicitly called out as consumed by `/restart`'s pre-stop check to confirm the handoff landed.
+
 - [ ] **Step 1: Append a Structured Result section at the end of the procedure**
 
 Find the closing section of the file. It currently ends with the "Rules" section. Use Edit. `old_string`:
@@ -1176,6 +1215,8 @@ git commit -m "feat(session-handoff): emit §10.C structured result in --auto mo
 
 **Files:**
 - Modify: `skills/visual-crawl/SKILL.md`
+
+> **Status: ✅ COMPLETE.** Verified live at `skills/visual-crawl/SKILL.md:489-520` — emission step 6 present with the §10.C shape (`routes_crawled`, `design_token_violations`, etc.). Unchanged since PR #85.
 
 - [ ] **Step 1: Append emission step to the Autonomous Mode section**
 
@@ -1243,6 +1284,8 @@ git commit -m "feat(visual-crawl): emit §10.C structured result in --auto mode"
 - Test: `scripts/test_skill_checks.py` (create if it doesn't exist)
 
 This task is OPTIONAL but recommended. It prevents future skills from claiming `--auto` support without emitting the structured result shape.
+
+> **Status: ✅ COMPLETE (the optional task was done, not skipped).** `check_structured_result_emission()` lives at `scripts/skill_checks.py:254-274`, wired as a hard-error check into `validate_skill_md` (`scripts/skill_checks.py:509`), alongside the two pre-existing behavioral checks (`check_output_github_reference`, `check_auto_no_ask_user`). `scripts/test_skill_checks.py` has unit tests for it. Confirmed live during this audit: `python3 scripts/validate-skills.py` reports "OK: 61 skills validated, no blocking violations" — the check runs clean against all 9 normalized skills plus every skill added since (including `/claudna:forge`, `/claudna:ironclad`).
 
 - [ ] **Step 1: Inspect the existing `skill_checks` module**
 
@@ -1437,6 +1480,8 @@ EOF
 **Files:**
 - Modify: `CHANGELOG.md`
 
+> **Status: ✅ COMPLETE.** Entry landed and has since aged out of "Unreleased" into a dated release: `CHANGELOG.md` §`[0.4.0] - 2026-05-18` (around lines 94-99, 109-110): "Autonomous-mode contract — Phase 1 of the autonomous-mode-and-orchestration rollout... Claudfather/clauDNA#82." More detailed than the plan's minimal template — documents every sub-change with file references, including the later Phase 3 entry immediately below it in the same release.
+
 - [ ] **Step 1: Add an Unreleased entry**
 
 Find the existing `## [Unreleased]` section (or add one at the top under the title if missing). Add a bulleted entry summarizing Phase 1:
@@ -1465,6 +1510,8 @@ git commit -m "docs(changelog): record Phase 1 autonomous-mode contract changes"
 ## Phase 1 Verification
 
 After all tasks complete, run end-to-end verification.
+
+> **Status: ✅ COMPLETE.** Re-ran this verification during this audit (2026-07-06): `python3 scripts/validate-skills.py` → "OK: 61 skills validated, no blocking violations." §10 of `orchestration-guide.md` confirmed intact top-to-bottom (Tier-3 sub-section, Structured Result Shape sub-section, compatibility matrix rows all present). The real PR that shipped this phase was literally titled "Phase 1: Autonomous-mode contract & structured result shape (#85)" — matching the title this plan's Step 5 script proposes almost exactly.
 
 - [ ] **Step 1: Run the full validator**
 
