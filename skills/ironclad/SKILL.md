@@ -60,6 +60,7 @@ Subagents are always available — there is no executor-availability step. Pick 
 | Lens | Skill | Applies to | Status |
 |------|-------|-----------|--------|
 | Adversarial Review | `adversarial-review` | plan, implementation, mixed | Active |
+| Align to Mission | `align-to-mission` | plan, mixed | Active |
 | First Principles | `first-principles` | plan, mixed | Active |
 | Extension Check | `extension-check` | implementation, mixed | Active |
 | Precedent Check | `precedent-check` | plan, implementation, mixed | Active |
@@ -82,7 +83,7 @@ Operate non-interactively: do not enter plan mode, do not prompt for input.
 Emit structured markdown per skills/_shared/contracts/lens-result-contract.md.
 ```
 
-Substitute `<SOURCE_PATH>` with the `<scratch>/source.md` path (or the PR URL for codebase-reading lenses such as extension-check and precedent-check), `<scratch>` with the scratch dir, and `<lens>` with each lens directory name.
+Substitute `<SOURCE_PATH>` with the `<scratch>/source.md` path (or the PR URL for codebase-reading lenses such as extension-check and precedent-check), `<scratch>` with the scratch dir, and `<lens>` with each lens directory name. For `align-to-mission`, append the target's repo (and local checkout path if the cwd differs) to the launch prompt — the lens reads mission documents (PROJECT_MISSION.md / README / CLAUDE.md) from the repo under review, never from an unrelated invoking directory, otherwise it grades the plan against the wrong mission.
 
 ### Phase 5: Collect results
 
