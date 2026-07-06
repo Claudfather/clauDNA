@@ -60,6 +60,7 @@ Subagents are always available — there is no executor-availability step. Pick 
 | Lens | Skill | Applies to | Status |
 |------|-------|-----------|--------|
 | Adversarial Review | `adversarial-review` | plan, implementation, mixed | Active |
+| Align to Mission | `align-to-mission` | plan, mixed | Active |
 | First Principles | `first-principles` | plan, mixed | Active |
 | Extension Check | `extension-check` | implementation, mixed | Active |
 | Precedent Check | `precedent-check` | plan, implementation, mixed | Active |

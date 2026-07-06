@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **`/ironclad` panel now dispatches `/align-to-mission`.** The lens shipped in 0.6.0 (#134) but was never added to ironclad's Phase-3 lens table, so no review cycle ever ran it. Added to the table for plan and mixed targets — surfaced by the first live `/ironclad --loops` run (epic #165 review, cycle 1).
+
 ### Added
 - **ADR 001 — shelve per-skill cheap-model subagent delegation.** `documentation/decisions/001-shelve-per-skill-model-delegation.md` records the decision *not* to build per-skill Haiku delegation for mechanical skills (`name-session` / `notes` / `lessons` / `skill-health`): subagent dispatch overhead exceeds the offloaded work for small single-shot skills, and the mechanism (skill→custom-agent dispatch; frontmatter `model:` actually pinning the subagent's model) is unproven in-repo. Documents the better alternative (agent-level model tiering on heavy read-only fan-out agents) and an explicit revisit trigger. First entry in `documentation/decisions/`.
 
