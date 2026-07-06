@@ -1,13 +1,15 @@
 ---
 title: "Phase 2: Ironclad Review Lens Skills"
 type: plan
-status: draft
+status: ✅ COMPLETE
 owner: astrid
 tags: [planning, skills, ironclad, lenses, clauDNA, dispatch]
 created: 2026-06-02
 updated: 2026-06-02
 ironclad-cycle: 1
 ---
+
+> **✅ COMPLETE (verified 2026-07-06 docs audit).** All six lens skills exist in `skills/`: `first-principles`, `align-to-mission`, `extension-check`, `precedent-check`, `plan-health-audit`, `cost-benefit` — each with `--dispatch` mode present. `skills/_shared/contracts/lens-result-contract.md` exists with the closed severity vocabulary (critical/major/minor/info) as specified. Unlike the companion ecosystem/migration docs, this one holds up cleanly against the current codebase with no architectural drift — candidate for archival.
 
 # Phase 2: Ironclad Review Lens Skills
 
@@ -100,6 +102,7 @@ Each skill's phase description declares its primary and secondary concern areas 
 All six skills are independent — fully parallelizable across engineers. Each phase below is one skill.
 
 ### Phase 2a: `/first-principles`
+**✅ COMPLETE** — `skills/first-principles/SKILL.md` exists with `--dispatch` mode.
 
 **Purpose:** Step back from the plan's proposed solution and ask whether the right problem is being solved the right way. Catches plans that extend suboptimal foundations, introduce accidental complexity, or miss simpler alternatives.
 
@@ -121,6 +124,7 @@ All six skills are independent — fully parallelizable across engineers. Each p
 **Relationship to `/adversarial-review`:** The adversarial-review skill includes "Lens 1: First Principles" as one of seven internal lenses. `/first-principles` extracts and deepens this into a standalone skill with its own `--dispatch` output, making it independently dispatchable by `/ironclad` to a dedicated bot. This gives first-principles reasoning a full context window instead of sharing one with six other lenses.
 
 ### Phase 2b: `/align-to-mission`
+**✅ COMPLETE** — `skills/align-to-mission/SKILL.md` exists with `--dispatch` mode.
 
 **Purpose:** Check whether every phase and deliverable in the plan serves the project's stated mission. Catches scope creep, tangential work, and misaligned success metrics.
 
@@ -145,6 +149,7 @@ All six skills are independent — fully parallelizable across engineers. Each p
 **Interactive mode (no `--dispatch`):** Present findings in chat with a summary table showing phase-by-phase alignment status (aligned / tangential / misaligned). For each concern, include options, a lean, and a rationale — advisory output that helps the developer reason about alignment, not just a verdict.
 
 ### Phase 2c: `/extension-check`
+**✅ COMPLETE** — `skills/extension-check/SKILL.md` exists with `--dispatch` mode.
 
 **Purpose:** For every new component a plan proposes, check whether an existing abstraction should be extended instead. Catches parallel implementations, duplicate patterns, and codebase sprawl before they happen.
 
@@ -163,6 +168,7 @@ All six skills are independent — fully parallelizable across engineers. Each p
 **Codebase access:** This skill requires reading the target codebase, not just the plan. In `--dispatch` mode, it uses Explore subagents to search for existing patterns matching each proposed component.
 
 ### Phase 2d: `/precedent-check`
+**✅ COMPLETE** — `skills/precedent-check/SKILL.md` exists with `--dispatch` mode.
 
 **Purpose:** Search git history, closed PRs, closed issues, and planning directories for prior art related to the plan's scope. Surface what was tried before and whether the current plan learns from or repeats past mistakes.
 
@@ -186,6 +192,7 @@ All six skills are independent — fully parallelizable across engineers. Each p
 **External tool dependency:** Requires `gh` CLI for issue/PR search. Graceful degradation: if `gh` is unavailable, search only git history and local files, and note the reduced coverage in the output.
 
 ### Phase 2e: `/plan-health-audit`
+**✅ COMPLETE** — `skills/plan-health-audit/SKILL.md` exists with `--dispatch` mode.
 
 **Purpose:** Structural completeness check — is the plan document itself well-formed, complete, and ready for implementation? This is the convergence gate for `/ironclad`.
 
@@ -215,6 +222,7 @@ All six skills are independent — fully parallelizable across engineers. Each p
 **Scope boundary:** This skill checks the plan *document*, not the codebase. It does not verify that file paths mentioned in the plan exist or that code references are accurate — that's `/extension-check`'s job. `/plan-health-audit` answers "is this document structurally ready to implement?" not "is this document factually correct?"
 
 ### Phase 2f: `/cost-benefit`
+**✅ COMPLETE** — `skills/cost-benefit/SKILL.md` exists with `--dispatch` mode.
 
 **Purpose:** For each phase in a plan, estimate engineering cost, operational cost, opportunity cost, and expected benefit. Help prioritize phases and identify low-ROI work that should be cut or deferred.
 

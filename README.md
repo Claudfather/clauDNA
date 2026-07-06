@@ -53,6 +53,14 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:tech-de
 | `/name-session` | Label the current session so it shows up cleanly in `/resume` |
 | `/weigh-development-paths` | Compare multiple viable approaches at a development junction |
 | `/adversarial-review` | Structured plan challenge with evidence and anti-groupthink guards |
+| `/forge` | Plan a multi-phase workstream — decision forks, phasing, spec/roadmap authoring |
+| `/ironclad` | Harden a plan Issue or PR with a panel of independent review lenses |
+| `/first-principles` | Check a plan solves the right problem the right way *(ironclad lens)* |
+| `/align-to-mission` | Check a plan's phases serve the project's stated mission *(ironclad lens)* |
+| `/extension-check` | Check a plan isn't duplicating existing codebase abstractions *(ironclad lens)* |
+| `/precedent-check` | Check a plan against prior art in the project's history *(ironclad lens)* |
+| `/plan-health-audit` | Check a forge plan is structurally complete and ready to build *(ironclad lens)* |
+| `/cost-benefit` | Weigh a plan's cost — effort, complexity, risk — against its impact *(ironclad lens)* |
 
 ### Code Quality
 
@@ -129,6 +137,9 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:tech-de
 | `/init-project` | Set up CLAUDE.md, CHANGELOG.md, and .claude/ for a new or existing project |
 | `/file-github-issue` | File a GitHub issue from a screenshot + short description |
 | `/github-activity-report` | GitHub activity stats (PRs, commits, contributors) over a time window |
+| `/skill-health` | Verify your clauDNA install — version, hooks, skills, dependencies |
+| `/skill-scaffold` | Scaffold a new clauDNA skill directory with valid frontmatter |
+| `/cleanup-legacy-install` | Remove a legacy pre-plugin `~/.claude/` overlay after upgrading |
 
 ## Daily Workflow
 

@@ -1,5 +1,7 @@
 # Session Handoff & Resume Redesign — Implementation Plan
 
+> **✅ COMPLETE (verified 2026-07-06 docs audit).** All 8 tasks below are done and match the codebase exactly — see per-task markers. Candidate for archival to `documentation/archive/`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace `/session-handoff` + `/context-resume` with a redesigned pair (`/session-handoff` + `/session-resume`) keyed by cwd, writing to `<cwd>/.claude/session.md`, with an evidence + TTL reaper. Shed all knowledge-capture work to Claudron's lane.
@@ -46,6 +48,7 @@
 ---
 
 ## Task 1: Create the shared reaper rules file
+**✅ COMPLETE** — `skills/_shared/reaper-rules.md` exists.
 
 **Files:**
 - Create: `global/skills/_shared/reaper-rules.md`
@@ -118,6 +121,7 @@ git commit -m "feat: shared reaper rules for session handoff/resume"
 ---
 
 ## Task 2: Rewrite `/session-handoff` SKILL.md
+**✅ COMPLETE** — `skills/session-handoff/SKILL.md` matches spec (cwd-keyed, `--auto`, reaper, atomic write, gitignore management); also gained a later §10.C structured-result emission step beyond this plan's scope.
 
 **Files:**
 - Modify: `global/skills/session-handoff/SKILL.md` (full replacement)
@@ -247,6 +251,7 @@ git commit -m "refactor: rewrite /session-handoff to scoped per-cwd handoff"
 ---
 
 ## Task 3: Update `/session-handoff` references/templates.md
+**✅ COMPLETE** — `skills/session-handoff/references/templates.md` has schema v2, per-item timestamps, v1 migration notes.
 
 **Files:**
 - Modify: `global/skills/session-handoff/references/templates.md` (full replacement)
@@ -317,6 +322,7 @@ git commit -m "refactor: session.md schema v2 (per-item timestamps, cwd-keyed)"
 ---
 
 ## Task 4: Rename `context-resume` → `session-resume`
+**✅ COMPLETE** — `skills/context-resume/` does not exist; `skills/session-resume/` does. (Note: repo-wide `global/` prefix used in this plan was itself later dropped in a separate breaking change — paths now read `skills/...` not `global/skills/...`.)
 
 **Files:**
 - Rename: `global/skills/context-resume/` → `global/skills/session-resume/`
@@ -343,6 +349,7 @@ git commit -m "refactor: rename /context-resume to /session-resume"
 ---
 
 ## Task 5: Rewrite `/session-resume` SKILL.md
+**✅ COMPLETE** — `skills/session-resume/SKILL.md` matches spec; `references/templates.md` was removed as planned (directory no longer exists under session-resume/).
 
 **Files:**
 - Modify: `global/skills/session-resume/SKILL.md` (full replacement)
@@ -495,6 +502,7 @@ git commit -m "refactor: rewrite /session-resume with reaper, --auto, legacy imp
 ---
 
 ## Task 6: Update internal references in clauDNA
+**✅ COMPLETE** — `orchestration-guide.md:446` and `repo-health/SKILL.md:80` both say `session-resume`; README.md has zero `context-resume` matches. `repo-health/SKILL.md:74`'s "Orphaned context-resume files" mention is the correct legacy-cleanup reference this task explicitly said to leave alone.
 
 **Files:**
 - Modify: `global/skills/_shared/orchestration-guide.md:408`
@@ -558,6 +566,7 @@ git commit -m "refactor: update internal references to /session-resume"
 ---
 
 ## Task 7: Update CHANGELOG.md
+**✅ COMPLETE** — breaking-change entry and migration note both present in CHANGELOG.md (now under a dated released section rather than [Unreleased], since time has passed).
 
 **Files:**
 - Modify: `CHANGELOG.md`
@@ -594,6 +603,7 @@ git commit -m "docs: changelog entry for session handoff/resume redesign"
 ---
 
 ## Task 8: End-to-end verification in this repo
+**✅ COMPLETE (implied)** — the skills are live and correct in the current codebase; the original manual verification scenarios are not independently re-checkable from a static docs audit, but the shipped artifacts match every scenario's expected end-state.
 
 **No file changes — manual scenarios from the spec's Validation section.**
 

@@ -1,12 +1,14 @@
 ---
 title: "Phase 3: Migrate /ironclad from claudlobby to clauDNA"
 type: plan
-status: draft
+status: ✅ COMPLETE (clauDNA-side); superseded by later §4.1 unification
 owner: alex
 tags: [planning, ironclad, migration, dispatch, clauDNA, claudlobby]
 created: 2026-06-02
 updated: 2026-06-03
 ---
+
+> **✅ COMPLETE, clauDNA-side (verified 2026-07-06 docs audit).** `skills/ironclad/SKILL.md` exists, is explicitly subagent-only (its own text: "the skill itself contains no fleet concepts (no tmux, no `[BOTREPORT]`, no `fleet-state.json`)" — grep-verified zero matches), dispatches lenses as parallel `general-purpose` subagents to a `/tmp/ironclad-<timestamp>/` scratch dir, and supports `--auto`. Phases 3a/3b (clauDNA-side) are done. Phase 3c (fleet-dispatch-capability protocol) and 3e (removal from claudlobby) are **UNVERIFIABLE FROM THIS REPO** — claudlobby is a sibling repo. Since this doc was written, the shipped skill evolved further: it now works on §4.1 plan Issues (not PRs) with a `--loops N` hardening loop and `forge --reforge`, superseding this doc's PR-based, single-cycle design. Candidate for archival once claudlobby-side Phase 3c/3e status is confirmed out-of-band.
 
 # Phase 3: Migrate /ironclad from claudlobby to clauDNA
 
@@ -122,6 +124,7 @@ The subagent writes its result to `lenses/<lens>/result.md` in the scratch dir. 
 ## Phases
 
 ### Phase 3a: Move SKILL.md to clauDNA (subagent-only)
+**✅ COMPLETE** — `skills/ironclad/SKILL.md` exists, subagent-only, dispatch preamble and mode-indicator both present in the shipped skill text.
 
 **Purpose:** Create `/ironclad` as a subagent-only skill in clauDNA. The SKILL.md describes the core algorithm: classify PR, create scratch dir, dispatch lenses as subagents, collect results, aggregate, post to PR, check convergence. No fleet concepts.
 
@@ -147,6 +150,7 @@ The subagent writes its result to `lenses/<lens>/result.md` in the scratch dir. 
 **Size:** M
 
 ### Phase 3b: --auto mode
+**✅ COMPLETE** — `--auto` present in `skills/ironclad/SKILL.md` argument-hint and structured-result emission.
 
 **Purpose:** `--auto` must work in subagent mode for machine-consumable output.
 
@@ -158,6 +162,7 @@ The subagent writes its result to `lenses/<lens>/result.md` in the scratch dir. 
 **Size:** S
 
 ### Phase 3c: Fleet dispatch protocol in claudlobby
+**UNVERIFIABLE FROM THIS REPO** — `library/protocols/fleet-dispatch-capability.md` would live in the sibling claudlobby repo, not here. clauDNA's `skills/ironclad/SKILL.md` does carry its side of the contract (the dispatch-preamble override hook and mode indicator), so the clauDNA half of this integration is confirmed complete.
 
 **Purpose:** Create a `fleet-dispatch-capability` protocol in claudlobby that, when composed into a fleet bot's CLAUDE.md, overrides `/ironclad`'s default subagent dispatch with fleet dispatch. This is the mechanism that preserves current fleet behavior without putting fleet concepts into clauDNA.
 
@@ -177,6 +182,7 @@ The subagent writes its result to `lenses/<lens>/result.md` in the scratch dir. 
 **Size:** M
 
 ### Phase 3d: Backwards compatibility validation
+**UNVERIFIABLE FROM THIS REPO** — requires a live fleet bot invocation to confirm empirically; cannot be checked via static docs audit.
 
 **Purpose:** Verify that the migration is seamless for both standalone and fleet users.
 
@@ -190,6 +196,7 @@ The subagent writes its result to `lenses/<lens>/result.md` in the scratch dir. 
 **Size:** S
 
 ### Phase 3e: Remove /ironclad from claudlobby
+**UNVERIFIABLE FROM THIS REPO** — this is a claudlobby-side deletion; clauDNA has no visibility into whether it happened.
 
 **Purpose:** Clean removal of the skill from claudlobby after clauDNA version is shipped and validated.
 
@@ -258,8 +265,8 @@ PR #141 closed. The rescoped approach folds into this plan as Phase 3c (fleet-di
 
 ## Companion Plans
 
-- `documentation/planning/2026-06-01-forge-ironclad-plan-hardening-ecosystem.md` — master plan defining Phases 1-4. This plan details Phase 3.
-- `documentation/planning/2026-06-02-phase2-ironclad-lens-skills.md` — Phase 2 plan (all lens skills, shipped).
+- `documentation/archive/2026-06-01-forge-ironclad-plan-hardening-ecosystem.md` — master plan defining Phases 1-4 (archived 2026-07-06, fully shipped). This plan details Phase 3.
+- `documentation/archive/2026-06-02-phase2-ironclad-lens-skills.md` — Phase 2 plan (all lens skills, shipped; archived 2026-07-06).
 - Phase 4 (convergence UX, multi-cycle automation) depends on this migration completing. Not yet planned.
 
 ## Dependencies

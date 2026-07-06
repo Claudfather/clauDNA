@@ -200,8 +200,8 @@ For bots, cron, and non-interactive runs that invoke claudna skills programmatic
     "allow": [
       "Skill(session-handoff)",            "Skill(session-handoff:*)",
       "Skill(claudna:session-handoff)",    "Skill(claudna:session-handoff:*)",
-      "Skill(context-resume)",             "Skill(context-resume:*)",
-      "Skill(claudna:context-resume)",     "Skill(claudna:context-resume:*)",
+      "Skill(session-resume)",             "Skill(session-resume:*)",
+      "Skill(claudna:session-resume)",     "Skill(claudna:session-resume:*)",
       "Skill(tech-debt)",                  "Skill(tech-debt:*)",
       "Skill(claudna:tech-debt)",          "Skill(claudna:tech-debt:*)",
       "Skill(security-audit)",             "Skill(security-audit:*)",

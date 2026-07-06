@@ -63,7 +63,7 @@ scripts/
 
 When modifying components inside the plugin tree (`skills/`, `agents/`, `plugin-hooks/`):
 1. Edit the file in place (this repo is the source of truth).
-2. Test by loading the plugin locally: `claude --plugin-dir /Users/chris/Projects/claudna` and invoking the affected skill.
+2. Test by loading the plugin locally: `claude --plugin-dir /Users/chris/Projects/clauDNA` and invoking the affected skill.
 3. Update `CHANGELOG.md` with the change.
 4. Before opening a PR, run `python3 scripts/validate-skills.py` — CI runs the same check and will block merge on violations.
 5. When bumping for release, update `version` in `.claude-plugin/plugin.json`. Without a bump, marketplace users do not receive the update.
