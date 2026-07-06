@@ -274,9 +274,11 @@ def check_structured_result_emission(fm: dict, body: str) -> list[str]:
     return errors
 
 
-# A `--` immediately followed by a letter is a CLI flag token (--auto, --output).
-# A spaced ` -- ` is prose (em-dash), which is fine.
-_DESC_FLAG_RE = re.compile(r"--[A-Za-z][A-Za-z-]*")
+# A whitespace-delimited token starting `--` followed by a letter is a CLI flag
+# (--auto, --output). Both prose forms of the double hyphen are fine: the spaced
+# em-dash (` -- `) and the glued compound (`plan--then-execute`) — hence the
+# start-of-string/after-whitespace anchor.
+_DESC_FLAG_RE = re.compile(r"(?:^|(?<=\s))--[A-Za-z][A-Za-z-]*")
 
 
 def check_description_grammar(fm: dict, body: str) -> list[str]:
@@ -326,25 +328,37 @@ def check_description_trigger_convention(fm: dict, body: str) -> list[str]:
 _SKILL_REF_RE = re.compile(r"\bclaudna:([A-Za-z0-9][A-Za-z0-9-]*)")
 
 
-def check_skill_references(text: str, valid_names: set[str]) -> list[str]:
+def collect_skill_reference_errors(text: str, valid_names: set[str]) -> list[tuple[str, str]]:
     """Every claudna:<name> mention must reference an existing skill.
 
     Cross-references are how skills route to each other (negative triggers,
     pipeline hand-offs); a dangling reference silently breaks that routing.
     Duplicate mentions of the same unknown target are reported once.
 
+    Returns (target, message) pairs. The target name matters: the caller must
+    register these as cross-skill errors with the TARGET as a participant, so
+    that a PR deleting skills/<target>/ (which marks only <target> as touched
+    in CI) still blocks on the dangling references left in untouched skills.
+    Attributing the error to the referrer alone demotes it to a warning in
+    exactly that scenario.
+
     Args:
         text: Markdown content to scan (a skill body or support file).
         valid_names: The set of existing skill directory names.
-
-    Returns:
-        List of error strings (empty = all references resolve).
     """
     unknown = {m.group(1) for m in _SKILL_REF_RE.finditer(text)} - valid_names
     return [
-        f"reference to unknown skill 'claudna:{target}' -- no skills/{target}/ directory"
+        (
+            target,
+            f"reference to unknown skill 'claudna:{target}' -- no skills/{target}/ directory",
+        )
         for target in sorted(unknown)
     ]
+
+
+def check_skill_references(text: str, valid_names: set[str]) -> list[str]:
+    """String-only projection of collect_skill_reference_errors."""
+    return [msg for _target, msg in collect_skill_reference_errors(text, valid_names)]
 
 
 def check_allowed_tools_usage(fm: dict, body: str) -> list[str]:

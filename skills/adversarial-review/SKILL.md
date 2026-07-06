@@ -1,7 +1,7 @@
 ---
 name: adversarial-review
 user-invocable: true
-description: "Use at any juncture where you have a plan, design, or proposal and want it stress-tested before execution — surfaces hidden assumptions, failure modes, edge cases, and gaps before they are locked in. For the standing multi-lens hardening loop on a published plan, use /claudna:ironclad."
+description: "Use at any juncture where you have a plan, design, or proposal and want it stress-tested before execution — pre-mortem analysis, assumption mapping, hidden failure modes, and edge cases surfaced before they are locked in. For the standing multi-lens hardening loop on a published plan, use /claudna:ironclad."
 argument-hint: "[plan-file-path] [--dispatch] [--output github|session]"
 ---
 

@@ -24,6 +24,7 @@ from skill_checks import (
     check_no_raw_gh_commands,
     check_output_github_reference,
     check_skill_references,
+    collect_skill_reference_errors,
     validate_skill_md,
     warn_skill_md,
 )
@@ -292,6 +293,18 @@ class TestDescriptionGrammar:
         fm = {"description": "Use when you need dbt commands -- build, test, compile -- against Snowflake."}
         assert check_description_grammar(fm, "body") == []
 
+    def test_unspaced_double_hyphen_prose_passes(self):
+        # A double hyphen glued to a preceding word (plan--then-execute, how--to)
+        # is prose punctuation, not a flag token; flags start a whitespace-delimited token.
+        fm = {"description": "Use when you plan--then-execute multi-step workflows."}
+        assert check_description_grammar(fm, "body") == []
+
+    def test_flag_at_description_start_fails(self):
+        fm = {"description": "--auto mode runner for headless workflows and pipelines."}
+        errors = check_description_grammar(fm, "body")
+        assert len(errors) == 1
+        assert "--auto" in errors[0]
+
     def test_missing_description_ignored(self):
         assert check_description_grammar({}, "body") == []
 
@@ -353,6 +366,40 @@ class TestSkillReferences:
         errors = check_skill_references(text, {"review-pr"})
         assert len(errors) == 1
         assert "missing-thing" in errors[0]
+
+
+# --- collect_skill_reference_errors (target attribution for CI partition) ---
+
+
+class TestCollectSkillReferenceErrors:
+    """Reference errors must carry the TARGET name so validate-skills.py can
+    register them as cross-skill errors. Without target attribution, a PR that
+    deletes skills/<X>/ marks only X as touched, dangling refs in untouched
+    skills demote to warnings, and CI passes exactly when the check matters."""
+
+    def test_returns_target_and_message_pairs(self):
+        text = "Hand off to /claudna:ghost-skill next."
+        pairs = collect_skill_reference_errors(text, {"publish"})
+        assert pairs == [
+            (
+                "ghost-skill",
+                "reference to unknown skill 'claudna:ghost-skill' -- no skills/ghost-skill/ directory",
+            )
+        ]
+
+    def test_known_reference_yields_nothing(self):
+        assert collect_skill_reference_errors("See /claudna:publish.", {"publish"}) == []
+
+    def test_multiple_unknown_targets_sorted_and_deduplicated(self):
+        text = "See claudna:zeta and claudna:alpha, then claudna:zeta again."
+        pairs = collect_skill_reference_errors(text, {"publish"})
+        assert [t for t, _ in pairs] == ["alpha", "zeta"]
+
+    def test_check_skill_references_stays_consistent(self):
+        # The legacy string API must remain a pure projection of the pairs.
+        text = "claudna:gone-one and claudna:gone-two"
+        pairs = collect_skill_reference_errors(text, set())
+        assert check_skill_references(text, set()) == [msg for _t, msg in pairs]
 
 
 # --- validate_skill_md picks up description grammar ---
