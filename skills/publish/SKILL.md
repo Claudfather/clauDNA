@@ -114,7 +114,7 @@ After creating:
 gh issue edit <number> --repo <owner>/<repo> --body-file <rendered-body-file>
 ```
 
-Rules: dedup is skipped (the target is explicit); the title is left untouched unless the doc's `title:` differs *and* the caller asked for a retitle; labels are additive only (`--add-label` for new `tags:`, never removing existing ones); report the issue URL and note "updated in place". The dedup near-match rule composes with this: when the mandatory dedup search finds an exact match, prefer offering an `--update` of the existing issue over skipping — updating keeps one canonical issue current instead of stranding it stale.
+Rules: dedup is skipped (the target is explicit); the title is never changed (`gh issue edit --body-file` only — retitling stays a manual act); labels are additive only (`--add-label` for new `tags:`, never removing existing ones); report the issue URL and note "updated in place". The exact-match dedup rule lives in `skills/_shared/output-guide.md` §4.5 and routes here: an exact match prefers an offered `--update` over a skip.
 
 ### Adapter: github-pr
 

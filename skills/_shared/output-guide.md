@@ -173,7 +173,7 @@ Skills that use severity systems map severity to a `priority:*` tag:
 
 The author does **not** dedup. The `github-issue` adapter of `/claudna:publish` searches for existing open issues before creating, and applies these rules:
 
-- **Exact match** (same file, same finding): Skip; report the existing issue URL.
+- **Exact match** (same file, same finding): prefer offering an in-place refresh via `/claudna:publish <doc> --update <existing-issue>` — one canonical issue stays current instead of stranding stale. If the caller declines (or the adapter has no update path), skip and report the existing issue URL.
 - **Related but different** (same area, different finding): Create and add `Related: #NNN`.
 - **Similar pattern, different location**: Prefer one umbrella issue listing all locations.
 - **Previously closed**: If it recurred, reopen with a comment; if a new instance, create referencing the old.
