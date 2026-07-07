@@ -1,6 +1,6 @@
 # Handoff File Format — `<cwd>/.claude/session.md`
 
-Schema version: 2. Written by `/session-handoff`, read by `/session-resume`. Optimized for agent consumption.
+Schema version: 2. Written by `/claudna:session` handoff and checkpoint modes, read by resume mode. Optimized for agent consumption.
 
 ```markdown
 ---
@@ -34,7 +34,7 @@ in_flight_branches:
 ## Format rules
 
 - Every bullet under Activity / Decisions / Open Questions / Next Steps starts with an ISO-8601 UTC timestamp followed by ` — ` (em-dash with spaces). The reaper parses on this format.
-- `State` is regenerated on every write — never preserves prior content.
+- `State` is regenerated on handoff/resume writes — never merged with prior content. Checkpoint refreshes `branch`/`working_tree` only and preserves the remaining State fields.
 - Empty sections may be omitted.
 - A bullet may carry a `(stale-flagged YYYY-MM-DD)` suffix added by the reaper. On the next pass, if the soft-drop conditions still hold, the bullet is dropped.
 - A bullet may carry a `[pin]` suffix added by the user to opt out of soft drops.
@@ -44,4 +44,4 @@ in_flight_branches:
 
 Legacy files at `~/.claude/notes/projects/<slug>/context-resume.md` use schema_version: 1 (no per-item timestamps; bullets in plain `- text` form; frontmatter with `session_date` only).
 
-When `/session-resume` imports a v1 file, it assigns the file's `session_date` as the timestamp for every imported item, then runs the reaper. Most v1 items will hard-drop on first reap because they exceed TTL (Activity > 7d, etc.) — which is the correct behavior.
+When resume mode imports a v1 file, it assigns the file's `session_date` as the timestamp for every imported item, then runs the reaper. Most v1 items will hard-drop on first reap because they exceed TTL (Activity > 7d, etc.) — which is the correct behavior.

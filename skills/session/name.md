@@ -1,13 +1,4 @@
----
-name: name-session
-user-invocable: true
-description: "Use when ending a session and you want to label it for easy identification in /resume. Also useful mid-session when work scope becomes clear."
-allowed-tools: Bash(git *), Bash(gh *)
----
-
-# Name Session
-
-Generate a descriptive session name in the format: `DESCRIPTION - REPO#PR - BRANCH` (all caps).
+Invoked by /claudna:session in name mode — generate a descriptive session name in the format: `DESCRIPTION - REPO#PR - BRANCH` (all caps), for easy identification in `/resume`. Interactive-only: this mode hands the user a `/rename` command.
 
 **The session name must reflect what this session actually did — not just whatever branch is currently checked out.** Sessions often switch branches, run in worktrees, or do investigative work unrelated to the current HEAD. Ground the name in the conversation, then use git state to confirm (or flag divergence).
 

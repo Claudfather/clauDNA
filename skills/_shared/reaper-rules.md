@@ -1,6 +1,6 @@
-# Reaper Rules — `/session-handoff` and `/session-resume`
+# Reaper Rules — the `/claudna:session` engine
 
-The reaper runs on every write (in `/session-handoff`) and every read (in `/session-resume`). Its job: prune stale items from `<cwd>/.claude/session.md` so the file stays scoped to live work.
+The reaper runs on every handoff write and every resume read (`/claudna:session` — checkpoint mode deliberately never reaps). Its job: prune stale items from `<cwd>/.claude/session.md` so the file stays scoped to live work.
 
 ## Inputs
 

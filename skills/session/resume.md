@@ -1,23 +1,6 @@
----
-name: session-resume
-user-invocable: true
-description: "Use at the start of a new session to read <cwd>/.claude/session.md, reap stale items, scan live state, and brief the agent on where to pick up. Counterpart to /claudna:session-handoff."
-allowed-tools: Bash(git *), Bash(gh *), Bash(stat *), Bash(ls *), Bash(grep *), Bash(mv *), Bash(mkdir *), Read, Write, Glob
-argument-hint: "[--auto]"
----
+Invoked by /claudna:session in resume mode — restore short-burst context fast at the start of a new session. Counterpart to the `handoff` mode.
 
-# Session Resume
-
-Restore short-burst context fast. Counterpart to `/session-handoff`.
-
-**Identity:** Keyed by **cwd**. Reads `<cwd>/.claude/session.md`.
-
-Target: under 30 seconds.
-
-## Arguments
-
-Parse `$ARGUMENTS`:
-- `--auto`: Headless. Skip step 7 (the user-focus question). Auto-import any legacy file silently.
+Target: under 30 seconds. With `--auto` (headless): skip step 7 (the user-focus question); auto-import any legacy file silently.
 
 ## Steps
 
@@ -27,7 +10,7 @@ Read `<cwd>/.claude/session.md`.
 
 If absent, check the legacy path: derive a slug from `git remote get-url origin` (extract `org/repo`, lowercase, replace `/` with `--`); fallback to lowercased dirname. Look for `~/.claude/notes/projects/<slug>/context-resume.md`. If found:
 
-- **With `--auto`:** Import silently. Copy content into `<cwd>/.claude/session.md` (assign the legacy file's `session_date` as the timestamp for every imported bullet — see `skills/session-handoff/references/templates.md` migration notes). Delete the legacy file. Continue.
+- **With `--auto`:** Import silently. Copy content into `<cwd>/.claude/session.md` (assign the legacy file's `session_date` as the timestamp for every imported bullet — see the migration notes in `templates.md` in this skill directory). Delete the legacy file. Continue.
 - **Without `--auto`:** Ask once: "Found a legacy handoff at `<path>` (last touched <date>). Import it? [y/N]". On `y`: import as above. On `n`: leave the legacy file alone and proceed without it.
 
 If neither file exists, run step 2 (live scan), then skip to step 5. Present a brief greeting using the live-scan data only; there is no handoff history.
@@ -107,9 +90,10 @@ When invoked with `--auto`, emit the §10.C structured result from `_shared/orch
 
 ```json
 {
-  "skill": "session-resume",
+  "skill": "session",
   "outcome": "completed",
   "artifacts": {
+    "mode": "resume",
     "handoff_path": "<absolute path to <cwd>/.claude/session.md, or null if none>",
     "handoff_found": true,
     "legacy_imported": false,
@@ -135,6 +119,5 @@ Interactive mode (no `--auto`) skips this step entirely.
 - **Read-only by default.** Only writes are step 4 (write back if reaped) and step 1 legacy import. Never modifies code, never commits.
 - **Speed over depth.** Scan, reap, summarize. No deep analysis.
 - **Reaper rules in `_shared/`.** Do not duplicate them inline.
-- **No compound commands.** Make separate parallel tool calls.
 - **`--auto` is silent on the prompt.** Briefing and focus suggestion still emit (they are the agent's context payload); only the explicit user-question is suppressed.
 - **Legacy import is one-shot per cwd.** Once imported, the legacy file is deleted, so this branch only fires once per project.

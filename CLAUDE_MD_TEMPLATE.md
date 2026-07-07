@@ -103,6 +103,6 @@ After ANY correction from the user:
 
 ---
 
-_Update this file at session boundaries (e.g., during `/session-handoff`). After corrections, update `.claude/lessons.md`._
+_Update this file at session boundaries (e.g., during `/claudna:session handoff`). After corrections, update `.claude/lessons.md`._
 
 _If this file grows beyond ~200 lines, move domain-specific details into `.claude/rules/` files with `paths:` frontmatter for on-demand loading._

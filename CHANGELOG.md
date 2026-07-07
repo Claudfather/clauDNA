@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **`/session` engine — 3 session skills become 1, plus a new mode ([#168](https://github.com/Claudfather/clauDNA/issues/168), epic [#165](https://github.com/Claudfather/clauDNA/issues/165) P4).** `session-handoff`, `session-resume`, and `name-session` consolidate into one engine with verb modes (`/claudna:session resume|handoff|checkpoint|name`) over the unchanged per-cwd substrate (`<cwd>/.claude/session.md` + `_shared/reaper-rules.md`). Bare `/session` uses **deterministic inference only** (F2 as amended): fresh session + handoff present → resume; an explicit wrap-up cue from the enumerated literal list → handoff; anything else prints the mode table and stops — never a blocking question, and the verb is required under `--auto`. **New `checkpoint` mode**: a mid-session save without the ceremony — appends new items and refreshes `branch`/`working_tree` only; deliberately never reaps, never scans fully, never manages `.gitignore` (all of that stays with `handoff`). Structured results carry `"skill": "session"` + `"mode"` in artifacts; the interactive-only `name` mode emits `blocked` under `--auto`. Mode procedures ported whole (handoff's reap-scan-write pipeline, resume's brief-and-suggest flow with legacy import, name's conversation-grounded reconciliation); the handoff file template moves to `skills/session/templates.md`.
+
+### Changed
+- Cross-references across README, SETUP_GUIDE (the four per-skill `Skill(session-*)` permission rules collapse to two `Skill(session…)` forms), both CLAUDE.md templates, `_shared` guides (reaper-rules retitled to the engine; documentation-standard and orchestration-guide rows), init-project, and the audit repo-health lens rewritten to `/claudna:session <mode>` form; routing fixtures' P4 rows expect the engine with modes.
+
+### Removed
+- **The 3 standalone session skills**: `session-handoff`, `session-resume`, `name-session` — hard removal per epic #165 F4 (per-phase releases). Their procedures live in the engine's mode files; the `Replaces` breadcrumb carries muscle memory; the pin recipe covers anyone needing the old names (`v0.8.0` is the last pre-P4 version). Catalog: 46 → 44 picker entries.
 
 ## [0.8.0] - 2026-07-07
 ### Added

@@ -79,7 +79,7 @@ Scan `CLAUDE.md` for instructions that encourage editing CLAUDE.md during an act
 - "Add new patterns to CLAUDE.md as you discover them"
 - "Keep CLAUDE.md current during work"
 
-The correct pattern: update CLAUDE.md at session boundaries (during `/claudna:session-handoff`), not mid-session. Mid-session edits invalidate the cached system prompt.
+The correct pattern: update CLAUDE.md at session boundaries (during `/claudna:session handoff`), not mid-session. Mid-session edits invalidate the cached system prompt.
 
 Also check the Self-Improvement Loop section — "Update `.claude/lessons.md`" is fine (lessons are not in the system prompt), but "Update CLAUDE.md" is a cache-busting pattern.
 

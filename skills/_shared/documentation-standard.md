@@ -50,7 +50,7 @@ Session directories follow: `<session-name>_<YYYY-MM-DD>`
 
 Example: `api-rate-limiting_2026-05-10`
 
-The `/claudna:name-session` skill generates these. Session names are kebab-case slugified descriptors.
+The `/claudna:session` engine's name mode generates these. Session names are kebab-case slugified descriptors.
 
 ## 4. File Naming Within Sessions
 
@@ -65,7 +65,7 @@ Phase files use: `NN_<phase-slug>.md` (e.g., `01_input-validation.md`).
 
 ## 5. Status Markers
 
-Embed these in plan documents. They are machine-read by `/claudna:session-resume`, `/claudna:session-handoff`, and `/claudna:implement-plan`:
+Embed these in plan documents. They are machine-read by `/claudna:session` (resume and handoff modes) and `/claudna:implement-plan`:
 
 | Marker | Meaning |
 |--------|---------|
@@ -81,7 +81,7 @@ When all phases are `✅ COMPLETE` and the final PR is merged:
 git mv documentation/planning/<category>/<session>/ documentation/archive/<session>/
 ```
 
-`/claudna:implement-plan` does this in Step 8. `/claudna:session-handoff` flags completed-but-unarchived sessions.
+`/claudna:implement-plan` does this in Step 8. `/claudna:session` handoff mode flags completed-but-unarchived sessions.
 
 ## 7. Non-Planning Directories
 
@@ -97,7 +97,7 @@ These are not archived — they're living documents that evolve with the codebas
 
 ## 8. Reading Documentation State
 
-Skills that scan documentation state (e.g., `/claudna:session-resume`, `/claudna:session-handoff`, `/claudna:audit repo-health`):
+Skills that scan documentation state (e.g., `/claudna:session` resume and handoff modes, `/claudna:audit repo-health`):
 
 ```bash
 # Find in-progress plans

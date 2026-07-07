@@ -1,25 +1,6 @@
----
-name: session-handoff
-user-invocable: true
-description: "Use at the end of a session to write a per-cwd handoff file (<cwd>/.claude/session.md) capturing live state, activity, decisions, open questions, and next steps. Reaps stale items on write. Counterpart to /claudna:session-resume."
-allowed-tools: Bash(git *), Bash(gh *), Bash(ls *), Bash(wc *), Bash(date *), Bash(grep *), Bash(mv *), Bash(mkdir *), Read, Write, Edit, Glob
-argument-hint: "[--auto]"
----
+Invoked by /claudna:session in handoff mode — write the short-burst continuity tattoo at the end of a session. Counterpart to the `resume` mode.
 
-# Session Handoff
-
-Write the short-burst continuity tattoo. Counterpart to `/session-resume`.
-
-**Identity:** This skill is keyed by **cwd**. The handoff lives at `<cwd>/.claude/session.md`. No global slug, no cross-project state.
-
-**Scope:** Session continuity only. Knowledge capture (lessons, durable findings, memory pruning, changelog backfill) is **not** this skill's job — Claudron owns that lane. Use `/lessons` or `/notes` for cross-session knowledge today.
-
-Target: under 60 seconds with `--auto`, under 2 minutes interactive.
-
-## Arguments
-
-Parse `$ARGUMENTS`:
-- `--auto`: Fully non-interactive. Never ask the user anything. Reaper runs as the only pruning mechanism. Silent on success.
+Target: under 60 seconds with `--auto`, under 2 minutes interactive. With `--auto`: fully non-interactive — never ask the user anything; the reaper is the only pruning mechanism; silent on success.
 
 ## Steps
 
@@ -73,7 +54,7 @@ Combine reaped survivors (from step 3) + new items (from step 4). Dedupe by cont
 
 ### 7. Write `<cwd>/.claude/session.md`
 
-Ensure `<cwd>/.claude/` exists first (`mkdir -p <cwd>/.claude`). Use the format in `references/templates.md`. Write atomically: write to `<cwd>/.claude/session.md.tmp` then `mv` to `<cwd>/.claude/session.md`.
+Ensure `<cwd>/.claude/` exists first (`mkdir -p <cwd>/.claude`). Use the format in `templates.md` in this skill directory. Write atomically: write to `<cwd>/.claude/session.md.tmp` then `mv` to `<cwd>/.claude/session.md`.
 
 ### 8. Manage `.gitignore`
 
@@ -88,12 +69,12 @@ Detect:
    session.md
    ```
 
-This is idempotent — step 1 catches both "already there" and "ignored by parent dir" (e.g., Claudlobby's `runtime/` is ignored at the Claudlobby root, so individual bot dirs need no further action).
+This is idempotent — step 1 catches both "already there" and "ignored by parent dir" (e.g., a runtime tree ignored at its root needs no further action).
 
 ### 9. Confirm
 
 - **With `--auto`:** Skip this confirmation — proceed to step 10.
-- **Without `--auto`:** "Handoff written to `<cwd>/.claude/session.md`. Use `/session-resume` next session."
+- **Without `--auto`:** "Handoff written to `<cwd>/.claude/session.md`. Use `/claudna:session resume` next session."
 
 ### 10. Structured-result emission (`--auto` only)
 
@@ -101,9 +82,10 @@ When invoked with `--auto`, emit the §10.C structured result from `_shared/orch
 
 ```json
 {
-  "skill": "session-handoff",
+  "skill": "session",
   "outcome": "completed",
   "artifacts": {
+    "mode": "handoff",
     "handoff_path": "<absolute path to <cwd>/.claude/session.md>",
     "branch": "<current branch>",
     "items_reaped": <N>,
@@ -127,8 +109,5 @@ Interactive mode (no `--auto`) skips this step entirely.
 
 - **Speed over thoroughness.** Reap, scan, write. Not a documentation exercise.
 - **Reaper rules in `_shared/`.** Do not duplicate them inline. Read `../_shared/reaper-rules.md` and apply.
-- **No writes to `~/.claude/`.** This skill stays out of the user-config tree entirely.
-- **No compound commands.** Make separate parallel tool calls — `allowed-tools` patterns only match simple commands.
 - **`State` is always regenerated.** Never reaped, never merged with prior State.
 - **`--auto` means silent.** Reaper is the only pruning mechanism in `--auto`; user-driven pruning is interactive-only.
-- **Atomic write.** `tmp` + `mv` so a concurrent reader (e.g., a bot mid-task) never sees a half-written file.

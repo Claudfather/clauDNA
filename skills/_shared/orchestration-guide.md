@@ -382,7 +382,7 @@ Every `--auto` run emits a single fenced JSON block as its final output (the las
 | `/claudna:audit access-path` | ✅ Yes | Scan + issue creation, no user input needed |
 | `/claudna:product-vision` | ⚠️ Limited | Vision without user input produces generic ideas. Use only with tight scope. |
 | `/claudna:audit design` | ❌ No | Requires screenshots, deployed URL, visual judgment |
-| `/claudna:session-handoff` | ✅ Yes | Already implemented |
+| `/claudna:session` (handoff/resume/checkpoint modes) | ✅ Yes | Already implemented |
 | `/claudna:implement-plan` | ✅ Yes | **Tier 3.** Phase 3 of the autonomous-mode rollout. Consumes plans/issues, produces PRs, never merges. |
 | `/claudna:weigh-development-paths` | ✅ Yes | **Composable.** Phase 1 adds `--auto` for chained use from `/implement-plan --auto`. Returns refined plan. |
 | `/claudna:adversarial-review` | ✅ Yes | **Composable.** `--dispatch` mode is non-interactive when invoked from another skill. Returns structured critique findings. |

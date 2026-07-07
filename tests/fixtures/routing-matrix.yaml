@@ -132,18 +132,26 @@ rows:
     mode: repo-health
     phase: P3
 
-  # --- P4: session family ---
+  # --- P4: session family (consolidated into the /session engine) ---
   - utterance: "write a handoff — I'm done for the day"
     keywords: [end of a session, handoff]
-    expect: session-handoff
+    expect: session
+    mode: handoff
     phase: P4
   - utterance: "new session — where did I leave off?"
     keywords: [start of a new session, pick up]
-    expect: session-resume
+    expect: session
+    mode: resume
     phase: P4
   - utterance: "label this session so I can find it later"
     keywords: [label, session]
-    expect: name-session
+    expect: session
+    mode: name
+    phase: P4
+  - utterance: "save a checkpoint before this risky refactor"
+    keywords: [checkpoint, mid-session]
+    expect: session
+    mode: checkpoint
     phase: P4
 
   # --- P5: review family ---

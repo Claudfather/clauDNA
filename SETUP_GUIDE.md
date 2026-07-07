@@ -192,16 +192,14 @@ Optional categories — add only the ones whose skills you actually use:
 
 #### Auto-skill-approval expansion
 
-For bots, cron, and non-interactive runs that invoke claudna skills programmatically, add `Skill(...)` rules to prevent permission prompts. **Anthropic's docs do not specify whether `Skill()` matches against the bare skill name (`session-handoff`) or the plugin-namespaced form (`claudna:session-handoff`).** To be safe, write both forms. Permission rules are additive — extra rules don't hurt.
+For bots, cron, and non-interactive runs that invoke claudna skills programmatically, add `Skill(...)` rules to prevent permission prompts. **Anthropic's docs do not specify whether `Skill()` matches against the bare skill name (`session`) or the plugin-namespaced form (`claudna:session`).** To be safe, write both forms. Permission rules are additive — extra rules don't hurt.
 
 ```json
 {
   "permissions": {
     "allow": [
-      "Skill(session-handoff)",            "Skill(session-handoff:*)",
-      "Skill(claudna:session-handoff)",    "Skill(claudna:session-handoff:*)",
-      "Skill(session-resume)",             "Skill(session-resume:*)",
-      "Skill(claudna:session-resume)",     "Skill(claudna:session-resume:*)",
+      "Skill(session)",                    "Skill(session:*)",
+      "Skill(claudna:session)",            "Skill(claudna:session:*)",
       "Skill(audit)",                      "Skill(audit:*)",
       "Skill(claudna:audit)",              "Skill(claudna:audit:*)",
       "Skill(product-enhance)",            "Skill(product-enhance:*)",

@@ -78,7 +78,7 @@ Generate `CLAUDE.md` using the template at [references/CLAUDE_MD_TEMPLATE.md](re
 - Static sections first, dynamic sections last. Add `<!-- Static sections above, project-specific sections below. Keep this order for prompt cache efficiency. -->` at the boundary.
 - Keep CLAUDE.md under 200 lines (WARN). Over 350 lines is a FAIL — significant token cost per call.
 - Don't auto-load `.claude/lessons.md` — keep lessons on-demand via `/claudna:lessons`.
-- Don't add instructions to edit CLAUDE.md mid-session — defer edits to session boundaries (`/claudna:session-handoff`).
+- Don't add instructions to edit CLAUDE.md mid-session — defer edits to session boundaries (`/claudna:session handoff`).
 - Don't add instructions to switch models or tools mid-session — both invalidate the entire prompt cache.
 - If using `.claude/rules/`, ensure each file has `paths:` frontmatter (not `globs:`) to scope when each rule loads.
 
