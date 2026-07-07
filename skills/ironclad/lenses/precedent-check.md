@@ -1,37 +1,20 @@
----
-name: precedent-check
-description: "Use when you want to check whether a plan or implementation PR has prior art in the project's history — previous attempts at the same problem, what was tried, what succeeded or failed, and whether the current plan learns from or repeats the past. Runs standalone or as a lens in the /claudna:ironclad review panel."
-argument-hint: "[plan-or-source-path] [--dispatch]"
----
+Panel lens for /claudna:ironclad — checks whether a plan or implementation PR has prior art in the project's history: previous attempts at the same problem, what was tried, what succeeded or failed, and whether the current plan learns from or repeats the past.
+Dispatched by the panel (or via /claudna:ironclad --lens precedent-check); emits structured markdown per skills/_shared/contracts/lens-result-contract.md. Not user-invocable.
 
 # Precedent Check
 
-Before building something new, check what came before. Plans that ignore prior art risk repeating mistakes, re-introducing reverted approaches, or duplicating work that already shipped under a different name. This skill searches the project's history — git log, closed PRs, closed issues, planning archives — and surfaces relevant precedents so the plan can build on them rather than around them.
+Before building something new, check what came before. Plans that ignore prior art risk repeating mistakes, re-introducing reverted approaches, or duplicating work that already shipped under a different name. This lens searches the project's history — git log, closed PRs, closed issues, planning archives — and surfaces relevant precedents so the plan can build on them rather than around them.
 
 **This is a codebase-dependent lens.** It reads the plan document AND searches the target repository's history using `git log`, `gh` CLI, and Explore subagents. It applies the "consolidate, don't fork" principle across time: if the team solved this problem before, the plan should acknowledge that history.
 
-## Arguments
+## Dispatch Rules
 
-Parse `$ARGUMENTS` at invocation:
-
-- **First positional arg:** Path to the plan document or PR source file. If omitted, prompt for it.
-- `--dispatch`: Non-interactive mode for fleet orchestration. Suppresses all interactive elements (no Plan Mode, no AskUserQuestion). Emits a single markdown document with YAML frontmatter per `skills/_shared/contracts/lens-result-contract.md`. Use this when invoked by `/ironclad` or another orchestrator.
-
----
-
-## `--dispatch` Mode
-
-When `--dispatch` is passed:
-
+- The dispatcher provides the source (plan document path or PR URL) and the result path.
 - **Do NOT call `EnterPlanMode`.** The dispatcher owns the lifecycle.
 - **Do NOT call `AskUserQuestion`.** No human is present.
 - **Do NOT prompt for clarification.** If the plan lacks identifiable topics or scope, emit `status: blocked` with a description of what is missing.
 - Execute the procedure below silently.
 - Emit the structured markdown result as the FINAL output and stop. No text after the result document.
-
-When `--dispatch` is NOT passed, follow the interactive procedure (see Interactive Mode below).
-
----
 
 ## Procedure
 
@@ -46,7 +29,7 @@ Read the full plan document. Extract:
 
 Build a list of **search terms** from these extractions: component names, domain keywords, problem descriptions. These drive the history searches in Step 2.
 
-If the plan lacks identifiable topics (no goal, no component names, no domain references), stop. In `--dispatch` mode, emit `status: blocked`. In interactive mode, tell the user the plan needs enough specificity for a history search to be meaningful.
+If the plan lacks identifiable topics (no goal, no component names, no domain references), stop and emit `status: blocked` with a description of what is missing.
 
 ### Step 2: Search for Prior Art
 
@@ -123,13 +106,13 @@ Classify the outcome:
 
 After analyzing precedents, identify areas of the plan that have **no relevant prior art**. These are genuinely novel — the plan is entering uncharted territory.
 
-Novel ground is not a finding. It is context: the plan cannot learn from history in these areas, so other lenses (first-principles, extension-check) carry more weight there. Note novel areas briefly in Observations.
+Novel ground is not a finding. It is context: the plan cannot learn from history in these areas, so other lenses — the first-principles panel lens (lenses/first-principles.md) and the extension-check panel lens (lenses/extension-check.md) — carry more weight there. Note novel areas briefly in Observations.
 
 ### Step 5: Emit Findings
 
 Classify each finding using the severity vocabulary defined in `skills/_shared/contracts/lens-result-contract.md` (`critical` > `major` > `minor` > `info`).
 
-Tag each finding with a concern area. This skill's primary concern areas are `architecture` and `scope`. Secondary: `compatibility` (when prior art reveals that a previous approach was abandoned due to migration or compatibility barriers). Use the closest match from the canonical set in the contract.
+Tag each finding with a concern area. This lens's primary concern areas are `architecture` and `scope`. Secondary: `compatibility` (when prior art reveals that a previous approach was abandoned due to migration or compatibility barriers). Use the closest match from the canonical set in the contract.
 
 Map findings to body sections:
 
@@ -141,96 +124,26 @@ Map findings to body sections:
 | **Questions** | Ambiguous whether the plan's approach differs enough from a prior attempt; prior art outcome unclear from history |
 | **Observations** | Areas with no prior art (novel ground); prior art that the plan correctly builds on; pattern of repeated refactors in the target area |
 
----
-
-## Structured Result Emission (`--dispatch` only)
+## Structured Result Emission
 
 After Step 5, emit a single markdown document with YAML frontmatter as the FINAL output. No text before or after this document.
 
-**Format:** Follow the canonical schema at `skills/_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all lens skill `--dispatch` output.
+**Format:** Follow the canonical schema at `skills/_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all panel lens output.
 
-For this skill, set `lens: precedent-check` in frontmatter. All other fields, severity vocabulary, body sections (Blockers/Risks/Gaps/Questions/Observations), concern area values, and blocked/failed output shape are defined in the contract.
-
----
-
-## Interactive Mode (no `--dispatch`)
-
-When invoked without `--dispatch`, this skill is an **advisor**, not a report generator.
-
-**Enter Plan Mode.** Call `EnterPlanMode`. All analysis is read-only.
-
-Execute Steps 1-5 above, then present findings as an advisory conversation:
-
-### Advisory Format
-
-Lead with a precedent summary table showing what was found for each plan topic. Then present each concern with options and leans.
-
-For each finding, present:
-
-1. **The precedent** — what was tried before, with a reference (PR number, commit SHA, plan doc path).
-2. **The concern** — how the current plan relates to the precedent (repeats it, ignores it, builds on it).
-3. **Options** — 2-3 ways the plan could address the concern (including "keep as-is" when the plan already accounts for the history).
-4. **Lean** — which option you'd pick and why, in one sentence.
-5. **Rationale** — the reasoning, grounded in what the history reveals.
-
-### Example Advisory Output
-
-```
-## Precedent Check: [Plan Title]
-
-### Prior Art Summary
-
-| Plan Topic | Precedents Found | Most Relevant |
-|-----------|-----------------|---------------|
-| Auth middleware rewrite | 3 PRs, 1 reverted | PR #87 (reverted — broke session persistence) |
-| Rate-limit config | 1 merged PR | PR #102 (active, ships current approach) |
-| API versioning | None | Novel ground |
-
-### Concerns
-
-**Concern:** PR #87 attempted the same auth middleware rewrite and was reverted because it broke session persistence under load. The current plan does not reference this failure.
-- **(a)** Add a phase addressing session persistence explicitly, informed by PR #87's failure mode
-- **(b)** Add a validation step that tests session persistence under load before merge
-- **(c)** Keep as-is — the plan uses a fundamentally different approach that avoids PR #87's architecture
-- **Lean:** (a) — the plan uses the same middleware pattern as PR #87; without explicitly addressing session persistence, it risks the same failure
-
-**Concern:** The rate-limit config in Phase 3 overlaps with the approach already shipped in PR #102.
-- **(a)** Extend PR #102's config rather than building a new one (consolidate)
-- **(b)** Replace PR #102's approach with the new design (acknowledge and supersede)
-- **Lean:** (a) — PR #102 is active and working; extending it avoids a parallel path
-
-### Novel Ground
-API versioning has no prior art in this repo. Other lenses (first-principles, extension-check) carry more weight for this area.
-
-### Summary
-[2-3 sentences. Key takeaway: does the plan learn from history, or does it risk repeating it?]
-```
-
-Use one heading per concern. Precedents that the plan correctly acknowledges need only their summary table row.
-
----
+For this lens, set `lens: precedent-check` in frontmatter. All other fields, severity vocabulary, body sections (Blockers/Risks/Gaps/Questions/Observations), concern area values, and blocked/failed output shape are defined in the contract.
 
 ## Codebase Access Strategy
 
-This skill requires access to the target repository's history, not just the plan document.
+This lens requires access to the target repository's history, not just the plan document.
 
-**In `--dispatch` mode (fleet orchestration):**
 - The working directory context or the PR URL in the source frontmatter identifies the target repo.
 - Use `gh pr view` to determine the repo if a `pr_url` is available in the source frontmatter.
 - Clone or navigate to the repo as needed. If already in the repo's working directory, use it directly.
 - Use Explore subagents for all history searches to keep the main context lean.
 
-**In interactive mode:**
-- Prompt for the repo path if not obvious from the current working directory.
-- Use Explore subagents for history searches.
-
----
-
 ## Relationship to `/adversarial-review`
 
-`/adversarial-review` includes an "Alternatives" lens that may touch on prior approaches. This standalone skill deepens that into a systematic history search with git log, `gh` CLI, and planning archives, giving precedent analysis a full context window and structured per-topic output. The overlap is intentional — general checkup vs. specialist appointment.
-
----
+`/adversarial-review` includes an "Alternatives" lens that may touch on prior approaches. This lens deepens that into a systematic history search with git log, `gh` CLI, and planning archives, giving precedent analysis a full context window and structured per-topic output. The overlap is intentional — general checkup vs. specialist appointment.
 
 ## Red Flags — You Are Doing This Wrong
 

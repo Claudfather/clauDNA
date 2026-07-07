@@ -4,6 +4,14 @@
 # documentation/archive/) from mentioning these names in any form;
 # `Replaces ...` breadcrumb lines are exempt.
 #
+# P6 (0.10.0) — lenses into the ironclad panel
+first-principles
+align-to-mission
+extension-check
+precedent-check
+plan-health-audit
+cost-benefit
+#
 # P4 (0.9.0) — session engine: /session
 session-handoff
 session-resume

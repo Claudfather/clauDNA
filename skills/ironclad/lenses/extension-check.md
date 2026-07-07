@@ -1,8 +1,5 @@
----
-name: extension-check
-description: "Use when you want to verify that a plan or implementation PR isn't duplicating existing codebase abstractions — parallel implementations, redundant patterns, naming drift, sprawl where an existing component should have been extended. Runs standalone or as a lens in the /claudna:ironclad review panel."
-argument-hint: "[plan-or-source-path] [--dispatch]"
----
+Panel lens for /claudna:ironclad — verifies that a plan or implementation PR isn't duplicating existing codebase abstractions: parallel implementations, redundant patterns, naming drift, sprawl where an existing component should have been extended.
+Dispatched by the panel (or via /claudna:ironclad --lens extension-check); emits structured markdown per skills/_shared/contracts/lens-result-contract.md. Not user-invocable.
 
 # Extension Check
 
@@ -10,26 +7,17 @@ For every new component a plan or PR proposes, check whether an existing abstrac
 
 **This is a codebase-dependent lens.** It reads the plan or PR source AND searches the target codebase using Explore subagents. It applies the "consolidate, don't fork" principle: when the team owns a surface, one path is better than two.
 
-## Arguments
+**Applies to:** `implementation` and `mixed` targets.
 
-Parse `$ARGUMENTS` at invocation:
+## Dispatch Discipline
 
-- **First positional arg:** Path to the plan document or PR source file. If omitted, prompt for it.
-- `--dispatch`: Non-interactive mode for fleet orchestration. Suppresses all interactive elements (no Plan Mode, no AskUserQuestion). Emits a single markdown document with YAML frontmatter per `skills/_shared/contracts/lens-result-contract.md`. Use this when invoked by `/ironclad` or another orchestrator.
-
----
-
-## `--dispatch` Mode
-
-When `--dispatch` is passed:
+This lens always runs dispatched, non-interactively:
 
 - **Do NOT call `EnterPlanMode`.** The dispatcher owns the lifecycle.
 - **Do NOT call `AskUserQuestion`.** No human is present.
 - **Do NOT prompt for clarification.** If the source lacks identifiable proposed components, emit `status: blocked` with a description of what is missing.
 - Execute the procedure below silently.
 - Emit the structured markdown result as the FINAL output and stop. No text after the result document.
-
-When `--dispatch` is NOT passed, follow the interactive procedure (see Interactive Mode below).
 
 ---
 
@@ -117,7 +105,7 @@ Is the proposed component at the right level of abstraction?
 
 Classify each finding using the severity vocabulary defined in `skills/_shared/contracts/lens-result-contract.md` (`critical` > `major` > `minor` > `info`).
 
-Tag each finding with a concern area. This skill's primary concern areas are `architecture` and `compatibility`. Secondary: `scope`, `dependencies`.
+Tag each finding with a concern area. This lens's primary concern areas are `architecture` and `compatibility`. Secondary: `scope`, `dependencies`.
 
 Map findings to body sections:
 
@@ -131,87 +119,30 @@ Map findings to body sections:
 
 ---
 
-## Structured Result Emission (`--dispatch` only)
+## Structured Result Emission
 
 After Step 4, emit a single markdown document with YAML frontmatter as the FINAL output. No text before or after this document.
 
-**Format:** Follow the canonical schema at `skills/_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all lens skill `--dispatch` output.
+**Format:** Follow the canonical schema at `skills/_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all panel lens output.
 
-For this skill, set `lens: extension-check` in frontmatter. All other fields, severity vocabulary, body sections (Blockers/Risks/Gaps/Questions/Observations), concern area values, and blocked/failed output shape are defined in the contract.
-
----
-
-## Interactive Mode (no `--dispatch`)
-
-When invoked without `--dispatch`, this skill is an **advisor**, not a report generator.
-
-**Enter Plan Mode.** Call `EnterPlanMode`. All analysis is read-only.
-
-Execute Steps 1-4 above, then present findings as an advisory conversation:
-
-### Advisory Format
-
-For each proposed component where findings exist, present:
-
-1. **The proposed component** — name, type, and what it does.
-2. **What exists** — the existing abstraction, parallel path, or naming pattern found in the codebase.
-3. **Options** — 2-3 ways to address the overlap (including "keep as-is" when the overlap is minor or justified).
-4. **Lean** — which option you'd pick and why, in one sentence.
-5. **Rationale** — the reasoning, grounded in what the codebase search revealed.
-
-Group findings by proposed component. Lead with a summary of how many proposed components were checked and how many have findings.
-
-### Example Advisory Output
-
-```
-## Extension Check: [Plan/PR Title]
-
-**Components checked:** 7
-**Findings:** 3 components have existing overlap
-
-### `SkillValidator` (new class in `scripts/`)
-
-**Existing:** `scripts/validate-skills.py` already validates SKILL_CONTRACT.md compliance,
-frontmatter checks, and CI integration.
-
-- **(a)** Extend `validate-skills.py` with the new validation rules
-- **(b)** Replace `validate-skills.py` with the new `SkillValidator` class (consolidate into one)
-- **(c)** Keep both — `validate-skills.py` for CI, `SkillValidator` for runtime
-- **Lean:** (a) — the existing script handles the same domain; extending it avoids a parallel path
-
-### `EventBus` (new module in `lib/`)
-
-**Existing:** No event bus pattern found in the codebase. This is genuinely novel.
-
-No concerns. The codebase doesn't have an eventing abstraction — this fills a real gap.
-
-### Summary
-
-2 of 7 proposed components overlap with existing abstractions. 1 is a direct parallel path
-(SkillValidator) that should be consolidated. 1 has a naming convention mismatch.
-```
+For this lens, set `lens: extension-check` in frontmatter. All other fields, severity vocabulary, body sections (Blockers/Risks/Gaps/Questions/Observations), concern area values, and blocked/failed output shape are defined in the contract.
 
 ---
 
 ## Codebase Access Strategy
 
-This skill requires access to the target codebase, not just the plan or PR source.
+This lens requires access to the target codebase, not just the plan or PR source:
 
-**In `--dispatch` mode (fleet orchestration):**
 - The working directory context or the PR URL in the source frontmatter identifies the target repo.
 - Use `gh pr view` to determine the repo if a `pr_url` is available in the source frontmatter.
 - Clone or navigate to the repo as needed. If already in the repo's working directory, use it directly.
 - Use Explore subagents for all codebase search to keep the main context lean.
 
-**In interactive mode:**
-- Prompt for the repo path if not obvious from the current working directory.
-- Use Explore subagents for codebase search.
-
 ---
 
 ## Relationship to `/adversarial-review`
 
-`/adversarial-review` includes an "Alternatives" lens that touches on existing-pattern reuse. This standalone skill deepens that into a systematic codebase search with Explore subagents, giving extension checking a full context window and structured per-component output. The overlap is intentional — general checkup vs. specialist appointment.
+`/adversarial-review` includes an "Alternatives" lens that touches on existing-pattern reuse. This panel lens deepens that into a systematic codebase search with Explore subagents, giving extension checking a full context window and structured per-component output. The overlap is intentional — general checkup vs. specialist appointment.
 
 ---
 

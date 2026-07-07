@@ -1,35 +1,23 @@
----
-name: align-to-mission
-description: "Use when you want to check whether every phase in a plan serves the project's stated mission. Catches scope creep, tangential work, misaligned success metrics, and aggregate drift from the north star. Runs standalone or as a lens in the /claudna:ironclad review panel."
-argument-hint: "[plan-file-path] [--dispatch]"
----
+Panel lens for /claudna:ironclad — checks whether every phase in a plan serves the project's stated mission, catching scope creep, tangential work, misaligned success metrics, and aggregate drift from the north star.
+Dispatched by the panel (or via /claudna:ironclad --lens align-to-mission); emits structured markdown per skills/_shared/contracts/lens-result-contract.md. Not user-invocable.
 
 # Align to Mission
 
-Check whether every phase and deliverable in a plan serves the project's north star. Plans accumulate scope naturally — individually-reasonable phases can drift from the mission in aggregate. This skill compares each phase against the mission and flags misalignment before resources are committed.
+Check whether every phase and deliverable in a plan serves the project's north star. Plans accumulate scope naturally — individually-reasonable phases can drift from the mission in aggregate. This lens compares each phase against the mission and flags misalignment before resources are committed.
 
-**This is a plan-only lens.** It reads the plan document and the project's mission source. It does not read the target codebase (that is `/extension-check`'s job).
+**This is a plan-only lens.** It reads the plan document and the project's mission source. It does not read the target codebase — that is the job of the extension-check panel lens (lenses/extension-check.md).
 
-## Arguments
+**Applies to:** `plan` and `mixed` targets.
 
-Parse `$ARGUMENTS` at invocation:
+## Dispatch Discipline
 
-- **First positional arg:** Path to the plan document. If omitted, prompt for it.
-- `--dispatch`: Non-interactive mode for fleet orchestration. Suppresses all interactive elements (no Plan Mode, no AskUserQuestion). Emits a single markdown document with YAML frontmatter per `skills/_shared/contracts/lens-result-contract.md`. Use this when invoked by `/ironclad` or another orchestrator.
-
----
-
-## `--dispatch` Mode
-
-When `--dispatch` is passed:
+This lens always runs dispatched, non-interactively:
 
 - **Do NOT call `EnterPlanMode`.** The dispatcher owns the lifecycle.
 - **Do NOT call `AskUserQuestion`.** No human is present.
 - **Do NOT prompt for clarification.** If the plan lacks phases or is too ambiguous to assess, emit `status: blocked` with a description of what is missing.
 - Execute the procedure below silently.
 - Emit the structured markdown result as the FINAL output and stop. No text after the result document.
-
-When `--dispatch` is NOT passed, follow the interactive procedure (see Interactive Mode below).
 
 ---
 
@@ -44,7 +32,7 @@ Read the full plan document. Identify:
 - **Decision Forks** — choices that may affect alignment.
 - **Validation Strategy** — success criteria the plan defines for itself.
 
-If the plan lacks identifiable phases, stop. In `--dispatch` mode, emit `status: blocked`. In interactive mode, tell the user the plan needs a phased breakdown before alignment analysis is meaningful.
+If the plan lacks identifiable phases, stop and emit `status: blocked` — the plan needs a phased breakdown before alignment analysis is meaningful.
 
 ### Step 2: Locate the Mission
 
@@ -97,7 +85,7 @@ After assessing individual phases, step back and check the plan as a whole:
 
 Classify each finding using the severity vocabulary defined in `skills/_shared/contracts/lens-result-contract.md` (`critical` > `major` > `minor` > `info`).
 
-Tag each finding with a concern area. This skill's primary concern area is `scope`. Secondary: `architecture` (when misalignment stems from structural choices). Use the closest match from the canonical set in the contract.
+Tag each finding with a concern area. This lens's primary concern area is `scope`. Secondary: `architecture` (when misalignment stems from structural choices). Use the closest match from the canonical set in the contract.
 
 Map findings to body sections:
 
@@ -111,70 +99,19 @@ Map findings to body sections:
 
 ---
 
-## Structured Result Emission (`--dispatch` only)
+## Structured Result Emission
 
 After Step 5, emit a single markdown document with YAML frontmatter as the FINAL output. No text before or after this document.
 
-**Format:** Follow the canonical schema at `skills/_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all lens skill `--dispatch` output.
+**Format:** Follow the canonical schema at `skills/_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all panel lens output.
 
-For this skill, set `lens: align-to-mission` in frontmatter. All other fields, severity vocabulary, body sections (Blockers/Risks/Gaps/Questions/Observations), concern area values, and blocked/failed output shape are defined in the contract.
-
----
-
-## Interactive Mode (no `--dispatch`)
-
-When invoked without `--dispatch`, this skill is an **advisor**, not a report generator.
-
-**Enter Plan Mode.** Call `EnterPlanMode`. All analysis is read-only.
-
-Execute Steps 1-5 above, then present findings as an advisory conversation:
-
-### Advisory Format
-
-Lead with the mission statement (Step 2) and a per-phase alignment summary table. Then present each concern with options and leans.
-
-For each finding, present:
-
-1. **The concern** — what the assessment revealed, stated concretely.
-2. **Options** — 2-3 ways the plan could address the concern (including "keep as-is" when the concern is minor).
-3. **Lean** — which option you'd pick and why, in one sentence.
-4. **Rationale** — the reasoning behind the lean, grounded in the mission.
-
-### Example Advisory Output
-
-```
-## Mission Alignment Review: [Plan Title]
-
-### Mission
-[The north-star statement, with source noted]
-
-### Phase Alignment Summary
-
-| Phase | Alignment | Notes |
-|-------|-----------|-------|
-| 2a. [name] | Aligned | Directly serves [mission aspect] |
-| 2b. [name] | Tangential | Useful but not mission-critical |
-| 2c. [name] | Aligned | ... |
-
-### Aggregate Assessment
-[Does the plan as a whole advance the mission? Ratio of aligned/tangential/misaligned.]
-
-### Concerns
-
-**Concern:** Phase 2b is tangential — [explanation]
-- **(a)** Defer to a follow-up plan
-- **(b)** Keep but reduce scope to [specific cut]
-- **(c)** Keep as-is — the tangential work enables future mission-critical work
-- **Lean:** (a) — [one-sentence reason grounded in mission]
-```
-
-Use one heading per concern. Phases that are cleanly aligned need only their summary table row — no separate section.
+For this lens, set `lens: align-to-mission` in frontmatter. All other fields, severity vocabulary, body sections (Blockers/Risks/Gaps/Questions/Observations), concern area values, and blocked/failed output shape are defined in the contract.
 
 ---
 
 ## Relationship to `/adversarial-review`
 
-`/adversarial-review` touches mission alignment tangentially across its seven lenses but does not dedicate a full pass to it. This standalone skill gives mission alignment a full context window and structured per-phase assessment for independent fleet dispatch by `/ironclad`.
+`/adversarial-review` touches mission alignment tangentially across its seven lenses but does not dedicate a full pass to it. This panel lens gives mission alignment a full context window and structured per-phase assessment for independent dispatch by `/ironclad`.
 
 ---
 

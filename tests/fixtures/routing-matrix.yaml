@@ -164,30 +164,36 @@ rows:
     expect: review-pr
     phase: P5
 
-  # --- P6: lens family (panel-internal after P6; expect updates then) ---
+  # --- P6: lens family (panel-internal — utterances resolve to /ironclad --lens <name>) ---
   - utterance: "step back — are we even solving the right problem?"
-    keywords: [right problem]
-    expect: first-principles
+    keywords: [harden, plan]
+    expect: ironclad
+    mode: --lens
     phase: P6
   - utterance: "does every phase of this plan serve the mission?"
-    keywords: [mission]
-    expect: align-to-mission
+    keywords: [plan, lenses]
+    expect: ironclad
+    mode: --lens
     phase: P6
   - utterance: "is this plan duplicating existing abstractions?"
-    keywords: [duplicating, abstractions]
-    expect: extension-check
+    keywords: [review, PR]
+    expect: ironclad
+    mode: --lens
     phase: P6
   - utterance: "has anyone tried this before in this repo?"
-    keywords: [prior art]
-    expect: precedent-check
+    keywords: [plan, panel]
+    expect: ironclad
+    mode: --lens
     phase: P6
   - utterance: "is this forge plan structurally complete and ready to build?"
-    keywords: [structurally complete]
-    expect: plan-health-audit
+    keywords: [harden, plan]
+    expect: ironclad
+    mode: --lens
     phase: P6
   - utterance: "do these phases justify their cost?"
-    keywords: [justify their cost]
-    expect: cost-benefit
+    keywords: [plan, lenses]
+    expect: ironclad
+    mode: --lens
     phase: P6
 
   # --- Cross-family disambiguation ---

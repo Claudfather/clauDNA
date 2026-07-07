@@ -1,45 +1,28 @@
----
-name: plan-health-audit
-description: "Use when you want to check whether a /claudna:forge plan is structurally complete, internally consistent, and ready for implementation — missing sections, unsized phases, vague validation criteria, undocumented decision forks. Runs standalone or as a lens in the /claudna:ironclad review panel."
-argument-hint: "[plan-file-path] [--dispatch]"
----
+Panel lens for /claudna:ironclad — checks whether a /claudna:forge plan is structurally complete, internally consistent, and ready for implementation: missing sections, unsized phases, vague validation criteria, undocumented decision forks.
+Dispatched by the panel (or via /claudna:ironclad --lens plan-health-audit); emits structured markdown per skills/_shared/contracts/lens-result-contract.md. Not user-invocable.
 
 # Plan Health Audit
 
-Structural completeness check for `/forge` plan documents. Is the plan well-formed, internally consistent, and ready for implementation? This skill is the convergence gate for `/ironclad` -- a plan that fails structural health cannot proceed to implementation regardless of what other lenses say.
+Structural completeness check for `/forge` plan documents. Is the plan well-formed, internally consistent, and ready for implementation? This lens is the convergence gate for `/ironclad` -- a plan that fails structural health cannot proceed to implementation regardless of what other lenses say.
 
-**This is a plan-only lens.** It reads the plan document and checks its structure. It does not read the target codebase (that is `/extension-check`'s job). It does not assess whether the plan is a good idea (that is `/first-principles`' job). It answers one question: is this document structurally ready to implement?
+**This is a plan-only lens.** It reads the plan document and checks its structure. It does not read the target codebase -- that is the job of the extension-check panel lens (lenses/extension-check.md). It does not assess whether the plan is a good idea -- that is the job of the first-principles panel lens (lenses/first-principles.md). It answers one question: is this document structurally ready to implement?
 
-Most checks in this skill are deterministic -- section presence, frontmatter completeness, effort size coverage, fork field presence. An LLM adds value in two areas: judging whether validation criteria are objectively testable (vs. vague), and assessing whether phase descriptions reference concrete deliverables (vs. hand-wavy goals). The skill marks where each check type applies.
+Most checks in this lens are deterministic -- section presence, frontmatter completeness, effort size coverage, fork field presence. An LLM adds value in two areas: judging whether validation criteria are objectively testable (vs. vague), and assessing whether phase descriptions reference concrete deliverables (vs. hand-wavy goals). The lens marks where each check type applies.
 
-## Arguments
+## Dispatch Rules
 
-Parse `$ARGUMENTS` at invocation:
-
-- **First positional arg:** Path to the plan document. If omitted, prompt for it.
-- `--dispatch`: Non-interactive mode for fleet orchestration. Suppresses all interactive elements (no Plan Mode, no AskUserQuestion). Emits a single markdown document with YAML frontmatter per `skills/_shared/contracts/lens-result-contract.md`. Use this when invoked by `/ironclad` or another orchestrator.
-
----
-
-## `--dispatch` Mode
-
-When `--dispatch` is passed:
-
+- The dispatcher provides the plan document path and the result path.
 - **Do NOT call `EnterPlanMode`.** The dispatcher owns the lifecycle.
 - **Do NOT call `AskUserQuestion`.** No human is present.
 - **Do NOT prompt for clarification.** If the plan is unreadable or not a markdown document, emit `status: blocked` with a description of what is wrong.
 - Execute the procedure below silently.
 - Emit the structured markdown result as the FINAL output and stop. No text after the result document.
 
-When `--dispatch` is NOT passed, follow the interactive procedure (see Interactive Mode below).
-
----
-
 ## Procedure
 
 ### Step 1: Read the Plan
 
-Read the full plan document. Determine whether it is a `/forge`-style plan by checking for the expected structure (YAML frontmatter + markdown body with section headings). If the document is not recognizable as a plan (e.g., it is code, a README, or an empty file), stop. In `--dispatch` mode, emit `status: blocked`. In interactive mode, tell the user this skill applies to `/forge` plan documents.
+Read the full plan document. Determine whether it is a `/forge`-style plan by checking for the expected structure (YAML frontmatter + markdown body with section headings). If the document is not recognizable as a plan (e.g., it is code, a README, or an empty file), stop and emit `status: blocked` -- this lens applies to `/forge` plan documents.
 
 ### Step 2: Frontmatter Completeness
 
@@ -189,9 +172,9 @@ Scan the plan for references to other documents:
 
 Count total references checked and broken references for the health summary.
 
-**Note:** These are filesystem checks on companion plans, shared docs, and planning files -- not target codebase reads. The "plan-only" scope means this skill does not read the repo the plan proposes to modify; it does read the filesystem to verify that referenced documents exist.
+**Note:** These are filesystem checks on companion plans, shared docs, and planning files -- not target codebase reads. The "plan-only" scope means this lens does not read the repo the plan proposes to modify; it does read the filesystem to verify that referenced documents exist.
 
-**Scope boundary:** This skill verifies that references point to things that exist. It does not verify that the referenced content is accurate or up-to-date -- that is `/extension-check`'s job for codebase references and `/precedent-check`'s job for historical references.
+**Scope boundary:** This lens verifies that references point to things that exist. It does not verify that the referenced content is accurate or up-to-date -- that is the job of the extension-check panel lens (lenses/extension-check.md) for codebase references and the precedent-check panel lens (lenses/precedent-check.md) for historical references.
 
 ### Step 9: None-Identified Density
 
@@ -220,13 +203,13 @@ Aggregate all findings and compute a health verdict:
 | `needs-work` | Zero `critical` but one or more `major` findings. Addressable without restructuring. |
 | `blocked` | One or more `critical` findings. The plan has structural problems that prevent implementation. |
 
-Include the health verdict in the output (both `--dispatch` and interactive modes).
+Include the health verdict in the output.
 
 ### Step 11: Emit Findings
 
 Assemble the findings classified in Steps 2-9 into the output format. Severity assignments from each step are final -- do not re-evaluate them here. Use the severity vocabulary defined in `skills/_shared/contracts/lens-result-contract.md` (`critical` > `major` > `minor` > `info`).
 
-Tag each finding with a concern area. This skill's primary concern area is `scope` (missing sections, incomplete coverage). Secondary: `architecture` (when structural issues reflect design gaps, e.g., phases without concrete deliverables suggest the architecture isn't thought through).
+Tag each finding with a concern area. This lens's primary concern area is `scope` (missing sections, incomplete coverage). Secondary: `architecture` (when structural issues reflect design gaps, e.g., phases without concrete deliverables suggest the architecture isn't thought through).
 
 Map findings to body sections:
 
@@ -238,17 +221,15 @@ Map findings to body sections:
 | **Questions** | Ambiguous section that could be interpreted as present or absent; phases that might be concrete enough depending on context |
 | **Observations** | None-identified density below threshold; minor numbering inconsistencies; health verdict summary |
 
----
-
-## Structured Result Emission (`--dispatch` only)
+## Structured Result Emission
 
 After Step 11, emit a single markdown document with YAML frontmatter as the FINAL output. No text before or after this document.
 
-**Format:** Follow the canonical schema at `skills/_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all lens skill `--dispatch` output.
+**Format:** Follow the canonical schema at `skills/_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all panel lens output.
 
-For this skill, set `lens: plan-health-audit` in frontmatter. All other fields, severity vocabulary, body sections (Blockers/Risks/Gaps/Questions/Observations), concern area values, and blocked/failed output shape are defined in the contract.
+For this lens, set `lens: plan-health-audit` in frontmatter. All other fields, severity vocabulary, body sections (Blockers/Risks/Gaps/Questions/Observations), concern area values, and blocked/failed output shape are defined in the contract.
 
-**Lens-specific extension:** This skill appends a `## Health Summary` section after the contract's standard sections (Blockers through Observations). This is a declared extension -- it does not replace or modify any contract section. Other lens skills should not parse or depend on it.
+**Lens-specific extension:** This lens appends a `## Health Summary` section after the contract's standard sections (Blockers through Observations). This is a declared extension -- it does not replace or modify any contract section. Other panel lenses should not parse or depend on it.
 
 ```markdown
 ## Health Summary
@@ -261,72 +242,27 @@ For this skill, set `lens: plan-health-audit` in frontmatter. All other fields, 
 **Validation criteria testable:** N/N
 ```
 
----
-
-## Interactive Mode (no `--dispatch`)
-
-When invoked without `--dispatch`, this skill is an **advisor**, not a report generator.
-
-**Enter Plan Mode.** Call `EnterPlanMode`. All analysis is read-only.
-
-Execute Steps 1-10 above, then present findings as an advisory conversation:
-
-### Advisory Format
-
-Lead with the health score, then walk through each check that produced findings:
-
-```
-## Plan Health Audit: [Plan Title]
-
-### Health Score: [ready | needs-work | blocked]
-
-**Sections:** N/10 present
-**Phases:** N sized, N with concrete deliverables
-**Forks:** N total (M open, K locked), N fully documented
-**Risks:** N total, N with mitigation
-**Validation:** N/N criteria testable
-**Cross-references:** N checked, N broken
-
-### [Check Name]
-
-**Finding:** [Concrete description of the structural issue]
-
-- **(a)** [Fix option: e.g., add the missing Companion Plans section with cross-references to X and Y]
-- **(b)** [Alternative: e.g., write "None identified" if genuinely standalone]
-- **Lean:** (a) -- [one-sentence reason]
-
-### Summary
-
-[1-2 sentences: overall structural health and the single most important fix to make the plan implementation-ready]
-```
-
-Group findings by check. For each finding, include options and a lean. Not every check will produce a finding -- checks that pass get a one-line confirmation ("Frontmatter complete. All 7 fields present.") and move on.
-
----
-
 ## Scope Boundary
 
-This skill checks the plan **document**, not the plan's **content quality**:
+This lens checks the plan **document**, not the plan's **content quality**:
 
-| This skill checks | Other skills check |
+| This lens checks | Other lenses check |
 |-------------------|--------------------|
-| Are all mandatory sections present? | Is the Goal the right problem? (`/first-principles`) |
-| Do phases have effort sizes? | Are effort sizes accurate? (`/cost-benefit`) |
+| Are all mandatory sections present? | Is the Goal the right problem? -- the first-principles panel lens (lenses/first-principles.md) |
+| Do phases have effort sizes? | Are effort sizes accurate? -- the cost-benefit panel lens (lenses/cost-benefit.md) |
 | Do forks have options, leans, ratifiers? | Are the fork options the right ones? (`/adversarial-review`) |
 | Do validation criteria have testable language? | Do validation criteria cover the right things? (`/adversarial-review`) |
-| Do cross-references point to existing files? | Does the referenced code match the plan's claims? (`/extension-check`) |
-| Is the document structurally complete? | Is the plan aligned with the mission? (`/align-to-mission`) |
+| Do cross-references point to existing files? | Does the referenced code match the plan's claims? -- the extension-check panel lens (lenses/extension-check.md) |
+| Is the document structurally complete? | Is the plan aligned with the mission? -- the align-to-mission panel lens (lenses/align-to-mission.md) |
 
 This separation is intentional. Structural health is a prerequisite for content review -- a plan missing its Risks section can't be meaningfully risk-reviewed.
-
----
 
 ## Red Flags — You Are Doing This Wrong
 
 | Symptom | Problem |
 |---------|---------|
-| You are evaluating whether the plan is a good idea | That is `/first-principles` or `/adversarial-review`. This skill checks structure, not strategy. |
-| You are reading the target codebase to verify claims | That is `/extension-check`. This skill reads only the plan document. |
+| You are evaluating whether the plan is a good idea | That is the first-principles panel lens (lenses/first-principles.md) or `/adversarial-review`. This lens checks structure, not strategy. |
+| You are reading the target codebase to verify claims | That is the extension-check panel lens (lenses/extension-check.md). This lens reads only the plan document. |
 | Every finding is `info` severity | You are cataloguing, not auditing. Missing sections and vague validation criteria are `major`, not `info`. |
 | You flagged a section as missing when it exists under a different heading | Match headings case-insensitively and allow reasonable synonyms (e.g., "Validation" for "Validation Strategy", "Sizing" for "Complexity and Sequencing"). |
 | You marked "None identified" content as a missing section | "None identified" is valid content -- the section is present. Only flag it under the none-identified density check (Step 9). |

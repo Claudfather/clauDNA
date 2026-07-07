@@ -1,14 +1,14 @@
 # Lens Result Contract
 
-Canonical schema for the structured markdown result emitted by any review lens skill in `--dispatch` mode and consumed by `/ironclad` (claudlobby) for plan-hardening synthesis. All lens skills MUST reference this file rather than inlining their own format.
+Canonical schema for the structured markdown result emitted by every panel lens and consumed by `/claudna:ironclad` for plan-hardening synthesis. All lens sources MUST reference this file rather than inlining their own format. (`/ironclad` migrated from claudlobby into clauDNA in 0.6.0; any fleet deployment consumes lenses through this plugin via the compositor-injected `fleet-dispatch-capability` override.)
 
 ## Producer
 
-Any lens skill running in `--dispatch` mode (e.g., `/adversarial-review --dispatch`, `/first-principles --dispatch`, `/align-to-mission --dispatch`).
+Any panel lens dispatched by `/claudna:ironclad` — the panel-internal lens files under `skills/ironclad/lenses/` and the `adversarial-review` skill in `--dispatch` mode.
 
 ## Consumer
 
-`/ironclad` (claudlobby) — reads `result.md` files from the scratch directory, parses YAML frontmatter and markdown body, aggregates findings across lenses, and posts to the plan PR.
+`/claudna:ironclad` — reads `result.md` files from the scratch directory, parses YAML frontmatter and markdown body, aggregates findings across lenses, and posts to the target Issue or PR. A fleet override (compositor-injected) substitutes the dispatch step only; lens addressing post-P6 is by panel-file path (`skills/ironclad/lenses/<name>.md`), not skill name — an *absent* protocol (or `FLEET_STATE_PATH` set with no protocol) degrades safely to subagent mode with the loud mode indicator; a present-but-stale protocol runs in fleet mode and recovers per-lens via the Phase-6 retry.
 
 ## Emission Rules (Producer Side)
 
@@ -59,7 +59,7 @@ severity: <highest severity across all findings: critical | major | minor | info
 
 | Field | Required | Type | Description |
 |-------|----------|------|-------------|
-| `lens` | yes | string | Skill name of the producing lens (e.g., `adversarial-review`, `first-principles`) |
+| `lens` | yes | string | Lens name of the producer (e.g., `adversarial-review`, `first-principles`) |
 | `worker` | yes | string | Bot ID of the worker that produced this result |
 | `pr_url` | no | string \| null | PR URL if reviewing a PR-linked plan, otherwise `null` |
 | `plan-path` | yes | string | Filesystem path or URL of the plan that was reviewed |
@@ -134,18 +134,18 @@ Consumers (currently `/ironclad`) MUST:
 
 ## Stability
 
-This contract is the integration surface between lens skills (clauDNA) and `/ironclad` (claudlobby). Changes are breaking:
+This contract is the integration surface between the panel lenses and `/claudna:ironclad` (including any fleet override). Changes are breaking:
 
 - Adding a new REQUIRED frontmatter field is breaking for producers.
 - Removing, renaming, or changing the type of any field is breaking for both sides.
 - Adding an OPTIONAL field is non-breaking — consumers MUST ignore unknown fields.
 - Changing the severity vocabulary or section names is breaking for consumers.
 
-When changing this file, update all lens skills that reference it and coordinate with the `/ironclad` skill in claudlobby.
+When changing this file, update every panel lens that references it and coordinate with any external fleet compositor that injects a dispatch override.
 
 ## Related
 
-- Consumer skill: `/ironclad` in claudlobby (`library/skills/ironclad/SKILL.md`)
+- Consumer: `/claudna:ironclad` (`skills/ironclad/SKILL.md`); producers: `skills/ironclad/lenses/*.md` + `skills/adversarial-review/`
 - Severity vocabulary: shared with `pr-comment-hygiene` protocol (claudlobby)
 - Concern area vocabulary: `skills/implement-plan/challenge-round-questions.md`
 - Sibling contract: `skills/_shared/contracts/synthesis-contract.md` (weigh-development-paths <-> implement-plan)

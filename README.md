@@ -32,7 +32,7 @@ For bots, CI runners, and Docker images, drop a `settings.json` with `enabledPlu
 
 | Directory | Count | Contents |
 |-----------|-------|----------|
-| `skills/` | 44 | User-invocable slash commands |
+| `skills/` | 38 | User-invocable slash commands |
 | `agents/` | 8 | `snowflake-analyst`, `dbt-engineer`, `neon-analyst`, `modal-ops`, `railway-ops`, `vercel-ops`, `code-reviewer`, `spec-reviewer` |
 | `plugin-hooks/` | 5 wired + 1 opt-in | Auto-format on Write/Edit, PreToolUse permission expansion, PreCompact reflect gate, opt-in skill telemetry, macOS notifications. (`statusline.sh` is opt-in — see [SETUP_GUIDE §3.2](./SETUP_GUIDE.md#32-statusline-optional).) Named `plugin-hooks/` to avoid a Claude Code bug that deletes any project-root `hooks/` directory between tool calls. |
 
@@ -57,13 +57,7 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:audit t
 | `/weigh-development-paths` | Compare multiple viable approaches at a development junction |
 | `/adversarial-review` | Structured plan challenge with evidence and anti-groupthink guards |
 | `/forge` | Plan a multi-phase workstream — decision forks, phasing, spec/roadmap authoring |
-| `/ironclad` | Harden a plan Issue or PR with a panel of independent review lenses |
-| `/first-principles` | Check a plan solves the right problem the right way *(ironclad lens)* |
-| `/align-to-mission` | Check a plan's phases serve the project's stated mission *(ironclad lens)* |
-| `/extension-check` | Check a plan isn't duplicating existing codebase abstractions *(ironclad lens)* |
-| `/precedent-check` | Check a plan against prior art in the project's history *(ironclad lens)* |
-| `/plan-health-audit` | Check a forge plan is structurally complete and ready to build *(ironclad lens)* |
-| `/cost-benefit` | Weigh a plan's cost — effort, complexity, risk — against its impact *(ironclad lens)* |
+| `/ironclad` | Harden a plan Issue or PR with a panel of independent review lenses — seven panel lenses built in; `--lens <name>` for a single-lens report |
 
 ### Code Quality
 

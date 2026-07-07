@@ -1,7 +1,7 @@
 ---
 name: ironclad
 description: "Use to harden a plan or review a PR with a panel of independent lenses — primary target a §4.1 plan Issue produced by /claudna:forge; also reviews implementation PRs. Subagent-only: dispatch it, don't follow it inline."
-argument-hint: "<issue-or-pr-url> [--loops N] [--auto]"
+argument-hint: "<issue-or-pr-url> [--loops N] [--lens <name>] [--auto]"
 requires:
   - cli: gh
     reason: "Reads PR diff and metadata, scans PR comments for fork state, and posts the aggregated review comment via the GitHub API."
@@ -11,7 +11,7 @@ requires:
 
 `/ironclad` runs a panel of independent review lenses against a **§4.1 plan Issue** or a **pull request**, aggregates their findings into comments, and reports whether the target is converged — no open blockers, and (for plans) all decision forks locked. For a plan Issue it is the *hardening loop*: `--loops N` repeats dispatch → fold (via `forge --reforge`) → convergence-check until converged or N cycles run. For an implementation PR it is a single review pass (no re-forge). It never authors the plan body itself — it dispatches `/forge` to.
 
-This skill is **subagent-only**: each lens runs as a parallel `general-purpose` subagent on the current machine. Fleet deployments override the dispatch step via a compositor-injected protocol (see the dispatch preamble below); the skill itself contains no fleet concepts (no tmux, no `[BOTREPORT]`, no `fleet-state.json`).
+This skill is **subagent-only**: each lens runs as a parallel `general-purpose` subagent on the current machine. Six lenses live as panel-internal files under `lenses/` in this skill directory; `adversarial-review` remains a standalone skill and is dispatched as one. Replaces the standalone lens skills /first-principles, /align-to-mission, /extension-check, /precedent-check, /plan-health-audit, /cost-benefit — for a one-off interactive challenge use `/claudna:adversarial-review`; for a one-off single-lens report use `--lens <name>` (below). Fleet deployments override the dispatch step via a compositor-injected protocol (see the dispatch preamble below); the skill itself contains no fleet concepts (no tmux, no `[BOTREPORT]`, no `fleet-state.json`).
 
 ## Dispatch preamble — read before Phase 4
 
@@ -57,33 +57,37 @@ Create a scratch directory at `/tmp/ironclad-<YYYY-MM-DD_HHMMSS>/` (referred to 
 
 Subagents are always available — there is no executor-availability step. Pick the lenses that apply from the target type:
 
-| Lens | Skill | Applies to | Status |
-|------|-------|-----------|--------|
-| Adversarial Review | `adversarial-review` | plan, implementation, mixed | Active |
-| Align to Mission | `align-to-mission` | plan, mixed | Active |
-| First Principles | `first-principles` | plan, mixed | Active |
-| Extension Check | `extension-check` | implementation, mixed | Active |
-| Precedent Check | `precedent-check` | plan, implementation, mixed | Active |
-| Plan Health Audit | `plan-health-audit` | plan, mixed | Active |
-| Cost-Benefit | `cost-benefit` | plan, implementation, mixed | Active |
+| Lens | Source | Applies to |
+|------|--------|-----------|
+| Adversarial Review | the `adversarial-review` **skill** (`skills/adversarial-review/SKILL.md`, applied with `--dispatch`) | plan, implementation, mixed |
+| Align to Mission | `lenses/align-to-mission.md` | plan, mixed |
+| First Principles | `lenses/first-principles.md` | plan, mixed |
+| Extension Check | `lenses/extension-check.md` | implementation, mixed |
+| Precedent Check | `lenses/precedent-check.md` | plan, implementation, mixed |
+| Plan Health Audit | `lenses/plan-health-audit.md` | plan, mixed |
+| Cost-Benefit | `lenses/cost-benefit.md` | plan, implementation, mixed |
 
-Dispatch only the lenses whose **Applies to** matches the target type. New lenses plug in by adding a row.
+Dispatch only the lenses whose **Applies to** matches the target type. A new panel concern is a new `lenses/<name>.md` file + a row here — never a new skill. (Persona lenses are a decide-then-draft rider: #175.)
 
 ### Phase 4: Dispatch lenses as parallel subagents
 
 Skip this phase entirely if the dispatch preamble routed you to a `fleet-dispatch-capability` protocol.
 
-Launch one `general-purpose` subagent per applicable lens, all in parallel (`run_in_background: true`). Use `general-purpose` (not a read-only explorer) — the subagent needs the Write tool to emit its result. Launch prompt per lens:
+Launch one `general-purpose` subagent per applicable lens, all in parallel (`run_in_background: true`). Use `general-purpose` (not a read-only explorer) — the subagent needs the Write tool to emit its result. Launch prompt per lens — the read target differs by source type:
+
+- **Panel-file lenses** (all rows sourced from `lenses/`):
 
 ```
-Read skills/<lens>/SKILL.md
-Apply the skill with --dispatch to: <SOURCE_PATH>
+Read skills/ironclad/lenses/<lens>.md
+Apply it to: <SOURCE_PATH>
 Write your result to: <scratch>/lenses/<lens>/result.md
 Operate non-interactively: do not enter plan mode, do not prompt for input.
 Emit structured markdown per skills/_shared/contracts/lens-result-contract.md.
 ```
 
-Substitute `<SOURCE_PATH>` with the `<scratch>/source.md` path (or the PR URL for codebase-reading lenses such as extension-check and precedent-check), `<scratch>` with the scratch dir, and `<lens>` with each lens directory name. For `align-to-mission`, append the target's repo (and local checkout path if the cwd differs) to the launch prompt — the lens reads mission documents (PROJECT_MISSION.md / README / CLAUDE.md) from the repo under review, never from an unrelated invoking directory, otherwise it grades the plan against the wrong mission.
+- **Adversarial Review** (a skill): replace the first two lines with `Read skills/adversarial-review/SKILL.md` / `Apply the skill with --dispatch to: <SOURCE_PATH>`.
+
+Substitute `<SOURCE_PATH>` with the `<scratch>/source.md` path (or the PR URL for codebase-reading lenses such as extension-check and precedent-check), `<scratch>` with the scratch dir, and `<lens>` with each lens name. For `align-to-mission`, append the target's repo (and local checkout path if the cwd differs) to the launch prompt — the lens reads mission documents (PROJECT_MISSION.md / README / CLAUDE.md) from the repo under review, never from an unrelated invoking directory, otherwise it grades the plan against the wrong mission.
 
 ### Phase 5: Collect results
 
@@ -152,6 +156,10 @@ For a **plan Issue** with `--loops N` (default `N=1`):
 3. Increment the cycle and repeat from **Phase 3** (re-select and re-dispatch lenses against the updated body).
 
 `/ironclad` never edits the plan body itself — `forge --reforge` (in the dispatched subagent) is the only writer of the body; ironclad writes only comments and orchestrates. **Implementation and mixed PRs do not loop** (`--loops` is ignored): code is iterated by humans / `/implement-plan`, not by re-forge.
+
+## `--lens <name>` mode — single-lens report
+
+With `--lens <name>` (a lens name from the Phase-3 table), skip panel selection: run Phases 1–2, dispatch ONLY the named lens (Phase 4 launch prompt), and present its lens-result-contract report directly in the session — **no comment is posted** and no convergence check runs (`--loops` is ignored). This is the dispatch-shaped replacement for the retired standalone lens skills: it returns the structured report, not an interactive advisory conversation. Combine with `--auto` for the structured-result JSON (`artifacts.lenses_run: 1`, `comment_url: null`).
 
 ## `--auto` mode
 
