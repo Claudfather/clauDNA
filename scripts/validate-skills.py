@@ -190,7 +190,21 @@ def main() -> int:
     # backstop lives in tests/test_removed_names.py (the unpartitioned
     # pytest CI job), so even a validator regression here cannot silently
     # re-open the hole.
-    removed_name_hits = scan_removed_names(load_removed_skills(REMOVED_SKILLS_FILE))
+    removed_names = load_removed_skills(REMOVED_SKILLS_FILE)
+    removed_name_hits = scan_removed_names(removed_names)
+
+    # Directory resurrection (#192): the text gate can't see a removed skill
+    # re-created whole as skills/<name>/ with a valid body — catch it here.
+    for name in removed_names:
+        if (SKILLS_DIR / name).is_dir():
+            removed_name_hits.append(
+                (
+                    f"skills/{name}/",
+                    f"removed skill '{name}' has been re-created as a skill directory -- "
+                    "resurrections require removing the name from scripts/removed-skills.txt "
+                    "(a deliberate, reviewable act), not silently restoring the directory",
+                )
+            )
 
     total_skills = len(skill_dirs) - len(SKIP_SKILLS)
 
