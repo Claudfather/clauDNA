@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.13.0] - 2026-07-07
 ### Added
 - **`/using-claudna` — the orientation skill ([#172](https://github.com/Claudfather/clauDNA/issues/172), epic [#165](https://github.com/Claudfather/clauDNA/issues/165) P8 — the epic's final phase).** Two sections: **Finding Skills** — enumerate the installed catalog, match intent against `description` fields (the §2.1 routing surfaces), know that consolidated capabilities live as engine verbs/lenses/modes, follow `Replaces /old-name` breadcrumbs for remembered names, and fall back to `/claudna:find-skills` for the public ecosystem (absorbing [#31](https://github.com/Claudfather/clauDNA/issues/31)'s intent); **Installation Health** — the full six-check diagnostic folded in from `/skill-health` (locate install, version currency, hook wiring now scoring **all six wired hooks** including `session-start.sh`, skill frontmatter scan, dependency availability incl. per-skill `requires:` guidance answering [#113](https://github.com/Claudfather/clauDNA/issues/113), telemetry state), preserving the under-5-seconds / read-only / no-subagents promises ADR 001 relied on. Subagent guard up top (dispatched subagents skip orientation). The SessionStart briefing injects it as a pointer, never the body. **The skill-first dispatch doctrine deliberately does not ship** — per the epic's contingency lock it lands only if the routing-fixture record shows persistent misses, and the record is green; the decision is recorded in the skill body.
 
