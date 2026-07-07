@@ -209,6 +209,11 @@ rows:
     expect: using-claudna
     phase: P8
 
+  - utterance: "land this Claudosseum promotion package as a PR"
+    keywords: [Claudosseum, promotion, package]
+    expect: promotion-intake
+    phase: post-epic
+
   # --- Cross-family disambiguation ---
   - utterance: "the page loads slow and the scrolling is janky"
     keywords: [janky]

@@ -32,7 +32,7 @@ For bots, CI runners, and Docker images, drop a `settings.json` with `enabledPlu
 
 | Directory | Count | Contents |
 |-----------|-------|----------|
-| `skills/` | 37 | User-invocable slash commands |
+| `skills/` | 38 | User-invocable slash commands |
 | `agents/` | 8 | `snowflake-analyst`, `dbt-engineer`, `neon-analyst`, `modal-ops`, `railway-ops`, `vercel-ops`, `code-reviewer`, `spec-reviewer` |
 | `plugin-hooks/` | 6 wired + 1 opt-in | SessionStart briefing (opt-out `CLAUDNA_SESSION_BRIEFING=0`), auto-format on Write/Edit, PreToolUse permission expansion, PreCompact reflect gate, opt-in skill telemetry, macOS notifications. (`statusline.sh` is opt-in — see [SETUP_GUIDE §3.2](./SETUP_GUIDE.md#32-statusline-optional).) Named `plugin-hooks/` to avoid a Claude Code bug that deletes any project-root `hooks/` directory between tool calls. |
 
@@ -120,6 +120,7 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:audit t
 | `/file-github-issue` | File a GitHub issue from a screenshot + short description |
 | `/github-activity-report` | GitHub activity stats (PRs, commits, contributors) over a time window |
 | `/using-claudna` | Orient in the skill set + Installation Health diagnostic (replaces the old skill-health diagnostic) |
+| `/promotion-intake` | Land a Claudosseum promotion package as a reviewable PR (validator-gated) |
 | `/skill-scaffold` | Scaffold a new clauDNA skill directory with valid frontmatter |
 | `/cleanup-legacy-install` | Remove a legacy pre-plugin `~/.claude/` overlay after upgrading |
 
