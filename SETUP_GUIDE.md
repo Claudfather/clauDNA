@@ -279,6 +279,14 @@ The plugin ships a `PreCompact` hook that automatically triggers `/claudna:refle
 
 ---
 
+### 3.6 SessionStart briefing (on by default)
+
+Every interactive session opens with a short context briefing injected by `plugin-hooks/session-start.sh`: current branch and tree state, the per-cwd handoff summary (`<cwd>/.claude/session.md`, staleness-aware), and your open PRs — plus a directive telling the agent to synthesize a 1–2 sentence warm start instead of greeting you cold. It is context for the agent, not terminal output.
+
+- **Disable it** with `CLAUDNA_SESSION_BRIEFING=0` (same pattern as `CLAUDNA_PRECOMPACT_REFLECT`).
+- **Bots / CI / `claude -p`:** there is no reliable in-hook headless signal, so the env var *is* the headless mechanism — set `CLAUDNA_SESSION_BRIEFING=0` in your bot environment (the §4.4 Dockerfile recipe includes it). The hook is harmless if left on (it only adds context and degrades silently), but headless runs don't need the token cost.
+- Every network read is timeout-wrapped; missing `gh`, auth failures, and rate limits silently drop the PR section. The hook always exits 0 — invariants enforced in `tests/test_session_start_hook.py`.
+
 ## 4. Headless / CI / Docker Provisioning
 
 Claude Code's `/plugin install` is interactive, but plugins can be auto-installed on session start by combining declarative settings with an environment variable. Use this pattern for bots, CI runners, and Docker images.
@@ -383,6 +391,8 @@ RUN npm install -g @anthropic-ai/claude-code
 # Copy the bot's pre-baked settings (marketplace + enabledPlugins declarations
 # from §4.1, plus whatever permissions and defaults the bot needs).
 COPY bot-settings.json /root/.claude/settings.json
+# Headless runs skip the SessionStart briefing (see §3.4)
+ENV CLAUDNA_SESSION_BRIEFING=0
 
 # Pre-install claudna at image *build* time so cold container starts don't
 # pay the marketplace-clone + install cost on every container boot.
