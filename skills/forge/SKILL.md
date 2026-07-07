@@ -204,7 +204,13 @@ Forge is an *author*, not a publisher: it produces a §4.1 publishable doc and h
 3. Route to the requested target:
    - `--output github` → `/claudna:publish <doc> --to github-issue --repo <repo>`
    - `--output docs` → `/claudna:publish <doc>` (disk → a PR-reviewable plan directory)
-4. Report the published URL(s) that `/claudna:publish` returns.
+4. **F7 issue generation** — with `--output github` and a multi-phase plan, forge publishes the *whole family*, epic first, then cross-links:
+   1. Publish the epic doc → note its issue number `E`.
+   2. Publish each per-phase doc in phase order. Every phase doc's `## Summary` opens with `Part of #E (<track>). Size: <S/M/L>.` and its `### Dependencies` names the phase issues it waits on — the numbers exist because publication follows phase order.
+   3. After all phases publish, append a `## Phase issues` table to the epic body (`| Phase | Issue | Track |`, one row per phase with the real issue numbers) and re-publish the epic body via `/claudna:publish --update #E` so the family is navigable from the top.
+   4. Decision riders (evaluate-later questions extracted from phases) publish as their own small issues and are listed under the epic's table as `Decision riders (not phases): #R1, #R2.`
+   With `--output docs` the same family lands as `00_overview.md` + numbered phase docs in one directory — cross-links by filename instead of issue number. Single-phase plans skip this step entirely.
+5. Report the published URL(s) that `/claudna:publish` returns — for a multi-phase plan, the epic URL first, then the phase issues in order.
 
 This is the substrate the hardening loop runs on: `/ironclad <issue> --loops N` stress-tests the published plan (lens findings posted as comments), and `forge --reforge <issue>` folds those comments back into the body — converged when there are no open blockers and all decision forks are locked.
 
@@ -216,7 +222,8 @@ Emit structured-result JSON per `skills/_shared/orchestration-guide.md` §10 (St
   "skill": "forge",
   "outcome": "completed",
   "artifacts": {
-    "published_url": "<issue/PR/doc URL returned by /claudna:publish>",
+    "published_url": "<epic (or sole doc) URL returned by /claudna:publish>",
+    "phase_issue_urls": ["<per-phase issue URLs in phase order, [] for single-phase>"],
     "target": "github-issue|docs|session",
     "right_size": "ok|marginal",
     "fork_count": N,

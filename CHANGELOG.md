@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **Forge generates the issue family (F7 — the last open item of epic [#155](https://github.com/Claudfather/clauDNA/issues/155)).** With `--output github` and a multi-phase plan, `/forge` now publishes the whole family instead of describing it: epic first, then each per-phase §4.1 doc in phase order (every phase Summary opens `Part of #E`, Dependencies name real phase-issue numbers), then a `## Phase issues` table appended to the epic via the new publish update path so the family is navigable from the top; decision riders publish as their own small issues. `--output docs` lands the same family as `00_overview` + numbered phase docs. `--auto` artifacts gain `phase_issue_urls`. The pattern is exactly the shape epic #165 was hand-authored and hardened on — F7 automates it.
+- **`/publish --update <issue#|url>` — in-place issue updates.** Replaces the named issue's body (`gh issue edit --body-file`) instead of creating: dedup skipped (target explicit), title untouched unless asked, labels additive only. The dedup rules compose: an exact match now prefers offering an update of the existing issue over skipping, keeping one canonical issue current. Consumers: forge's F7 epic-table step and `--reforge` re-publication.
 
 ## [0.13.0] - 2026-07-07
 ### Added

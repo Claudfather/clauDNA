@@ -2,7 +2,7 @@
 name: publish
 user-invocable: true
 description: "Use when a finished markdown document — plan, audit or review findings, retro, decision, or knowledge page — needs to reach its destination: shared docs on disk, a GitHub issue, a PR description, the chat session, or a Notion page. The single output sink: skills author content, publish delivers it."
-argument-hint: "<source-file> [--to disk|github-issue|github-pr|session|notion] [--repo <name>] [--dry-run]"
+argument-hint: "<source-file> [--to disk|github-issue|github-pr|session|notion] [--update <issue#|url>] [--repo <name>] [--dry-run]"
 ---
 
 # Publish
@@ -107,6 +107,14 @@ Labels come from `tags:` — skills express severity/priority as tags (`priority
 After creating:
 1. Add the issue URL to the source doc's `links:` frontmatter field.
 2. Report the issue URL.
+
+**In-place update (`--update <issue#|url>`).** When the caller names an existing issue — a re-forged plan body, an epic gaining its phase-issues table, a corrected audit — replace that issue's body instead of creating anything:
+
+```bash
+gh issue edit <number> --repo <owner>/<repo> --body-file <rendered-body-file>
+```
+
+Rules: dedup is skipped (the target is explicit); the title is left untouched unless the doc's `title:` differs *and* the caller asked for a retitle; labels are additive only (`--add-label` for new `tags:`, never removing existing ones); report the issue URL and note "updated in place". The dedup near-match rule composes with this: when the mandatory dedup search finds an exact match, prefer offering an `--update` of the existing issue over skipping — updating keeps one canonical issue current instead of stranding it stale.
 
 ### Adapter: github-pr
 
