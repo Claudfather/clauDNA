@@ -198,6 +198,17 @@ rows:
     mode: --lens
     phase: P6
 
+  # --- P8: orientation + install diagnostic ---
+  - utterance: "is my claudna installation healthy? are the hooks wired?"
+    keywords: [installation, healthy, hooks]
+    expect: using-claudna
+    mode: health
+    phase: P8
+  - utterance: "which installed skill should I use for this task?"
+    keywords: [skill, task]
+    expect: using-claudna
+    phase: P8
+
   # --- Cross-family disambiguation ---
   - utterance: "the page loads slow and the scrolling is janky"
     keywords: [janky]

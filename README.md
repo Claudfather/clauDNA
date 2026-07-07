@@ -119,7 +119,7 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:audit t
 | `/init-project` | Set up CLAUDE.md, CHANGELOG.md, and .claude/ for a new or existing project |
 | `/file-github-issue` | File a GitHub issue from a screenshot + short description |
 | `/github-activity-report` | GitHub activity stats (PRs, commits, contributors) over a time window |
-| `/skill-health` | Verify your clauDNA install — version, hooks, skills, dependencies |
+| `/using-claudna` | Orient in the skill set + Installation Health diagnostic (replaces the old skill-health diagnostic) |
 | `/skill-scaffold` | Scaffold a new clauDNA skill directory with valid frontmatter |
 | `/cleanup-legacy-install` | Remove a legacy pre-plugin `~/.claude/` overlay after upgrading |
 

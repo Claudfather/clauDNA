@@ -8,6 +8,9 @@
 review-changes
 review-pr
 #
+# P8 (0.13.0) — using-claudna absorbs the install diagnostic
+skill-health
+#
 # P6 (0.10.0) — lenses into the ironclad panel
 first-principles
 align-to-mission
