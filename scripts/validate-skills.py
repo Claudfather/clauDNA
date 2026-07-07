@@ -18,6 +18,7 @@ from skill_checks import (
     STALE_PATH_RE,
     check_removed_name_mentions,
     collect_skill_reference_errors,
+    find_resurrected_dirs,
     get_touched_skills,
     load_removed_skills,
     parse_frontmatter,
@@ -195,16 +196,15 @@ def main() -> int:
 
     # Directory resurrection (#192): the text gate can't see a removed skill
     # re-created whole as skills/<name>/ with a valid body — catch it here.
-    for name in removed_names:
-        if (SKILLS_DIR / name).is_dir():
-            removed_name_hits.append(
-                (
-                    f"skills/{name}/",
-                    f"removed skill '{name}' has been re-created as a skill directory -- "
-                    "resurrections require removing the name from scripts/removed-skills.txt "
-                    "(a deliberate, reviewable act), not silently restoring the directory",
-                )
+    for name in find_resurrected_dirs(removed_names, SKILLS_DIR):
+        removed_name_hits.append(
+            (
+                f"skills/{name}/",
+                f"removed skill '{name}' has been re-created as a skill directory -- "
+                "resurrections require removing the name from scripts/removed-skills.txt "
+                "(a deliberate, reviewable act), not silently restoring the directory",
             )
+        )
 
     total_skills = len(skill_dirs) - len(SKIP_SKILLS)
 

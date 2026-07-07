@@ -43,8 +43,14 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git tag -a "$TAG" -m "Release $TAG"
-            git push origin "$TAG"
-            echo "tagged $TAG at $GITHUB_SHA"
+            # Race guard: if another actor pushed the tag between checkout and
+            # now, treat an existing remote tag as success (idempotent intent).
+            if git push origin "$TAG"; then
+              echo "tagged $TAG at $GITHUB_SHA"
+            else
+              git fetch --tags
+              git rev-parse -q --verify "refs/tags/$TAG" >/dev/null && echo "tag $TAG appeared concurrently — ok"
+            fi
           fi
 
       - name: Create release if missing
@@ -59,7 +65,7 @@ jobs:
           fi
           # Extract this version's CHANGELOG section as the release notes.
           awk -v ver="$VERSION" '
-            $0 ~ "^## \\[" ver "\\]" { in_section = 1; next }
+            index($0, "## [" ver "]") == 1 { in_section = 1; next }
             in_section && /^## \[/ { exit }
             in_section { print }
           ' CHANGELOG.md > /tmp/notes.md

@@ -120,14 +120,12 @@ class TestRepoIsCleanOfRemovedNames:
 
     def test_no_removed_skill_directory_resurrected(self):
         # #192: the text gate matches references; a whole-directory
-        # re-creation of a removed skill needs its own check.
-        spec = importlib.util.spec_from_file_location(
-            "validate_skills", REPO_ROOT / "scripts" / "validate-skills.py"
-        )
-        validate_skills = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(validate_skills)
-        removed = validate_skills.load_removed_skills(validate_skills.REMOVED_SKILLS_FILE)
-        resurrected = [n for n in removed if (REPO_ROOT / "skills" / n).is_dir()]
+        # re-creation of a removed skill needs its own check. Uses the same
+        # helper the validator does, so gate and backstop cannot drift.
+        from skill_checks import find_resurrected_dirs
+
+        removed = load_removed_skills(REPO_ROOT / "scripts" / "removed-skills.txt")
+        resurrected = find_resurrected_dirs(removed, REPO_ROOT / "skills")
         assert resurrected == [], (
             f"removed skills re-created as directories: {resurrected} — "
             "remove the name from scripts/removed-skills.txt deliberately instead"
