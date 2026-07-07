@@ -95,25 +95,38 @@ fi
 
 # Opportunistic pruning: every ~100th write, prune entries older than 30 days.
 # Use line count mod 100 as a cheap heuristic — avoids pruning on every write.
+#
+# Concurrency (#164): the old read→filter→mv-replace lost any event a
+# concurrent hook appended between the read and the rename. Now: a mkdir
+# lock ensures one pruner at a time (losers skip — the next 100th write
+# prunes), and the pruner ROTATES the live file aside instead of replacing
+# it. rename(2) is atomic: a writer holding an fd keeps appending to the
+# rotated inode (read by the filter), and a writer opening after the
+# rotation creates a fresh live file (untouched). Survivors append back to
+# the live file. Residual caveat, documented: a writer that resolved the
+# old path before the rotation but appends after the filter's read loses
+# that one line — a microseconds window, down from the full prune duration.
+# Pruning requires jq; without it the file simply grows (the old grep
+# fallback silently kept everything anyway — now that behavior is explicit).
 LINE_COUNT=$(wc -l < "$TELEMETRY_PATH" 2>/dev/null || echo "0")
 LINE_COUNT=$(echo "$LINE_COUNT" | tr -d ' ')
-if [ "$((LINE_COUNT % 100))" -eq "0" ] && [ "$LINE_COUNT" -gt "0" ]; then
+if [ "$((LINE_COUNT % 100))" -eq "0" ] && [ "$LINE_COUNT" -gt "0" ] && command -v jq &>/dev/null; then
     CUTOFF=$(date -u -d "30 days ago" +"%Y-%m-%dT" 2>/dev/null || date -u -v-30d +"%Y-%m-%dT" 2>/dev/null || true)
-    if [ -n "$CUTOFF" ]; then
-        TMPFILE=$(mktemp "${TELEMETRY_DIR}/prune.XXXXXX")
-        if command -v jq &>/dev/null; then
-            jq -c "select(.ts >= \"$CUTOFF\")" "$TELEMETRY_PATH" > "$TMPFILE" 2>/dev/null || cp "$TELEMETRY_PATH" "$TMPFILE"
-        else
-            # grep fallback: keep lines where the timestamp is >= cutoff
-            # This is approximate but safe — worst case we keep a few extra lines
-            grep -v "\"ts\":\"[0-9T:-]*\"" "$TELEMETRY_PATH" > "$TMPFILE" 2>/dev/null || true
-            grep "\"ts\":\"${CUTOFF%T}" "$TELEMETRY_PATH" >> "$TMPFILE" 2>/dev/null || true
-            # If fallback is unreliable, just keep everything
-            if [ ! -s "$TMPFILE" ]; then
-                cp "$TELEMETRY_PATH" "$TMPFILE"
+    LOCKDIR="${TELEMETRY_PATH}.prune.lock"
+    if [ -n "$CUTOFF" ] && mkdir "$LOCKDIR" 2>/dev/null; then
+        trap 'rm -rf "$LOCKDIR"' EXIT
+        ROTATED="${TELEMETRY_PATH}.pruning"
+        if mv "$TELEMETRY_PATH" "$ROTATED" 2>/dev/null; then
+            if jq -c "select(.ts >= \"$CUTOFF\")" "$ROTATED" >> "$TELEMETRY_PATH" 2>/dev/null; then
+                rm -f "$ROTATED"
+            else
+                # Filter failed (malformed line?) — restore everything unpruned.
+                cat "$ROTATED" >> "$TELEMETRY_PATH" 2>/dev/null || true
+                rm -f "$ROTATED"
             fi
         fi
-        mv "$TMPFILE" "$TELEMETRY_PATH"
+        rm -rf "$LOCKDIR"
+        trap - EXIT
     fi
 fi
 
