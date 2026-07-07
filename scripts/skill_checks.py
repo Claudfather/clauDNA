@@ -361,6 +361,80 @@ def check_skill_references(text: str, valid_names: set[str]) -> list[str]:
     return [msg for _target, msg in collect_skill_reference_errors(text, valid_names)]
 
 
+def load_removed_skills(path: Path) -> list[str]:
+    """Read scripts/removed-skills.txt: one removed skill name per line.
+
+    `#` starts a comment (full-line or inline); blank lines are skipped;
+    missing file → []. A remaining entry that isn't a valid skill name
+    raises — a malformed entry would otherwise silently disable the gate
+    for that name. Deletion PRs append the names they remove; the gate
+    below keeps every later change from resurrecting references to them.
+    """
+    if not path.is_file():
+        return []
+    names: list[str] = []
+    for lineno, raw in enumerate(path.read_text().splitlines(), start=1):
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        if not NAME_RE.match(line):
+            raise ValueError(f"{path.name} line {lineno}: {line!r} is not a valid skill name")
+        names.append(line)
+    return names
+
+
+def check_removed_name_mentions(text: str, removed_names: list[str]) -> list[tuple[str, str]]:
+    """Flag any mention of a removed skill name, in any reference form.
+
+    A single word-boundary match per name catches every form at once —
+    `claudna:<name>`, `/<name>`, `skills/<name>/`, `Skill(<name>)`, and bare
+    prose mentions — because the name itself is the invariant token.
+    A mention positioned after a `Replaces` token on its line is exempt:
+    SKILL_CONTRACT §2.1 rule 6 *requires* successor breadcrumbs to name the
+    skills they replace. The exemption is positional — a real reference
+    earlier on a line that merely also contains the word "Replaces" still
+    flags.
+
+    Returns (name, message) pairs. Callers must treat these as
+    always-blocking (never demoted by CI touched-set scoping): once a
+    deletion release lands, main is clean of the removed names, so any hit
+    was introduced by the change under test.
+    """
+    if not removed_names:
+        return []
+    # One alternation for all names: a whole-text pre-pass skips clean files
+    # (the common case), and per-line finditer replaces a per-name inner loop.
+    # Measured ~5x over per-name patterns on this repo's scan set.
+    alternation = "|".join(re.escape(name) for name in sorted(removed_names))
+    pattern = re.compile(
+        rf"(?<![A-Za-z0-9_-])({alternation})(?![A-Za-z0-9_-])", re.IGNORECASE
+    )
+    if not pattern.search(text):
+        return []
+    replaces_re = re.compile(r"\bReplaces\b")
+    errors: list[tuple[str, str]] = []
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        m_replaces = replaces_re.search(line)
+        breadcrumb_start = m_replaces.start() if m_replaces else None
+        seen_on_line: set[str] = set()
+        for m in pattern.finditer(line):
+            if breadcrumb_start is not None and m.start() > breadcrumb_start:
+                continue  # breadcrumb-sanctioned mention
+            name = m.group(1).lower()
+            if name in seen_on_line:
+                continue
+            seen_on_line.add(name)
+            errors.append(
+                (
+                    name,
+                    f"line {lineno}: mention of removed skill '{name}' -- update to its "
+                    "successor engine or drop the reference (removed-names gate, "
+                    "scripts/removed-skills.txt)",
+                )
+            )
+    return errors
+
+
 def check_allowed_tools_usage(fm: dict, body: str) -> list[str]:
     """Warn if allowed-tools declares a tool never mentioned in body.
 

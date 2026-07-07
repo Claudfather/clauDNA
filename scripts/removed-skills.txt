@@ -1,0 +1,19 @@
+# Skills removed by consolidation releases (epic #165, F4: hard removal,
+# per-phase releases). One name per line. The removed-names gate in
+# validate-skills.py blocks any repo surface (outside CHANGELOG.md and
+# documentation/archive/) from mentioning these names in any form;
+# `Replaces ...` breadcrumb lines are exempt.
+#
+# P2 (0.7.0) — infra engines: /modal /railway /vercel /neon
+modal-deploy
+modal-logs
+modal-status
+railway-deploy
+railway-logs
+railway-status
+vercel-deploy
+vercel-logs
+vercel-status
+neon-branch
+neon-info
+neon-query

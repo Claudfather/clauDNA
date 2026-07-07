@@ -79,7 +79,7 @@ Don't bulk-`rm -rf` `~/.claude/skills/` or `~/.claude/hooks/` — those director
 | SnowSQL | `/claudna:dbt` | Download from Snowflake |
 | OpenSSL | Snowflake key-pair auth | Pre-installed on macOS |
 | `gh` (GitHub CLI) | `/claudna:review-pr`, `/claudna:heist`, GitHub-issue output modes | `brew install gh` |
-| `psql` | `/claudna:neon-query`, `/claudna:neon-info`, `/claudna:neon-branch` | `brew install libpq` |
+| `psql` | `/claudna:neon` (query, branch, and info modes) | `brew install libpq` |
 | `ruff` | Python auto-format hook | `pip install ruff` |
 | `prettier` | JS/TS/MD auto-format hook | `npm install -g prettier` |
 
@@ -342,7 +342,45 @@ Third-party marketplaces (which Claudfather is) **do not auto-update by default*
 claude plugin update claudna@Claudfather
 ```
 
-Wire this into your bot's startup script or a deploy hook so each run gets the latest published version. Or, if you want strict version pinning, set the plugin's `version` field in the marketplace listing and never call update — the bot stays on whatever version was last installed.
+Wire this into your bot's startup script or a deploy hook so each run gets the latest published version. If you instead need to hold a specific version, use the pin recipe below (§4.3.1) — it works for interactive users and bots alike and supersedes the older advice of editing the `version` field in the marketplace listing.
+
+### 4.3.1 Pinning to a version, and rolling back
+
+Consolidation releases (0.7.0 onward) **remove** superseded skills — their capabilities move into engines with modes, and `Replaces /old-name` breadcrumbs on the successors carry the mapping. If a release breaks your workflow, or you need old skill names for a while longer, pin:
+
+1. **Create a local marketplace directory** — Claude Code adds local marketplaces by *directory*, not by file, and the manifest requires an `owner` object. Make a directory (say `~/claudna-pinned/`) containing `.claude-plugin/marketplace.json`:
+
+   ```json
+   {
+     "name": "Claudfather-pinned",
+     "owner": { "name": "you" },
+     "plugins": [
+       {
+         "name": "claudna",
+         "source": { "source": "github", "repo": "Claudfather/clauDNA", "ref": "v0.6.1" }
+       }
+     ]
+   }
+   ```
+
+   Release tags are listed at <https://github.com/Claudfather/clauDNA/releases> — `v0.6.1` is the last pre-consolidation version. (`ref` pins the git ref; if you set both `ref` and `sha`, `sha` wins.)
+
+2. **Install from the pinned marketplace:**
+
+   ```bash
+   claude plugin marketplace add ~/claudna-pinned
+   claude plugin install claudna@Claudfather-pinned
+   ```
+
+3. **Unpin when ready** — this is the step that matters. A pin left in place forever is how installs strand (release 0.5.0 removed a repo-side pin for exactly that reason: consumers had been silently frozen at 0.2.0 while the plugin moved on). To return to the live channel:
+
+   ```bash
+   claude plugin uninstall claudna@Claudfather-pinned
+   claude plugin marketplace remove Claudfather-pinned
+   claude plugin install claudna@Claudfather
+   ```
+
+Treat pinning as a temporary hold with a planned exit, never a permanent posture.
 
 ### 4.4 Dockerfile sketch
 

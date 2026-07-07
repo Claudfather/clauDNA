@@ -116,7 +116,7 @@ Minimum body length: 200 characters of non-frontmatter content. Skills shorter t
 - Skill names use `kebab-case`: `tech-debt`, `review-pr`, `frontend-performance-audit`.
 - Slash commands are the skill name with a `/` prefix: `/tech-debt`.
 - Skills that file or read GitHub issues end in `-audit` or `-review` (planning) or use a plain action verb (`heist`, `commit-push-pr`).
-- Skills that wrap a third-party tool start with the tool's name: `dbt`, `neon-info`, `modal-deploy`, `railway-logs`, `vercel-status`.
+- Skills that wrap a third-party tool are **one engine named for the tool, with verb modes** — `dbt`, `modal`, `railway`, `vercel`, `neon` — never one skill per tool×verb (`<tool>-deploy` / `<tool>-logs` / …). Engines follow `skills/_shared/infra-cli-contract.md`: thin body, first-token verb dispatch, per-verb depth in support files. A new capability for a tool is a new verb row + depth file, not a new skill.
 
 Naming is not validator-enforced today — it's a guideline. Conflicts and confusion (e.g. duplicate names) are validator-enforced.
 

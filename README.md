@@ -32,7 +32,7 @@ For bots, CI runners, and Docker images, drop a `settings.json` with `enabledPlu
 
 | Directory | Count | Contents |
 |-----------|-------|----------|
-| `skills/` | 61 | User-invocable slash commands |
+| `skills/` | 53 | User-invocable slash commands |
 | `agents/` | 8 | `snowflake-analyst`, `dbt-engineer`, `neon-analyst`, `modal-ops`, `railway-ops`, `vercel-ops`, `code-reviewer`, `spec-reviewer` |
 | `plugin-hooks/` | 5 wired + 1 opt-in | Auto-format on Write/Edit, PreToolUse permission expansion, PreCompact reflect gate, opt-in skill telemetry, macOS notifications. (`statusline.sh` is opt-in — see [SETUP_GUIDE §3.2](./SETUP_GUIDE.md#32-statusline-optional).) Named `plugin-hooks/` to avoid a Claude Code bug that deletes any project-root `hooks/` directory between tool calls. |
 
@@ -114,23 +114,15 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:tech-de
 | Skill | Description |
 |-------|-------------|
 | `/dbt` | dbt build, test, compile, full-refresh |
-| `/neon-query` | Run SQL against Neon PostgreSQL via psql |
-| `/neon-info` | Neon dashboard — connection status, tables, branches |
-| `/neon-branch` | Create and manage Neon database branches |
+| `/neon` | Neon PostgreSQL engine — `query` / `branch` / `info` modes (replaces the three `neon-*` skills) |
 
 ### Platform Operations
 
 | Skill | Description |
 |-------|-------------|
-| `/modal-status` | Modal dashboard — apps, containers, secrets, GPU usage |
-| `/modal-deploy` | Deploy Modal apps with health verification |
-| `/modal-logs` | View and stream Modal app logs |
-| `/railway-status` | Railway dashboard — services, deployments, environments |
-| `/railway-deploy` | Deploy to Railway with build monitoring and rollback |
-| `/railway-logs` | Filter Railway logs by level, time, patterns |
-| `/vercel-status` | Vercel dashboard — deployments, domains, env vars |
-| `/vercel-deploy` | Deploy to Vercel with health verification and rollback |
-| `/vercel-logs` | Filter Vercel deployment logs |
+| `/modal` | Modal engine — `deploy` / `logs` / `status` modes (replaces the three `modal-*` skills) |
+| `/railway` | Railway engine — `deploy` / `logs` / `status` modes (replaces the three `railway-*` skills) |
+| `/vercel` | Vercel engine — `deploy` / `logs` / `status` modes (replaces the three `vercel-*` skills) |
 | `/investigate-app` | Platform-agnostic production debugging |
 
 ### Utilities

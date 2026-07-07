@@ -1,44 +1,10 @@
----
-name: vercel-logs
-user-invocable: true
-description: "Use when you need to view, filter, or debug Vercel deployment logs."
-argument-hint: "[deployment URL or filter]"
-requires:
-  - cli: vercel
-    reason: "Vercel CLI for log access"
----
+# Vercel — Logs
 
-# Vercel Logs
+Invoked by /claudna:vercel in logs mode. Pre-flight (CLI installed, authenticated, project linked) has already passed per the engine SKILL.md. Execution, output, and failure conventions: `skills/_shared/infra-cli-contract.md` §§5–7 — separate Bash calls, verbatim stderr. Logs is read-only: it never gates on confirmation (contract §5).
 
-View and filter Vercel deployment logs. The CLI supports native filtering by level, status code, source type, time range, and full-text search — with JSON output for parsing.
-
-## Instructions
+View and filter Vercel deployment logs. The CLI supports native filtering by level, status code, source type, time range, and full-text search — with JSON output for parsing. If the verb arguments carry a deployment URL/ID or filter hints, apply them in the steps below.
 
 Follow these steps exactly in order.
-
----
-
-### Step 0: Prerequisites
-
-Run these checks in order. Stop at the first failure and guide the user.
-
-**1. CLI installed?**
-```bash
-vercel --version
-```
-- If the command fails (non-zero exit code or "command not found"): tell the user to install with `npm install -g vercel`
-
-**2. Authenticated?**
-```bash
-vercel whoami
-```
-- If the command fails: tell the user to run `vercel login`
-
-**3. Project linked?**
-```bash
-ls .vercel/project.json
-```
-- If the file does not exist: tell the user to run `vercel link` to select a project
 
 ---
 
@@ -126,7 +92,7 @@ vercel logs --request-id req_xxxxx
 
 ### Step 3: JSON Output & Parsing
 
-Use `--json` to get structured JSON Lines output. Do NOT pipe through `jq` — instead, parse the JSON output yourself to extract and filter the fields you need.
+Use `--json` to get structured JSON Lines output (contract §5: prefer `--json`; parse rather than scrape). Do NOT pipe through `jq` — instead, parse the JSON output yourself to extract and filter the fields you need.
 
 **JSON Lines format:**
 ```bash
@@ -219,5 +185,3 @@ vercel httpstat /api/your-route
 ```bash
 vercel ls --limit 20
 ```
-
-$ARGUMENTS

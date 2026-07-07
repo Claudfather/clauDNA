@@ -248,8 +248,8 @@ class TestParseFrontmatterWithRequires:
         assert isinstance(fm["requires"], list)
         assert fm["requires"][0]["cli"] == "dbt"
 
-    def test_parse_neon_branch_skill(self):
-        skill_path = REPO_ROOT / "skills" / "neon-branch" / "SKILL.md"
+    def test_parse_neon_engine_skill(self):
+        skill_path = REPO_ROOT / "skills" / "neon" / "SKILL.md"
         if not skill_path.exists():
             return
         parsed = parse_frontmatter(skill_path)

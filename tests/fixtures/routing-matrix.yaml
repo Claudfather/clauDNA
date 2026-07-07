@@ -1,0 +1,179 @@
+# Routing-fixture matrix (epic #165, owned by P2 step 0.5).
+#
+# One row per skill retired by the consolidation epic, phrased in that
+# skill's distinctive symptom vocabulary, plus cross-family disambiguation
+# rows. Two verification layers:
+#
+#   1. CI (deterministic): tests/test_routing_fixtures.py asserts every row's
+#      anchor `keywords` appear (case-insensitive substrings) in the expected
+#      skill's frontmatter description — the picker routes on descriptions,
+#      so keyword presence is the mechanical proxy for routing quality.
+#   2. Manual (richer, run at phase boundaries): in a fresh interactive
+#      session, type the utterance and record which skill the picker
+#      resolves. Pass rule: 2 of 3 attempts resolve to `expect` (+ mode where
+#      noted). Paste the results table into the consolidation PR.
+#
+# Rows for not-yet-consolidated families point at their current skills; each
+# phase updates its own family's `expect` values in its PR (P3: audit → the
+# /audit engine; P4: session → /session; P5: review → /review-work; P6:
+# lenses → the /ironclad --lens door, carried in ironclad's body).
+#
+# Baseline: this file passing against the pre-P2 catalog (all rows green on
+# main before the first deletion) is the recorded "before" state.
+
+rows:
+  # --- P2: infra engines (consolidated this phase) ---
+  - utterance: "deploy my modal app to production"
+    keywords: [modal, deploy]
+    expect: modal
+    mode: deploy
+    phase: P2
+  - utterance: "stream the logs from my modal app"
+    keywords: [modal, logs]
+    expect: modal
+    mode: logs
+    phase: P2
+  - utterance: "what's running in my modal workspace — apps, containers, secrets"
+    keywords: [modal, workspace, status]
+    expect: modal
+    mode: status
+    phase: P2
+  - utterance: "deploy this service to railway"
+    keywords: [railway, deploy]
+    expect: railway
+    mode: deploy
+    phase: P2
+  - utterance: "show me the railway service logs"
+    keywords: [railway, logs]
+    expect: railway
+    mode: logs
+    phase: P2
+  - utterance: "check my railway project status and deployments"
+    keywords: [railway, status, deployments]
+    expect: railway
+    mode: status
+    phase: P2
+  - utterance: "deploy a vercel preview"
+    keywords: [vercel, deploy, preview]
+    expect: vercel
+    mode: deploy
+    phase: P2
+  - utterance: "pull the vercel deployment logs"
+    keywords: [vercel, logs]
+    expect: vercel
+    mode: logs
+    phase: P2
+  - utterance: "vercel project status — domains and env vars"
+    keywords: [vercel, status, domains]
+    expect: vercel
+    mode: status
+    phase: P2
+  - utterance: "run a sql query against neon"
+    keywords: [neon, sql, quer]
+    expect: neon
+    mode: query
+    phase: P2
+  - utterance: "create a neon database branch to experiment safely"
+    keywords: [neon, branch]
+    expect: neon
+    mode: branch
+    phase: P2
+  - utterance: "give me an overview of my neon database"
+    keywords: [neon, overview]
+    expect: neon
+    mode: info
+    phase: P2
+
+  # --- P3: audit family (current skills until P3 lands) ---
+  - utterance: "check the codebase for security vulnerabilities"
+    keywords: [security, vulnerabilit]
+    expect: security-audit
+    phase: P3
+  - utterance: "find the technical debt in this codebase"
+    keywords: [technical debt]
+    expect: tech-debt
+    phase: P3
+  - utterance: "our docs are stale — audit them against the code"
+    keywords: [documentation, stale]
+    expect: docs-review
+    phase: P3
+  - utterance: "do a visual and UX audit of the deployed app"
+    keywords: [visual, UX]
+    expect: design-review
+    phase: P3
+  - utterance: "do our interfaces enforce auth and rate limiting consistently?"
+    keywords: [interfaces, cross-cutting]
+    expect: access-path-audit
+    phase: P3
+  - utterance: "audit how well the data model serves the application"
+    keywords: [data model]
+    expect: data-model-audit
+    phase: P3
+  - utterance: "the page flickers and scrolls janky — find out why"
+    keywords: [janky, performance]
+    expect: frontend-performance-audit
+    phase: P3
+  - utterance: "birds-eye view across all my repos — where should I spend time?"
+    keywords: [birds-eye, repositories]
+    expect: repo-health
+    phase: P3
+
+  # --- P4: session family ---
+  - utterance: "write a handoff — I'm done for the day"
+    keywords: [end of a session, handoff]
+    expect: session-handoff
+    phase: P4
+  - utterance: "new session — where did I leave off?"
+    keywords: [start of a new session, pick up]
+    expect: session-resume
+    phase: P4
+  - utterance: "label this session so I can find it later"
+    keywords: [label, session]
+    expect: name-session
+    phase: P4
+
+  # --- P5: review family ---
+  - utterance: "review my uncommitted changes before I commit"
+    keywords: [uncommitted changes]
+    expect: review-changes
+    phase: P5
+  - utterance: "review this pull request before merging"
+    keywords: [pull request]
+    expect: review-pr
+    phase: P5
+
+  # --- P6: lens family (panel-internal after P6; expect updates then) ---
+  - utterance: "step back — are we even solving the right problem?"
+    keywords: [right problem]
+    expect: first-principles
+    phase: P6
+  - utterance: "does every phase of this plan serve the mission?"
+    keywords: [mission]
+    expect: align-to-mission
+    phase: P6
+  - utterance: "is this plan duplicating existing abstractions?"
+    keywords: [duplicating, abstractions]
+    expect: extension-check
+    phase: P6
+  - utterance: "has anyone tried this before in this repo?"
+    keywords: [prior art]
+    expect: precedent-check
+    phase: P6
+  - utterance: "is this forge plan structurally complete and ready to build?"
+    keywords: [structurally complete]
+    expect: plan-health-audit
+    phase: P6
+  - utterance: "do these phases justify their cost?"
+    keywords: [justify their cost]
+    expect: cost-benefit
+    phase: P6
+
+  # --- Cross-family disambiguation ---
+  - utterance: "the page loads slow and the scrolling is janky"
+    keywords: [janky]
+    expect: frontend-performance-audit
+    phase: cross
+  - utterance: "the spacing and typography look inconsistent across screens"
+    keywords: [spacing, typography]
+    expect: design-review
+    phase: cross

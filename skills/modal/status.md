@@ -1,53 +1,18 @@
----
-name: modal-status
-user-invocable: true
-description: "Use when you want an overview of your Modal workspace -- deployed apps, containers, secrets, and volumes."
-requires:
-  - cli: modal
-    reason: "Modal CLI for workspace inspection"
----
+Invoked by /claudna:modal in status mode — pre-flight (contract §4) has already run; the remaining args may name an environment to scope to (`--env`).
 
-# Modal Status
+# Status
 
-Quick dashboard for your Modal workspace. Shows deployed apps, running containers, secrets, volumes, environments, and GPU usage at a glance.
+Quick dashboard for the Modal workspace. Shows deployed apps, running containers, secrets, volumes, environments, and GPU usage at a glance. Read-only — never gates. Follow these steps exactly in order.
 
-## Instructions
+## Step 1: Environments
 
-Follow these steps exactly in order.
-
----
-
-### Step 0: Prerequisites
-
-Run these checks in order. Stop at the first failure and guide the user.
-
-**1. CLI installed?**
-
-Run these as separate parallel Bash calls (never chain with `||` or `&&`):
-```bash
-modal --version
-```
-If that fails, try:
-```bash
-python -m modal --version
-```
-If both fail, tell the user to install with `pip install modal`. If only `python -m modal` works, note this and use `python -m modal` for all subsequent commands.
-
-**2. Authenticated?**
-```bash
-modal token info
-```
-If the command fails, tell the user to run `modal token new` (opens browser) or `modal token set --token-id <id> --token-secret <secret>` for headless auth.
-
-**3. Check environment:**
 ```bash
 modal environment list --json
 ```
-Note which environments exist and which is active. Default is used if `--env` is not specified.
 
----
+List all environments and their web suffixes. Note which is active — the default is used if `--env` is not specified.
 
-### Step 1: Deployed Apps
+## Step 2: Deployed Apps
 
 ```bash
 modal app list --json
@@ -55,7 +20,7 @@ modal app list --json
 
 List all deployed and running apps: name, state, creation time.
 
-### Step 2: Running Containers
+## Step 3: Running Containers
 
 ```bash
 modal container list --json
@@ -63,7 +28,7 @@ modal container list --json
 
 List all currently running containers: container ID, app, function, GPU type (if any).
 
-### Step 3: Secrets
+## Step 4: Secrets
 
 ```bash
 modal secret list --json
@@ -71,7 +36,7 @@ modal secret list --json
 
 List secret **names only** — never display values. Note which environment each secret belongs to.
 
-### Step 4: Volumes
+## Step 5: Volumes
 
 ```bash
 modal volume list --json
@@ -79,15 +44,7 @@ modal volume list --json
 
 List all volumes: name, creation time, environment.
 
-### Step 5: Environments
-
-```bash
-modal environment list --json
-```
-
-List all environments and their web suffixes.
-
-### Step 6: Check for Modal Config
+## Step 6: Check for Modal Config
 
 Use the Read tool to check for project-level Modal configuration:
 - Read `.modal.toml` (skip if it doesn't exist)
@@ -97,9 +54,9 @@ Also check for Modal app files:
 - Use the Glob tool with pattern `*.py` to find Python files
 - Use the Grep tool with pattern `modal\.App|modal\.Stub|@app\.` and glob `*.py` with `output_mode: files_with_matches` to find Modal app files
 
-### Step 7: Present Dashboard
+## Step 7: Present Dashboard
 
-Format all output as a clean summary:
+Format all output as a clean summary (workspace name comes from the pre-flight `modal token info`):
 
 ```
 Modal Dashboard

@@ -1,54 +1,12 @@
----
-name: modal-deploy
-user-invocable: true
-description: "Use when you need to deploy a Modal app to production or update an existing deployment."
-argument-hint: "[app or module to deploy]"
-requires:
-  - cli: modal
-    reason: "Modal CLI for app deployment"
----
+Invoked by /claudna:modal in deploy mode — pre-flight (contract §4) has already run; the remaining args name the app or module to deploy plus any environment, tag, or name the user specified.
 
-# Modal Deploy
+# Deploy
 
-Deploy a Modal app with pre-flight checks, log streaming, health verification, and deployment history review.
+Deploy a Modal app with pre-deploy checks, log streaming, health verification, and deployment history review. Follow these steps exactly in order. **Do NOT skip the user confirmation gate in Step 2.**
 
-## Instructions
+## Step 1: Pre-Deploy Check
 
-Follow these steps exactly in order. **Do NOT skip the user confirmation gate in Step 2.**
-
----
-
-### Step 0: Prerequisites
-
-Run these checks in order. Stop at the first failure and guide the user.
-
-**1. CLI installed?**
-
-Run these as separate parallel Bash calls (never chain with `||` or `&&`):
-```bash
-modal --version
-```
-If that fails, try:
-```bash
-python -m modal --version
-```
-If both fail, tell the user to install with `pip install modal`. If only `python -m modal` works, use that prefix for all subsequent commands.
-
-**2. Authenticated?**
-```bash
-modal token info
-```
-If the command fails, tell the user to run `modal token new` (opens browser) or `modal token set`.
-
-**3. Identify app file:**
-
-Use the Grep tool with pattern `modal\.App|modal\.Stub|@app\.` and glob `*.py` with `output_mode: files_with_matches` to find Modal app files. If no app files found, ask the user which file to deploy.
-
----
-
-### Step 1: Pre-Deploy Check
-
-Gather context about what's about to be deployed.
+Gather context about what's about to be deployed. If target discovery surfaced multiple candidate app files and the remaining args don't pick one, ask the user which file to deploy.
 
 **Current deployment state:**
 ```bash
@@ -56,9 +14,11 @@ modal app list --json
 ```
 Note any existing deployment with the same name — it will be updated in place.
 
-**Git context:**
+**Git context** (two separate Bash calls):
 ```bash
 git log -1 --oneline
+```
+```bash
 git status --porcelain
 ```
 
@@ -93,13 +53,13 @@ Deploy Summary
 ═══════════════════════════════════════════════════════
 ```
 
-### Step 2: User Confirmation Gate
+## Step 2: User Confirmation Gate (contract §5)
 
 **Ask the user: "Ready to deploy? (y/n)"**
 
 Do NOT proceed until the user explicitly confirms. If they say no, stop and ask what they'd like to change.
 
-### Step 3: Deploy
+## Step 3: Deploy
 
 **Standard deployment:**
 ```bash
@@ -132,7 +92,7 @@ The `--stream-logs` flag streams app logs after deployment completes. Monitor fo
 - Function registration failures
 - Secret mount failures
 
-### Step 4: Health Check
+## Step 4: Health Check
 
 After deployment completes:
 
@@ -158,7 +118,7 @@ modal container list --json
 ```
 If the app has `min_containers` set, verify containers are running.
 
-### Step 5: Post-Deploy Log Review
+## Step 5: Post-Deploy Log Review
 
 ```bash
 modal app logs <app-name> --timestamps
@@ -173,7 +133,7 @@ Check for:
 - Volume mount failures
 - Import errors in container
 
-### Step 6: Deployment History
+## Step 6: Deployment History
 
 ```bash
 modal app history <app-name> --json
@@ -181,7 +141,7 @@ modal app history <app-name> --json
 
 Show recent deployment versions, useful for confirming the deploy and for rollback reference.
 
-### Step 7: Deploy Report
+## Step 7: Deploy Report
 
 Present a final summary:
 
@@ -206,5 +166,3 @@ If the deploy failed:
 - Suggest checking `modal app logs <app-name> --timestamps`
 - Offer to rollback: `modal app rollback <app-name> <version>` (Team/Enterprise plans only)
 - Offer to stop: `modal app stop <app-name>` (permanent — requires redeployment)
-
-$ARGUMENTS

@@ -1,48 +1,10 @@
----
-name: modal-logs
-user-invocable: true
-description: "Use when you need to view, stream, or debug Modal app or container logs."
-argument-hint: "[app name or container ID]"
-requires:
-  - cli: modal
-    reason: "Modal CLI for log access"
----
+Invoked by /claudna:modal in logs mode — pre-flight (contract §4) has already run; the remaining args name the app, container ID, or environment to fetch logs for.
 
-# Modal Logs
+# Logs
 
-View and stream Modal app and container logs. Supports app-level logs, per-container logs, and deployment log streaming.
+View and stream Modal app and container logs. Supports app-level logs, per-container logs, and deployment log streaming. Follow these steps exactly in order.
 
-## Instructions
-
-Follow these steps exactly in order.
-
----
-
-### Step 0: Prerequisites
-
-Run these checks in order. Stop at the first failure and guide the user.
-
-**1. CLI installed?**
-
-Run these as separate parallel Bash calls (never chain with `||` or `&&`):
-```bash
-modal --version
-```
-If that fails, try:
-```bash
-python -m modal --version
-```
-If both fail, tell the user to install with `pip install modal`.
-
-**2. Authenticated?**
-```bash
-modal token info
-```
-If the command fails, tell the user to run `modal token new`.
-
----
-
-### Step 1: Identify Target
+## Step 1: Identify Target
 
 Determine what to fetch logs for.
 
@@ -56,9 +18,9 @@ modal app list --json
 modal container list --json
 ```
 
-If the user specified an app name, container ID, or environment, use that. Otherwise, ask which app they want logs for.
+If the remaining args specify an app name, container ID, or environment, use that. Otherwise, ask which app the user wants logs for.
 
-### Step 2: Fetch Logs
+## Step 2: Fetch Logs
 
 **App-level logs (streams while app is active):**
 ```bash
@@ -95,7 +57,7 @@ modal run <app-file.py> --timestamps
 modal deploy <app-file.py> --stream-logs --timestamps
 ```
 
-### Step 3: Debug Deeper
+## Step 3: Debug Deeper
 
 If app-level logs aren't enough, investigate individual containers.
 
@@ -109,7 +71,7 @@ modal container list --json
 modal container logs <container-id> --timestamps
 ```
 
-**Execute diagnostic commands inside a container:**
+**Execute diagnostic commands inside a container** (each is its own Bash call):
 ```bash
 modal container exec <container-id> -- nvidia-smi          # GPU status
 modal container exec <container-id> -- ps aux              # Process list
@@ -123,7 +85,7 @@ modal shell <container-id>
 ```
 The shell container has preinstalled tools: vim, nano, ps, strace, curl, py-spy.
 
-### Common Investigations
+## Common Investigations
 
 **GPU OOM detection:**
 ```bash
@@ -160,7 +122,7 @@ modal secret list --json
 ```
 Verify the secret exists in the correct environment. Don't display values.
 
-### Step 4: Present Results
+## Step 4: Present Results
 
 Format log output clearly:
 - Group by severity (errors first, then warnings, then info)
@@ -170,7 +132,7 @@ Format log output clearly:
 - If logs are empty or the app has no recent activity, say so
 - Suggest next steps based on what the logs show
 
-### Debug Environment Variables
+## Debug Environment Variables
 
 For more verbose logging, suggest the user set:
 ```bash
@@ -181,5 +143,3 @@ For full tracebacks:
 ```bash
 MODAL_TRACEBACK=1 modal run <app-file.py>
 ```
-
-$ARGUMENTS

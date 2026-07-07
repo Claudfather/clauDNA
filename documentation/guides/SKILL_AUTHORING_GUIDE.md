@@ -33,7 +33,7 @@ Skill names are `kebab-case`: lowercase letters, digits, hyphens. The name becom
 
 Conventions:
 - Action verbs for workflow skills: `quick-commit`, `review-pr`, `implement-plan`
-- Platform prefix for infrastructure: `neon-query`, `modal-deploy`, `vercel-status`
+- Bare tool name for infrastructure engines: `modal`, `railway`, `vercel`, `neon` — one engine with verb modes per `skills/_shared/infra-cli-contract.md`, never a `<tool>-<verb>` skill
 - Descriptive compound for audits: `tech-debt`, `security-audit`, `cache-audit`
 
 ### 2. Create the Directory

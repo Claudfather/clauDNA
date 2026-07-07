@@ -1,53 +1,10 @@
----
-name: railway-status
-user-invocable: true
-description: "Use when you want an overview of your Railway project -- services, deployments, environments, and metrics."
-requires:
-  - cli: railway
-    reason: "Railway CLI for project inspection"
----
+# Railway — Status
 
-# Railway Status
+Invoked by /claudna:railway in status mode. Pre-flight (CLI install, version gate, auth, project link) has already passed per the engine contract — do not re-run it.
 
-Quick dashboard for your Railway project. Shows project info, services, recent deployments, environments, and resource metrics at a glance.
+Quick dashboard for your Railway project. Shows project info, services, recent deployments, environments, and resource metrics at a glance. Follow these steps in order.
 
-## Instructions
-
-Follow these steps exactly in order.
-
----
-
-### Step 0: Prerequisites
-
-Run these checks in order. Stop at the first failure and guide the user.
-
-**1. CLI installed?**
-```bash
-railway --version
-```
-- If the command fails (not found): tell the user to install with `npm install -g @railway/cli` or `brew install railway`
-
-**2. Version check (minimum 4.27.3):**
-```bash
-railway --version
-```
-- If below 4.27.3: tell the user to update with `npm update -g @railway/cli`
-
-**3. Authenticated?**
-```bash
-railway whoami --json
-```
-- If the command fails: tell the user to run `railway login`
-
-**4. Project linked?**
-```bash
-railway status --json
-```
-- If the command fails: tell the user to run `railway link` to select a project
-
----
-
-### Step 1: Project & Service Overview
+## Step 1: Project & Service Overview
 
 ```bash
 railway status --json
@@ -55,7 +12,7 @@ railway status --json
 
 Parse and present: project name, project ID, current environment, linked service.
 
-### Step 2: All Services
+## Step 2: All Services
 
 ```bash
 railway service list --json
@@ -63,7 +20,7 @@ railway service list --json
 
 List all services with their current deployment status.
 
-### Step 3: Recent Deployments
+## Step 3: Recent Deployments
 
 ```bash
 railway deployment list --limit 5 --json
@@ -71,7 +28,7 @@ railway deployment list --limit 5 --json
 
 Show the 5 most recent deployments: status, service, trigger, timestamp, commit.
 
-### Step 4: Environments
+## Step 4: Environments
 
 ```bash
 railway environment list --json
@@ -79,7 +36,7 @@ railway environment list --json
 
 List all environments (production, staging, PR environments, etc.).
 
-### Step 5: Environment Variables
+## Step 5: Environment Variables
 
 ```bash
 railway variables list --json
@@ -87,7 +44,7 @@ railway variables list --json
 
 List variable **names only** — never display values. Note any common variables that appear unset.
 
-### Step 6: Resource Metrics (if available)
+## Step 6: Resource Metrics (if available)
 
 Attempt to query Railway's GraphQL API for CPU and memory metrics of active services.
 
@@ -111,7 +68,7 @@ Parse the JSON response to extract service names, deployment IDs, and statuses.
 
 If the token is missing or any query fails, skip this step and note: "GraphQL metrics unavailable -- token not found in ~/.railway/config.json"
 
-### Step 7: Present Dashboard
+## Step 7: Present Dashboard
 
 Format all output as a clean summary:
 

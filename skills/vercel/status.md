@@ -1,43 +1,10 @@
----
-name: vercel-status
-user-invocable: true
-description: "Use when you want an overview of your Vercel project -- deployments, domains, environment variables, and config."
-requires:
-  - cli: vercel
-    reason: "Vercel CLI for project inspection"
----
+# Vercel — Status
 
-# Vercel Status
+Invoked by /claudna:vercel in status mode. Pre-flight (CLI installed, authenticated, project linked) has already passed per the engine SKILL.md. Execution, output, and failure conventions: `skills/_shared/infra-cli-contract.md` §§5–7 — separate Bash calls, verbatim stderr. Status is read-only: it never gates on confirmation (contract §5).
 
 Quick dashboard for your Vercel project. Shows project info, deployments, domains, environment variables, and framework details at a glance.
 
-## Instructions
-
 Follow these steps exactly in order.
-
----
-
-### Step 0: Prerequisites
-
-Run these checks in order. Stop at the first failure and guide the user.
-
-**1. CLI installed?**
-```bash
-vercel --version
-```
-- If the command fails (non-zero exit code or "command not found"): tell the user to install with `npm install -g vercel`
-
-**2. Authenticated?**
-```bash
-vercel whoami
-```
-- If the command fails: tell the user to run `vercel login`
-
-**3. Project linked?**
-```bash
-ls .vercel/project.json
-```
-- If the file does not exist: tell the user to run `vercel link` to select a project
 
 ---
 
@@ -91,7 +58,7 @@ List variable **names and targets** (Production, Preview, Development) — never
 
 ### Step 6: Present Dashboard
 
-Format all output as a clean summary:
+Format all output as a clean summary (the contract §6 boxed post-verb report):
 
 ```
 Vercel Dashboard
