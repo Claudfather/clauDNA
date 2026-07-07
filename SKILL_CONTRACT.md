@@ -50,7 +50,7 @@ The `description` is a routing surface: it is what the model reads when choosing
 1. **Trigger-first.** Open with the situation that calls for the skill — the description begins with `Use ` (`Use when …`, `Use at …`, `Use before …`, `Use after …`, `Use to …`). Descriptions that lead with a label or a capability summary hide the when-to-use signal. *(Advisory warning when missing.)*
 2. **No CLI flags.** Flag surfaces (`--auto`, `--output …`) belong in `argument-hint`. Any `--flag` token in a description is selection noise and a **hard error**.
 3. **No workflow summaries.** Never narrate the skill's internal process in the description ("dispatches lenses, folds comments, checks convergence"). A description that summarizes the workflow becomes a shortcut the model follows *instead of reading the body*.
-4. **Negative routing.** When a skill has a confusable sibling, disambiguate inside the description itself: `For uncommitted local changes, use /claudna:review-changes.` The pair should partition the intent space so the picker cannot land wrong.
+4. **Negative routing.** When a skill has a confusable sibling, disambiguate inside the description itself: `For triaging known issues in an existing product, use /claudna:product-enhance.` The pair should partition the intent space so the picker cannot land wrong.
 5. **Concrete anchors.** Temporal and state anchors ("Use when a PR has been merged…", "Use before starting substantive work…") and quoted trigger phrases ("Option A vs B") outperform topic labels. Include the symptoms and keywords a model would match on.
 6. **Rename breadcrumbs.** A skill that supersedes older skills says so at the end: `Replaces /product-brainstorm.` Old muscle memory still resolves. Breadcrumbs to **removed** skills must use the bare slash form (`Replaces /old-name`), never `/claudna:old-name` — the reference check requires every `claudna:<name>` mention to resolve to an *existing* skill.
 
@@ -104,7 +104,7 @@ The body is markdown. There is no rigid template, but the following conventions 
 2. **`## Procedure`** is the standard heading for the executable steps. Skills that don't fit a linear procedure (`/notes`) use other headings.
 3. **Numbered steps** when ordering matters. Subagent-driven skills often have an explicit `EnterPlanMode` step early.
 4. **Reference long supporting material via filename** rather than inlining (`See subagent-prompts.md in this skill directory`). This keeps `SKILL.md` scannable; the orchestrator reads the file, subagents read the deep references at runtime.
-5. **Hard gates** — when a step blocks proceeding without evidence, mark it with `<HARD-GATE>` tags or "Iron Law" language. See `/implement-plan`, `/review-changes`, `/review-pr` for examples.
+5. **Hard gates** — when a step blocks proceeding without evidence, mark it with `<HARD-GATE>` tags or "Iron Law" language. See `/implement-plan` and `/review-work` for examples.
 6. **Red Flags / Common Rationalizations tables** — for skills that get rationalized away ("this case is special"), include a short table mapping common excuses to counter-arguments.
 
 Minimum body length: 200 characters of non-frontmatter content. Skills shorter than that are stubs and fail validation.
@@ -113,7 +113,7 @@ Minimum body length: 200 characters of non-frontmatter content. Skills shorter t
 
 ## 4. Naming conventions
 
-- Skill names use `kebab-case`: `product-vision`, `review-pr`, `implement-plan`.
+- Skill names use `kebab-case`: `product-vision`, `review-work`, `implement-plan`.
 - Slash commands are the skill name with a `/` prefix: `/product-vision`.
 - Codebase audits are **lenses of the one `/audit` engine** (`skills/audit/<lens>/`, per `skills/_shared/audit-lens-contract.md`) — a new audit concern is a new lens directory + table row, never a new `-audit` skill. Review skills for plans/PRs use `-review` or a plain action verb (`heist`, `commit-push-pr`).
 - Skills that wrap a third-party tool are **one engine named for the tool, with verb modes** — `dbt`, `modal`, `railway`, `vercel`, `neon` — never one skill per tool×verb (`<tool>-deploy` / `<tool>-logs` / …). Engines follow `skills/_shared/infra-cli-contract.md`: thin body, first-token verb dispatch, per-verb depth in support files. A new capability for a tool is a new verb row + depth file, not a new skill.

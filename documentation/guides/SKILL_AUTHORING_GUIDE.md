@@ -21,7 +21,7 @@ A skill is a markdown file that teaches Claude how to do something specific, on 
 | User invokes via `/claudna:<name>` | Invoked by name in conversation ("use code-reviewer to...") |
 | Procedural: numbered steps, gates, output | Persona: tone, expertise, evaluation lens |
 | Runs once, produces output, done | Persistent identity across a conversation |
-| Examples: `tech-debt`, `review-pr`, `quick-commit` | Examples: `snowflake-analyst`, `code-reviewer`, `dbt-engineer` |
+| Examples: `audit`, `review-work`, `quick-commit` | Examples: `snowflake-analyst`, `code-reviewer`, `dbt-engineer` |
 
 If your contribution defines _who_ the agent is (expertise, judgment criteria, personality), it's an agent. If it defines _what_ to do (steps, gates, output format), it's a skill.
 
@@ -32,7 +32,7 @@ If your contribution defines _who_ the agent is (expertise, judgment criteria, p
 Skill names are `kebab-case`: lowercase letters, digits, hyphens. The name becomes both the directory name and the slash command (`/claudna:<name>`).
 
 Conventions:
-- Action verbs for workflow skills: `quick-commit`, `review-pr`, `implement-plan`
+- Action verbs for workflow skills: `quick-commit`, `review-work`, `implement-plan`
 - Bare tool name for infrastructure engines: `modal`, `railway`, `vercel`, `neon` — one engine with verb modes per `skills/_shared/infra-cli-contract.md`, never a `<tool>-<verb>` skill
 - Descriptive compound for audits: `tech-debt`, `security-audit`, `cache-audit`
 
@@ -196,8 +196,9 @@ When ordering matters (most skills), use numbered steps under `## Procedure`. Ea
 For skills with substantial supporting material (checklists, question matrices, severity definitions), put that content in separate files in the skill directory rather than inlining it.
 
 ```
-skills/review-pr/
-  SKILL.md                      # The skill procedure
+skills/review-work/
+  SKILL.md                      # The engine: mode dispatch
+  pr.md / changes.md / multi-pr.md   # Per-mode procedures
   review-dimensions.md          # 10 evaluation dimensions
   severity-categories.md        # Blocker/Suggestion/Nit/Question definitions
   red-flags-and-rationalizations.md  # Anti-patterns table
@@ -225,7 +226,7 @@ with the questions, re-present the top 3 concerns before proceeding.
 </HARD-GATE>
 ```
 
-HARD-GATEs appear in skills where the cost of skipping a step is high: `implement-plan` gates code writing behind a challenge round, `review-pr` gates approval behind checklist verification. Use them sparingly — one or two per skill at most.
+HARD-GATEs appear in skills where the cost of skipping a step is high: `implement-plan` gates code writing behind a challenge round, `review-work` gates approval behind checklist verification. Use them sparingly — one or two per skill at most.
 
 ### User Confirmation Gates
 

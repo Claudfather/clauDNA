@@ -7,7 +7,7 @@ body:
     attributes:
       label: Skill or component
       description: Which existing skill, hook, or agent should be improved?
-      placeholder: "/claudna:review-pr, plugin-hooks/auto-format, etc."
+      placeholder: "/claudna:review-work, plugin-hooks/auto-format, etc."
     validations:
       required: true
 

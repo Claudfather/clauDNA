@@ -32,7 +32,7 @@ For bots, CI runners, and Docker images, drop a `settings.json` with `enabledPlu
 
 | Directory | Count | Contents |
 |-----------|-------|----------|
-| `skills/` | 38 | User-invocable slash commands |
+| `skills/` | 37 | User-invocable slash commands |
 | `agents/` | 8 | `snowflake-analyst`, `dbt-engineer`, `neon-analyst`, `modal-ops`, `railway-ops`, `vercel-ops`, `code-reviewer`, `spec-reviewer` |
 | `plugin-hooks/` | 5 wired + 1 opt-in | Auto-format on Write/Edit, PreToolUse permission expansion, PreCompact reflect gate, opt-in skill telemetry, macOS notifications. (`statusline.sh` is opt-in — see [SETUP_GUIDE §3.2](./SETUP_GUIDE.md#32-statusline-optional).) Named `plugin-hooks/` to avoid a Claude Code bug that deletes any project-root `hooks/` directory between tool calls. |
 
@@ -64,8 +64,7 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:audit t
 | Skill | Description |
 |-------|-------------|
 | `/audit` | Codebase-audit engine — `security` / `tech-debt` / `docs` / `design` / `access-path` / `data-model` / `frontend-perf` / `repo-health` lenses (replaces the eight standalone audit skills) |
-| `/review-pr` | Structured PR review with severity-categorized findings |
-| `/review-changes` | Review uncommitted changes for bugs, conventions, security |
+| `/review-work` | Review engine — `changes` (uncommitted work) / `pr` (one PR) / `multi-pr` (parallel subagent reviews + synthesis) modes (replaces the two review skills) |
 | `/lessons` | Capture and review lessons from corrections |
 | `/verify-completion` | Verify work is actually complete before claiming success |
 | `/visual-crawl` | Autonomous visual crawl — discover routes, screenshot at 3 viewports, file issues for findings |
@@ -150,8 +149,8 @@ Building (the core loop)
 
 Reviewing
 ───────────────────────────────────────────────────
-  /claudna:review-pr 42          → Structured review of any PR
-  /claudna:review-changes        → Audit uncommitted work
+  /claudna:review-work pr 42     → Structured review of any PR
+  /claudna:review-work changes   → Audit uncommitted work
 
 End of Day
 ───────────────────────────────────────────────────

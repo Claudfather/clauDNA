@@ -1,16 +1,4 @@
----
-name: review-pr
-user-invocable: true
-description: "Use when you need to review a pull request -- yours or someone else's -- before merging. For uncommitted local changes, use /claudna:review-changes."
-argument-hint: "[PR number or URL]"
-requires:
-  - cli: gh
-    reason: "GitHub CLI for PR diff and review submission"
----
-
-# Review PR
-
-Structured code review on a pull request. Produce clear, actionable comments -- then post them with user approval.
+Invoked by /claudna:review-work in pr mode — structured code review on a pull request: produce clear, actionable comments, then post them with user approval.
 
 ## Engineering Lens
 

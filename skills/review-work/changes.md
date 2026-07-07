@@ -1,10 +1,4 @@
----
-name: review-changes
-user-invocable: true
-description: "Use when you have uncommitted changes and want them reviewed before committing. For a pull request that is already open, use /claudna:review-pr."
----
-
-# Review Changes
+Invoked by /claudna:review-work in changes mode — review uncommitted local changes before committing.
 
 > **Violating the letter of verification is violating the spirit. Partial checks prove nothing.**
 

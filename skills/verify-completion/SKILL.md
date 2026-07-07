@@ -113,6 +113,6 @@ ALWAYS before: any success/completion/satisfaction claim, committing, PR creatio
 ## Cross-References
 
 - `/claudna:implement-plan` Step 6 -- applies this discipline to deliverable audit
-- `/claudna:review-changes` -- run verification before recommending "commit"
+- `/claudna:review-work` (changes mode) -- run verification before recommending "commit"
 - `/claudna:quick-commit` -- run verification before staging and committing
 - `/verify` (built-in Claude Code) -- the runtime-observation protocol for *behavioral* verification: build, run the app, drive it to the change, capture what you see. This skill gates *whether you may claim done*; `/verify` is *how* you produce behavioral evidence.

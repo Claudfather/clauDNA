@@ -440,7 +440,7 @@ When multiple skills could apply to a task, invoke them in tier order. Process s
 |------|----------|--------|---------|
 | 1 | **Process** | review-self, investigate-app, verify-completion | Establish approach, verify assumptions, gather evidence, debug |
 | 2 | **Planning** | product-enhance, product-vision, audit (lens engine — lenses per `audit-lens-contract.md`) | Analyze what to build, identify gaps, produce design docs |
-| 3 | **Implementation** | implement-plan, review-changes, review-pr, quick-commit, commit-push-pr | Execute plans, review code, commit and ship PRs |
+| 3 | **Implementation** | implement-plan, review-work (mode engine — changes/pr/multi-pr), quick-commit, commit-push-pr | Execute plans, review code, commit and ship PRs |
 | 4 | **Deployment & Ops** | modal, railway, vercel, neon, dbt (infra engines — verb modes per `infra-cli-contract.md`) | Deploy, monitor, query infrastructure |
 
 **Utility skills** (session-handoff, session-resume, lessons, notes, find-skills, cache-audit, worktree, clauDNA-migrate, notifications) are not tiered -- they are invoked on demand for session management, not as part of a build workflow. (The former docs-review and repo-health utilities are now `docs` and `repo-health` lenses of the tiered `audit` engine.)

@@ -338,7 +338,7 @@ class TestDescriptionTriggerConvention:
 
 
 class TestSkillReferences:
-    VALID = {"publish", "implement-plan", "review-pr"}
+    VALID = {"publish", "implement-plan", "review-work"}
 
     def test_known_reference_passes(self):
         text = "Route the doc via /claudna:publish, then /claudna:implement-plan builds it."
@@ -361,9 +361,9 @@ class TestSkillReferences:
         assert len(errors) == 1
 
     def test_bare_prefix_form_matched(self):
-        # `claudna:review-pr` without the leading slash still counts as a reference.
+        # `claudna:publish` without the leading slash still counts as a reference.
         text = "The claudna:missing-thing skill handles that."
-        errors = check_skill_references(text, {"review-pr"})
+        errors = check_skill_references(text, {"publish"})
         assert len(errors) == 1
         assert "missing-thing" in errors[0]
 

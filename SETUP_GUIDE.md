@@ -78,7 +78,7 @@ Don't bulk-`rm -rf` `~/.claude/skills/` or `~/.claude/hooks/` — those director
 |----------|---------|--------------|
 | SnowSQL | `/claudna:dbt` | Download from Snowflake |
 | OpenSSL | Snowflake key-pair auth | Pre-installed on macOS |
-| `gh` (GitHub CLI) | `/claudna:review-pr`, `/claudna:heist`, GitHub-issue output modes | `brew install gh` |
+| `gh` (GitHub CLI) | `/claudna:review-work`, `/claudna:heist`, GitHub-issue output modes | `brew install gh` |
 | `psql` | `/claudna:neon` (query, branch, and info modes) | `brew install libpq` |
 | `ruff` | Python auto-format hook | `pip install ruff` |
 | `prettier` | JS/TS/MD auto-format hook | `npm install -g prettier` |
@@ -554,7 +554,7 @@ Each event records:
 | Field | Value |
 |-------|-------|
 | `event` | `"skill_invocation"` |
-| `skill` | Skill name (e.g., `claudna:review-pr`) |
+| `skill` | Skill name (e.g., `claudna:review-work`) |
 | `ts` | ISO 8601 timestamp (UTC) |
 | `bot` | `BOT_NAME` env var, or `"interactive"` |
 | `duration_ms` | `null` (not available in PostToolUse hooks) |

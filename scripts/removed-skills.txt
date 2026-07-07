@@ -4,6 +4,10 @@
 # documentation/archive/) from mentioning these names in any form;
 # `Replaces ...` breadcrumb lines are exempt.
 #
+# P5 (0.11.0) — review engine: /review-work
+review-changes
+review-pr
+#
 # P6 (0.10.0) — lenses into the ironclad panel
 first-principles
 align-to-mission

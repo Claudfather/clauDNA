@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **`/review-work` engine — 2 review skills become 1, plus a new mode ([#169](https://github.com/Claudfather/clauDNA/issues/169), epic [#165](https://github.com/Claudfather/clauDNA/issues/165) P5 — Track A complete).** `review-changes` and `review-pr` consolidate into one engine with modes (`/claudna:review-work changes|pr|multi-pr`): first-token dispatch, unambiguous-only inference (dirty tree → changes; one PR ref → pr; two-plus → multi-pr; otherwise print the table and stop; mode required headless). **New `multi-pr` mode**: one subagent per PR in parallel (each applying pr-mode discipline, findings to the scratch dir per the orchestration guide), aggregated into a per-PR verdict table plus cross-PR findings (shared root causes, conflicting changes, merge-order recommendation); posting stays per-PR and approval-gated. The pr mode's three support files (review-dimensions, severity-categories, red-flags-and-rationalizations) are shared by all modes. The name avoids the Claude Code built-in `/review` ([#148](https://github.com/Claudfather/clauDNA/issues/148) — the naming rationale is this entry's data point).
+
+### Removed
+- **The 2 standalone review skills**: `review-changes`, `review-pr` — hard removal per epic #165 F4. Their procedures live whole in the engine's mode files (HARD-GATE verification discipline and the post-with-approval gate included); the `Replaces` breadcrumb carries muscle memory; `v0.10.0` is the last pre-P5 version. Catalog: 38 → 37 picker entries.
 
 ## [0.10.0] - 2026-07-07
 ### Added

@@ -154,14 +154,16 @@ rows:
     mode: checkpoint
     phase: P4
 
-  # --- P5: review family ---
+  # --- P5: review family (consolidated into /review-work) ---
   - utterance: "review my uncommitted changes before I commit"
     keywords: [uncommitted changes]
-    expect: review-changes
+    expect: review-work
+    mode: changes
     phase: P5
   - utterance: "review this pull request before merging"
     keywords: [pull request]
-    expect: review-pr
+    expect: review-work
+    mode: pr
     phase: P5
 
   # --- P6: lens family (panel-internal — utterances resolve to /ironclad --lens <name>) ---
