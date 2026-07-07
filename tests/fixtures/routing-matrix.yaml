@@ -18,6 +18,12 @@
 # /audit engine; P4: session → /session; P5: review → /review-work; P6:
 # lenses → the /ironclad --lens door, carried in ironclad's body).
 #
+# Accepted drift (P3): post-consolidation, cross-family disambiguation rows
+# anchor on the engine description's vocabulary (visual/UX, janky) rather than
+# every utterance token (spacing/typography) — in-description budget can't hold
+# each lens's full symptom set; lens-level disambiguation is the engine's
+# dispatch job, checked by the manual protocol via the rows' mode fields.
+#
 # Baseline: this file passing against the pre-P2 catalog (all rows green on
 # main before the first deletion) is the recorded "before" state.
 
@@ -84,38 +90,46 @@ rows:
     mode: info
     phase: P2
 
-  # --- P3: audit family (current skills until P3 lands) ---
+  # --- P3: audit family (consolidated into the /audit engine) ---
   - utterance: "check the codebase for security vulnerabilities"
     keywords: [security, vulnerabilit]
-    expect: security-audit
+    expect: audit
+    mode: security
     phase: P3
   - utterance: "find the technical debt in this codebase"
     keywords: [technical debt]
-    expect: tech-debt
+    expect: audit
+    mode: tech-debt
     phase: P3
   - utterance: "our docs are stale — audit them against the code"
     keywords: [documentation, stale]
-    expect: docs-review
+    expect: audit
+    mode: docs
     phase: P3
   - utterance: "do a visual and UX audit of the deployed app"
     keywords: [visual, UX]
-    expect: design-review
+    expect: audit
+    mode: design
     phase: P3
   - utterance: "do our interfaces enforce auth and rate limiting consistently?"
     keywords: [interfaces, cross-cutting]
-    expect: access-path-audit
+    expect: audit
+    mode: access-path
     phase: P3
   - utterance: "audit how well the data model serves the application"
     keywords: [data model]
-    expect: data-model-audit
+    expect: audit
+    mode: data-model
     phase: P3
   - utterance: "the page flickers and scrolls janky — find out why"
     keywords: [janky, performance]
-    expect: frontend-performance-audit
+    expect: audit
+    mode: frontend-perf
     phase: P3
   - utterance: "birds-eye view across all my repos — where should I spend time?"
     keywords: [birds-eye, repositories]
-    expect: repo-health
+    expect: audit
+    mode: repo-health
     phase: P3
 
   # --- P4: session family ---
@@ -171,9 +185,11 @@ rows:
   # --- Cross-family disambiguation ---
   - utterance: "the page loads slow and the scrolling is janky"
     keywords: [janky]
-    expect: frontend-performance-audit
+    expect: audit
+    mode: frontend-perf
     phase: cross
   - utterance: "the spacing and typography look inconsistent across screens"
-    keywords: [spacing, typography]
-    expect: design-review
+    keywords: [visual, UX]
+    expect: audit
+    mode: design
     phase: cross

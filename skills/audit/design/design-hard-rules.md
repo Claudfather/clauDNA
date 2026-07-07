@@ -1,7 +1,7 @@
 # Design Hard Rules
 
 
-Reference material for the design-review skill. These rules are used by the page-type classifier in Step 2 and inform the gap analysis in Step 4. They are reference material — do NOT display these tables to the user. Use them to calibrate your evaluation.
+Reference material for the `/claudna:audit design` lens. These rules are used by the page-type classifier in Step 2 and inform the gap analysis in Step 4. They are reference material — do NOT display these tables to the user. Use them to calibrate your evaluation.
 
 ## Hard Rejection Criteria
 

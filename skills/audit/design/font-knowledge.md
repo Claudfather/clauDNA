@@ -1,7 +1,7 @@
 # Font Knowledge
 
 
-Reference material for the design-review skill. Use this to inform typography findings in Step 4 and font-related proposals in Step 5. Do NOT display these lists as raw tables to the user — use them to make specific, opinionated recommendations when flagging typography issues.
+Reference material for the `/claudna:audit design` lens. Use this to inform typography findings in Step 4 and font-related proposals in Step 5. Do NOT display these lists as raw tables to the user — use them to make specific, opinionated recommendations when flagging typography issues.
 
 ## Recommended Fonts by Purpose
 

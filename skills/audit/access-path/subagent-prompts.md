@@ -1,6 +1,6 @@
 # Subagent Prompt Templates
 
-Reference material for the `/claudna:access-path-audit` skill. Detailed instructions for each subagent launched during the audit.
+Reference material for the `/claudna:audit access-path` lens. Detailed instructions for each subagent launched during the audit.
 
 ---
 

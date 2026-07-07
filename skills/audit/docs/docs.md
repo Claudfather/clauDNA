@@ -1,28 +1,13 @@
----
-name: docs-review
-user-invocable: true
-description: "Use when project documentation may be stale, inaccurate, or incomplete and needs a thorough audit against the codebase — READMEs that drifted, setup guides that no longer work, dead links, undocumented behavior."
-argument-hint: "[--auto] [--output github|session] [scope-path]"
----
+Invoked by /claudna:audit in docs mode — a rigorous audit of project documentation against the actual codebase: READMEs that drifted, setup guides that no longer work, dead links, undocumented behavior.
 
-# Documentation Review
-
-Rigorously audit project documentation against the actual codebase. Update inaccuracies, mark development plan statuses, archive stale docs, and identify gaps — ensuring full handoff-readiness.
+Update inaccuracies, mark development plan statuses, archive stale docs, and identify gaps — ensuring full handoff-readiness.
 
 **Framing principle:** This project is being handed off to another engineering team. There must be zero gaps. Any engineer who picks up the codebase should be able to fully understand it, have complete context, and confidently edit and enhance the codebase without asking the original team a single question. See `skills/_shared/planning-standard.md` for the shared quality standard that all plan output must meet.
 
-## Arguments
-
-Parse `$ARGUMENTS` at invocation:
-- `--auto`: Fully non-interactive. Auto-fixes stale docs, creates GitHub Issues for gaps (implies `--output github`). See orchestration guide Section 10.
-- `--output github`: Create GitHub Issues for documentation gaps. See output guide (`skills/_shared/output-guide.md`).
-- `--output session`: Present findings in chat only, no persistence.
-- Remaining text is the scope path (e.g., `docs/`, `documentation/`). If provided, skip asking in Step 1.
-
 ## When NOT to use
 
-- For code quality/tech debt → use `/claudna:tech-debt`
-- For security vulnerabilities → use `/claudna:security-audit`
+- For code quality/tech debt → use `/claudna:audit tech-debt`
+- For security vulnerabilities → use `/claudna:audit security`
 - For writing new docs from scratch → just ask Claude directly
 
 ## Procedure
@@ -31,7 +16,7 @@ Follow these steps exactly in order.
 
 ### Step 1: Scope Selection
 
-Ask the user:
+If a scope path was provided as the focus argument (e.g., `docs/`, `documentation/`), use it and skip asking. Otherwise ask the user:
 
 1. **"Review a specific folder?"** → user provides a path (e.g., `./documentation`, `./docs`)
 2. **"Global review?"** → scan the entire project for documentation files
@@ -129,9 +114,9 @@ Execute the user's choices — create or update docs as requested.
 
 ### Step 5.5: Adversarial Review Pass on Gap Proposals
 
-Follow `skills/_shared/pre-handoff-checklist.md` for the general procedure. The adversarial-review `--dispatch` output is markdown with YAML frontmatter per `skills/_shared/contracts/lens-result-contract.md` — parse `status` from frontmatter and findings from body sections. For docs-review, the workflow is adapted:
+Follow `skills/_shared/pre-handoff-checklist.md` for the general procedure. The adversarial-review `--dispatch` output is markdown with YAML frontmatter per `skills/_shared/contracts/lens-result-contract.md` — parse `status` from frontmatter and findings from body sections. For the docs lens, the workflow is adapted:
 
-1. Write each gap-fix proposal to a temporary scratch file at `/tmp/docs-review-<timestamp>/proposals/<gap-slug>.md`.
+1. Write each gap-fix proposal to a temporary scratch file at `/tmp/audit-docs-<timestamp>/proposals/<gap-slug>.md`.
 
 2. Run the pre-handoff checklist against each scratch file.
 
@@ -183,12 +168,12 @@ Could a new engineer onboard from these docs alone?
 
 ## Output Targets
 
-This skill supports `--output github` and `--output session` in addition to the default inline-fix behavior.
+This lens supports `--output github` and `--output session`. **Lens delta (predecessor-faithful, overrides contract §2's session default):** with no `--output` flag this lens fixes docs inline and asks about gaps — its distinctive behavior.
 
 Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Apply `docs` label. Auto-fix verifiable inaccuracies first, then create issues for gaps requiring human judgment.
 - For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- Default: fix docs inline and ask about gaps (current behavior)
+- No flag (lens delta): fix docs inline and ask about gaps
 
 After creating issues, present the batch summary and return issue URLs for audit tracking.
 
@@ -196,8 +181,8 @@ After creating issues, present the batch summary and return issue URLs for audit
 
 ## Autonomous Mode (--auto)
 
-When `--auto` is set (see orchestration guide Section 10):
-1. Use scope from `$ARGUMENTS` or default to global review
+When `--auto` is set (see orchestration guide Section 10), run fully non-interactively — auto-fix stale docs and create GitHub Issues for gaps (`--auto` implies `--output github`):
+1. Use the scope path from the focus argument or default to global review
 2. Skip user confirmation of inventory (Step 2) — proceed with auto-categorization
 3. Auto-fix verifiable inaccuracies in coding overviews (wrong file paths, renamed functions) — commit fixes directly
 4. Auto-mark development plan statuses
@@ -207,9 +192,10 @@ When `--auto` is set (see orchestration guide Section 10):
 
 ```json
 {
-  "skill": "docs-review",
+  "skill": "audit",
   "outcome": "completed",
   "artifacts": {
+    "lens": "docs",
     "issues_created": ["https://github.com/org/repo/issues/789", "..."],
     "files_changed": 3,
     "lines_added": 12,

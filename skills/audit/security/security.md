@@ -1,28 +1,13 @@
----
-name: security-audit
-user-invocable: true
-description: "Use when you want to check the codebase for security vulnerabilities — injection, authentication and authorization flaws, secrets exposure, unsafe dependencies — and get remediation plans."
-argument-hint: "[--auto] [--output github|session] [focus-area]"
----
-
-# Security Audit
-
-Scan the codebase for security vulnerabilities, present findings by severity, and generate phased remediation plans with branch/build/PR workflow.
+Invoked by /claudna:audit in security mode — scan the codebase for security vulnerabilities (injection, authentication and authorization flaws, secrets exposure, unsafe dependencies), present findings by severity, and generate phased remediation plans.
 
 **Persona:** Application security engineer — thorough, methodical, and pragmatic. Prioritize exploitable vulnerabilities over theoretical risks. Never print secret values.
 
-## Arguments
-
-Parse `$ARGUMENTS` at invocation:
-- `--auto`: Fully non-interactive. Implies `--output github`. Scans, creates issues, returns summary. See orchestration guide Section 10.
-- `--output github`: Write findings and remediation plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
-- `--output session`: Present findings in chat only, no persistence.
-- Remaining text is the focus area (e.g., `auth`, `api/`, `dependencies`). If provided, scope the scan to that area.
+**Focus interpretation** (flag semantics live in the lens contract §2): the focus text is a security area or path (e.g., `auth`, `api/`, `dependencies`). If provided, scope the scan to that area; otherwise scan the full codebase.
 
 ## When NOT to use
 
-- For general code quality/tech debt → use `/claudna:tech-debt`
-- For frontend performance → use `/claudna:frontend-performance-audit`
+- For general code quality/tech debt → use `/claudna:audit tech-debt`
+- For frontend performance → use `/claudna:audit frontend-perf`
 - For production outages → use `/claudna:investigate-app`
 
 ## Procedure
@@ -152,7 +137,7 @@ Then tell the user:
 
 **"Plans are ready. Run `/claudna:implement-plan documentation/planning/security/<session>/` to start building — it will handle challenge review, branching, implementation, and PRs for each phase doc."**
 
-**This skill produces plans, not code.** Implementation is always handled by `/claudna:implement-plan`, which provides its own challenge round, verification, and PR workflow. Do NOT build, branch, or create PRs from this skill.
+**This lens produces plans, not code.** Implementation is always handled by `/claudna:implement-plan`, which provides its own challenge round, verification, and PR workflow. Do NOT build, branch, or create PRs from this lens.
 
 ---
 
@@ -170,12 +155,12 @@ Then tell the user:
 
 ## Output Targets
 
-This skill supports `--output github` and `--output session` in addition to the default `docs` target.
+`--output` flag semantics are owned by the lens contract (§2). This lens supports `github` and `session` in addition to the `docs` deliverable produced by the full interactive procedure above.
 
 Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Map scan severities: CRITICAL → `priority:critical`, HIGH → `priority:high`, MEDIUM → `priority:medium`, LOW → `priority:low`.
-- For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs` (default): follow the subagent workflow in the orchestration guide
+- For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
+- For `docs`: follow the subagent workflow in the orchestration guide
 
 After creating issues, present the batch summary and return issue URLs for audit tracking.
 
@@ -183,21 +168,22 @@ After creating issues, present the batch summary and return issue URLs for audit
 
 ## Autonomous Mode (--auto)
 
-When `--auto` is set (see orchestration guide Section 10):
+When `--auto` is set (implies `--output github`; see the lens contract §4 and orchestration guide Section 10):
 1. Skip Plan Mode — go straight to Phase 1 scan
 2. Skip the user confirmation gate between Phase 1 and Phase 2
-3. Use focus area from `$ARGUMENTS` as scope. If none provided, scan full codebase.
+3. Use the focus area from the dispatched arguments as scope. If none provided, scan full codebase.
 4. Create GitHub Issues for all findings (CRITICAL and HIGH immediately, MEDIUM batched)
 5. Skip LOW/INFO findings unless particularly noteworthy
 6. Return structured summary for audit tracking
 7. **Security-specific:** Never include actual secret values in issue bodies. Mask as `sk-****`.
-8. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+8. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after (skill `audit`, lens inside `artifacts`, per the lens contract §4):
 
 ```json
 {
-  "skill": "security-audit",
+  "skill": "audit",
   "outcome": "completed",
   "artifacts": {
+    "lens": "security",
     "issues_created": ["https://github.com/org/repo/issues/123", "..."],
     "findings_by_severity": {"critical": 0, "high": 2, "medium": 5, "low": 3},
     "session_dir": "documentation/planning/security/<session>/"

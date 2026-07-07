@@ -1,30 +1,13 @@
----
-name: access-path-audit
-user-invocable: true
-description: "Use when you want to evaluate whether a system's interfaces (API, CLI, Slack, MCP, SDK, workers) consistently enforce cross-cutting concerns — auth, validation, rate limiting, logging — and whether those concerns live at the correct architectural layer."
-argument-hint: "[--auto] [--output github|session] [focus-area]"
----
-
-# Access Path Audit
-
-Audit whether a system's access paths consistently enforce cross-cutting concerns — and whether those concerns are placed at the correct architectural layer (transport vs. domain core).
+Invoked by /claudna:audit in access-path mode — evaluates whether a system's interfaces (API, CLI, Slack, MCP, SDK, workers) consistently enforce cross-cutting concerns — auth, validation, rate limiting, logging — and whether those concerns live at the correct architectural layer (transport vs. domain core).
 
 **Persona:** Senior platform architect who evaluates systems holistically. Evidence-driven — every finding cites specific code paths. Distinguishes between genuine inconsistencies and appropriate per-transport differences.
 
-## Arguments
-
-Parse `$ARGUMENTS` at invocation:
-- `--auto`: Fully non-interactive. Implies `--output github`. Scans, creates issues, returns summary. See orchestration guide Section 10.
-- `--output github`: Write findings and remediation plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
-- `--output session`: Present findings in chat only, no persistence.
-- Remaining text is the focus area (e.g., `auth`, `validation`, `api/`). If provided, scope the audit to that area.
-
 ## When NOT to use
 
-- For security vulnerabilities (injection, secrets, OWASP) → use `/claudna:security-audit`
-- For general code quality / tech debt → use `/claudna:tech-debt`
+- For security vulnerabilities (injection, secrets, OWASP) → use `/claudna:audit security`
+- For general code quality / tech debt → use `/claudna:audit tech-debt`
 - For production outages or broken behavior → use `/claudna:investigate-app`
-- For frontend performance → use `/claudna:frontend-performance-audit`
+- For frontend performance → use `/claudna:audit frontend-perf`
 
 ## The Key Insight
 
@@ -57,7 +40,7 @@ Do NOT read CLAUDE.md or MEMORY.md — already in system prompt.
 
 ### Step 1: Scope & Stack Detection
 
-If no focus area was provided in `$ARGUMENTS`, ask: **"Any specific concern or access path to focus on?"** Default to full system scan if no scope given.
+If no focus area was provided (the engine's `[focus]` argument — e.g., `auth`, `validation`, `api/` — scopes the audit to that area), ask: **"Any specific concern or access path to focus on?"** Default to full system scan if no scope given.
 
 Detect the system's framework and access patterns. Run in parallel:
 
@@ -81,7 +64,7 @@ Launch two `general-purpose` subagents in parallel (Agent tool, `subagent_type: 
 - **Subagent A: Access Path Inventory** — every access path, transport, entry point, auth, domain services called. Writes to `research/path-inventory.md`.
 - **Subagent B: Cross-Cutting Concern Mapping** — for each concern in `scan-categories.md`, maps enforcement across every access path. Writes to `research/concern-mapping.md`.
 
-**Full subagent prompts and research file formats:** See `subagent-prompts.md` in this skill directory.
+**Full subagent prompts and research file formats:** See `subagent-prompts.md` in this lens directory.
 
 ### Step 3: Convergence — Concern Placement Analysis
 
@@ -207,12 +190,12 @@ Follow Section 9 of the orchestration guide (`skills/_shared/orchestration-guide
 
 ## Output Targets
 
-This skill supports `--output github` and `--output session` in addition to the default `docs` target.
+This lens supports `--output github`, `--output session` (the engine default, contract §2), and a `docs` target.
 
 Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Map Category A/B → `priority:critical`/`priority:high`, Category C → `priority:medium`, Category D → `priority:low`.
-- For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs` (default): follow the subagent workflow in the orchestration guide
+- For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
+- For `docs`: follow the subagent workflow in the orchestration guide
 
 After creating issues, present the batch summary and return issue URLs for audit tracking.
 
@@ -266,7 +249,7 @@ Then tell the user:
 
 **"Plans are ready. Run `/claudna:implement-plan documentation/planning/access-paths/<session>/` to start building — it will handle challenge review, branching, implementation, and PRs for each phase doc."**
 
-**This skill produces plans, not code.** Implementation is always handled by `/claudna:implement-plan`, which provides its own challenge round, verification, and PR workflow. Do NOT build, branch, or create PRs from this skill.
+**This lens produces plans, not code.** Implementation is always handled by `/claudna:implement-plan`, which provides its own challenge round, verification, and PR workflow. Do NOT build, branch, or create PRs from this lens.
 
 ---
 
@@ -294,19 +277,20 @@ Then tell the user:
 
 ## Autonomous Mode (--auto)
 
-When `--auto` is set (see orchestration guide Section 10):
+When `--auto` is set, the run is fully non-interactive and implies `--output github` (see orchestration guide Section 10):
 1. Skip Plan Mode — go straight to Phase 1 scan
 2. Skip the user confirmation gate between Phase 1 and Phase 2
-3. Use focus area from `$ARGUMENTS` as scope. If none provided, scan full system.
+3. Use the focus area from the engine's `[focus]` argument as scope. If none provided, scan full system.
 4. Create GitHub Issues for all Category A and B findings (CRITICAL and HIGH immediately, MEDIUM batched)
 5. Skip Category C (appropriate differences) and Category D at LOW severity
 6. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
 ```json
 {
-  "skill": "access-path-audit",
+  "skill": "audit",
   "outcome": "completed",
   "artifacts": {
+    "lens": "access-path",
     "issues_created": ["..."],
     "findings_by_category": {"A": 1, "B": 2, "C": 4, "D": 1},
     "paths_analyzed": ["HTTP", "CLI", "MCP"],
@@ -319,5 +303,5 @@ When `--auto` is set (see orchestration guide Section 10):
 }
 ```
 
-- `outcome` is `completed` on success, `blocked` if fewer than 2 access paths exist (skill bails per existing rule).
+- `outcome` is `completed` on success, `blocked` if fewer than 2 access paths exist (the lens bails per existing rule).
 - Category C ("appropriate differences") count is included in artifacts even though no issues are filed for them, to demonstrate audit thoroughness.

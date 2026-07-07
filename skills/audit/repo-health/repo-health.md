@@ -1,27 +1,19 @@
----
-name: repo-health
-user-invocable: true
-description: "Use when you want a birds-eye view across multiple repositories to decide where to spend your time — activity, staleness, CI health, and open work. For depth on a single codebase's debt, use /claudna:tech-debt."
-argument-hint: "[--output github|session] [parent-directory]"
-requires:
-  - cli: gh
-    reason: "GitHub CLI for repo stats and PR listing"
----
+Invoked by /claudna:audit in repo-health mode — a birds-eye view across multiple repositories to decide where to spend your time: activity, staleness, CI health, and open work.
 
-# Repo Health
+Scan for open PRs, CI status, stale branches, pending plan docs, and uncommitted work — then present a single dashboard. For depth on a single codebase's debt, use `/claudna:audit tech-debt`.
 
-Birds-eye view across multiple repositories. Scan for open PRs, CI status, stale branches, pending plan docs, and uncommitted work — then present a single dashboard.
+**Reference:** `health-checks.md` (same directory) — detailed check definitions, commands, and example output formats.
 
-**Reference:** `health-checks.md` — detailed check definitions, commands, and example output formats.
+## Lens arguments (beyond contract §2)
 
-## Arguments
+Shared argument semantics live in `skills/_shared/audit-lens-contract.md` §2. Lens-specific:
 
-Parse `$ARGUMENTS` at invocation:
-- `--output github`: Write findings and plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
-- `--output session`: Present findings in chat only, no persistence.
-- Remaining text is a parent directory path to scan. If provided, skip the discovery prompt.
+- `[focus]` — a parent directory path to scan. If provided, skip the discovery prompt (Step 1).
+- **Interactive-only** (**auto: no** in the engine table). This lens has no non-interactive variant — `--auto` is answered by the engine's blocked-result path (contract §4); never improvise one here.
 
-Default (no flag): Write planning docs to `documentation/planning/`.
+## GitHub reads vs. issue filing
+
+Reading GitHub via `gh` (PR lists, CI checks, run history — see `health-checks.md`) is core to this lens and stays direct. Contract §2's rule that lenses never call `gh` directly governs issue **filing**: findings filed as issues route through `/claudna:publish`.
 
 ## Procedure
 
@@ -83,12 +75,11 @@ Once the user picks a repo, suggest the relevant skill (`/session-resume`, `/rev
 
 ## Output Targets
 
-This skill supports `--output github` and `--output session` in addition to the default `docs` target.
+Follow the output guide at `skills/_shared/output-guide.md`. Beyond the shared `--output github|session` surface (contract §2), this lens supports a `docs` target for persisting the dashboard:
 
-Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Create one issue per repo with actionable findings (stale branches, failing CI, PRs needing review). Label with `auto-audit` and `repo-health`.
-- For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs` (default): write the dashboard and priority recommendations to `documentation/planning/repo-health/<session_name>_<YYYY-MM-DD>/`
+- For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
+- For `docs`: write the dashboard and priority recommendations to `documentation/planning/repo_health/<session_name>_<YYYY-MM-DD>/` (underscore form, matching the `tech_debt/` planning-dir convention)
 
 ---
 

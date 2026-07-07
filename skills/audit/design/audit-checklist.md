@@ -1,7 +1,7 @@
 # Design Audit Checklist
 
 
-Reference material for the design-review skill. Apply these checks systematically across all pages in scope. Each finding gets an **impact rating** (High / Medium / Polish) and its category. Use the page-type classifier from Step 2 to weight findings — e.g., "no expressive typography" is High-impact on a marketing page but may be acceptable on an app UI.
+Reference material for the `/claudna:audit design` lens. Apply these checks systematically across all pages in scope. Each finding gets an **impact rating** (High / Medium / Polish) and its category. Use the page-type classifier from Step 2 to weight findings — e.g., "no expressive typography" is High-impact on a marketing page but may be acceptable on an app UI.
 
 ## 10 Categories
 

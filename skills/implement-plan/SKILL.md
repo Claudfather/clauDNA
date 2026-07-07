@@ -41,7 +41,7 @@ allowed-tools:
 
 # Implement Plan
 
-Execute a design or development plan against the codebase. Challenge first, refine through dialogue, then build — updating the plan as the single source of truth throughout. Works with any structured development document (downstream of `/claudna:tech-debt`, `/claudna:product-enhance`, or standalone) or a GitHub Issue created by `--output github`.
+Execute a design or development plan against the codebase. Challenge first, refine through dialogue, then build — updating the plan as the single source of truth throughout. Works with any structured development document (downstream of `/claudna:audit tech-debt`, `/claudna:product-enhance`, or standalone) or a GitHub Issue created by `--output github`.
 
 ## Arguments
 
@@ -452,7 +452,7 @@ After the work item is loaded into the queue (Step 1), validate that the plan bo
     "issue_url": "<source URL or path>"
   },
   "summary": "Plan lacks ## Implementation Plan section; cannot implement in --auto mode.",
-  "next": "Run /claudna:tech-debt --auto, /claudna:security-audit --auto, or similar planning skill against this issue to expand it into an implementable plan, then re-invoke /implement-plan --auto.",
+  "next": "Run /claudna:audit tech-debt --auto, /claudna:audit security --auto, or similar planning skill against this issue to expand it into an implementable plan, then re-invoke /implement-plan --auto.",
   "errors": [],
   "blocker_description": "Source issue body has findings but no implementation plan. Expansion requires planning judgment that --auto mode does not provide. Run a planning skill first."
 }

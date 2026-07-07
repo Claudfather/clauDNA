@@ -51,7 +51,7 @@ No build step. The repo is a Claude Code plugin — skills are markdown files, h
    ```bash
    claude --plugin-dir /path/to/clauDNA
    ```
-   Then invoke the skill you changed (e.g. `/claudna:tech-debt`) and verify it works.
+   Then invoke the skill you changed (e.g. `/claudna:audit tech-debt`) and verify it works.
 
 4. **Run the validators:**
    ```bash

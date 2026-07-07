@@ -187,7 +187,7 @@ Optional categories — add only the ones whose skills you actually use:
 | **Node** | JS/TS projects | `Bash(node *)`, `Bash(npm *)`, `Bash(npx *)`, `Bash(prettier *)` |
 | **Data & Analytics** | `/claudna:dbt`, `/claudna:neon-*`, `snowflake-analyst` agent | `Bash(snowsql *)`, `Bash(dbt *)`, `Bash(psql *)`, `Bash(pg_isready *)` |
 | **Infrastructure CLIs** | `/claudna:railway-*`, `/claudna:vercel-*`, `/claudna:modal-*` | `Bash(railway *)`, `Bash(vercel *)`, `Bash(modal *)` |
-| **Browser Automation** | `/claudna:design-review`, `/claudna:visual-crawl` | `Bash(/Applications/Google*)`, `Bash("/Applications/Google*)`, `Bash(google-chrome*)`, `Bash(chromium*)` |
+| **Browser Automation** | `/claudna:audit design`, `/claudna:visual-crawl` | `Bash(/Applications/Google*)`, `Bash("/Applications/Google*)`, `Bash(google-chrome*)`, `Bash(chromium*)` |
 | **Auto-skill-approval** | Bots / cron / non-interactive runs | See "Auto-skill-approval" expansion below |
 
 #### Auto-skill-approval expansion
@@ -202,16 +202,10 @@ For bots, cron, and non-interactive runs that invoke claudna skills programmatic
       "Skill(claudna:session-handoff)",    "Skill(claudna:session-handoff:*)",
       "Skill(session-resume)",             "Skill(session-resume:*)",
       "Skill(claudna:session-resume)",     "Skill(claudna:session-resume:*)",
-      "Skill(tech-debt)",                  "Skill(tech-debt:*)",
-      "Skill(claudna:tech-debt)",          "Skill(claudna:tech-debt:*)",
-      "Skill(security-audit)",             "Skill(security-audit:*)",
-      "Skill(claudna:security-audit)",     "Skill(claudna:security-audit:*)",
+      "Skill(audit)",                      "Skill(audit:*)",
+      "Skill(claudna:audit)",              "Skill(claudna:audit:*)",
       "Skill(product-enhance)",            "Skill(product-enhance:*)",
-      "Skill(claudna:product-enhance)",    "Skill(claudna:product-enhance:*)",
-      "Skill(docs-review)",                "Skill(docs-review:*)",
-      "Skill(claudna:docs-review)",        "Skill(claudna:docs-review:*)",
-      "Skill(frontend-performance-audit)", "Skill(frontend-performance-audit:*)",
-      "Skill(claudna:frontend-performance-audit)", "Skill(claudna:frontend-performance-audit:*)"
+      "Skill(claudna:product-enhance)",    "Skill(claudna:product-enhance:*)"
     ]
   }
 }

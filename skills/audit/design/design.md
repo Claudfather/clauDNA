@@ -1,45 +1,13 @@
----
-name: design-review
-user-invocable: true
-description: "Use when you want a visual and UX audit of a deployed application — inconsistent spacing or typography, confusing flows, accessibility gaps — to find design debt and plan improvements. For performance symptoms (slow loads, jank), use /claudna:frontend-performance-audit."
-argument-hint: "[--output github|session] [deployed-url]"
-allowed-tools:
-  - "Bash(which *)"
-  - "Bash(test *)"
-  - "Bash(curl *)"
-  - "Bash(lsof *)"
-  - "Bash(npm run *)"
-  - "Bash(pnpm *)"
-  - "Bash(yarn *)"
-  - "Bash(/Applications/Google*)"
-  - "Bash(\"/Applications/Google*)"
-  - "Bash(google-chrome*)"
-  - "Bash(chromium*)"
-  - "Read(*)"
-  - "Write(*)"
-  - "Glob(*)"
-  - "Grep(*)"
-  - "Task(*)"
-  - "Agent(*)"
-  - "EnterPlanMode"
-  - "ExitPlanMode"
----
+Invoked by /claudna:audit in design mode — a visual and UX audit of a deployed application: inconsistent spacing or typography, confusing flows, accessibility gaps — to find design debt and plan improvements.
 
-# Design Review & UI/UX Enhancement Planner
+Design-literate PM bridging visual polish and engineering. Audit a deployed app, find design/UX gaps, produce phased PR-ready design docs. This lens is interactive-only — user gates at every step; there is no non-interactive variant.
 
-Design-literate PM bridging visual polish and engineering. Audit a deployed app, find design/UX gaps, produce phased PR-ready design docs.
-
-## Arguments
-
-Parse `$ARGUMENTS` at invocation:
-- If it contains `--output github`: activate GitHub Issues output mode. See output guide (`skills/_shared/output-guide.md`).
-- If it contains `--output session`: present findings in chat only, no persistence.
-- Remaining text is the deployed URL or focus area. If provided, skip asking in Step 1.
+Tool note: the standalone predecessor pre-approved its browser-automation commands (curl, Chrome/Chromium launches) via `allowed-tools`; the engine deliberately declares none — pre-approving browser launches for all eight lenses would over-grant. Expect normal permission prompts for those commands, or pre-approve them in your own settings.
 
 ## When NOT to use
 
-- For frontend performance (flickering, slow loads, re-renders) → use `/claudna:frontend-performance-audit`
-- For code quality/tech debt → use `/claudna:tech-debt`
+- For frontend performance (flickering, slow loads, re-renders) → use `/claudna:audit frontend-perf`
+- For code quality/tech debt → use `/claudna:audit tech-debt`
 - For product feature gaps → use `/claudna:product-enhance`
 
 ## Procedure
@@ -50,7 +18,7 @@ Parse `$ARGUMENTS` at invocation:
 
 ### Step 1: Scope & Context Gathering
 
-Ask: (1) deployed URL, (2) focus area, (3) anything to skip, (4) front-end stack. Scratch dir: `/tmp/design-review-<YYYY-MM-DD_HHMMSS>/research/`.
+Ask: (1) deployed URL, (2) focus area, (3) anything to skip, (4) front-end stack. If a deployed URL or focus area was provided as the focus argument, use it and skip asking for it. Scratch dir: `/tmp/audit-design-<YYYY-MM-DD_HHMMSS>/research/`.
 
 Parallel: **A.** Explore subagents (disk-write pattern, orchestration guide Section 2) for front-end structure, styling, state, APIs, tokens, components. **B.** Begin Step 2.
 
@@ -116,7 +84,7 @@ Output to `documentation/planning/phases/<session_name>_<YYYY-MM-DD>/`. Overview
 
 Phase docs include: header, context + screenshots, visual spec (exact before/after), dependencies, implementation plan, responsive behavior, accessibility checklist, test plan, verification, "What NOT To Do."
 
-Tell user: **"Run `/claudna:implement-plan` on the phase directory to start building."** This skill produces plans, not code.
+Tell user: **"Run `/claudna:implement-plan` on the phase directory to start building."** This lens produces plans, not code.
 
 ---
 
@@ -138,12 +106,12 @@ Before presenting output (all modes), run the adversarial review gate per `skill
 
 ## Output Targets
 
-This skill supports `--output github` and `--output session` in addition to the default `docs` target.
+This lens supports `--output github`, `--output session` (the engine default, contract §2), and a `docs` target.
 
 Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Apply `design` label. Include SAFE vs RISK classification in issue body.
-- For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs` (default): follow the subagent workflow in the orchestration guide
+- For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
+- For `docs`: follow the subagent workflow in the orchestration guide
 
 After creating issues, present the batch summary and return issue URLs for audit tracking.
 

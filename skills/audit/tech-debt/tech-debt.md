@@ -1,29 +1,12 @@
----
-name: tech-debt
-user-invocable: true
-description: "Use when you want to find and plan remediation of technical debt in a codebase — duplication, dead code, fragile modules, outdated patterns. For a portfolio view across many repos, use /claudna:repo-health."
-argument-hint: "[--auto] [--output github|session] [focus-area]"
-requires:
-  - cli: gh
-    reason: "GitHub CLI for issue creation (--output github mode)"
----
+Invoked by /claudna:audit in tech-debt mode — find, report, and plan remediation of technical debt in the current codebase: duplication, dead code, fragile modules, outdated patterns.
 
-# Tech Debt Finder & Remediation Planner
-
-Find, report, and plan remediation of technical debt in the current codebase.
-
-## Arguments
-
-Parse `$ARGUMENTS` at invocation:
-- `--auto`: Fully non-interactive. Implies `--output github`. Scans, creates issues, returns summary. See orchestration guide Section 10.
-- `--output github`: Write findings and plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
-- `--output session`: Present findings in chat only, no persistence.
-- Remaining text is the focus area (e.g., `src/api/` or `auth module`). If provided, scope the scan to that area instead of the full codebase.
+**Focus interpretation** (flag semantics live in the lens contract §2): the focus text is an area or path (e.g., `src/api/` or `auth module`). If provided, scope the scan to that area instead of the full codebase.
 
 ## When NOT to use
 
-- For security-specific vulnerabilities → use `/claudna:security-audit`
-- For frontend performance issues → use `/claudna:frontend-performance-audit`
+- For security-specific vulnerabilities → use `/claudna:audit security`
+- For frontend performance issues → use `/claudna:audit frontend-perf`
+- For a portfolio view across many repos → use `/claudna:audit repo-health`
 - For product feature gaps → use `/claudna:product-enhance`
 
 **Enter Plan Mode.** Call `EnterPlanMode` to enter deliberation mode. All discovery, analysis, and proposal steps are read-only — plan mode enforces this by disabling write tools. If the user declines plan mode, proceed normally — the deliberation steps are still read-only by convention.
@@ -32,7 +15,7 @@ Parse `$ARGUMENTS` at invocation:
 
 These constraints arbitrate every cleanup decision. When in doubt, defer to them in this order:
 
-1. **No functionality regression.** Cleanup must preserve behavior. The test suite must pass before AND after each change. If a refactor would change observable behavior — even subtly — it's out of scope of this skill: flag it as a separate issue and skip. The whole point of `/claudna:tech-debt` is to ship cleaner code with the same semantics; any uncertainty about preservation is reason to bail on the change.
+1. **No functionality regression.** Cleanup must preserve behavior. The test suite must pass before AND after each change. If a refactor would change observable behavior — even subtly — it's out of scope of this lens: flag it as a separate issue and skip. The whole point of `/claudna:audit tech-debt` is to ship cleaner code with the same semantics; any uncertainty about preservation is reason to bail on the change.
 
 2. **Call-site check on every edited surface.** Renaming a symbol, extracting a function, decomposing a file, or relocating a constant all change the surface that callers reach. Before merging any cleanup PR, grep every caller of the edited surface (function name, type, exported constant, file path, route handler) and verify each still resolves. Run tests on the touching surfaces specifically. A missed call-site is the most common form of "behavior-preserving" refactor that quietly breaks production — guard against it explicitly.
 
@@ -206,7 +189,7 @@ Each plan document represents **exactly 1 PR** and must include:
    - Post-change verification: same test suite passes after the change (capture command + result).
    - Call-site audit: for every renamed/extracted/moved surface, list the grep command used to find callers and confirm each was updated. If a caller resists trivial migration, abort the change — it's a sign the refactor is changing more than the surface.
    - Manual smoke (where applicable): UI changes get a dual-mode visual smoke; API changes get a representative curl/HTTP probe; data-layer changes get a sample query.
-   - If any item above can't be filled in honestly, the PR is OUT of scope for `/claudna:tech-debt` — split or skip.
+   - If any item above can't be filled in honestly, the PR is OUT of scope for `/claudna:audit tech-debt` — split or skip.
 
 #### C. Subagent Workflow
 
@@ -222,12 +205,12 @@ Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. The adv
 
 ## Output Targets
 
-This skill supports `--output github` and `--output session` in addition to the default `docs` target.
+`--output` flag semantics are owned by the lens contract (§2). This lens supports `github` and `session` in addition to the `docs` deliverable produced by the full interactive procedure above.
 
 Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Map scan priorities: High → `priority:high`, Medium → `priority:medium`, Low → `priority:low`.
-- For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs` (default): follow the subagent workflow in the orchestration guide
+- For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
+- For `docs`: follow the subagent workflow in the orchestration guide
 
 After creating issues, present the batch summary and return issue URLs for audit tracking.
 
@@ -235,19 +218,20 @@ After creating issues, present the batch summary and return issue URLs for audit
 
 ## Autonomous Mode (--auto)
 
-When `--auto` is set (see orchestration guide Section 10):
+When `--auto` is set (see the lens contract §4 and orchestration guide Section 10):
 1. Skip Plan Mode — go straight to Phase 1 scan
 2. Skip the user confirmation gate between Phase 1 and Phase 2
 3. Implies `--output github`
-4. Use focus area from `$ARGUMENTS` as scope. If none provided, scan full codebase but limit to top 10 findings.
+4. Use the focus area from the dispatched arguments as scope. If none provided, scan full codebase but limit to top 10 findings.
 5. Create GitHub Issues per the output guide (`--output github`) for all findings above LOW severity
-6. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+6. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after (skill `audit`, lens inside `artifacts`, per the lens contract §4):
 
 ```json
 {
-  "skill": "tech-debt",
+  "skill": "audit",
   "outcome": "completed",
   "artifacts": {
+    "lens": "tech-debt",
     "issues_created": ["https://github.com/org/repo/issues/123", "..."],
     "session_dir": "documentation/planning/tech_debt/<session>/",
     "files_changed": 0

@@ -38,7 +38,18 @@ SKIP_SKILLS: set[str] = set()  # add skill names here to intentionally bypass va
 GATE_EXTENSIONS = {".md", ".sh", ".py", ".json", ".yaml", ".yml", ".toml", ".txt"}
 GATE_PRUNE_DIRS = {".git", "__pycache__", "worktrees", "node_modules"}
 GATE_EXCLUDE_FILES = {"CHANGELOG.md", "scripts/removed-skills.txt"}  # exact paths
-GATE_EXCLUDE_PREFIXES = ("documentation/archive/",)
+# Point-in-time records legitimately narrate retired skills: the archive,
+# plan/spec/decision documents (rewriting history would falsify them), and
+# cleanup-legacy-install, which enumerates pre-plugin overlay files by their
+# retired names by definition. The gate protects LIVING surfaces: README,
+# guides, skills/, scripts/, tests/.
+GATE_EXCLUDE_PREFIXES = (
+    "documentation/archive/",
+    "documentation/decisions/",
+    "documentation/planning/",
+    "documentation/specs/",
+    "skills/cleanup-legacy-install/",
+)
 
 
 def scan_removed_names(removed_names: list[str]) -> list[tuple[str, str]]:

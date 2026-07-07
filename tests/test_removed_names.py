@@ -48,14 +48,30 @@ class TestCheckRemovedNameMentions:
             "Or invoke /ghost-deploy directly.\n"
             "The file lives at skills/ghost-deploy/SKILL.md.\n"
             "Permission rule: Skill(ghost-deploy)\n"
-            "The ghost-deploy skill handles this.\n"
         )
         errors = check_removed_name_mentions(text, self.NAMES)
-        assert len(errors) == 5
+        assert len(errors) == 4
         assert all("ghost-deploy" in msg for _n, msg in errors)
 
+    def test_bare_prose_mention_not_flagged(self):
+        # A retired name may persist as ordinary vocabulary (labels, taxonomy);
+        # only sigil-prefixed reference forms flag.
+        text = "The ghost-deploy label still applies; ghost-deploy debt remains."
+        assert check_removed_name_mentions(text, self.NAMES) == []
+
+    def test_reborn_lens_path_segment_not_flagged(self):
+        # A removed skill name reborn as an engine lens: inner path segments
+        # (slash continuing a path) are legitimate, not stale references.
+        text = "| `ghost-deploy` | ... | `ghost-deploy/ghost-deploy.md` |\nsee skills/audit/ghost-deploy/notes.md"
+        assert check_removed_name_mentions(text, self.NAMES) == []
+
+    def test_old_top_level_skills_path_still_flagged(self):
+        text = "the file lives at skills/ghost-deploy/SKILL.md"
+        errors = check_removed_name_mentions(text, self.NAMES)
+        assert len(errors) == 1
+
     def test_word_boundary_no_false_positives(self):
-        text = "The ghost-deployment pipeline uses ghost-deploy-v2 conventions."
+        text = "The /ghost-deployment pipeline uses /ghost-deploy-v2 conventions."
         assert check_removed_name_mentions(text, self.NAMES) == []
 
     def test_replaces_breadcrumb_line_exempt(self):

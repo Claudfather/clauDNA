@@ -32,7 +32,7 @@ For bots, CI runners, and Docker images, drop a `settings.json` with `enabledPlu
 
 | Directory | Count | Contents |
 |-----------|-------|----------|
-| `skills/` | 53 | User-invocable slash commands |
+| `skills/` | 46 | User-invocable slash commands |
 | `agents/` | 8 | `snowflake-analyst`, `dbt-engineer`, `neon-analyst`, `modal-ops`, `railway-ops`, `vercel-ops`, `code-reviewer`, `spec-reviewer` |
 | `plugin-hooks/` | 5 wired + 1 opt-in | Auto-format on Write/Edit, PreToolUse permission expansion, PreCompact reflect gate, opt-in skill telemetry, macOS notifications. (`statusline.sh` is opt-in — see [SETUP_GUIDE §3.2](./SETUP_GUIDE.md#32-statusline-optional).) Named `plugin-hooks/` to avoid a Claude Code bug that deletes any project-root `hooks/` directory between tool calls. |
 
@@ -44,7 +44,7 @@ For bots, CI runners, and Docker images, drop a `settings.json` with `enabledPlu
 
 ## Skills
 
-Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:tech-debt`). Bare names below are shown without the prefix for readability.
+Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:audit tech-debt`). Bare names below are shown without the prefix for readability.
 
 ### Workflow
 
@@ -52,7 +52,6 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:tech-de
 |-------|-------------|
 | `/session-resume` | Pick up where you left off — scans git, PRs, plans, handoff notes |
 | `/session-handoff` | End-of-session capture — decisions, learnings, next steps |
-| `/repo-health` | Multi-repo dashboard — open PRs, CI status, stale branches |
 | `/implement-plan` | Execute a design doc or GitHub Issue — browse, pick, challenge, build, test, PR |
 | `/worktree` | Manage git worktrees for parallel Claude sessions |
 | `/development-retro` | Post-merge retrospective — systemic patterns, friction, breadcrumb trails |
@@ -72,14 +71,11 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:tech-de
 
 | Skill | Description |
 |-------|-------------|
-| `/tech-debt` | Scan for tech debt, generate phased remediation plans |
-| `/security-audit` | Scan 8 vulnerability categories, generate remediation plans |
+| `/audit` | Codebase-audit engine — `security` / `tech-debt` / `docs` / `design` / `access-path` / `data-model` / `frontend-perf` / `repo-health` lenses (replaces the eight standalone audit skills) |
 | `/review-pr` | Structured PR review with severity-categorized findings |
 | `/review-changes` | Review uncommitted changes for bugs, conventions, security |
 | `/lessons` | Capture and review lessons from corrections |
 | `/verify-completion` | Verify work is actually complete before claiming success |
-| `/frontend-performance-audit` | Trace re-render cascades, identify fetch/state/observer issues |
-| `/access-path-audit` | Audit cross-cutting concern consistency across system interfaces (API, CLI, MCP, Slack) |
 | `/visual-crawl` | Autonomous visual crawl — discover routes, screenshot at 3 viewports, file issues for findings |
 
 ### Product
@@ -88,9 +84,6 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:tech-de
 |-------|-------------|
 | `/product-enhance` | Discover enhancements via intent interviews and gap analysis |
 | `/product-vision` | Architecture-aware product vision — explore what the codebase could become |
-| `/design-review` | Visual audit at 3 breakpoints with phased fix plans |
-| `/docs-review` | Audit docs for accuracy, update plan statuses, archive stale docs |
-| `/data-model-audit` | Audit code-to-schema fit — traces code paths to DB, identifies mismatches |
 
 ### Knowledge
 
@@ -146,12 +139,12 @@ The skills form a pipeline:
 ```
 Morning
 ───────────────────────────────────────────────────
-  /claudna:repo-health           → See what needs attention across all repos
+  /claudna:audit repo-health     → See what needs attention across all repos
   /claudna:session-resume        → Pick a repo, get a 30-second briefing
 
 Planning (when starting new work)
 ───────────────────────────────────────────────────
-  /claudna:tech-debt             → Find what's broken → generates phase docs
+  /claudna:audit tech-debt       → Find what's broken → generates phase docs
   /claudna:product-enhance       → Find what could be better → generates phase docs
   /claudna:product-vision        → Explore what the codebase could become
 
@@ -174,7 +167,7 @@ End of Day
                                    → Writes handoff file for tomorrow's /claudna:session-resume
 ```
 
-**First time?** Start with `/claudna:repo-health` to see your repos, then `/claudna:session-resume` in any project.
+**First time?** Start with `/claudna:audit repo-health` to see your repos, then `/claudna:session-resume` in any project.
 
 ## Agents
 

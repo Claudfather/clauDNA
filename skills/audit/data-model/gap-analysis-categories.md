@@ -1,6 +1,6 @@
 # Gap Analysis Categories
 
-Reference material for the `/claudna:data-model-audit` skill. These categories are used in Step 4 (Fit Analysis) to classify and rank findings, and in Step 5 to structure the report.
+Reference material for the `/claudna:audit data-model` lens. These categories are used in Step 4 (Fit Analysis) to classify and rank findings, and in Step 5 to structure the report.
 
 ---
 

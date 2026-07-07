@@ -7,7 +7,7 @@ body:
     attributes:
       label: Skill or component
       description: Which skill, hook, or agent is affected?
-      placeholder: "/claudna:tech-debt, plugin-hooks/auto-format, etc."
+      placeholder: "/claudna:audit tech-debt, plugin-hooks/auto-format, etc."
     validations:
       required: true
 
@@ -18,7 +18,7 @@ body:
       description: What did you do? Be specific enough that someone else can follow along.
       placeholder: |
         1. Open a project with ...
-        2. Run `/claudna:tech-debt`
+        2. Run `/claudna:audit tech-debt`
         3. ...
     validations:
       required: true

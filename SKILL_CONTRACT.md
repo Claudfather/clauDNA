@@ -17,7 +17,7 @@ Every skill lives under `skills/<name>/`. The directory contents:
 | `references/` | Optional | Subdirectory for grouped reference material (used by `session-resume`, `session-handoff`) |
 
 Hard rules:
-- The directory **name** is the skill's slash-command name (e.g. `/tech-debt` lives at `skills/tech-debt/`).
+- The directory **name** is the skill's slash-command name (e.g. `/product-vision` lives at `skills/product-vision/`).
 - The directory name **must match** the `name` field inside `SKILL.md` exactly.
 - One special directory exists: `skills/_shared/`. It holds shared orchestration material referenced by skills, contains no `SKILL.md`, and is not itself a skill. The validator skips it.
 
@@ -60,8 +60,8 @@ Cross-references to living skills use the `/claudna:<name>` form. Every `claudna
 
 ```yaml
 ---
-name: tech-debt
-description: "Use when you want to find and plan remediation of technical debt in a codebase — duplication, dead code, fragile modules, outdated patterns. For a portfolio view across many repos, use /claudna:repo-health."
+name: product-vision
+description: "Use when you want to explore what a codebase could become — candidate features one or two hops from existing infrastructure, compound plays, and a trajectory aligned to the project mission. For triaging known issues in an existing product, use /claudna:product-enhance. Replaces /product-brainstorm."
 argument-hint: "[--auto] [--output github|session] [focus-area]"
 allowed-tools: Bash(git *), Bash(gh *), Edit, Read, Grep, Glob
 requires:
@@ -113,9 +113,9 @@ Minimum body length: 200 characters of non-frontmatter content. Skills shorter t
 
 ## 4. Naming conventions
 
-- Skill names use `kebab-case`: `tech-debt`, `review-pr`, `frontend-performance-audit`.
-- Slash commands are the skill name with a `/` prefix: `/tech-debt`.
-- Skills that file or read GitHub issues end in `-audit` or `-review` (planning) or use a plain action verb (`heist`, `commit-push-pr`).
+- Skill names use `kebab-case`: `product-vision`, `review-pr`, `implement-plan`.
+- Slash commands are the skill name with a `/` prefix: `/product-vision`.
+- Codebase audits are **lenses of the one `/audit` engine** (`skills/audit/<lens>/`, per `skills/_shared/audit-lens-contract.md`) — a new audit concern is a new lens directory + table row, never a new `-audit` skill. Review skills for plans/PRs use `-review` or a plain action verb (`heist`, `commit-push-pr`).
 - Skills that wrap a third-party tool are **one engine named for the tool, with verb modes** — `dbt`, `modal`, `railway`, `vercel`, `neon` — never one skill per tool×verb (`<tool>-deploy` / `<tool>-logs` / …). Engines follow `skills/_shared/infra-cli-contract.md`: thin body, first-token verb dispatch, per-verb depth in support files. A new capability for a tool is a new verb row + depth file, not a new skill.
 
 Naming is not validator-enforced today — it's a guideline. Conflicts and confusion (e.g. duplicate names) are validator-enforced.

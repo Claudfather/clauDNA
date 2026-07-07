@@ -4,6 +4,16 @@
 # documentation/archive/) from mentioning these names in any form;
 # `Replaces ...` breadcrumb lines are exempt.
 #
+# P3 (0.8.0) — audit engine: /audit
+security-audit
+tech-debt
+docs-review
+design-review
+access-path-audit
+data-model-audit
+frontend-performance-audit
+repo-health
+#
 # P2 (0.7.0) — infra engines: /modal /railway /vercel /neon
 modal-deploy
 modal-logs

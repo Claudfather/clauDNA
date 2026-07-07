@@ -12,7 +12,7 @@ At orchestration start, define a scratch directory path for this session:
 /tmp/<skill-name>-<timestamp>/research/
 ```
 
-- `<skill-name>` is the slash command name (e.g., `product-enhance`, `security-audit`)
+- `<skill-name>` is the slash command name (e.g., `product-enhance`, `audit`)
 - `<timestamp>` is `YYYY-MM-DD_HHMMSS`
 - Research subagents write research files here (use `general-purpose` subagents — Explore agents lack the Write tool)
 - Plan agents read research from here
@@ -65,7 +65,7 @@ Scanned authentication flow. Found 3 issues:
 - JWT secret hardcoded (src/auth.ts:12) — CRITICAL
 - No rate limiting on login endpoint — HIGH
 - Session cookies missing secure flag — MEDIUM
-Full research: /tmp/security-audit-2026-02-17_143022/research/auth-flow.md
+Full research: /tmp/audit-2026-02-17_143022/research/auth-flow.md
 ```
 
 **The orchestrator MUST NOT read the full research files into its context.** The orchestrator uses these summaries for user-facing presentation tables only.
@@ -216,11 +216,11 @@ Output directories follow this pattern per skill:
 documentation/planning/<subdirectory>/<session_name>_<YYYY-MM-DD>/
 ```
 
-Where `<subdirectory>` varies by skill:
-- product-enhance, product-vision, design-review: `phases/`
-- frontend-performance-audit: `performance/`
-- security-audit: `security/`
-- tech-debt: `tech_debt/`
+Where `<subdirectory>` varies by skill or audit lens:
+- product-enhance, product-vision, `audit design`: `phases/`
+- `audit frontend-perf`: `performance/`
+- `audit security`: `security/`
+- `audit tech-debt`: `tech_debt/`
 
 When all phases are complete, the session directory moves to:
 
@@ -269,7 +269,7 @@ When `$ARGUMENTS` contains `--auto`:
 2. **Skip all user gates.** Do not ask for confirmation, scope selection, or approval. Proceed with sensible defaults.
 3. **Scope from arguments.** The focus area must come from `$ARGUMENTS` (e.g., a directory path). If no scope is provided, scan the full codebase but limit findings to the top 10 most impactful.
 4. **No Plan Mode.** Skip `EnterPlanMode`/`ExitPlanMode` — there's no deliberation phase when running autonomously. Go straight to scan → findings → issues.
-5. **Bail gracefully.** If the skill genuinely cannot proceed without user input (e.g., deployed URL required for design-review), write what you have to the handoff file and stop. Do not block.
+5. **Bail gracefully.** If the skill genuinely cannot proceed without user input (e.g., deployed URL required for the audit engine's design lens), write what you have to the handoff file and stop. Do not block.
 
 ### Default behavior changes with `--auto`
 
@@ -374,14 +374,14 @@ Every `--auto` run emits a single fenced JSON block as its final output (the las
 
 | Skill | Auto-viable? | Notes |
 |---|---|---|
-| `/claudna:tech-debt` | ✅ Yes | Scan + issue creation, no user input needed |
-| `/claudna:security-audit` | ✅ Yes | Scan + issue creation, no user input needed |
+| `/claudna:audit tech-debt` | ✅ Yes | Scan + issue creation, no user input needed |
+| `/claudna:audit security` | ✅ Yes | Scan + issue creation, no user input needed |
 | `/claudna:product-enhance` | ✅ Yes | Uses triage path (skip discovery/interview) |
-| `/claudna:frontend-performance-audit` | ✅ Yes | Requires page/flow in arguments |
-| `/claudna:docs-review` | ✅ Yes | Global review mode, auto-fix stale docs |
-| `/claudna:access-path-audit` | ✅ Yes | Scan + issue creation, no user input needed |
+| `/claudna:audit frontend-perf` | ✅ Yes | Requires page/flow in arguments |
+| `/claudna:audit docs` | ✅ Yes | Global review mode, auto-fix stale docs |
+| `/claudna:audit access-path` | ✅ Yes | Scan + issue creation, no user input needed |
 | `/claudna:product-vision` | ⚠️ Limited | Vision without user input produces generic ideas. Use only with tight scope. |
-| `/claudna:design-review` | ❌ No | Requires screenshots, deployed URL, visual judgment |
+| `/claudna:audit design` | ❌ No | Requires screenshots, deployed URL, visual judgment |
 | `/claudna:session-handoff` | ✅ Yes | Already implemented |
 | `/claudna:implement-plan` | ✅ Yes | **Tier 3.** Phase 3 of the autonomous-mode rollout. Consumes plans/issues, produces PRs, never merges. |
 | `/claudna:weigh-development-paths` | ✅ Yes | **Composable.** Phase 1 adds `--auto` for chained use from `/implement-plan --auto`. Returns refined plan. |
@@ -439,11 +439,11 @@ When multiple skills could apply to a task, invoke them in tier order. Process s
 | Tier | Category | Skills | Purpose |
 |------|----------|--------|---------|
 | 1 | **Process** | review-self, investigate-app, verify-completion | Establish approach, verify assumptions, gather evidence, debug |
-| 2 | **Planning** | product-enhance, product-vision, design-review, security-audit, tech-debt, frontend-performance-audit | Analyze what to build, identify gaps, produce design docs |
+| 2 | **Planning** | product-enhance, product-vision, audit (lens engine — lenses per `audit-lens-contract.md`) | Analyze what to build, identify gaps, produce design docs |
 | 3 | **Implementation** | implement-plan, review-changes, review-pr, quick-commit, commit-push-pr | Execute plans, review code, commit and ship PRs |
 | 4 | **Deployment & Ops** | modal, railway, vercel, neon, dbt (infra engines — verb modes per `infra-cli-contract.md`) | Deploy, monitor, query infrastructure |
 
-**Utility skills** (session-handoff, session-resume, lessons, notes, find-skills, cache-audit, docs-review, repo-health, worktree, clauDNA-migrate, notifications) are not tiered -- they are invoked on demand for session management, not as part of a build workflow.
+**Utility skills** (session-handoff, session-resume, lessons, notes, find-skills, cache-audit, worktree, clauDNA-migrate, notifications) are not tiered -- they are invoked on demand for session management, not as part of a build workflow. (The former docs-review and repo-health utilities are now `docs` and `repo-health` lenses of the tiered `audit` engine.)
 
 ### Rules
 

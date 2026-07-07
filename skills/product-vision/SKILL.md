@@ -20,9 +20,9 @@ Parse `$ARGUMENTS` at invocation:
 ## When NOT to use
 
 - For specific known issues or bug triage → use `/claudna:product-enhance`
-- For code quality/tech debt → use `/claudna:tech-debt`
-- For design/UX problems → use `/claudna:design-review`
-- For security vulnerabilities → use `/claudna:security-audit`
+- For code quality/tech debt → use `/claudna:audit tech-debt`
+- For design/UX problems → use `/claudna:audit design`
+- For security vulnerabilities → use `/claudna:audit security`
 
 **Enter Plan Mode.** Call `EnterPlanMode`. All discovery and analysis steps are read-only. If declined, proceed by convention.
 

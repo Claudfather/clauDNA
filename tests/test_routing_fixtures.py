@@ -49,6 +49,24 @@ def test_expected_skills_exist():
     )
 
 
+def test_modes_appear_in_expected_argument_hint():
+    # A row's `mode` drives the manual phase-boundary protocol; a typo'd mode
+    # would silently mislead it. Engines carry their verbs in argument-hint.
+    failures = []
+    for row in load_rows():
+        mode = row.get("mode")
+        if not mode:
+            continue
+        skill_md = REPO_ROOT / "skills" / row["expect"] / "SKILL.md"
+        if not skill_md.is_file():
+            continue  # covered by test_expected_skills_exist
+        parsed = parse_frontmatter(skill_md)
+        hint = str(parsed[0].get("argument-hint", "")) if parsed else ""
+        if mode not in hint:
+            failures.append(f"{row['expect']}: mode {mode!r} not in argument-hint {hint!r}")
+    assert not failures, "\n".join(failures)
+
+
 def test_keywords_anchor_in_expected_description():
     failures = []
     for row in load_rows():

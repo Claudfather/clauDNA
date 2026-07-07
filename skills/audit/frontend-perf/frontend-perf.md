@@ -1,29 +1,21 @@
----
-name: frontend-performance-audit
-user-invocable: true
-description: "Use when a frontend page or flow has performance symptoms -- flickering, slow loads, janky scroll, excessive re-renders, or layout shifts. For visual and UX quality rather than speed, use /claudna:design-review."
-argument-hint: "[--auto] [--output github|session] [page-or-flow]"
----
-
-# Frontend Performance Audit
+Invoked by /claudna:audit in frontend-perf mode — audits a frontend page or flow with performance symptoms: flickering, slow loads, janky scroll, excessive re-renders, or layout shifts.
 
 Audit frontend rendering performance by tracing render cycles, diagnosing fetch patterns, and producing phased remediation plans for `/claudna:implement-plan`.
 
 **Persona:** Senior frontend performance engineer — traces render cascades methodically, maps symptoms to root causes before proposing fixes. Pragmatic: fix the bottleneck, not everything.
 
-## Arguments
+## Lens arguments (beyond contract §2)
 
-Parse `$ARGUMENTS` at invocation:
-- `--auto`: Fully non-interactive. Implies `--output github`. Requires page/flow in arguments. See orchestration guide Section 10.
-- `--output github`: Write findings and remediation plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
-- `--output session`: Present findings in chat only, no persistence.
-- Remaining text is the page or flow to audit. If provided, use it as the scope in Phase 1 instead of asking.
+Shared argument semantics live in `skills/_shared/audit-lens-contract.md` §2. Lens-specific:
+
+- `[focus]` — the page or flow to audit. If provided, use it as the scope in Phase 1 instead of asking.
+- `--auto` — implies `--output github` and **requires** the page/flow in the arguments; this lens cannot auto-detect what to audit. See Autonomous Mode below.
 
 ## When NOT to use
 
-- For visual/UX design issues → use `/claudna:design-review`
+- For visual/UX design issues → use `/claudna:audit design`
 - For backend/API latency → use `/claudna:investigate-app`
-- For general code quality → use `/claudna:tech-debt`
+- For general code quality → use `/claudna:audit tech-debt`
 
 ## Procedure
 
@@ -33,7 +25,7 @@ Follow these steps in order. **Enter Plan Mode** (`EnterPlanMode`) before starti
 
 ## Phase 1: Scope & Symptom
 
-Ask the user: (1) what's the symptom, (2) which page or flow, (3) how to reproduce. If vague, ask them to narrow to a specific page. Performance audits need a concrete entry point.
+Ask the user: (1) what's the symptom, (2) which page or flow, (3) how to reproduce. If vague, ask them to narrow to a specific page. Performance audits need a concrete entry point. If `[focus]` supplied the page or flow, use it as the scope instead of asking.
 
 ---
 
@@ -52,7 +44,7 @@ Present a brief architecture summary (framework, React version, affected route, 
 
 ## Phase 3: Scan
 
-Scan the affected components across 8 categories using **Explore subagents** (one per category). Each agent reads **`scan-categories.md`** for detailed checklists, writes findings to the scratch directory, and returns a summary. Focus on the Phase 2 component tree only.
+Scan the affected components across 8 categories using **Explore subagents** (one per category). Each agent reads **`scan-categories.md`** (same directory as this file) for detailed checklists, writes findings to the scratch directory, and returns a summary. Focus on the Phase 2 component tree only.
 
 **Categories:** A. Render Cascades, B. Fetch Patterns, C. Observer & Listener Overhead, D. State Management, E. Memoization Gaps, F. Layout Stability, G. Framework-Specific Issues, H. Bundle & Loading
 
@@ -112,12 +104,11 @@ Prioritize these `concern_area` values:
 
 ## Output Targets
 
-This skill supports `--output github` and `--output session` in addition to the default `docs` target.
+Follow the output guide at `skills/_shared/output-guide.md`. Beyond the shared `--output github|session` surface (contract §2), this lens supports a `docs` target — the Phase 4 remediation plan docs:
 
-Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Apply `performance` label. Map severity levels to priority labels. Group issues by cascade chain where applicable.
-- For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs` (default): follow the subagent workflow in the orchestration guide
+- For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
+- For `docs`: follow the subagent workflow in the orchestration guide
 
 After creating issues, present the batch summary and return issue URLs for audit tracking.
 
@@ -127,16 +118,17 @@ After creating issues, present the batch summary and return issue URLs for audit
 
 When `--auto` is set (see orchestration guide Section 10):
 1. Skip Plan Mode — go straight to reconnaissance and scan
-2. Page/flow **must** be provided in `$ARGUMENTS` (bail if missing — this skill can't auto-detect what to audit)
+2. Page/flow **must** be provided in the arguments (bail if missing — this lens can't auto-detect what to audit)
 3. Skip the user confirmation gate between scan and remediation
 4. Create GitHub Issues for all findings, grouped by cascade chain
-5. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+5. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after, `skill: "audit"` with the lens inside `artifacts` (contract §4):
 
 ```json
 {
-  "skill": "frontend-performance-audit",
+  "skill": "audit",
   "outcome": "completed",
   "artifacts": {
+    "lens": "frontend-perf",
     "issues_created": ["..."],
     "cascade_chains_found": 2,
     "page_audited": "<route or flow>",
@@ -149,4 +141,4 @@ When `--auto` is set (see orchestration guide Section 10):
 }
 ```
 
-- `outcome` is `completed` on success, `blocked` if the page/flow wasn't provided (this skill cannot auto-detect; see existing rule #2 in Autonomous Mode).
+- `outcome` is `completed` on success, `blocked` if the page/flow wasn't provided (this lens cannot auto-detect; see rule 2 above).

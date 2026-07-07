@@ -1,6 +1,6 @@
 # Subagent Prompt Templates
 
-Reference material for the `/claudna:data-model-audit` skill. These are the detailed instructions for each parallel subagent launched during the audit.
+Reference material for the `/claudna:audit data-model` lens. These are the detailed instructions for each parallel subagent launched during the audit.
 
 ---
 

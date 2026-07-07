@@ -251,14 +251,14 @@ class TestNameCollision:
     def test_collision_detected(self):
         manifest = load_manifest(VALID_PKG)
         # Use a slug that exists in skills/
-        manifest["skill"]["slug"] = "tech-debt"
+        manifest["skill"]["slug"] = "audit"
         manifest["claudna"]["is_update"] = False
         result = validate_name_collision(manifest)
         assert not result.passed
 
     def test_collision_allowed_for_updates(self):
         manifest = load_manifest(VALID_PKG)
-        manifest["skill"]["slug"] = "tech-debt"
+        manifest["skill"]["slug"] = "audit"
         manifest["claudna"]["is_update"] = True
         result = validate_name_collision(manifest)
         assert result.passed  # passes with a warning

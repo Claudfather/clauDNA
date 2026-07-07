@@ -9,7 +9,7 @@ argument-hint: "[topic-or-issue-url] [--output github|docs|session] [--auto]"
 
 You are a plan architect. Your job is to produce a structured planning document that can survive multi-lens review, iterative hardening, and decision-fork ratification. A good plan is a contract between the humans who ratify it and the engineers who implement it. A vague plan wastes more time than no plan — it creates false alignment.
 
-Forge is the *general-purpose* planning lens — reach for it when the lens is "build this specific thing," as opposed to the targeted lenses (`/tech-debt`, `/security-audit`, …). Like them, forge **authors** a plan in the shared §4.1 publishable-doc contract and hands it to `/claudna:publish` to persist; it never writes output itself. The published artifact is the substrate the `/ironclad` hardening loop iterates on.
+Forge is the *general-purpose* planning lens — reach for it when the lens is "build this specific thing," as opposed to the targeted audit lenses (`/claudna:audit tech-debt`, `/claudna:audit security`, …). Like them, forge **authors** a plan in the shared §4.1 publishable-doc contract and hands it to `/claudna:publish` to persist; it never writes output itself. The published artifact is the substrate the `/ironclad` hardening loop iterates on.
 
 **Enter Plan Mode.** Call `EnterPlanMode`. All analysis is read-only during research phases. If declined, proceed by convention.
 
@@ -83,7 +83,7 @@ For each risk, draft a mitigation. If no mitigation exists, flag it as an open r
 
 ### Plan Document Structure
 
-Forge authors in the **shared §4.1 publishable-doc contract** (`skills/_shared/output-guide.md` §3 frontmatter + §4.1 body) — the same contract `/tech-debt`, `/security-audit`, et al. emit — so `/claudna:publish` can route it and `/implement-plan` can consume it. Forge's distinctive sections (Decision Forks, Architecture, Sequencing) ride **alongside** the §4.1 skeleton as added sections; publish validates the skeleton's presence, not its exclusivity.
+Forge authors in the **shared §4.1 publishable-doc contract** (`skills/_shared/output-guide.md` §3 frontmatter + §4.1 body) — the same contract the audit lenses (`/claudna:audit tech-debt`, `/claudna:audit security`, et al.) emit — so `/claudna:publish` can route it and `/implement-plan` can consume it. Forge's distinctive sections (Decision Forks, Architecture, Sequencing) ride **alongside** the §4.1 skeleton as added sections; publish validates the skeleton's presence, not its exclusivity.
 
 Per **F7**, a multi-phase plan is **one epic/overview doc + one §4.1 doc per phase** (§4.1 is "one phase per issue"; this mirrors the disk `00_overview` + phase-docs pattern). A single-phase plan is one §4.1 doc.
 

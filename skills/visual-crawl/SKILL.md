@@ -1,7 +1,7 @@
 ---
 name: visual-crawl
 user-invocable: true
-description: "Use when you want a frontend app crawled and visually inspected without supervision — every route screenshotted at desktop, tablet, and mobile viewports, interactions exercised, findings filed as issues. For a judgment-based audit of specific screens, use /claudna:design-review."
+description: "Use when you want a frontend app crawled and visually inspected without supervision — every route screenshotted at desktop, tablet, and mobile viewports, interactions exercised, findings filed as issues. For a judgment-based audit of specific screens, use /claudna:audit design."
 argument-hint: "[--auto] [--deep] [--output github|session] [--url <base-url>] [--local] [focus-area]"
 allowed-tools:
   - "Bash(which *)"
@@ -47,10 +47,10 @@ If neither `--url` nor `--local` is specified, ask the user.
 
 ## When NOT to use
 
-- For design critique and enhancement proposals → use `/claudna:design-review`
-- For frontend performance (flickering, re-renders, layout shifts) → use `/claudna:frontend-performance-audit`
-- For code quality/tech debt → use `/claudna:tech-debt`
-- For security vulnerabilities → use `/claudna:security-audit`
+- For design critique and enhancement proposals → use `/claudna:audit design`
+- For frontend performance (flickering, re-renders, layout shifts) → use `/claudna:audit frontend-perf`
+- For code quality/tech debt → use `/claudna:audit tech-debt`
+- For security vulnerabilities → use `/claudna:audit security`
 
 **Enter Plan Mode.** Call `EnterPlanMode`. All discovery and crawl steps are read-only. If declined, proceed by convention.
 

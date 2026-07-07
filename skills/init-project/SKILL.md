@@ -144,7 +144,7 @@ documentation/
 If `documentation/` already exists, scan for missing subdirectories and create only what's missing.
 
 **Directory purposes:**
-- `planning/` — skill output from `/claudna:tech-debt`, `/claudna:security-audit`, `/claudna:product-enhance`, `/claudna:product-vision`. Session subdirectories created at runtime.
+- `planning/` — skill output from `/claudna:audit tech-debt`, `/claudna:audit security`, `/claudna:product-enhance`, `/claudna:product-vision`. Session subdirectories created at runtime.
 - `decisions/` — Architecture Decision Records (ADRs). Why we chose X over Y. Permanent, not archived.
 - `specs/` — Technical specifications, API contracts, data schemas. Living docs.
 - `guides/` — Setup guides, onboarding, runbooks. Living docs.

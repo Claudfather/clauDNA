@@ -1,28 +1,12 @@
----
-name: data-model-audit
-user-invocable: true
-description: "Use when an application's data model may be fighting the product — schema-to-intent mismatches, awkward code-to-database paths, redundant or missing structures — and you want a grounded audit of how well the model serves the code that uses it."
-argument-hint: "[--output github|session] [focus-area]"
----
+Invoked by /claudna:audit in data-model mode — a grounded audit of how well an application's data model serves the code that uses it: schema-to-intent mismatches, awkward code-to-database paths, redundant or missing structures.
 
-# Data Model Audit
-
-Audit how well a Python/Postgres application's data model serves its codebase — traces code paths to DB interactions, maps intent to schema, finds where the model fights the application.
+Audits a Python/Postgres application's data model against its codebase — traces code paths to DB interactions, maps intent to schema, finds where the model fights the application. Interactive-only lens: there is no `--auto` variant; the engine owns the `--auto` blocked-result path (contract §4).
 
 **Persona:** Senior data architect who reads code. Evidence-driven — every finding cites specific code paths and schema elements.
 
-## Arguments
-
-Parse `$ARGUMENTS` at invocation:
-- `--output github`: Write findings and plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
-- `--output session`: Present findings in chat only, no persistence.
-- Remaining text is the focus area (e.g., `src/models/` or `auth tables`). If provided, scope the audit to that area.
-
-Default (no flag): Present findings in chat (diagnostic skill — no file output by default).
-
 ## Procedure
 
-Follow steps in order. Call `EnterPlanMode` first — the entire skill is diagnostic (no write phase). If user declines, proceed read-only by convention. Never exit plan mode.
+Follow steps in order. Call `EnterPlanMode` first — the entire lens is diagnostic (no write phase). If user declines, proceed read-only by convention. Never exit plan mode.
 
 Do NOT read CLAUDE.md or MEMORY.md — already in system prompt.
 
@@ -30,7 +14,7 @@ Do NOT read CLAUDE.md or MEMORY.md — already in system prompt.
 
 ## Step 1: Scope & Context
 
-Ask: (1) **"What's the pain point?"** and (2) **"Any specific area to focus on?"** Default to full codebase scan if no scope given.
+Ask: (1) **"What's the pain point?"** and (2) **"Any specific area to focus on?"** The engine's `[focus]` argument (e.g., `src/models/` or `auth tables`) may already answer (2) — if provided, scope the audit to that area. Default to full codebase scan if no scope given.
 
 ### Target System Detection
 
@@ -40,7 +24,7 @@ Verify Python/Postgres/SQLAlchemy codebase. Run in parallel:
 - Glob `**/alembic/versions/*.py`
 - Grep `psycopg|asyncpg|postgresql|postgres` in `*.{py,toml,cfg,txt,yml,yaml,env*}`
 
-If none match, warn the user this skill targets Python/Postgres/SQLAlchemy and offer best-effort or alternative. Proceed on confirmation.
+If none match, warn the user this lens targets Python/Postgres/SQLAlchemy and offer best-effort or alternative. Proceed on confirmation.
 
 ---
 
@@ -58,7 +42,7 @@ Discovers the complete data model — SQLAlchemy models, Alembic migrations, raw
 
 Traces every code path from entry points (routes, CLI, tasks) through business logic to database interactions. Catalogs data access patterns, query patterns, and N+1 candidates. Writes findings to `research/code-path-tracing.md`.
 
-**Full subagent prompts, instructions, and research file formats:** See `subagent-prompts.md` in this skill directory.
+**Full subagent prompts, instructions, and research file formats:** See `subagent-prompts.md` in this lens directory.
 
 ---
 
@@ -66,7 +50,7 @@ Traces every code path from entry points (routes, CLI, tasks) through business l
 
 Launch a third `general-purpose` subagent that reads both research files, verifies against the codebase, and builds a code-to-schema convergence map (unused schema, write-only columns, read-hot tables, god-tables, structural workarounds, missing constraints, N+1 patterns). Writes to `research/convergence.md`.
 
-**Full convergence subagent prompt and checklist:** See `subagent-prompts.md` in this skill directory.
+**Full convergence subagent prompt and checklist:** See `subagent-prompts.md` in this lens directory.
 
 **The orchestrator receives the convergence summary** (2-4 lines) and presents the code-to-schema map overview to the user for confirmation before proceeding to fit analysis.
 
@@ -90,16 +74,14 @@ Print structured report: scope summary, code-to-schema map, ranked findings tabl
 
 ---
 
----
-
 ## Output Targets
 
-This skill supports `--output github` and `--output session` in addition to the default `session` target.
+This lens supports `--output github` and `--output session` (contract §2) in addition to the default `session` target — diagnostic lens, no file output by default.
 
 Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Create one issue per ranked finding (Schema Gap, Structural Friction, Performance Anti-pattern, etc.). Label with `auto-audit` and the finding category.
 - For `session` (default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs`: write the full ranked findings report to `documentation/planning/data-model-audit/<session_name>_<YYYY-MM-DD>/`
+- For `docs`: write the full ranked findings report to `documentation/planning/data-model/<session_name>_<YYYY-MM-DD>/`
 
 ---
 

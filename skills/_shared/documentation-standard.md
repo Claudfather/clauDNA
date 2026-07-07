@@ -19,9 +19,9 @@ Every repo initialized with `/claudna:init-project` has this structure:
 └── documentation/
     ├── planning/                    # Active plans and audits (skill output)
     │   ├── phases/                  # /claudna:product-enhance
-    │   ├── tech_debt/               # /claudna:tech-debt
-    │   ├── security/                # /claudna:security-audit
-    │   ├── access-paths/            # /claudna:access-path-audit
+    │   ├── tech_debt/               # /claudna:audit tech-debt
+    │   ├── security/                # /claudna:audit security
+    │   ├── access-paths/            # /claudna:audit access-path
     │   ├── product-vision/          # /claudna:product-vision
     │   └── investigations/          # Ad-hoc research
     ├── decisions/                   # Architecture Decision Records
@@ -36,10 +36,10 @@ When writing planning output (default `--output docs` target), use these paths:
 
 | Skill | Output directory |
 |-------|-----------------|
-| `/claudna:tech-debt` | `documentation/planning/tech_debt/` |
+| `/claudna:audit tech-debt` | `documentation/planning/tech_debt/` |
 | `/claudna:product-enhance` | `documentation/planning/phases/` |
-| `/claudna:security-audit` | `documentation/planning/security/` |
-| `/claudna:access-path-audit` | `documentation/planning/access-paths/` |
+| `/claudna:audit security` | `documentation/planning/security/` |
+| `/claudna:audit access-path` | `documentation/planning/access-paths/` |
 | `/claudna:product-vision` | `documentation/planning/product-vision/` |
 
 If the target directory doesn't exist, create it (with `.gitkeep`) before writing. Don't fail on missing directories.
@@ -97,7 +97,7 @@ These are not archived — they're living documents that evolve with the codebas
 
 ## 8. Reading Documentation State
 
-Skills that scan documentation state (e.g., `/claudna:session-resume`, `/claudna:session-handoff`, `/claudna:repo-health`):
+Skills that scan documentation state (e.g., `/claudna:session-resume`, `/claudna:session-handoff`, `/claudna:audit repo-health`):
 
 ```bash
 # Find in-progress plans

@@ -1,7 +1,7 @@
 # AI Slop Blacklist
 
 
-Reference material for the design-review skill, category 9 (AI Slop Detection). The test: would a human designer at a respected studio ever ship this?
+Reference material for the `/claudna:audit design` lens, category 9 (AI Slop Detection). The test: would a human designer at a respected studio ever ship this?
 
 ## 10 Anti-Patterns
 

@@ -384,11 +384,14 @@ def load_removed_skills(path: Path) -> list[str]:
 
 
 def check_removed_name_mentions(text: str, removed_names: list[str]) -> list[tuple[str, str]]:
-    """Flag any mention of a removed skill name, in any reference form.
+    """Flag reference-form mentions of a removed skill name.
 
-    A single word-boundary match per name catches every form at once —
-    `claudna:<name>`, `/<name>`, `skills/<name>/`, `Skill(<name>)`, and bare
-    prose mentions — because the name itself is the invariant token.
+    Four reference forms are matched: `claudna:<name>`, `/<name>`,
+    `skills/<name>/`-style paths, and `Skill(<name>)` permission rules —
+    each is the name preceded by a reference sigil. Bare prose mentions are
+    deliberately NOT flagged: a retired skill's name may legitimately
+    persist as ordinary vocabulary (e.g. the `tech-debt` GitHub label and
+    concern taxonomy outlive the tech-debt skill).
     A mention positioned after a `Replaces` token on its line is exempt:
     SKILL_CONTRACT §2.1 rule 6 *requires* successor breadcrumbs to name the
     skills they replace. The exemption is positional — a real reference
@@ -406,11 +409,21 @@ def check_removed_name_mentions(text: str, removed_names: list[str]) -> list[tup
     # (the common case), and per-line finditer replaces a per-name inner loop.
     # Measured ~5x over per-name patterns on this repo's scan set.
     alternation = "|".join(re.escape(name) for name in sorted(removed_names))
+    # A reference sigil must immediately precede the name: `claudna:`,
+    # `Skill(`, a slash-command `/` (slash NOT continuing a path — a removed
+    # name may be reborn as a lens/verb token, so `audit/tech-debt/…` inner
+    # segments are legitimate), or the old top-level `skills/<name>` path.
     pattern = re.compile(
-        rf"(?<![A-Za-z0-9_-])({alternation})(?![A-Za-z0-9_-])", re.IGNORECASE
+        rf"(?:claudna:|Skill\(|(?<![A-Za-z0-9_./-])/|(?<![A-Za-z0-9_-])skills/)"
+        rf"({alternation})(?![A-Za-z0-9_-])",
+        re.IGNORECASE,
     )
     if not pattern.search(text):
         return []
+    # Deliberately canonical-case: only the §2.1 rule-6 breadcrumb form
+    # ("Replaces /old-name") is sanctioned; lowercase prose like "this engine
+    # replaces /old-name" is a real reference and must flag (the safe,
+    # false-positive direction).
     replaces_re = re.compile(r"\bReplaces\b")
     errors: list[tuple[str, str]] = []
     for lineno, line in enumerate(text.splitlines(), start=1):

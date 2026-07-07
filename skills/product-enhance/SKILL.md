@@ -20,8 +20,8 @@ Parse `$ARGUMENTS` at invocation:
 ## When NOT to use
 
 - For net-new feature brainstorming (divergent ideation) → use `/claudna:product-vision`
-- For code quality/tech debt → use `/claudna:tech-debt`
-- For security vulnerabilities → use `/claudna:security-audit`
+- For code quality/tech debt → use `/claudna:audit tech-debt`
+- For security vulnerabilities → use `/claudna:audit security`
 
 ## Process Flow (authoritative)
 
