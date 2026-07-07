@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.9.0] - 2026-07-07
 ### Added
 - **`/session` engine — 3 session skills become 1, plus a new mode ([#168](https://github.com/Claudfather/clauDNA/issues/168), epic [#165](https://github.com/Claudfather/clauDNA/issues/165) P4).** `session-handoff`, `session-resume`, and `name-session` consolidate into one engine with verb modes (`/claudna:session resume|handoff|checkpoint|name`) over the unchanged per-cwd substrate (`<cwd>/.claude/session.md` + `_shared/reaper-rules.md`). Bare `/session` uses **deterministic inference only** (F2 as amended): fresh session + handoff present → resume; an explicit wrap-up cue from the enumerated literal list → handoff; anything else prints the mode table and stops — never a blocking question, and the verb is required under `--auto`. **New `checkpoint` mode**: a mid-session save without the ceremony — appends new items and refreshes `branch`/`working_tree` only; deliberately never reaps, never scans fully, never manages `.gitignore` (all of that stays with `handoff`). Structured results carry `"skill": "session"` + `"mode"` in artifacts; the interactive-only `name` mode emits `blocked` under `--auto`. Mode procedures ported whole (handoff's reap-scan-write pipeline, resume's brief-and-suggest flow with legacy import, name's conversation-grounded reconciliation); the handoff file template moves to `skills/session/templates.md`.
 
