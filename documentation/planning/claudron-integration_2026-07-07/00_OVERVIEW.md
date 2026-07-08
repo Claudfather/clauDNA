@@ -443,4 +443,17 @@ Epic-level (each phase doc carries its own):
 
 ## Phase issues
 
-(appended after filing — `| Phase | Issue | Track |`)
+Epic: [#197](https://github.com/Claudfather/clauDNA/issues/197) · Plan-docs PR: #196
+
+| Phase | Issue | Track |
+|---|---|---|
+| P1 — publish two-plane router | #198 | A |
+| P2 — vocabulary SSOT | #199 | A |
+| P3 — init-project vault seam | #200 | A |
+| P4 — `/claudron` engine + engine contract | #201 | B |
+| P5 — remember/learn engine preference | #202 | B |
+| P6 — reflect + stacking contract | #203 | B |
+| P7 — notes/lessons disposition | #204 | B |
+
+No decision riders — the panel's open questions were folded into forks F1–F6, which
+ratify on #197.
