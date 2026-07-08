@@ -5,6 +5,8 @@ All notable changes to clauDNA are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
 ## [0.14.0] - 2026-07-07
 ### Added
 - **`/promotion-intake` — the Claudosseum importer ([#103](https://github.com/Claudfather/clauDNA/issues/103), the roadmap's declared next build; the importer half of [#33](https://github.com/Claudfather/clauDNA/issues/33)).** Consumes a promotion package (path or URL), validates it with `scripts/validate-promotion-package.py --json` as the single source of contract truth (never re-implementing a rule), and on a clean pass stages the skill byte-identical under `skills/<name>/`, appends a provenance CHANGELOG entry, re-runs the repo gates locally, and opens the PR via `/claudna:commit-push-pr` (`feat: promote /claudna:<name> from Claudosseum arena`). Any failure — acquisition, contract, or repo gates — emits `outcome: blocked` with the verbatim failures in `errors[]`. `--dry-run` validates without writing; `--auto` is the headless entry point for Claudosseum's automation, with the PR itself as the human gate. Never merges, never bumps versions. Catalog: 37 → 38.
