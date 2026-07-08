@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **`--to disk` renamed `--to vault`** (the adapter's true target: the shared-docs vault). `disk` stays as a deprecated alias for exactly one release — warn once, continue as `vault`. Scoping note for the house deprecation doctrine: hard-removal-no-stubs applies to *picker entries*; adapter *flag values* callers may have scripted get a one-release grace window (the v0.2.0 stranding incident is the precedent for the grace).
+
+## [0.15.0] - 2026-07-08
+### Changed
 - **Legacy planning docs use placeholder repo slugs in examples.** The 2026-05 archive/planning/spec docs referenced a real external organization's repositories in worked examples and test scaffolding (17 occurrences across 6 files); examples now use `example-org/*` placeholders. `CLAUDE.md`'s local-testing instruction likewise uses `<path-to-this-repo>` instead of a personal absolute path. Doc surfaces only — no skill, contract, or script content changed.
 
 ### Added
