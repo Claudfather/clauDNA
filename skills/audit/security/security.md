@@ -40,7 +40,7 @@ Do NOT proceed to Phase 2 without explicit confirmation.
 
 ## Phase 2: Remediation Plans
 
-**Output location:**
+**Output lands in:**
 ```
 documentation/planning/security/<session_name>_<YYYY-MM-DD>/
 ├── 00_SECURITY_AUDIT.md
@@ -48,6 +48,8 @@ documentation/planning/security/<session_name>_<YYYY-MM-DD>/
 ├── 02_<remediation-slug>.md
 └── ...
 ```
+
+Plan agents write the family to the session's scratch docs directory (`/tmp/security-audit-<YYYY-MM-DD_HHMMSS>/docs/`); the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/security/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide, Section 3).
 
 > **Archive convention:** See orchestration guide, Section 8.
 
@@ -94,7 +96,7 @@ Follow Section 9 of the orchestration guide (`skills/_shared/orchestration-guide
 
 ## Phase 2.5: Adversarial Review Pass
 
-Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. The adversarial-review `--dispatch` output is markdown with YAML frontmatter per `skills/_shared/contracts/lens-result-contract.md` — parse `status` from frontmatter and findings from body sections. Run on each remediation doc in `documentation/planning/security/<session>/<NN>_*.md` and the master `00_SECURITY_AUDIT.md`. Apply in all output modes and `--auto`.
+Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. The adversarial-review `--dispatch` output is markdown with YAML frontmatter per `skills/_shared/contracts/lens-result-contract.md` — parse `status` from frontmatter and findings from body sections. Run on each remediation doc (`<NN>_*.md`) and the master `00_SECURITY_AUDIT.md` in the session's scratch docs directory, before the family is published to `documentation/planning/security/<session>/`. Apply in all output modes and `--auto`.
 
 ### Security-specific rules
 
@@ -160,7 +162,7 @@ Then tell the user:
 Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Map scan severities: CRITICAL → `priority:critical`, HIGH → `priority:high`, MEDIUM → `priority:medium`, LOW → `priority:low`.
 - For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs`: follow the subagent workflow in the orchestration guide
+- For `docs`: follow the subagent workflow in the orchestration guide (publish step: `--dir documentation/planning/security/<session_name>_<YYYY-MM-DD>/`)
 
 After creating issues, present the batch summary and return issue URLs for audit tracking.
 

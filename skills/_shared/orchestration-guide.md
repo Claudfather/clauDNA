@@ -255,7 +255,7 @@ When a skill's doc generation step (typically the final step) delegates to Plan 
 > - Archive convention (Section 8)
 > - Pre-handoff adversarial review (`skills/_shared/pre-handoff-checklist.md`)
 >
-> Plan agents read research from the session's scratch directory, write docs directly to the output directory, and return only a metadata summary.
+> Plan agents read research from the session's scratch directory, write docs into the scratch docs directory (the orchestrator publishes the family via `/claudna:publish --to docs` — §3), and return only a metadata summary.
 >
 > **The orchestrator MUST NOT write docs itself.** Always delegate to Plan subagents.
 

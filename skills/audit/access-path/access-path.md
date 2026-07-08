@@ -135,7 +135,7 @@ Do NOT proceed to Phase 2 without explicit confirmation.
 
 ## Phase 2: Remediation Plans
 
-**Output location:**
+**Output lands in:**
 ```
 documentation/planning/access-paths/<session_name>_<YYYY-MM-DD>/
 ├── 00_ACCESS_PATH_AUDIT.md
@@ -143,6 +143,8 @@ documentation/planning/access-paths/<session_name>_<YYYY-MM-DD>/
 ├── 02_<remediation-slug>.md
 └── ...
 ```
+
+Plan agents write the family to the session's scratch docs directory (`/tmp/access-path-audit-<YYYY-MM-DD_HHMMSS>/docs/`); the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/access-paths/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide, Section 3).
 
 > **Archive convention:** See orchestration guide, Section 8.
 
@@ -195,7 +197,7 @@ This lens supports `--output github`, `--output session` (the engine default, co
 Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Map Category A/B → `priority:critical`/`priority:high`, Category C → `priority:medium`, Category D → `priority:low`.
 - For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs`: follow the subagent workflow in the orchestration guide
+- For `docs`: follow the subagent workflow in the orchestration guide (publish step: `--dir documentation/planning/access-paths/<session_name>_<YYYY-MM-DD>/`)
 
 After creating issues, present the batch summary and return issue URLs for audit tracking.
 
@@ -203,7 +205,7 @@ After creating issues, present the batch summary and return issue URLs for audit
 
 ## Phase 2.5: Adversarial Review Pass
 
-Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. Run on each remediation doc in `documentation/planning/access-paths/<session>/<NN>_*.md` and `00_ACCESS_PATH_AUDIT.md`.
+Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. Run on each remediation doc (`<NN>_*.md`) and `00_ACCESS_PATH_AUDIT.md` in the session's scratch docs directory, before the family is published to `documentation/planning/access-paths/<session>/`.
 
 ### Access-path-specific concern areas
 

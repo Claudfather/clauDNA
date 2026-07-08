@@ -64,7 +64,7 @@ Present findings and cascade diagram. Ask: **"Would you like me to generate reme
 
 ## Phase 4: Remediation Plans
 
-Ask the user for a short session name (e.g., `explain-page-flicker`). Output to `documentation/planning/performance/<session_name>_<YYYY-MM-DD>/`. Archive convention: orchestration guide, Section 8.
+Ask the user for a short session name (e.g., `explain-page-flicker`). Output lands in `documentation/planning/performance/<session_name>_<YYYY-MM-DD>/` — Plan agents write the family to the session's scratch docs directory and the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir <that target>` (family mode; orchestration guide Section 3). Archive convention: orchestration guide, Section 8.
 
 **00_PERF_AUDIT.md** — Master audit: date, scope, symptom, architecture summary, findings table, cascade diagram, priority order, grouping rationale, dependency matrix.
 
@@ -78,7 +78,7 @@ After generating docs: **"Plans are ready for review. Run `/claudna:implement-pl
 
 ## Phase 4.5: Adversarial Review Pass
 
-Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. Run on each phase doc in `documentation/planning/performance/<session>/<NN>_*.md` and `00_PERF_AUDIT.md`.
+Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. Run on each phase doc (`<NN>_*.md`) and `00_PERF_AUDIT.md` in the session's scratch docs directory, before the family is published to `documentation/planning/performance/<session>/`.
 
 ### Performance-specific concern areas
 
@@ -108,7 +108,7 @@ Follow the output guide at `skills/_shared/output-guide.md`. Beyond the shared `
 
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Apply `performance` label. Map severity levels to priority labels. Group issues by cascade chain where applicable.
 - For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs`: follow the subagent workflow in the orchestration guide
+- For `docs`: follow the subagent workflow in the orchestration guide (publish step: `--dir documentation/planning/performance/<session_name>_<YYYY-MM-DD>/`)
 
 After creating issues, present the batch summary and return issue URLs for audit tracking.
 

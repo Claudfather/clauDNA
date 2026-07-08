@@ -149,7 +149,7 @@ Ask: "Would you like me to generate detailed tech debt documentation and phased 
 
 **Exit Plan Mode.** Call `ExitPlanMode` to transition to execution mode. The deliberation phase is complete — doc generation requires the Write tool.
 
-If yes, ask the user for a **short session name** (e.g., `api-cleanup`, `db-layer`) or derive one from the focus area. All output goes into:
+If yes, ask the user for a **short session name** (e.g., `api-cleanup`, `db-layer`) or derive one from the focus area. Output lands in:
 
 ```
 documentation/planning/tech_debt/<session_name>_<YYYY-MM-DD>/
@@ -158,6 +158,8 @@ documentation/planning/tech_debt/<session_name>_<YYYY-MM-DD>/
 ├── 02_<remediation-slug>.md
 └── ...
 ```
+
+Plan agents write the family to the session's scratch docs directory (`/tmp/tech-debt-<YYYY-MM-DD_HHMMSS>/docs/`); the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/tech_debt/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide, Section 3).
 
 > **Archive convention:** See orchestration guide, Section 8.
 
@@ -199,7 +201,7 @@ Follow Section 9 of the orchestration guide (`skills/_shared/orchestration-guide
 
 ## Phase 2.5: Adversarial Review Pass
 
-Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. The adversarial-review `--dispatch` output is markdown with YAML frontmatter per `skills/_shared/contracts/lens-result-contract.md` — parse `status` from frontmatter and findings from body sections. Run on each phase doc in `documentation/planning/tech_debt/<session>/<NN>_*.md` and the master `00_TECH_DEBT.md`. Apply in all output modes and `--auto`.
+Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. The adversarial-review `--dispatch` output is markdown with YAML frontmatter per `skills/_shared/contracts/lens-result-contract.md` — parse `status` from frontmatter and findings from body sections. Run on each phase doc (`<NN>_*.md`) and the master `00_TECH_DEBT.md` in the session's scratch docs directory, before the family is published to `documentation/planning/tech_debt/<session>/`. Apply in all output modes and `--auto`.
 
 ---
 
@@ -210,7 +212,7 @@ Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. The adv
 Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Map scan priorities: High → `priority:high`, Medium → `priority:medium`, Low → `priority:low`.
 - For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs`: follow the subagent workflow in the orchestration guide
+- For `docs`: follow the subagent workflow in the orchestration guide (publish step: `--dir documentation/planning/tech_debt/<session_name>_<YYYY-MM-DD>/`)
 
 After creating issues, present the batch summary and return issue URLs for audit tracking.
 

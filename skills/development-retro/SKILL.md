@@ -149,7 +149,7 @@ This skill supports `--output github` and `--output session` in addition to the 
 Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Create one issue per systemic pattern or breadcrumb trail that warrants follow-up work. Label with `auto-audit` and `tech-debt` or `enhancement` as appropriate.
 - For `session` (default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs`: write the retro to `documentation/planning/retros/<session_name>_<YYYY-MM-DD>/`
+- For `docs`: author the retro as a publishable doc in scratch, then `/claudna:publish <file> --to docs --dir documentation/planning/retros/<session_name>_<YYYY-MM-DD>/`
 
 ---
 

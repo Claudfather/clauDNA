@@ -202,7 +202,7 @@ When `--auto` is set:
 Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: write each finding/play as a doc (frontmatter + Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish dedups and applies labels from `tags:`
 - For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs` (default): write to `documentation/planning/product-vision/<session_name>_<YYYY-MM-DD>/`
+- For `docs` (default): author the vision report as a publishable doc in scratch, then `/claudna:publish <file> --to docs --dir documentation/planning/product-vision/<session_name>_<YYYY-MM-DD>/`
 
 ---
 
