@@ -1,8 +1,8 @@
 ---
 name: publish
 user-invocable: true
-description: "Use when a finished markdown document — plan, audit or review findings, retro, decision, or knowledge page — needs to reach its destination: shared docs on disk, a GitHub issue, a PR description, the chat session, or a Notion page. The single output sink: skills author content, publish delivers it."
-argument-hint: "<source-file> [--to disk|github-issue|github-pr|session|notion] [--update <issue#|url>] [--repo <name>] [--dry-run]"
+description: "Use when a finished markdown document — plan, audit or review findings, retro, decision, or knowledge page — needs to reach its destination: the shared-docs vault, the repo's documentation/ tree, a GitHub issue, a PR description, the chat session, or a Notion page. The single output sink: skills author content, publish delivers it."
+argument-hint: "<source-file-or-dir> [--to vault|docs|github-issue|github-pr|session|notion] [--dir <path>] [--update <issue#|url>] [--repo <name>] [--dry-run]"
 ---
 
 # Publish
@@ -14,8 +14,9 @@ Markdown-first, output-last. Takes a doc with frontmatter and publishes it to th
 ## Arguments
 
 Parse `$ARGUMENTS` at invocation:
-- **First positional arg:** Path to the source markdown file. Required.
-- `--to <dest>`: Destination adapter. One of: `disk` (default), `github-issue`, `github-pr`, `session`, `notion`.
+- **First positional arg:** Path to the source markdown file — or, for the docs adapter's family mode, a directory holding one `00_*.md` master plus `NN_*.md` phase docs. Required.
+- `--to <dest>`: Destination adapter. One of: `vault` (default), `docs`, `github-issue`, `github-pr`, `session`, `notion`. `disk` is a deprecated alias for `vault` (one release): warn once per invocation, then treat as `vault`.
+- `--dir <path>`: docs adapter only — the target directory under `documentation/` (the calling skill knows its category; registry in `skills/_shared/documentation-standard.md` §2). Required with `--to docs`.
 - `--update <issue#|url>`: Replace the named GitHub issue's body instead of creating anything. Implies `--to github-issue` — the only adapter with an update path — so `--to` may be omitted. See "In-place update" under the github-issue adapter.
 - `--repo <name>`: Target repository (for github adapters).
 - `--dry-run`: Show what would be published without doing it.
@@ -48,7 +49,7 @@ Type-dependent `status` values:
 | `runbook` | current, stale, superseded |
 | `audit`, `review` | draft, completed |
 
-Optional fields: `tags` (→ issue labels), `repos` (→ disk dir + repo inference), `links` (publish writes the destination URL back here), `updated`, `expires`, `description`.
+Optional fields: `tags` (→ issue labels), `repos` (→ vault dir + repo inference), `links` (publish writes the destination URL back here), `updated`, `expires`, `description`.
 
 ### 1b. Body skeleton (per `type:`)
 
@@ -59,13 +60,22 @@ The body must match the house-style skeleton for its `type:`. This is keyed off 
   **Hard gate:** the `## Implementation Plan` heading and its `### Steps` subsection MUST be present. This is the contract `/claudna:implement-plan --source github` depends on to tell an implementable issue from a findings-only one — without it, `--auto` implementation blocks. Reject the publish if missing.
 - **`decision`, `knowledge`, `runbook`** — require a non-trivial body (not just frontmatter) and a leading `#`/`##` heading. No fixed section gate (see `skills/_shared/documentation-standard.md`); validate presence, not structure.
 
+**Family mode exception (docs adapter, directory source):** a `00_*.md` master doc validates like the knowledge tier — frontmatter + non-trivial body + leading heading, no §4.1 skeleton gate — even when its `type:` is `audit`/`review`/`plan`. Masters are inventories and dependency matrices, not implementation plans; the skeleton hard gate exists for implement-plan readiness, which is a property of the `NN_*` phase docs (which validate in full). This exemption is the design, not a workaround.
+
 ---
 
 ## Step 2: Route to Adapter
 
-### Adapter: disk (default)
+Two disk-backed adapters serve two different planes — the plane doctrine and which-door table live in `skills/_shared/documentation-standard.md`:
 
-Write the doc to the appropriate shared docs directory based on the `type:` field:
+- **`vault`** → the shared-docs vault (cross-project referential knowledge; INDEX-discovered)
+- **`docs`** → the current repo's `documentation/` tree (work-in-flight + repo-coupled records; git/PR-discovered)
+
+### Adapter: vault (default)
+
+*(`--to disk` is the deprecated alias — warn once, continue as `vault`.)*
+
+Write the doc to the appropriate shared-docs vault directory based on the `type:` field:
 
 | Type | Destination |
 |------|-------------|
@@ -75,11 +85,24 @@ Write the doc to the appropriate shared docs directory based on the `type:` fiel
 | runbook | `shared/runbooks/` |
 | audit, review | `shared/planning/active/` |
 
-If the file already exists at the destination, compare and warn before overwriting (this is the disk adapter's dedup).
+If the file already exists at the destination, compare and warn before overwriting (this is the vault adapter's dedup).
+
+**Plane-fit advisory:** a `plan`/`audit`/`review` doc landing here gets a one-line note — "unusual plane for this type: work-in-flight planning usually belongs in the repo's `documentation/` tree (docs adapter)". Advisory only, never a block — fleet workflows legitimately share plans vault-side.
 
 After writing:
 1. Run `/claudna:index` on the destination directory to update INDEX.md.
 2. Report the file path written.
+
+### Adapter: docs
+
+Write the doc — or doc family — into the current repo's `documentation/` tree, the per-project plane. The author produces its output in a scratch directory and hands it here; publish is the single writer for this plane, same as every other.
+
+- `--dir <path>` is **required** and must resolve under `documentation/`. Reject anything outside it.
+- **Single-doc mode** (source is a file): validate per Step 1, write into `--dir`, report the path.
+- **Family mode** (source is a directory): the source holds one `00_*.md` master + `NN_*.md` phase docs (the shape forge F7 and the audit lenses produce). Loop per doc: phase docs validate against the full Step 1 contract including the §4.1 skeleton hard gate; the master validates under the family-mode exception (Step 1b). Any doc failing validation fails the whole family — report every error, write nothing (no partial families). On success, write all docs into `--dir` preserving filenames; report the directory and doc count.
+- **No INDEX step.** The docs plane is git/PR-discovered — never run `/claudna:index` here; INDEX.md is the vault plane's discovery layer.
+- **Dedup:** if a target file already exists, compare and warn before overwriting (same rule as the vault adapter).
+- **Plane-fit advisory:** a `knowledge`/`runbook` doc landing here gets a one-line note — "unusual plane for this type: cross-project reference knowledge usually belongs in the vault (default adapter)". Advisory only, never a block.
 
 ### Adapter: github-issue
 
@@ -158,7 +181,7 @@ Requires the Notion MCP server to be configured. If not available, report the er
 
 ## Step 3: Dry Run
 
-When `--dry-run` is set, show exactly what would happen without doing it (including the result of Step 1 validation):
+When `--dry-run` is set, show exactly what would happen without doing it (including the result of Step 1 validation, the resolved adapter/plane — with any plane-fit advisory — and, in family mode, the per-doc validation verdicts):
 
 ```
 Dry run: /claudna:publish doc.md --to github-issue --repo shuffify
