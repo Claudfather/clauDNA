@@ -6,7 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **`/publish --to docs` — the two-plane router lands ([#198](https://github.com/Claudfather/clauDNA/issues/198), epic [#197](https://github.com/Claudfather/clauDNA/issues/197) P1, fork F3).** Publish now serves both documentation planes: the new `docs` adapter writes the current repo's `documentation/` tree (`--dir` required, validated under `documentation/`; no INDEX step — that plane is git/PR-discovered), with a **family mode** for `00_*` + `NN_*` session directories where phase docs validate against the full §4.1 skeleton and the `00_*` master validates presence-only (masters are inventories, not implementation plans — the exemption is the design). Author skills and orchestration Plan agents now write to a scratch docs directory and publish places the family — publish is the single writer on every plane; `output-guide.md`'s long-standing §1 deferral ("Reconciling the two is its own change") is discharged. `documentation-standard.md` gains the plane doctrine (§10: two planes, one router, which-door table) and §2 becomes the `--dir` registry. Cross-plane publishes get a plane-fit advisory (never a block).
+
 ### Changed
+- **`--to disk` renamed `--to vault`** (the adapter's true target: the shared-docs vault). `disk` stays as a deprecated alias for exactly one release — warn once, continue as `vault`. Scoping note for the house deprecation doctrine: hard-removal-no-stubs applies to *picker entries*; adapter *flag values* callers may have scripted get a one-release grace window (the v0.2.0 stranding incident is the precedent for the grace).
 - **Legacy planning docs use placeholder repo slugs in examples.** The 2026-05 archive/planning/spec docs referenced a real external organization's repositories in worked examples and test scaffolding (17 occurrences across 6 files); examples now use `example-org/*` placeholders. `CLAUDE.md`'s local-testing instruction likewise uses `<path-to-this-repo>` instead of a personal absolute path. Doc surfaces only — no skill, contract, or script content changed.
 
 ### Added
