@@ -50,6 +50,8 @@ The output target is a persistence decision, not a quality decision.
 ## 3. The Publishable Doc — Frontmatter
 
 > **SSOT: [Claudron `SCHEMA.md`](https://github.com/Claudfather/Claudron/blob/main/SCHEMA.md)** (ratified with Claudron 0.2.0, enforced in code by `claudron validate`). The table below is publish's operational summary of that contract. Deltas worth knowing: Claudron adds `archived` as a terminal status for every type; accepts `active` on knowledge/runbook as a legacy alias for `current` (warns, never errors on adopted docs); and adds an optional `maturity: draft | verified | canonical` trust axis, orthogonal to `status` — agent-written notes enter as `maturity: draft`. The body skeleton (Section 4.1) remains this guide's own contract.
+>
+> **Claudron is not required.** This table remains the complete contract `/claudna:publish` enforces, and no skill invokes `claudron` at runtime — the SSOT link governs where vocabulary *changes* are ratified, not what users must install. Docs written without Claudron adopt cleanly later: its lenient tier accepts this vocabulary as-is (warnings at most, never errors).
 
 Every doc an author hands to `/claudna:publish` carries YAML frontmatter. Publish validates these (and rejects malformed docs):
 
