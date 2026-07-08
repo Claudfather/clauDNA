@@ -16,6 +16,7 @@ Markdown-first, output-last. Takes a doc with frontmatter and publishes it to th
 Parse `$ARGUMENTS` at invocation:
 - **First positional arg:** Path to the source markdown file. Required.
 - `--to <dest>`: Destination adapter. One of: `disk` (default), `github-issue`, `github-pr`, `session`, `notion`.
+- `--update <issue#|url>`: Replace the named GitHub issue's body instead of creating anything. Implies `--to github-issue` — the only adapter with an update path — so `--to` may be omitted. See "In-place update" under the github-issue adapter.
 - `--repo <name>`: Target repository (for github adapters).
 - `--dry-run`: Show what would be published without doing it.
 
@@ -88,7 +89,7 @@ After writing:
 gh issue list --repo <owner>/<repo> --search "<key terms from title/tags/files>" --state open --limit 20
 ```
 
-- Exact match → skip, report the existing issue URL.
+- Exact match → prefer offering `--update` of the existing issue (§4.5); skip and report its URL only if the caller declines.
 - Related but different → create and add `Related: #NNN` to the body.
 - Same pattern, different location → prefer adding to an umbrella issue.
 
