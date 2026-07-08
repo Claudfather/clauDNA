@@ -2,7 +2,7 @@
 
 Shared reference for planning skills that support `--output <target>`. Skills reference this file at `skills/_shared/output-guide.md`.
 
-**Author writes content → `/claudna:publish` enforces + routes.** Skills are *authors*: they run their analysis and produce a markdown doc with valid frontmatter and the house-style body skeleton (defined below). They never call `gh` themselves. `/claudna:publish` is the *publisher*: it validates the doc against this spec, dedups per-medium, and routes it to the chosen edition. This guide is the canonical house-style spec — skills read it for *what to produce*, and `/claudna:publish` reads it for *what to enforce*.
+**Author writes content → `/claudna:publish` enforces + routes.** Skills are *authors*: they run their analysis and produce a markdown doc with valid frontmatter and the house-style body skeleton (defined below). They never call `gh` themselves. `/claudna:publish` is the *publisher*: it validates the doc against this spec, dedups per-medium, and routes it to the chosen edition. This guide is the canonical spec for **body structure and publish routing**; the **frontmatter vocabulary** (types, per-type status values, optional fields) is ratified in [Claudron `SCHEMA.md`](https://github.com/Claudfather/Claudron/blob/main/SCHEMA.md) — Section 3 summarizes it, changes to it PR Claudron first.
 
 ---
 
@@ -48,6 +48,8 @@ The output target is a persistence decision, not a quality decision.
 ---
 
 ## 3. The Publishable Doc — Frontmatter
+
+> **SSOT: [Claudron `SCHEMA.md`](https://github.com/Claudfather/Claudron/blob/main/SCHEMA.md)** (ratified with Claudron 0.2.0, enforced in code by `claudron validate`). The table below is publish's operational summary of that contract. Deltas worth knowing: Claudron adds `archived` as a terminal status for every type; accepts `active` on knowledge/runbook as a legacy alias for `current` (warns, never errors on adopted docs); and adds an optional `maturity: draft | verified | canonical` trust axis, orthogonal to `status` — agent-written notes enter as `maturity: draft`. The body skeleton (Section 4.1) remains this guide's own contract.
 
 Every doc an author hands to `/claudna:publish` carries YAML frontmatter. Publish validates these (and rejects malformed docs):
 
