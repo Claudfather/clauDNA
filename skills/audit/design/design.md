@@ -80,7 +80,7 @@ Ask: **"Which would you like me to design? Pick by number or adjust."** Wait for
 
 ### Step 6: Generate Phased Design Docs
 
-Output lands in `documentation/planning/phases/<session_name>_<YYYY-MM-DD>/` — Plan agents write the family to the session's scratch docs directory and the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir <that target>` (family mode; orchestration guide Section 3). Overview + numbered docs (1 PR each). Orchestration guide Section 9.
+Output lands in `documentation/planning/phases/<session_name>_<YYYY-MM-DD>/` — Plan agents write the family to the session's scratch docs directory and the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/phases/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide Section 3). Overview + numbered docs (1 PR each). Orchestration guide Section 9.
 
 Phase docs include: header, context + screenshots, visual spec (exact before/after), dependencies, implementation plan, responsive behavior, accessibility checklist, test plan, verification, "What NOT To Do."
 

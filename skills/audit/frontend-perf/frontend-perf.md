@@ -64,7 +64,7 @@ Present findings and cascade diagram. Ask: **"Would you like me to generate reme
 
 ## Phase 4: Remediation Plans
 
-Ask the user for a short session name (e.g., `explain-page-flicker`). Output lands in `documentation/planning/performance/<session_name>_<YYYY-MM-DD>/` — Plan agents write the family to the session's scratch docs directory and the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir <that target>` (family mode; orchestration guide Section 3). Archive convention: orchestration guide, Section 8.
+Ask the user for a short session name (e.g., `explain-page-flicker`). Output lands in `documentation/planning/performance/<session_name>_<YYYY-MM-DD>/` — Plan agents write the family to the session's scratch docs directory and the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/performance/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide Section 3). Archive convention: orchestration guide, Section 8.
 
 **00_PERF_AUDIT.md** — Master audit: date, scope, symptom, architecture summary, findings table, cascade diagram, priority order, grouping rationale, dependency matrix.
 

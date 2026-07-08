@@ -147,7 +147,7 @@ The orchestrator session is long-running and must stay within context limits. Th
 ### Launching Plan agents
 
 - Launch ALL Plan agents in parallel using `run_in_background: true`
-- Each Plan agent writes its output directly to disk via the Write tool
+- Each Plan agent writes its output to the scratch docs directory via the Write tool
 - Collect Plan agent completions via TaskOutput one at a time
 - Each TaskOutput response contains only the metadata summary (not the full doc)
 - After all agents complete, present the summary table to the user

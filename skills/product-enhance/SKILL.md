@@ -126,7 +126,7 @@ Compare Step 2 answers against Step 1B findings via **Explore subagents** (disk-
 
 ### Step 5: Generate Phased Design Docs
 
-Output lands in `documentation/planning/phases/<session_name>_<YYYY-MM-DD>/`, prefixed `01_`, `02_` by implementation order — Plan agents write the family to the session's scratch docs directory and the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir <that target>` (family mode; Section 3). `00_OVERVIEW.md`: context, dependency graph, parallel phases, total effort. Archive per Section 8; Plan agents per Section 9, reading from scratch research dir. Plan agents must also read `skills/_shared/planning-standard.md`.
+Output lands in `documentation/planning/phases/<session_name>_<YYYY-MM-DD>/`, prefixed `01_`, `02_` by implementation order — Plan agents write the family to the session's scratch docs directory and the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/phases/<session_name>_<YYYY-MM-DD>/` (family mode; Section 3). `00_OVERVIEW.md`: context, dependency graph, parallel phases, total effort. Archive per Section 8; Plan agents per Section 9, reading from scratch research dir. Plan agents must also read `skills/_shared/planning-standard.md`.
 
 Present a `Product Enhancement Summary`, then direct user to `/claudna:implement-plan`. **This skill produces plans, not code.**
 
