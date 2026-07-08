@@ -12,11 +12,11 @@ Planning skills support three output targets. The target controls **where** the 
 
 | Target | Flag | Routing | Behavior |
 |---|---|---|---|
-| `docs` | (default, no flag needed) | _written directly_ | Write phased planning docs to `documentation/planning/<skill>/<session>_<date>/` (as today) |
+| `docs` | (default, no flag needed) | `/claudna:publish --to docs --dir <category-dir>` | Author writes the doc (or `00_*` + `NN_*` family) to a scratch directory; publish validates and places it under `documentation/planning/<skill>/<session>_<date>/` |
 | `github` | `--output github` | `/claudna:publish --to github-issue` | Create a GitHub issue from the doc |
 | `session` | `--output session` | `/claudna:publish --to session` | Print the doc body back into the chat, no persistence |
 
-**The `github` and `session` targets route through `/claudna:publish`.** The default `docs` target still writes phased planning docs to `documentation/planning/` directly — unifying it through publish's `--to disk` adapter is **deferred**, because publish's disk adapter targets the shared-docs vault (`shared/planning/active/`), a different destination than per-project `documentation/planning/`. Reconciling the two is its own change.
+**Every target routes through `/claudna:publish` — the docs plane included.** Publish serves two disk planes with two adapters: `--to docs` writes the current repo's `documentation/` tree (work-in-flight, repo-coupled, git/PR-discovered), and `--to vault` (the default adapter; formerly `disk`) writes the shared-docs vault (`shared/…`, cross-project, INDEX-discovered). The plane doctrine — what belongs where, and which door each writing skill is — lives in `skills/_shared/documentation-standard.md`. For a multi-doc session directory, the docs adapter's **family mode** validates phase docs in full and the `00_*` master under the presence-only exemption (see `skills/publish/SKILL.md` Step 1b).
 
 **All targets use Plan Mode** for the deliberation phase.
 
@@ -40,7 +40,7 @@ Regardless of output target, every skill must:
 
 1. **Run the full analysis pipeline.** No phases are skipped based on output target. The scan, analysis, and plan generation phases all execute identically.
 2. **Produce a publishable doc.** Each unit of output is a markdown file with the frontmatter (Section 3) and the body skeleton (Section 4) below. Every finding includes before/after code examples, step-by-step instructions, a verification checklist, and "What NOT To Do" guidance.
-3. **Delegate GitHub/session output to `/claudna:publish`.** Never run `gh issue create` / `gh pr create` directly. For `--output github` or `--output session`, invoke `/claudna:publish <file> --to <edition>` (mapping in Section 1) — publish handles validation, dedup, labels, and the destination. For the default `docs` target, write the doc to `documentation/planning/` directly (see Section 1 note).
+3. **Delegate ALL output to `/claudna:publish`.** Never run `gh issue create` / `gh pr create` directly, and never write into `documentation/` directly. For `--output github` or `--output session`, invoke `/claudna:publish <file> --to <edition>` (mapping in Section 1). For the default `docs` target, write the doc(s) to a scratch directory and invoke `/claudna:publish <scratch-file-or-dir> --to docs --dir <category-dir>` — publish handles validation (family mode for `00_*` + `NN_*` directories), dedup, and placement.
 4. **Use Plan Mode for deliberation.** Enter Plan Mode before analysis begins. Exit Plan Mode when transitioning to writing the doc + publishing.
 
 The output target is a persistence decision, not a quality decision.
@@ -63,7 +63,7 @@ Every doc an author hands to `/claudna:publish` carries YAML frontmatter. Publis
 | `owner` | The skill or user that produced it. |
 | `created` | `YYYY-MM-DD`. |
 | `tags` | Labels to apply (github-issue edition maps these → `--label`). Use the taxonomy in Section 4.3. |
-| `repos` | Target repo(s); a single value lets the github/disk adapters infer destination. |
+| `repos` | Target repo(s); a single value lets the github/vault adapters infer destination. |
 | `links` | Publish writes the destination URL back here after publishing. |
 
 ---
@@ -182,7 +182,7 @@ The author does **not** dedup. The `github-issue` adapter of `/claudna:publish` 
 - **Similar pattern, different location**: Prefer one umbrella issue listing all locations.
 - **Previously closed**: If it recurred, reopen with a comment; if a new instance, create referencing the old.
 
-(Disk dedup = compare-and-warn on an existing file; session has no dedup.)
+(Vault and docs dedup = compare-and-warn on an existing file; session has no dedup.)
 
 ### 4.6. Batch Creation Pattern
 
@@ -250,7 +250,7 @@ In the skill's Arguments section:
 ```
 - `--output github`: Write findings and plans as GitHub Issues (via /claudna:publish). See output guide (`skills/_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
-- Default (no flag): Write planning docs to disk.
+- Default (no flag): Publish planning docs to the repo's documentation/ tree (via /claudna:publish).
 ```
 
 In the skill's output section:
@@ -260,12 +260,12 @@ In the skill's output section:
 This skill supports `--output github` and `--output session` in addition to the default `docs` target.
 
 Produce each unit of output as a markdown doc with frontmatter + the body skeleton in
-`skills/_shared/output-guide.md`, then delegate to `/claudna:publish`:
+`skills/_shared/output-guide.md` (written to a scratch directory), then delegate to `/claudna:publish`:
 - `--output github` → `/claudna:publish <file> --to github-issue --repo <repo>` (Section 4)
 - `--output session` → `/claudna:publish <file> --to session` (Section 5)
-- `docs` (default) → write to `documentation/planning/<skill>/<session>_<date>/` directly (publish-disk unification deferred, see Section 1)
+- `docs` (default) → `/claudna:publish <scratch-file-or-dir> --to docs --dir documentation/planning/<skill-category>/<session>_<date>/` (family mode for 00_ + NN_ directories; Section 1)
 
-Never call `gh` directly for GitHub output — `/claudna:publish` owns validation, dedup, labels, and routing.
+Never call `gh` directly and never write into `documentation/` directly — `/claudna:publish` owns validation, dedup, labels, and routing on every plane.
 
 [Skill-specific output notes, if any]
 ```
