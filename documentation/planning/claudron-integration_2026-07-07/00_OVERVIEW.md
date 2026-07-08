@@ -210,7 +210,13 @@ Phase-by-phase; each phase is one PR, detailed in its own doc:
    already-initialized repos, an idempotent-by-dedup migration guide, the semver
    statement, and a named breakage-report channel for the bake.
 
-## Decision Forks
+## Decision Forks — ALL LOCKED 2026-07-08
+
+Ratified in the #197 comment ledger (`[FORK-LOCK F1]`…`[FORK-LOCK F6]`, most-recent-marker-wins):
+**F1(a)** CLI-first · **F2(a)** engine shape · **F3(a)** two planes, one router · **F4(b)
+soft preference — diverges from the lean; see the amended P7** · **F5(a)** engine field +
+`errors[]` · **F6(a)** clauDNA ships the skills. Original fork texts retained below for
+the record.
 
 ### Fork F1: Engine door — CLI-first or MCP-first
 - **Context:** Claudron exposes the same engine twice: CLI (`recall`/`capture`, E2,
@@ -226,9 +232,8 @@ Phase-by-phase; each phase is one PR, detailed in its own doc:
   rides E1's ratified CLI contract. MCP adds in-context *discovery*, which clauDNA
   skills don't need. (b) couples the epic to G1's ordering risk. (c) is (a) plus a probe
   sentence — allowed as prose; the *contract floor* is the CLI.
-- **Ratifier:** Chris · **Status: open**
-- **Consequence:** P4–P7 gate on Claudron 0.2.0, not E3. Under (b), Track B re-gates on
-  E3/G1.
+- **Ratifier:** Chris · **Status: LOCKED (a) 2026-07-08**
+- **Consequence (binding):** P4–P7 gate on Claudron 0.2.0, not E3.
 
 ### Fork F2: Write-door shape — `/claudron` engine or `/claudron-write` skill
 - **Context:** the archived design doc (PR #88) named "`/claudron-write` (or
@@ -239,7 +244,7 @@ Phase-by-phase; each phase is one PR, detailed in its own doc:
   room for more) · **(b) single-purpose `/claudron-write`**.
 - **Lean: (a)** — contract-conformant, and the `read` verb (added at panel insistence,
   see F4) has a natural home.
-- **Ratifier:** Chris · **Status: open**
+- **Ratifier:** Chris · **Status: LOCKED (a) 2026-07-08**
 
 ### Fork F3: Doc-planes end state
 - **Context:** `output-guide.md:19` — the deferred reconciliation between per-project
@@ -252,7 +257,7 @@ Phase-by-phase; each phase is one PR, detailed in its own doc:
   travels with the repo, public when the repo is; the vault is private, cross-project,
   lifecycle-managed. (b) moves public-repo design docs into a private vault; (c) is the
   current confusion with a second substrate arriving. (a) adds routing, removes nothing.
-- **Ratifier:** Chris · **Status: open**
+- **Ratifier:** Chris · **Status: LOCKED (a) 2026-07-08** — P1 (#198) cleared to start
 
 ### Fork F4: `/notes` + `/lessons` disposition
 - **Context:** #106/#107 defer disposition until a Claudron equivalent ships; P4–P6 are
@@ -274,8 +279,14 @@ Phase-by-phase; each phase is one PR, detailed in its own doc:
 - **Lean: (a), but it is a genuine call** — (b) is the honest runner-up if the ratifier
   weighs the standalone-user regression heavier than the two-writers-one-data-shape
   cost. Per-repo `.claude/lessons.md` is repo-plane and survives under every option.
-- **Ratifier:** Chris · **Status: open** · **Gate: locks before P7 starts (not before
-  Track B generally).**
+- **Ratifier:** Chris · **Status: LOCKED (b) 2026-07-08 — the runner-up taken over the
+  lean.** Standalone-user regression judged heavier than the two-writers cost at this
+  maturity. Binding consequences: `/notes` + `/lessons` **stay** and gain vault
+  preference (engine-routed saves when a vault is detected; unchanged otherwise); the
+  migration guide ships as *optional* guidance; **hard removal re-files as its own
+  future issue** gated on adoption evidence (the F5 `engine` field is that signal);
+  #106/#107 stay open with the soft-preference disposition; #192 is no longer a
+  prerequisite of this epic; P7 reshapes M→S.
 
 ### Fork F5: `--auto` visibility of the engine door
 - **Context:** structured results currently carry no signal of which door served a run
@@ -287,7 +298,8 @@ Phase-by-phase; each phase is one PR, detailed in its own doc:
 - **Lean: (a)** (amended from artifacts-only at panel insistence). Claudron's own
   `events.jsonl` instruments the engine side; clauDNA surfaces only what orchestrators
   must see. **Gate: locks before P4 merges** (P4 implements it).
-- **Ratifier:** Chris · **Status: open**
+- **Ratifier:** Chris · **Status: LOCKED (a) 2026-07-08** — added weight post-F4(b): the
+  `engine` field is the adoption-evidence signal the deferred removal issue will cite
 
 ### Fork F6: Integration-surface ownership (panel-added)
 - **Context:** the adversarial lens's strongest alternative — Claudron could ship the
@@ -306,7 +318,8 @@ Phase-by-phase; each phase is one PR, detailed in its own doc:
   claudron-engine.md) is needed regardless. But this is a real placement decision the
   ratifier should make consciously; under (b), P4 shrinks to claudron-engine.md only and
   P7's replacement surface becomes a Claudron deliverable.
-- **Ratifier:** Chris · **Status: open**
+- **Ratifier:** Chris · **Status: LOCKED (a) 2026-07-08** — ownership inversion declined
+  with the written rebuttal above; Claudron's own hook pack coexists via the P6 contract
 
 ## Companion Plans
 
@@ -342,11 +355,11 @@ Phase-by-phase; each phase is one PR, detailed in its own doc:
 | P4 — `/claudron` engine + engine contract | L | Claudron 0.2.0 tag + re-confirmation checkpoint | F1, F2, F5, F6 locked | P2 |
 | P5 — remember/learn engine preference | M | P4 merged | — | P6 |
 | P6 — reflect + stacking contract | M | P4 merged; contract posted before Claudron E2 PR3 merges | — | P5 |
-| P7 — notes/lessons disposition | M | P4–P6 released; #192 gate merged; adoption evidence | F4 locked | — |
+| P7 — notes/lessons soft preference (F4(b)) | S (was M) | P4–P6 released | F4 LOCKED (b) | — |
 
 Critical path: P1 → P3 (Track A, can start now; independently ratifiable) and
 0.2.0 → P4 → P5/P6 → P7 (Track B). Releases are per-phase with CHANGELOG discipline;
-P7 is the only deletion release. Filing posture: the whole family files now; Track B
+under F4(b) this epic contains **no deletion release** — removal re-files separately. Filing posture: the whole family files now; Track B
 phase issues carry the re-confirmation step 0 rather than waiting for the tag to file.
 
 ## Reconciliation (dispositions of overlapping open issues)
@@ -361,8 +374,9 @@ phase issues carry the re-confirmation step 0 rather than waiting for the tag to
 - **#112** (persist phase in protocols) — clauDNA half lands in **P6** (persist-nudge
   lines in `/session` handoff mode + `/review-work` post-verdict prose); claudlobby's
   `library/protocols/` half stays theirs. #112 closes at P6 with the pointer.
-- **#106 / #107** (lessons/notes boundary) — resolved by **P7** under fork F4; closing
-  comments record the capability reading of the wait condition explicitly.
+- **#106 / #107** (lessons/notes boundary) — **F4 locked (b)**: P7 ships soft
+  preference; both issues stay open pending adoption evidence; the capability reading
+  of the wait condition is endorsed for the replacement surface, removal deferred.
 - **#36** (`/index --fleet`) — **superseded at P5**: cross-repo query lands via the
   engine over `projects/<repo>/` tiers; fleet aggregation is engine-only **by design**
   (raw-tree fallback stays repo-local — stated in the close-out).
@@ -373,10 +387,12 @@ phase issues carry the re-confirmation step 0 rather than waiting for the tag to
 - **#116 / #159** (publish single-sink completion; §4.1 conformance audit) — **P1 is
   substantially their remaining work** (the author-skill sweep); partial-close notice
   at filing, closed or re-scoped when P1 lands.
-- **#114** (formalize the deprecation lifecycle) — P7 is the third execution of the F4
-  pattern; its ledger posts to #114 as the data point the formalization wants.
-- **#192** (removed-names gate: directory-resurrection check) — **hard-sequenced before
-  P7** (it is the resurrection guard for exactly this deletion).
+- **#114** (formalize the deprecation lifecycle) — the F4-pattern execution defers with
+  the removal (F4(b)); the future removal issue inherits the playbook and posts its
+  ledger to #114.
+- **#192** (removed-names gate: directory-resurrection check) — under F4(b) **no longer
+  a prerequisite of this epic** (nothing deletes here); remains the guard for the future
+  removal issue.
 - **#111** (expand /reflect triggers) — fed by P6's trigger prose; stays open.
 - **#41** (`/claudna:pull`) — distinct (publish-symmetric *fetch* of published docs, not
   vault recall); stays open, cross-referenced from P5.
@@ -404,7 +420,7 @@ Epic-level (each phase doc carries its own):
 
 ## Verification Checklist
 
-- [ ] Fork gates honored: F3 locked before P1 merges; F1/F2/F5/F6 before P4 merges; F4 before P7 starts
+- [x] Fork gates honored — all six locked 2026-07-08 in the #197 comment ledger (F1a/F2a/F3a/F4b/F5a/F6a)
 - [ ] `output-guide.md:19`'s deferral paragraph replaced by the two-plane routing table; forge's `--output docs` prose matches the shipped mechanism (P1)
 - [ ] Audit-skill family output (00_ master + NN_ phases) publishes through `--to docs` without tripping the Step 1b gate (P1)
 - [ ] Rendered vocabulary table carries its SCHEMA.md source stamp and a green drift check (P2)
@@ -413,8 +429,8 @@ Epic-level (each phase doc carries its own):
 - [ ] Engine calls validate the JSON envelope every call; degradation appears in `--auto` `errors[]` (P4/F5)
 - [ ] `/remember` reports its door both ways; fallback prose unchanged (P5)
 - [ ] One prompt per session-boundary event with both plugins installed; presence marker observable by a sibling hook (P6)
-- [ ] `/notes`+`/lessons` disposition executed per locked F4, with field-remediation guidance and the migration guide in the same release (P7)
-- [ ] #106/#107/#112/#36 closed with dispositions; #110/#50/#116/#159/#114/#192 carry their reconciliation comments
+- [ ] P7 per locked F4(b): vault preference live in `/notes`+`/lessons` bodies; optional migration guide shipped; removal issue filed separately when adoption evidence exists
+- [ ] #112/#36 closed with dispositions; #106/#107 carry the F4(b) soft-preference disposition (open pending adoption evidence); #110/#50/#116/#159/#114/#192 carry their reconciliation comments
 - [ ] Zero MCP servers shipped; zero writes to `~/.claude/settings.json` anywhere in the epic
 
 ## What NOT To Do
@@ -431,9 +447,9 @@ Epic-level (each phase doc carries its own):
   design; write doors refuse and point at `/claudna:skill-scaffold`.
 - **Don't let any engine write fail silently** — retry, then degrade loudly (fallback
   where one exists, explicit error where not).
-- **Don't deprecate `/notes`/`/lessons` before F4 is locked and its preconditions are
-  met** — removal without a working, *evidenced* replacement is the #106/#107 failure
-  mode.
+- **Don't remove `/notes`/`/lessons` in this epic** — F4 locked (b): they stay with
+  vault preference; removal is a future issue gated on adoption evidence (the
+  #106/#107 failure mode stays impossible).
 - **Don't treat the fallback as a second product** — it is frozen compatibility
   behavior; feature asks against it are redirected to the engine path.
 

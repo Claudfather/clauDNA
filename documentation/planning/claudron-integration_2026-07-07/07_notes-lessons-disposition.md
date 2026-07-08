@@ -1,5 +1,5 @@
 ---
-title: "[plan] P7: /notes + /lessons disposition — the boundary lands, with the trade-off priced (resolves #106/#107)"
+title: "[plan] P7: /notes + /lessons vault preference — F4 locked (b); removal deferred behind adoption evidence"
 type: plan
 status: draft
 owner: chris
@@ -10,7 +10,18 @@ repos: clauDNA
 links:
 ---
 
-# P7 — `/notes` + `/lessons` disposition
+# P7 — `/notes` + `/lessons` vault preference (F4 locked (b), 2026-07-08)
+
+> **RATIFICATION NOTE:** Fork F4 locked **(b) soft preference** on #197 — the runner-up
+> over the lean this doc was drafted around. The executed scope is the "Under F4(b)"
+> branch already specced below: **step 1 ships (migration guide, now optional
+> guidance), steps 2–3 become soft-preference body edits** (both skills prefer the
+> engine when a vault is detected, unchanged otherwise, with `--auto` `engine`/`errors[]`
+> visibility per F5), **and hard removal re-files as its own future issue** gated on
+> adoption evidence — inheriting steps 2–6 below as its ready-made playbook (#192 moves
+> to that issue's gates; #106/#107 stay open with the soft-preference disposition).
+> Size reshapes M→S. The original (a)-primary text is retained below as the deferred
+> playbook.
 
 Part of the Claudron-integration epic (`00_OVERVIEW.md`). Size: **M**. Gates: **fork F4
 locked** (this phase executes whichever option is ratified); P4–P6 released;
