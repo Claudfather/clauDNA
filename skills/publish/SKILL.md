@@ -16,6 +16,7 @@ Markdown-first, output-last. Takes a doc with frontmatter and publishes it to th
 Parse `$ARGUMENTS` at invocation:
 - **First positional arg:** Path to the source markdown file. Required.
 - `--to <dest>`: Destination adapter. One of: `disk` (default), `github-issue`, `github-pr`, `session`, `notion`.
+- `--update <issue#|url>`: Replace the named GitHub issue's body instead of creating anything. Implies `--to github-issue` — the only adapter with an update path — so `--to` may be omitted. See "In-place update" under the github-issue adapter.
 - `--repo <name>`: Target repository (for github adapters).
 - `--dry-run`: Show what would be published without doing it.
 
@@ -88,7 +89,7 @@ After writing:
 gh issue list --repo <owner>/<repo> --search "<key terms from title/tags/files>" --state open --limit 20
 ```
 
-- Exact match → skip, report the existing issue URL.
+- Exact match → prefer offering `--update` of the existing issue (§4.5); skip and report its URL only if the caller declines.
 - Related but different → create and add `Related: #NNN` to the body.
 - Same pattern, different location → prefer adding to an umbrella issue.
 
@@ -114,7 +115,7 @@ After creating:
 gh issue edit <number> --repo <owner>/<repo> --body-file <rendered-body-file>
 ```
 
-Rules: dedup is skipped (the target is explicit); the title is left untouched unless the doc's `title:` differs *and* the caller asked for a retitle; labels are additive only (`--add-label` for new `tags:`, never removing existing ones); report the issue URL and note "updated in place". The dedup near-match rule composes with this: when the mandatory dedup search finds an exact match, prefer offering an `--update` of the existing issue over skipping — updating keeps one canonical issue current instead of stranding it stale.
+Rules: dedup is skipped (the target is explicit); the title is never changed (`gh issue edit --body-file` only — retitling stays a manual act); labels are additive only (`--add-label` for new `tags:`, never removing existing ones); report the issue URL and note "updated in place". The exact-match dedup rule lives in `skills/_shared/output-guide.md` §4.5 and routes here: an exact match prefers an offered `--update` over a skip.
 
 ### Adapter: github-pr
 
