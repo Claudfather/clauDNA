@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- **Legacy planning docs use placeholder repo slugs in examples.** The 2026-05 archive/planning/spec docs referenced a real external organization's repositories in worked examples and test scaffolding (17 occurrences across 6 files); examples now use `example-org/*` placeholders. `CLAUDE.md`'s local-testing instruction likewise uses `<path-to-this-repo>` instead of a personal absolute path. Doc surfaces only — no skill, contract, or script content changed.
 
 ## [0.14.0] - 2026-07-07
 ### Added
