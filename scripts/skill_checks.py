@@ -383,6 +383,18 @@ def load_removed_skills(path: Path) -> list[str]:
     return names
 
 
+def find_resurrected_dirs(removed_names: list[str], skills_dir: Path) -> list[str]:
+    """Removed skill names that exist again as skills/<name>/ directories.
+
+    The text gate matches references; a removed skill restored whole as a
+    directory needs this check (#192). Resurrection is legitimate only via
+    deliberately deleting the name from removed-skills.txt — a reviewable
+    diff — never by silently recreating the directory. Used by both the
+    validator (always-blocking) and the pytest backstop.
+    """
+    return [name for name in removed_names if (skills_dir / name).is_dir()]
+
+
 def check_removed_name_mentions(text: str, removed_names: list[str]) -> list[tuple[str, str]]:
     """Flag reference-form mentions of a removed skill name.
 

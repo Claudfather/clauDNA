@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **Automatic tag + release on version bump ([#154](https://github.com/Claudfather/clauDNA/issues/154) — the lag cannot recur).** New `.github/workflows/release-tag.yml`: any push to main that changes `.claude-plugin/plugin.json` gets a `v<version>` tag at that commit and a GitHub release whose notes are that version's CHANGELOG section. Idempotent — manually-created tags/releases are honored, so `scripts/release.sh` (which now documents the interplay) and hand-cut releases never conflict. This closes the failure mode where the marketplace served a version whose tag and release object didn't exist, which had broken the pin/rollback recipe's premise.
+- **Directory-resurrection check ([#192](https://github.com/Claudfather/clauDNA/issues/192)).** The removed-names gate matched references but not re-creation: a removed skill restored whole as `skills/<name>/` with a valid body passed everything. `validate-skills.py` now blocks when any `scripts/removed-skills.txt` name exists as a skill directory (resurrections require deliberately removing the name from the list — a reviewable act), with a matching backstop in the unpartitioned pytest job. Probe-verified: a resurrected `skill-health/` directory fails CI.
 
 ## [0.14.0] - 2026-07-07
 ### Added
