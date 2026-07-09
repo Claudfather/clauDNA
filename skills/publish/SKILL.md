@@ -25,7 +25,7 @@ Parse `$ARGUMENTS` at invocation:
 
 ## Step 1: Read and Validate Source (house style)
 
-Read the source markdown file. Parse YAML frontmatter. Validation is **deep** — a malformed manuscript is never published. If any check below fails, report the specific errors and stop.
+Read the source markdown file. Parse YAML frontmatter. Validation is **deep** — a malformed manuscript is never published. If any check below fails, report the specific errors and stop. (Directory source: this step runs per doc via the docs adapter's family loop.)
 
 ### 1a. Frontmatter schema
 
@@ -60,7 +60,7 @@ The body must match the house-style skeleton for its `type:`. This is keyed off 
   **Hard gate:** the `## Implementation Plan` heading and its `### Steps` subsection MUST be present. This is the contract `/claudna:implement-plan --source github` depends on to tell an implementable issue from a findings-only one — without it, `--auto` implementation blocks. Reject the publish if missing.
 - **`decision`, `knowledge`, `runbook`** — require a non-trivial body (not just frontmatter) and a leading `#`/`##` heading. No fixed section gate (see `skills/_shared/documentation-standard.md`); validate presence, not structure.
 
-**Family mode exception (docs adapter, directory source):** a `00_*.md` master doc validates like the knowledge tier — frontmatter + non-trivial body + leading heading, no §4.1 skeleton gate — even when its `type:` is `audit`/`review`/`plan`. Masters are inventories and dependency matrices, not implementation plans; the skeleton hard gate exists for implement-plan readiness, which is a property of the `NN_*` phase docs (which validate in full). This exemption is the design, not a workaround.
+**Master-doc exception (docs adapter):** a `00_*.md` doc validates like the knowledge tier — frontmatter + non-trivial body + leading heading, no §4.1 skeleton gate — even when its `type:` is `audit`/`review`/`plan`, whether it arrives as a family member (directory source) or alone (single-doc source: retros, dashboards, findings reports). Masters and standalone reports are inventories, not implementation plans; the skeleton hard gate exists for implement-plan readiness, which is a property of the `NN_*` phase docs (which validate in full). This exemption is the design, not a workaround.
 
 ---
 
@@ -95,13 +95,13 @@ After writing:
 
 ### Adapter: docs
 
-Write the doc — or doc family — into the current repo's `documentation/` tree, the per-project plane. The author produces its output in a scratch directory and hands it here; publish is the single writer for this plane, same as every other.
+Write the doc — or doc family — into the current repo's `documentation/` tree, the per-project plane. The author produces its output in a scratch directory and hands it here; publish is the single **placement path for finished docs** on this plane (status-marker write-backs and archiving by `/claudna:implement-plan` are the documented exceptions).
 
-- `--dir <path>` is **required** and must resolve under `documentation/`. Reject anything outside it.
+- `--dir <path>` is **required** and must resolve under `documentation/`. Reject anything outside it. Create the directory if it doesn't exist (the Write tool creates parents automatically) — don't fail on missing directories.
 - **Single-doc mode** (source is a file): validate per Step 1, write into `--dir`, report the path.
-- **Family mode** (source is a directory): the source holds one `00_*.md` master + `NN_*.md` phase docs (the shape forge F7 and the audit lenses produce). Loop per doc: phase docs validate against the full Step 1 contract including the §4.1 skeleton hard gate; the master validates under the family-mode exception (Step 1b). Validation reads are bounded — frontmatter (first ~15 lines) plus a Grep for the required section headings decide every check; never pull a family's full prose into context (the orchestration guide's context-window rules apply to the publishing orchestrator too). Any doc failing validation fails the whole family — report every error, write nothing (no partial families). On success, write all docs into `--dir` preserving filenames; report the directory and doc count.
+- **Family mode** (source is a directory): the source holds **exactly one** `00_*.md` master + `NN_*.md` phase docs (the shape forge F7 and the audit lenses produce); any other `.md` file fails the family (zero or multiple `00_*` files likewise); non-markdown files (screenshots, assets) copy through unvalidated. Loop per doc: phase docs validate against the full Step 1 contract including the §4.1 skeleton hard gate; the master validates under the master-doc exception (Step 1b). Validation reads are bounded — frontmatter (first ~15 lines) plus a Grep for the required section headings decide every check; never pull a family's full prose into context (the orchestration guide's context-window rules apply to the publishing orchestrator too). Any doc failing validation fails the whole family — report every error, write nothing (no partial families). On success, write all docs into `--dir` preserving filenames; report the directory and doc count.
 - **No INDEX step.** The docs plane is git/PR-discovered — never run `/claudna:index` here; INDEX.md is the vault plane's discovery layer.
-- **Dedup:** if a target file already exists, compare and warn before overwriting (same rule as the vault adapter).
+- **Dedup:** if a target file already exists, compare (bounded — same read rules as validation) and warn before overwriting (same rule as the vault adapter).
 - **Plane-fit advisory:** a `knowledge`/`runbook` doc landing here gets a one-line note — "unusual plane for this type: cross-project reference knowledge usually belongs in the vault (default adapter)". Advisory only, never a block.
 
 ### Adapter: github-issue

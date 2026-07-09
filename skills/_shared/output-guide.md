@@ -12,7 +12,7 @@ Planning skills support three output targets. The target controls **where** the 
 
 | Target | Flag | Routing | Behavior |
 |---|---|---|---|
-| `docs` | (default, no flag needed) | `/claudna:publish --to docs --dir <category-dir>` | Author writes the doc (or `00_*` + `NN_*` family) to a scratch directory; publish validates and places it under `documentation/planning/<skill>/<session>_<date>/` |
+| `docs` | (default, no flag needed) | `/claudna:publish --to docs --dir <category>/<session>_<date>/` | Author writes the doc (or `00_*` + `NN_*` family) to a scratch directory; publish validates and places it at exactly the `--dir` it receives (registry: documentation-standard §2) |
 | `github` | `--output github` | `/claudna:publish --to github-issue` | Create a GitHub issue from the doc |
 | `session` | `--output session` | `/claudna:publish --to session` | Print the doc body back into the chat, no persistence |
 

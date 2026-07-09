@@ -1,6 +1,6 @@
 # Documentation Standard
 
-Shared reference for skills that read from or write to the two documentation planes — the per-project `documentation/` tree (§1–§9) and the shared-docs vault (§10). Skills reference this file at `skills/_shared/documentation-standard.md`.
+Shared reference for skills that read from or write to the two documentation planes — the per-project `documentation/` tree (§1–§9) and the plane doctrine covering both it and the shared-docs vault (§10). Skills reference this file at `skills/_shared/documentation-standard.md`.
 
 ---
 
@@ -32,7 +32,7 @@ Every repo initialized with `/claudna:init-project` has this structure:
 
 ## 2. Planning Output Paths — the `--dir` registry
 
-Planning output (the default `--output docs` target) routes through `/claudna:publish --to docs --dir <path>` — the author writes its doc(s) to a scratch directory and publish validates + places them. This table is the `--dir` registry: the category directory each skill passes.
+Planning output (the default `--output docs` target) routes through `/claudna:publish --to docs --dir <path>` — the author writes its doc(s) to a scratch directory and publish validates + places them. This table is the `--dir` registry: each skill passes its category directory **with its session directory appended** (`<category>/<session-name>_<YYYY-MM-DD>/`, §3) — publish places docs into exactly the `--dir` it receives, no path composition of its own.
 
 | Skill | `--dir` |
 |-------|-----------------|
@@ -50,7 +50,7 @@ Planning output (the default `--output docs` target) routes through `/claudna:pu
 | `/claudna:weigh-development-paths` | `documentation/planning/decisions/` |
 | `/claudna:forge` (docs output) | `documentation/planning/<topic-slug>/` |
 
-Each skill appends its session directory (`<session-name>_<YYYY-MM-DD>`, §3) to its category. If the target directory doesn't exist, publish creates it before writing. Don't fail on missing directories.
+If the target directory doesn't exist, publish creates it before writing (Write tool creates parents). Don't fail on missing directories. Categories beyond §1's scaffolded tree (`performance/`, `repo_health/`, `data-model/`, `retros/`, `decisions/`) are created on demand the same way.
 
 ## 3. Session Naming
 

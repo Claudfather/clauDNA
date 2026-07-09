@@ -84,7 +84,9 @@ The orchestrator constructs a prompt for each Plan agent that includes:
 ## Setup
 
 1. Read skills/_shared/planning-standard.md — follow the Quality
-   Standard and Phase Doc Structure exactly.
+   Standard and Phase Doc Structure exactly (docs are publishable docs:
+   output-guide §3 frontmatter + the §4.1 body skeleton; the standard's
+   content sections map onto it — see its mapping table).
 2. Read the research file(s) at: /tmp/<skill>-<timestamp>/research/<slug>.md
 3. [Any skill-specific quality requirements, inlined by the calling skill]
 
@@ -109,7 +111,7 @@ Do NOT return the full document content.
 
 ### Publishing the family (orchestrator step)
 
-After all Plan agents complete (and the `00_` master is written to the same scratch docs directory), the orchestrator places the family with one call:
+After all Plan agents complete, the **orchestrator composes the `00_` master** from the Plan agents' metadata summaries and writes it to the same scratch docs directory — the sole exception to "never write docs" (§6's read-the-first-15-20-lines allowance exists for exactly this), with output-guide §3 frontmatter like every family member. Then it places the family with one call:
 
 ```
 /claudna:publish /tmp/<skill>-<timestamp>/docs/ --to docs --dir documentation/planning/<subdirectory>/<session_name>_<YYYY-MM-DD>/
@@ -119,7 +121,7 @@ Family mode validates each doc — `NN_*` phase docs against the full §4.1 skel
 
 ### What the orchestrator MUST NOT do
 
-- **MUST NOT write docs itself** — it does not have the research context or quality standards to produce adequate output. Always delegate to Plan subagents.
+- **MUST NOT write docs itself** — it does not have the research context or quality standards to produce adequate output. Always delegate to Plan subagents. (Sole exception: the `00_` master, composed from metadata summaries — above.)
 - **MUST NOT write into `documentation/` directly** — placement goes through `/claudna:publish --to docs` (family mode), the single writer for that plane.
 - **MUST NOT collect full doc content** from Plan agents into its context.
 - **MUST NOT read finished docs** into its context (except the first 15-20 lines for header metadata if needed for the overview doc).
@@ -222,7 +224,7 @@ For Python virtual environments, use the venv binary directly: `./venv/bin/pytho
 
 ## 8. Archive Convention
 
-Output directories follow this pattern per skill (reached via `publish --to docs --dir` — the registry in `skills/_shared/documentation-standard.md` §2; skills never write here directly):
+Output directories follow this pattern per skill (reached via `publish --to docs --dir` — the registry in `skills/_shared/documentation-standard.md` §2; skills never *place finished docs* here directly. Documented exceptions: `/claudna:implement-plan`'s status-marker write-backs and its `git mv` archive move):
 
 ```
 documentation/planning/<subdirectory>/<session_name>_<YYYY-MM-DD>/

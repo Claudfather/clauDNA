@@ -21,7 +21,21 @@ These plans will be handed off to a **junior engineering team for implementation
 
 ## Phase Doc Structure
 
-Each phase doc represents **exactly 1 PR** and must include, at minimum, these sections:
+Each phase doc represents **exactly 1 PR**, and is authored as a **publishable doc**: YAML frontmatter per `skills/_shared/output-guide.md` §3 (`title`, `type`, `status`, `owner`, `created`, plus `tags`/`repos` as applicable) over the §4.1 body skeleton (`## Summary`, `## Evidence`, `## Implementation Plan` with `### Dependencies`/`### Blocks`/`### Steps`, `## Test Plan`, `## Verification Checklist`, `## What NOT To Do`, `## Context`) — `/claudna:publish` validates exactly that shape and rejects docs without it. The content sections below map onto and ride alongside that skeleton (forge models the same layering):
+
+| This standard's section | Lands in |
+|---|---|
+| 1. Header (PR title, risk, effort, files) | frontmatter `title:` + the `## Context` line (effort/risk) |
+| 2. Context (why it matters, the gap) | `## Summary` + `## Evidence` |
+| 3. Dependencies | `## Implementation Plan` → `### Dependencies` / `### Blocks` |
+| 4. Detailed Implementation Plan | `## Implementation Plan` → `### Steps` |
+| 5. Test Plan | `## Test Plan` |
+| 6. Documentation Updates | inside `### Steps`, or an added section |
+| 7. Stress Testing & Edge Cases | an added section (rides alongside the skeleton) |
+| 8. Verification Checklist | `## Verification Checklist` |
+| 9. "What NOT To Do" | `## What NOT To Do` |
+
+The content requirements, at minimum:
 
 1. **Header** — PR title, risk level, estimated effort, files created/modified/deleted
 2. **Context** — Why this change matters. Link back to user intent and the gap it addresses.
