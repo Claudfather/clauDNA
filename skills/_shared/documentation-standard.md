@@ -136,6 +136,29 @@ Documentation lives on two planes, and `/claudna:publish` is the single router o
 | **Visibility** | Public when the repo is | Private by default |
 | **Publish adapter** | `--to docs --dir <path>` (§2 registry) | `--to vault` (the default adapter) |
 
+### The Shared Documentation section — locating the root
+
+Consumers find the shared-docs root through two doors, env first:
+
+1. **Env override:** `CLAUDRON_VAULT_PATH` (engine-managed vault) or `SHARED_DOCS_PATH` (raw tree). User-managed — no clauDNA skill ever sets env vars.
+2. **CLAUDE.md section:** a section headed exactly `## Shared Documentation`. `/claudna:init-project` (Step 7.5) is the sole producer; `/claudna:remember` and `/claudna:index` parse it.
+
+The section format is parseable, not prose:
+
+- **The first non-empty line after the heading is the root path** — absolute or `~`-relative.
+- **An optional `(claudron vault)` annotation** after the path marks the root as engine-managed. Everything after the path line is free prose for humans.
+
+```markdown
+## Shared Documentation
+
+~/vault  (claudron vault)
+Cross-project knowledge lives here — see /claudna:remember.
+```
+
+**Precedence.** Env wins. When an env var and the section disagree, consumers use the env value and print a mismatch notice naming both paths.
+
+**Annotation semantics.** A `(claudron vault)` root is engine-indexed and carries **no INDEX.md** — fallback consumers must never INDEX-scan it and never suggest `/claudna:index` against it. Their degraded message: "engine-managed root; install claudron or point the section at a raw tree." An unannotated root is a raw tree — INDEX.md discovery per this standard applies.
+
 ### Which door writes the vault?
 
 Four surfaces write vault-ward — partitioned by intent:
