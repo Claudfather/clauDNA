@@ -23,7 +23,10 @@ Parse `$ARGUMENTS` at invocation:
 
 ## Step 1: Locate INDEX.md Files
 
-Determine the shared docs root from `SHARED_DOCS_PATH` env var or by scanning the current CLAUDE.md for the Shared Documentation section path.
+Determine the shared docs root: `CLAUDRON_VAULT_PATH` / `SHARED_DOCS_PATH` env vars win; otherwise parse the current CLAUDE.md `## Shared Documentation` section — first non-empty line is the root path (contract: `skills/_shared/documentation-standard.md` §10). If env and section disagree, use the env value and note the mismatch.
+
+- **Root annotated `(claudron vault)`:** the root is engine-managed and carries no INDEX.md — do not INDEX-scan it and do not suggest `/claudna:index`. Degrade with: "engine-managed root; install claudron or point the section at a raw tree."
+- **No root resolves:** say so and point at `/claudna:init-project` — its Step 7.5 provisions the section.
 
 Scan these INDEX.md files:
 
@@ -96,7 +99,7 @@ Check planning/active/shuffify-auth-rework.md before starting to avoid contradic
 ## Rules
 
 - **5-doc cap is non-negotiable.** If more than 5 docs match, show the top 5 and note how many were omitted.
-- Scan INDEX.md only — never walk directories to find docs. If INDEX.md is missing or empty, note it and suggest running `/claudna:index`.
+- Scan INDEX.md only — never walk directories to find docs. If INDEX.md is missing or empty on a raw tree, note it and suggest running `/claudna:index` — but never against a `(claudron vault)`-annotated root (Step 1's degraded message applies instead).
 - Don't modify any files. This is a read-only skill.
 - If no matches are found, say so clearly — don't fabricate relevant docs.
 

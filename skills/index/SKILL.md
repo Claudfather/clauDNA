@@ -14,7 +14,7 @@ Scan, validate, and index shared documentation. INDEX.md is the discovery layer 
 ## Arguments
 
 Parse `$ARGUMENTS` at invocation:
-- **First positional arg:** Directory path to index. Defaults to the shared docs root (from `SHARED_DOCS_PATH` env var or detect from cwd).
+- **First positional arg:** Directory path to index. Defaults to the shared docs root — `CLAUDRON_VAULT_PATH`/`SHARED_DOCS_PATH` env vars, else CLAUDE.md's `## Shared Documentation` section (contract: `skills/_shared/documentation-standard.md` §10; env wins on disagreement, note the mismatch), else detect from cwd.
 - `--validate-only`: Check frontmatter without regenerating INDEX.md.
 - `--recursive`: Index all subdirectories, not just the target.
 - `--fix`: Auto-fill missing required fields where inferrable.
@@ -23,6 +23,8 @@ Parse `$ARGUMENTS` at invocation:
 ---
 
 ## Step 1: Discover Documents
+
+**Engine-managed roots are never indexed.** If the target is a root annotated `(claudron vault)` in CLAUDE.md's `## Shared Documentation` section (or came from `CLAUDRON_VAULT_PATH`), stop with: "engine-managed root; install claudron or point the section at a raw tree." The engine owns vault indexing — an INDEX.md written there would be stale on arrival.
 
 Walk all `.md` files in the target directory (excluding `INDEX.md` itself).
 
@@ -124,6 +126,7 @@ Stale:
 - Never modify document content — only frontmatter (and only with `--fix`).
 - INDEX.md is always fully regenerated, never appended to. This avoids stale entries.
 - If the target directory doesn't exist, error clearly — don't create it.
+- Never index an engine-managed root — Step 1's refusal applies before any walk.
 - If no `.md` files are found (excluding INDEX.md), write an empty INDEX.md with just the header.
 
 $ARGUMENTS
