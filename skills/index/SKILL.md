@@ -37,27 +37,19 @@ If `--recursive`, walk subdirectories too. Each subdirectory gets its own INDEX.
 
 ## Step 2: Parse and Validate Frontmatter
 
-For each file, read and parse YAML frontmatter. Validate against the schema:
+For each file, read and parse YAML frontmatter. Validate against the schema (vocabulary SSOT: `skills/_shared/output-guide.md` §3 — the repo's only type/status enum table):
 
 **Required fields:**
 
 | Field | Type | Validation |
 |-------|------|------------|
 | title | string | Non-empty |
-| type | enum | plan, decision, knowledge, runbook, audit, review |
-| status | enum | Type-dependent (see below) |
+| type | enum | A valid note type per the output-guide §3 vocabulary table |
+| status | enum | Valid for the type per the §3 table — canonical or accepted legacy (legacy gets a mapping note, not an error) |
 | owner | string | Non-empty |
 | created | date | Valid YYYY-MM-DD |
 
-**Type-dependent status values:**
-
-| Type | Valid statuses |
-|------|---------------|
-| plan | draft, active, completed, superseded |
-| knowledge | current, stale, superseded |
-| decision | draft, ratified, superseded |
-| runbook | current, stale, superseded |
-| audit, review | draft, completed |
+**Pass-through fields** (accepted, never flagged, never required — output-guide §3): `maturity`, `schema_version`, and any `x-*`-prefixed field. Index reads past them; they are never validation errors.
 
 For each validation error, record: file path, field name, issue (missing, invalid value, wrong type).
 
@@ -66,7 +58,7 @@ For each validation error, record: file path, field name, issue (missing, invali
 When `--fix` is set, auto-fill missing fields where inferrable:
 - `created:` — use file modification time (`stat` or `git log --format=%aI --diff-filter=A -- <file>`)
 - `owner:` — use `git log --format=%an -1 -- <file>`
-- `status:` — default to first valid status for the type (draft for plan/decision, current for knowledge/runbook)
+- `status:` — default per type: `current` for knowledge/runbook, `draft` for plan/decision/audit/review (the §3 type defaults; unchanged by the SSOT rendering)
 - `type:` — infer from parent directory name if possible (planning/ → plan, knowledge/ → knowledge, decisions/ → decision, runbooks/ → runbook)
 
 Write the fixed frontmatter back to the file. Report each auto-fix applied.
@@ -86,7 +78,7 @@ Report stale docs separately from validation errors.
 Skip this step if `--validate-only` is set.
 
 Sort documents:
-1. **Primary:** active/current/ratified/draft first, then completed/stale/superseded
+1. **Primary:** active/current/ratified/draft first, then completed/stale/superseded/archived
 2. **Secondary:** alphabetical by title
 
 Generate INDEX.md with one line per doc, including inline tags for grep-friendly filtering:

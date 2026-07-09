@@ -49,7 +49,7 @@ The output target is a persistence decision, not a quality decision.
 
 ## 3. The Publishable Doc — Frontmatter
 
-> **SSOT: [Claudron `SCHEMA.md`](https://github.com/Claudfather/Claudron/blob/main/SCHEMA.md)** (ratified with Claudron 0.2.0, enforced in code by `claudron validate`). The table below is publish's operational summary of that contract. Deltas worth knowing: Claudron adds `archived` as a terminal status for every type; accepts `active` on knowledge/runbook as a legacy alias for `current` (warns, never errors on adopted docs); and adds an optional `maturity: draft | verified | canonical` trust axis, orthogonal to `status` — agent-written notes enter as `maturity: draft`. The body skeleton (Section 4.1) remains this guide's own contract.
+> **SSOT: [Claudron `SCHEMA.md`](https://github.com/Claudfather/Claudron/blob/main/SCHEMA.md)** (ratified with Claudron 0.2.0, enforced in code by `claudron validate`). Rendered from [Claudfather/Claudron `SCHEMA.md`](https://github.com/Claudfather/Claudron/blob/bb84ee3ab9325c3a49c4f0274069c29eb2270768/SCHEMA.md) @ `bb84ee3` (2026-07-08) — the vocabulary below is publish's operational summary of that contract and the **only** type/status enum table in clauDNA: `/claudna:publish` Step 1a and `/claudna:index` Step 2 point here instead of restating it, and CI diffs this rendered copy against the stamped source (`scripts/check_schema_drift.py`) — update by re-rendering + restamping, never by hand-editing. Deltas worth knowing: Claudron adds `archived` as a terminal status for every type; accepts `active` on knowledge/runbook as a legacy alias for `current` (warns, never errors on adopted docs); and adds an optional `maturity: draft | verified | canonical` trust axis, orthogonal to `status` — agent-written notes enter as `maturity: draft`. The body skeleton (Section 4.1) remains this guide's own contract.
 >
 > **Claudron is not required.** This table remains the complete contract `/claudna:publish` enforces, and no skill invokes `claudron` at runtime — the SSOT link governs where vocabulary *changes* are ratified, not what users must install. Docs written without Claudron adopt cleanly later: its lenient tier accepts this vocabulary as-is (warnings at most, never errors).
 
@@ -58,13 +58,33 @@ Every doc an author hands to `/claudna:publish` carries YAML frontmatter. Publis
 | Field | Rule |
 |-------|------|
 | `title` | Issue/page title. For findings use the format in Section 4.2. |
-| `type` | One of: `plan`, `decision`, `knowledge`, `runbook`, `audit`, `review`. Audits/reviews/plans require the body skeleton in Section 4.1. |
-| `status` | Valid for the type (`audit`/`review`: `draft`\|`completed`; `plan`: `draft`\|`active`\|`completed`\|`superseded`; etc.) |
+| `type` | One of the note types in the vocabulary table below. Audits/reviews/plans require the body skeleton in Section 4.1. |
+| `status` | Valid for the `type` per the vocabulary table below — canonical, or an accepted legacy value (validates with a mapping note, never a rejection). |
 | `owner` | The skill or user that produced it. |
 | `created` | `YYYY-MM-DD`. |
 | `tags` | Labels to apply (github-issue edition maps these → `--label`). Use the taxonomy in Section 4.3. |
 | `repos` | Target repo(s); a single value lets the github/vault adapters infer destination. |
 | `links` | Publish writes the destination URL back here after publishing. |
+
+**Type and status vocabulary** — SCHEMA.md's per-type status table, rendered verbatim. Canonical values are what clauDNA skills write; accepted legacy values validate with a one-line mapping note (never a rejection); terminal statuses mark a doc done or replaced. Absent `status` defaults per type: `current` for knowledge/runbook, `draft` for the rest.
+
+<!-- schema-drift: STATUS_TABLE — rendered copy; do not hand-edit. Re-render from the stamped SCHEMA.md and update the stamp above. -->
+| type | canonical | terminal | accepted legacy → mapping |
+|---|---|---|---|
+| knowledge | `current`, `stale`, `superseded`, `archived` | `superseded`, `archived` | `active` → `current`; `draft` → use `maturity: draft` |
+| decision | `draft`, `ratified`, `superseded`, `archived` | `ratified`, `superseded`, `archived` | — |
+| runbook | `current`, `stale`, `superseded`, `archived` | `superseded`, `archived` | `active` → `current`; `draft` → use `maturity: draft` |
+| plan | `draft`, `active`, `completed`, `superseded`, `archived` | `completed`, `superseded`, `archived` | — |
+| audit | `draft`, `completed`, `archived` | `completed`, `archived` | — |
+| review | `draft`, `completed`, `archived` | `completed`, `archived` | — |
+
+**Second axis + pass-through fields.** `maturity: draft | verified | canonical` is the trust axis, orthogonal to `status` (a doc can be `maturity: canonical` and `status: superseded` at once); absent means unrated. `schema_version` (int) is stamped by Claudron's write paths. Both are **pass-through** everywhere clauDNA validates frontmatter: present = fine, never rejected, never required. clauDNA skills don't write them today; docs carrying them publish untouched.
+
+**Local additions are prohibited — except `x-*`.** Vocabulary changes are ratified upstream: PR Claudron's SCHEMA.md first, then re-render this section with a fresh stamp. Relief valves so an external pre-1.0 SSOT never blocks work:
+
+- **The `x-*` escape hatch:** any frontmatter field prefixed `x-` (e.g. `x-review-round: 2`) is accepted and passed through by publish and index — never validated, never required, never rejected. Experiment-local metadata goes here; it needs no upstream round-trip.
+- **Schema gaps** (a field or value that deserves to be shared vocabulary): comment on the Claudron epic issue that owns the surface — capture/CLI → [Claudron#16](https://github.com/Claudfather/Claudron/issues/16), MCP → [Claudron#17](https://github.com/Claudfather/Claudron/issues/17) — and cross-reference it here.
+- **Dormancy clause:** if the SSOT is unmaintained when a needed change arrives, this rendered copy becomes de-facto canonical by a recorded decision on [clauDNA#197](https://github.com/Claudfather/clauDNA/issues/197) — never by silent edit (the drift check exists precisely to make silent edits fail).
 
 ---
 

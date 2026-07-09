@@ -17,7 +17,7 @@ Parse `$ARGUMENTS` at invocation:
 - **First positional arg:** Task description, repo name, or topic query. Used to filter INDEX.md entries by relevance.
 - `--repo <name>`: Scope to a specific repo's knowledge directory.
 - `--full`: Read and summarize matched docs (default: titles and one-line descriptions only).
-- `--include-stale`: Also show docs with status stale or superseded (hidden by default).
+- `--include-stale`: Also show docs with terminal statuses (stale, superseded, completed, archived — hidden by default).
 
 ---
 
@@ -45,7 +45,7 @@ For each INDEX.md entry, match against the query:
 - **Title match** — does the title contain keywords from the task?
 - **Tag match** — do inline tags overlap with the task's domain?
 - **Repo match** — does the entry's repo tag match the target repo?
-- **Status filter** — include only `active`, `current`, `ratified`, `draft`. Exclude `stale`, `superseded`, `completed` unless `--include-stale` is set.
+- **Status filter** — include only `active`, `current`, `ratified`, `draft`. Exclude `stale`, `superseded`, `completed`, `archived` unless `--include-stale` is set.
 
 Rank matches by: exact repo match > tag overlap > title keyword match.
 

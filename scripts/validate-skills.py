@@ -14,6 +14,7 @@ import os
 import sys
 from pathlib import Path
 
+from check_schema_drift import run_check as run_schema_drift_check
 from skill_checks import (
     STALE_PATH_RE,
     check_removed_name_mentions,
@@ -206,6 +207,16 @@ def main() -> int:
             )
         )
 
+    # Schema-drift gate (#199, epic #197 P2): skills/_shared/output-guide.md §3
+    # is a stamped rendered copy of Claudron SCHEMA.md and the repo's only
+    # type/status enum table; publish/index must point at it, and (network
+    # permitting) the copy must match the SSOT at the stamped ref. Errors are
+    # ALWAYS-BLOCKING, like removed-name hits: vocabulary at an immutable
+    # stamped ref cannot change on its own, so any failure was introduced by
+    # the change under test. Network failures degrade to notes, never errors
+    # -- CI must not flake when the SSOT host is unreachable.
+    drift_errors, drift_warnings, drift_notes = run_schema_drift_check(REPO_ROOT)
+
     total_skills = len(skill_dirs) - len(SKIP_SKILLS)
 
     # In CI mode, partition errors into blocking (touched) vs warnings (untouched).
@@ -237,6 +248,18 @@ def main() -> int:
     # applies to this class (see scan_removed_names).
     for rel, msg in removed_name_hits:
         blocking_errors.setdefault(rel, []).append(msg)
+
+    # Schema-drift errors likewise block in BOTH modes (rationale above).
+    for msg in drift_errors:
+        blocking_errors.setdefault("schema-drift", []).append(msg)
+
+    # Drift notes/warnings are advisory — always printed, never blocking.
+    if drift_notes or drift_warnings:
+        for n in drift_notes:
+            print(f"NOTE(schema-drift): {n}")
+        for w in drift_warnings:
+            print(f"WARN(schema-drift): {w}")
+        print()
 
     # Print advisory warnings (never blocking)
     if all_warnings:
