@@ -35,6 +35,8 @@ Before any verb, run the **detection ladder in `skills/_shared/claudron-engine.m
 
 Every `--json` call is envelope-validated per claudron-engine.md §2, and failures follow the exit-code posture in §3.
 
+**Door note (F1).** clauDNA ships no MCP servers — this engine *is* the CLI. If Claudron's own MCP tools are configured in the session, they are the same engine with equivalent semantics; the CLI is the contract floor this skill targets.
+
 ## Structured result (`--auto`)
 
 In `--auto`, each verb emits the single **structured result** JSON block defined in `skills/_shared/orchestration-guide.md` ("Structured Result Shape") as its final output — `artifacts.action` / `artifacts.path` / `artifacts.engine` (`"claudron"` on the engine path, `"fallback"` when degraded), any degradation in `errors[]`, and no interactive prompts. Per-verb details are in the depth files.
