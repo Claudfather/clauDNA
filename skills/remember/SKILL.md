@@ -23,16 +23,19 @@ Parse `$ARGUMENTS` at invocation:
 
 ## Step 1: Locate INDEX.md Files
 
-Determine the shared docs root from `SHARED_DOCS_PATH` env var or by scanning the current CLAUDE.md for the Shared Documentation section path.
+Determine the shared docs root: `CLAUDRON_VAULT` / `CLAUDRON_VAULT_PATH` / `SHARED_DOCS_PATH` env vars win (in that order); otherwise parse the current CLAUDE.md `## Shared Documentation` section — first non-empty line is the root path, or the first backtick-quoted path when that line is templated prose (contract: `skills/_shared/documentation-standard.md` §10). If env and section disagree, use the env value and note the mismatch.
+
+- **Root annotated `(claudron vault)` (or resolved from `CLAUDRON_VAULT`/`CLAUDRON_VAULT_PATH`):** the root is engine-managed and carries no INDEX.md — do not INDEX-scan it and do not suggest `/claudna:index`. Degrade with: "engine-managed root; install claudron or point the section at a raw tree." — appending, when the root came from env: "(root came from `CLAUDRON_VAULT`/`CLAUDRON_VAULT_PATH` — unset it to fall back)".
+- **No root resolves:** say so and point at `/claudna:init-project` — its Step 7.5 provisions the section.
 
 Scan these INDEX.md files:
 
-| Path | Why |
+| Path (under the resolved root) | Why |
 |------|-----|
-| `shared/planning/active/INDEX.md` | Active plans that may affect the task |
-| `shared/knowledge/<repo>/INDEX.md` | Repo-specific learnings (if `--repo` set or repo inferrable from task) |
-| `shared/knowledge/INDEX.md` | Top-level knowledge index |
-| `shared/decisions/INDEX.md` | Ratified decisions that constrain the work |
+| `<root>/planning/active/INDEX.md` | Active plans that may affect the task |
+| `<root>/knowledge/<repo>/INDEX.md` | Repo-specific learnings (if `--repo` set or repo inferrable from task) |
+| `<root>/knowledge/INDEX.md` | Top-level knowledge index |
+| `<root>/decisions/INDEX.md` | Ratified decisions that constrain the work |
 
 If `--repo` is set, prioritize `knowledge/<repo>/`. If the task mentions a repo name, infer it.
 
@@ -96,7 +99,7 @@ Check planning/active/shuffify-auth-rework.md before starting to avoid contradic
 ## Rules
 
 - **5-doc cap is non-negotiable.** If more than 5 docs match, show the top 5 and note how many were omitted.
-- Scan INDEX.md only — never walk directories to find docs. If INDEX.md is missing or empty, note it and suggest running `/claudna:index`.
+- Scan INDEX.md only — never walk directories to find docs. If INDEX.md is missing or empty on a raw tree, note it and suggest running `/claudna:index` — but never against a `(claudron vault)`-annotated root (Step 1's degraded message applies instead).
 - Don't modify any files. This is a read-only skill.
 - If no matches are found, say so clearly — don't fabricate relevant docs.
 

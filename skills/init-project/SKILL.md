@@ -2,12 +2,15 @@
 name: init-project
 user-invocable: true
 description: "Use when setting up a new project or adding standard Claude Code configuration (CLAUDE.md, CHANGELOG.md, .claude/, documentation/) to an existing project."
-allowed-tools: Read(*), Write(*), Edit(*), Glob(*), Grep(*), Bash(git *), Bash(ls *), Bash(mkdir *)
+allowed-tools: Read(*), Write(*), Edit(*), Glob(*), Grep(*), Bash(git *), Bash(ls *), Bash(mkdir *), Bash(printenv *), Bash(command -v *), Bash(claudron status *)
+requires:
+  - cli: claudron
+    reason: "Optional — Step 7.5 vault detection only; every ladder branch degrades gracefully when absent (this is a soft dependency, not a functional requirement)"
 ---
 
 # Initialize Project
 
-Set up a project with standard clauDNA configuration: `CLAUDE.md`, `CHANGELOG.md`, `.claude/lessons.md`, `PROJECT_MISSION.md`, and the `documentation/` planning structure. Works for both new repos and existing projects that lack these files.
+Set up a project with standard clauDNA configuration: `CLAUDE.md`, `CHANGELOG.md`, `.claude/lessons.md`, `PROJECT_MISSION.md`, the `documentation/` planning structure, and the shared-docs seam (a `## Shared Documentation` section in CLAUDE.md — Step 7.5). Works for both new repos and existing projects that lack these files.
 
 ## Procedure
 
@@ -22,6 +25,7 @@ Scan the project root for existing configuration:
 - `.claude/lessons.md` — project-specific lessons
 - `PROJECT_MISSION.md` — project mission statement
 - `documentation/planning/` — planning structure for skills
+- CLAUDE.md `## Shared Documentation` section — the shared-docs seam (Step 7.5)
 
 Also scan for signals about the project:
 
@@ -44,10 +48,11 @@ Project Assessment
   .claude/lessons.md:   ✓ exists / ✗ missing
   PROJECT_MISSION.md:   ✓ exists / ✗ missing
   documentation/:       ✓ exists / ✗ missing
+  Shared docs seam:     ✓ declared (<root path>) / ✗ not declared
 ═══════════════════════════════════════════════════════
 ```
 
-If all three exist, tell the user and ask if they want to align any to the clauDNA template. If none exist, proceed to Step 2. If some exist, note which will be created vs. skipped.
+If everything already exists, tell the user and ask if they want to align any of it to the clauDNA template. If none exist, proceed to Step 2. If some exist, note which will be created vs. skipped.
 
 ### Step 2: Gather Project Context
 
@@ -70,7 +75,7 @@ Generate `CLAUDE.md` using the template at [references/CLAUDE_MD_TEMPLATE.md](re
 - Fill in Commands Reference with the actual commands
 - Add any gotchas from Step 2 to "Things Claude Should NOT Do"
 - Keep all static sections (Workflow Orchestration, Core Principles, etc.) exactly as templated — these are universal
-- Remove placeholder comments (`<!-- Customize -->`) after filling in
+- Remove placeholder comments (`<!-- Customize -->`) after filling in — but leave the commented `## Shared Documentation` block alone; Step 7.5 owns it
 
 **For large projects** (200+ lines after customization): Consider creating `.claude/rules/` files with `paths:` frontmatter to scope domain-specific rules to matching files. Keep CLAUDE.md under 200 lines — only universal rules and safety constraints.
 
@@ -122,7 +127,7 @@ If the user provided a clear description in Step 2, write a real mission stateme
 
 ### Step 7: Scaffold documentation/
 
-If `documentation/planning/` doesn't exist, create the standard planning structure. This is the shared directory layout that planning and audit skills write to (see `documentation/specs/repo-documentation-standard.md` for the full spec).
+If `documentation/planning/` doesn't exist, create the standard planning structure. This is the shared directory layout that planning and audit skills write to (see `skills/_shared/documentation-standard.md` for the full spec).
 
 Create these directories with `.gitkeep` files:
 
@@ -150,6 +155,57 @@ If `documentation/` already exists, scan for missing subdirectories and create o
 - `guides/` — Setup guides, onboarding, runbooks. Living docs.
 - `archive/` — Completed planning sessions moved here after all phases merge.
 
+### Step 7.5: Shared Knowledge Seam
+
+Provision the `## Shared Documentation` CLAUDE.md section — the root that `/claudna:remember` and `/claudna:index` resolve. The section format, `(claudron vault)` annotation semantics, and env-over-section precedence are contract-bound in `skills/_shared/documentation-standard.md` §10 — write exactly that format.
+
+**Idempotency first.** If CLAUDE.md already has a `## Shared Documentation` section, show it and offer to update it by re-running the detection below — never write a second section. (The CLAUDE.md template ships the section as a commented placeholder — treat that as absent, and replace the commented block with the real section when writing.)
+
+**Pre-ladder: an existing raw tree via env.** If `SHARED_DOCS_PATH` is set (`printenv SHARED_DOCS_PATH`) and no vault resolves in (a), the raw tree already exists — offer to write the unannotated section with *that* path and skip the ladder; never scaffold a new default beside an env-declared root.
+
+Detect which of three states applies, in order:
+
+**(a) Vault resolvable.** `CLAUDRON_VAULT` or `CLAUDRON_VAULT_PATH` is set (check with `printenv CLAUDRON_VAULT CLAUDRON_VAULT_PATH` — Claudron's shipped CLI reads the bare form; accept both, bare form first), or `claudron` is on PATH (`command -v claudron`) and `claudron status --json` reports a vault path. Write the section with the resolved path (prefer the `~`-relative form when it's under the home directory) and the `(claudron vault)` annotation:
+
+```markdown
+## Shared Documentation
+
+~/vault  (claudron vault)
+Cross-project knowledge lives here — see /claudna:remember.
+```
+
+Detection is read-only (`claudron status` is safe to run). **Print-not-execute for anything mutating:** never run `claudron init`, `claudron migrate`, or any other writing claudron command — show the command and let the user run it.
+
+**(b) claudron present, no vault.** `claudron` is on PATH but no vault resolves (no env var, and `claudron status` exits non-zero with a stderr message — it never emits JSON on the no-vault path). Print the remedy — do not run it, and do **not** scaffold a raw tree (it would shadow the vault the user is about to create):
+
+```
+claudron is installed but no vault is initialized. Run:
+
+  claudron init ~/vault --personal
+
+(the path is where your vault will live — pick your own; if the command is
+rejected, the CLI has moved — `claudron --help` shows the current form) then
+re-invoke /claudna:init-project — Step 7.5 will detect the vault and write
+the CLAUDE.md section.
+```
+
+Offer to re-run this step's detection once the user has initialized.
+
+**(c) No claudron.** Offer the minimal raw-tree scaffold. Ask where the shared root should live, defaulting to the **stable absolute `~/shared`** — never a cwd-relative sibling like `../shared`, which fragments the store per parent directory. If the user picks a path *inside this repo*, warn once before proceeding: shared docs are cross-project by doctrine (documentation-standard §10) — an in-repo root silently scopes them to this repo. On yes:
+
+1. Create `<root>/knowledge/<repo-name>/`, `<root>/planning/active/`, and `<root>/decisions/` (`mkdir -p`).
+2. Invoke `/claudna:index <root> --recursive` to write the stub INDEX.md files — index is the sole INDEX.md writer; don't write them by hand.
+3. Write the section into CLAUDE.md with the path only, **no annotation** (raw trees are INDEX-discovered):
+
+```markdown
+## Shared Documentation
+
+~/shared
+Cross-project knowledge lives here — see /claudna:remember.
+```
+
+The scaffold is the only write this skill makes outside the project, and only at the path the user chose. If the user declines, skip the seam entirely and point at SETUP_GUIDE's "Claudron Integration" section for setting it up later.
+
 ### Step 8: Verify & Confirm
 
 Show the user what was created:
@@ -163,11 +219,14 @@ Project Initialized
     ✓ .claude/lessons.md     (N lines — lessons)
     ✓ PROJECT_MISSION.md     (N lines — mission statement)
     ✓ documentation/         (10 directories: planning, decisions, specs, guides, archive)
+    ✓ Shared docs seam       (## Shared Documentation → ~/shared; raw tree scaffolded)
 
   Skipped:
     - CLAUDE.md (already exists)
 ═══════════════════════════════════════════════════════
 ```
+
+Report the seam line as whichever Step 7.5 branch ran: the annotated vault section, the raw-tree scaffold + section, printed `claudron init` guidance (nothing written), or skipped.
 
 Ask: **"Want me to commit these files?"**
 
@@ -175,6 +234,8 @@ If yes, stage only the created/modified files and commit with:
 ```
 docs: initialize project configuration (CLAUDE.md, CHANGELOG.md, .claude/, documentation/)
 ```
+
+A Step 7.5 raw-tree scaffold lives outside the repo — never stage it; only the CLAUDE.md section ships with the commit.
 
 ---
 
