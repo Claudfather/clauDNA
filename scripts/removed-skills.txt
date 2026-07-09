@@ -47,3 +47,6 @@ vercel-status
 neon-branch
 neon-info
 neon-query
+#
+# Vocabulary alignment (#221, epic #197) — /remember renamed /recall
+remember

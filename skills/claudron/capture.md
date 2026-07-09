@@ -1,6 +1,6 @@
-Invoked by /claudna:claudron in write mode — the detection ladder (claudron-engine.md §1) has already run. `write` needs present-with-vault (Step 0 gates). Do NOT skip the Step 4 confirmation gate.
+Invoked by /claudna:claudron in capture mode — the detection ladder (claudron-engine.md §1) has already run. `capture` needs present-with-vault (Step 0 gates). Do NOT skip the Step 4 confirmation gate.
 
-# Write
+# Capture
 
 Deliberately save one note to the shared fleet vault via `claudron capture`. Mutating — it writes to the vault. Follow these steps in order.
 
@@ -8,7 +8,7 @@ Deliberately save one note to the shared fleet vault via `claudron capture`. Mut
 
 From the pre-flight detection ladder (claudron-engine.md §1):
 - **present-with-vault** → continue.
-- **present-no-vault** → stop. Report: "Claudron is installed but no vault is configured — run `claudron init <path> --personal`, then retry." There is no raw-tree fallback for `write` (claudron-engine.md §3).
+- **present-no-vault** → stop. Report: "Claudron is installed but no vault is configured — run `claudron init <path> --personal`, then retry." There is no raw-tree fallback for `capture` (claudron-engine.md §3).
 - **absent** → stop. Report: "Claudron is not installed — save to the vault with `/claudna:publish --to vault` instead, or install Claudron (SETUP_GUIDE)."
 
 In `--auto`, either non-usable verdict emits the structured result with `outcome: "blocked"` and a `blocker_description` naming the remedy — never a silent skip.
@@ -67,7 +67,7 @@ Validate the envelope (claudron-engine.md §2), then branch on `data.action`:
 Interactive — a boxed summary:
 
 ```
-Vault write
+Vault capture
   Action:  created
   Path:    <path>
   Type:    <type>    Title: <title>

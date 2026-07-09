@@ -560,7 +560,7 @@ The `/claudna:worktree` skill manages this interactively if you'd rather not mem
 
 ### 7.1 The shared-docs seam
 
-Knowledge skills (`/claudna:remember`, `/claudna:index`) resolve the shared-docs root through two doors, env first:
+Knowledge skills (`/claudna:recall`, `/claudna:index`) resolve the shared-docs root through two doors, env first:
 
 1. **Env override:** `CLAUDRON_VAULT` or `CLAUDRON_VAULT_PATH` (engine-managed vault — Claudron's CLI reads the bare form; clauDNA accepts both) or `SHARED_DOCS_PATH` (raw tree). Set these yourself if you want them — the plugin never writes env vars, shell profiles, or `~/.claude/settings.json`.
 2. **CLAUDE.md section:** a `## Shared Documentation` section whose first non-empty line is the root path, optionally annotated `(claudron vault)` for engine-managed roots. `/claudna:init-project` (Step 7.5) provisions it; the parse contract lives in `skills/_shared/documentation-standard.md` §10.

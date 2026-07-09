@@ -132,7 +132,7 @@ Documentation lives on two planes, and `/claudna:publish` is the single router o
 | **Content** | Work-in-flight + repo-coupled records: plans, audits, reviews, ADRs, specs, guides | Cross-project referential knowledge: knowledge pages, runbooks, cross-repo decisions, reflections |
 | **Lives** | In the repo, versioned with the code | Outside any one repo (`shared/{knowledge,decisions,runbooks,planning/…}` raw tree, or a Claudron vault) |
 | **Reviewed via** | Pull requests | Lifecycle management (status/supersession; curation) |
-| **Discovered via** | git + status-marker greps (§8) | Raw tree: INDEX.md (`/claudna:index` writes it, `/claudna:remember` scans it) · Claudron vault: engine-indexed, no INDEX.md (annotation semantics below) |
+| **Discovered via** | git + status-marker greps (§8) | Raw tree: INDEX.md (`/claudna:index` writes it, `/claudna:recall` scans it) · Claudron vault: engine-indexed, no INDEX.md (annotation semantics below) |
 | **Visibility** | Public when the repo is | Private by default |
 | **Publish adapter** | `--to docs --dir <path>` (§2 registry) | `--to vault` (the default adapter) |
 
@@ -141,7 +141,7 @@ Documentation lives on two planes, and `/claudna:publish` is the single router o
 Consumers find the shared-docs root through two doors, env first:
 
 1. **Env override:** `CLAUDRON_VAULT` or `CLAUDRON_VAULT_PATH` (engine-managed vault — Claudron's shipped CLI reads the bare form, its CLI-contract doc names the `_PATH` form; consumers accept both) or `SHARED_DOCS_PATH` (raw tree). If several are set, that order wins. User-managed — no clauDNA skill ever sets env vars.
-2. **CLAUDE.md section:** a section headed exactly `## Shared Documentation`. `/claudna:init-project` (Step 7.5) is the sole producer; `/claudna:remember` and `/claudna:index` parse it.
+2. **CLAUDE.md section:** a section headed exactly `## Shared Documentation`. `/claudna:init-project` (Step 7.5) is the sole producer; `/claudna:recall` and `/claudna:index` parse it.
 
 The section format is parseable, not prose:
 
@@ -154,7 +154,7 @@ The section format is parseable, not prose:
 ## Shared Documentation
 
 ~/vault  (claudron vault)
-Cross-project knowledge lives here — see /claudna:remember.
+Cross-project knowledge lives here — see /claudna:recall.
 ```
 
 **Precedence.** Env wins. When an env var and the section disagree, consumers use the env value and print a mismatch notice naming both paths.
@@ -167,7 +167,7 @@ Four surfaces write vault-ward — partitioned by intent:
 
 | Intent | Door |
 |---|---|
-| Deliberate save — "note this down for the fleet" | `/claudna:claudron write` — needs the Claudron CLI; without it, `/claudna:publish --to vault` |
+| Deliberate save — "note this down for the fleet" | `/claudna:claudron capture` — needs the Claudron CLI; without it, `/claudna:publish --to vault` |
 | Ingest external content — article, repo, transcript | `/claudna:learn` |
 | Distill the current session's learnings | `/claudna:reflect` |
 | Route a finished, frontmattered doc | `/claudna:publish --to vault` |
