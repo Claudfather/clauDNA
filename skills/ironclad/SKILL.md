@@ -1,7 +1,7 @@
 ---
 name: ironclad
 description: "Use to harden a plan or review a PR with a panel of independent lenses — primary target a §4.1 plan Issue produced by /claudna:forge; also reviews implementation PRs. Subagent-only: dispatch it, don't follow it inline."
-argument-hint: "<issue-or-pr-url> [--loops N] [--lens <name>] [--auto]"
+argument-hint: "<issue-or-pr-url> [--loops N] [--lens first-principles|align-to-mission|extension-check|precedent-check|plan-health-audit|cost-benefit] [--auto]"
 requires:
   - cli: gh
     reason: "Reads PR diff and metadata, scans PR comments for fork state, and posts the aggregated review comment via the GitHub API."
