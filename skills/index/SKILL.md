@@ -24,7 +24,7 @@ Parse `$ARGUMENTS` at invocation:
 
 ## Step 1: Discover Documents
 
-**Engine-managed roots are never indexed.** If the target is a root annotated `(claudron vault)` in CLAUDE.md's `## Shared Documentation` section (or came from `CLAUDRON_VAULT_PATH`), stop with: "engine-managed root; install claudron or point the section at a raw tree." The engine owns vault indexing — an INDEX.md written there would be stale on arrival.
+**Engine-managed roots are never indexed.** If the target is a root annotated `(claudron vault)` in CLAUDE.md's `## Shared Documentation` section (or came from `CLAUDRON_VAULT_PATH`), stop with: "engine-managed root; install claudron or point the section at a raw tree." — appending, when the root came from env: "(root came from `CLAUDRON_VAULT_PATH` — unset it to fall back)". The engine owns vault indexing — an INDEX.md written there would be stale on arrival.
 
 Walk all `.md` files in the target directory (excluding `INDEX.md` itself).
 

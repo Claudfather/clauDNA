@@ -20,8 +20,8 @@ If all you need is "install clauDNA", read the README. Come here when something 
 7. [Claudron Integration](#7-claudron-integration)
 8. [Telemetry](#8-telemetry)
 9. [Troubleshooting](#9-troubleshooting)
-9. [Appendix A: Boris Cherny's Key Tips](#appendix-a-boris-chernys-key-tips)
-10. [Appendix B: Workflow Orchestration Principles](#appendix-b-workflow-orchestration-principles)
+10. [Appendix A: Boris Cherny's Key Tips](#appendix-a-boris-chernys-key-tips)
+11. [Appendix B: Workflow Orchestration Principles](#appendix-b-workflow-orchestration-principles)
 
 ---
 
@@ -579,7 +579,7 @@ Knowledge skills (`/claudna:remember`, `/claudna:index`) resolve the shared-docs
 | **claudron installed, no vault** | Prints `claudron init --personal` for you to run, then offers to re-detect. No raw tree is scaffolded — it would shadow the vault you're about to create. |
 | **No claudron** | Offers a minimal raw tree (`knowledge/<repo>/`, `planning/active/`, `decisions/` + stub INDEX.md files) at a path you choose — default `~/shared`, stable and absolute — then writes the section without annotation. |
 
-Declined the seam during init, or set up shared docs later? Re-run `/claudna:init-project` — re-runs detect an existing section and offer an update, never a duplicate.
+Declined the seam during init? Re-run `/claudna:init-project` and Step 7.5 offers it fresh. Already have a section? Re-runs detect it and offer an update, never a duplicate.
 
 > Later phases of the integration epic ([#197](https://github.com/Claudfather/clauDNA/issues/197), phases #201–#204) append to this section as they land: the `/claudron` engine skill, engine-preferred recall and capture, reflect-at-compaction, and the notes/lessons disposition.
 

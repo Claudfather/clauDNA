@@ -158,6 +158,8 @@ Provision the `## Shared Documentation` CLAUDE.md section — the root that `/cl
 
 **Idempotency first.** If CLAUDE.md already has a `## Shared Documentation` section, show it and offer to update it by re-running the detection below — never write a second section. (The CLAUDE.md template ships the section as a commented placeholder — treat that as absent, and replace the commented block with the real section when writing.)
 
+**Pre-ladder: an existing raw tree via env.** If `SHARED_DOCS_PATH` is set (`printenv SHARED_DOCS_PATH`) and no vault resolves in (a), the raw tree already exists — offer to write the unannotated section with *that* path and skip the ladder; never scaffold a new default beside an env-declared root.
+
 Detect which of three states applies, in order:
 
 **(a) Vault resolvable.** `CLAUDRON_VAULT_PATH` is set (check with `printenv CLAUDRON_VAULT_PATH`), or `claudron` is on PATH (`command -v claudron`) and `claudron status --json` reports a vault path. Write the section with the resolved path (prefer the `~`-relative form when it's under the home directory) and the `(claudron vault)` annotation:
@@ -178,13 +180,14 @@ claudron is installed but no vault is initialized. Run:
 
   claudron init --personal
 
-then re-invoke /claudna:init-project — Step 7.5 will detect the vault and
-write the CLAUDE.md section.
+(if that flag is rejected, the CLI has moved — `claudron --help` shows the
+current form) then re-invoke /claudna:init-project — Step 7.5 will detect
+the vault and write the CLAUDE.md section.
 ```
 
-(If `claudron init --personal` is rejected, the flags have moved — `claudron --help` shows the current form.) Offer to re-run this step's detection once the user has initialized.
+Offer to re-run this step's detection once the user has initialized.
 
-**(c) No claudron.** Offer the minimal raw-tree scaffold. Ask where the shared root should live, defaulting to the **stable absolute `~/shared`** — never a cwd-relative sibling like `../shared`, which fragments the store per parent directory. On yes:
+**(c) No claudron.** Offer the minimal raw-tree scaffold. Ask where the shared root should live, defaulting to the **stable absolute `~/shared`** — never a cwd-relative sibling like `../shared`, which fragments the store per parent directory. If the user picks a path *inside this repo*, warn once before proceeding: shared docs are cross-project by doctrine (documentation-standard §10) — an in-repo root silently scopes them to this repo. On yes:
 
 1. Create `<root>/knowledge/<repo-name>/`, `<root>/planning/active/`, and `<root>/decisions/` (`mkdir -p`).
 2. Invoke `/claudna:index <root> --recursive` to write the stub INDEX.md files — index is the sole INDEX.md writer; don't write them by hand.
