@@ -581,7 +581,24 @@ Knowledge skills (`/claudna:remember`, `/claudna:index`) resolve the shared-docs
 
 Declined the seam during init? Re-run `/claudna:init-project` and Step 7.5 offers it fresh. Already have a section? Re-runs detect it and offer an update, never a duplicate.
 
-> Later phases of the integration epic ([#197](https://github.com/Claudfather/clauDNA/issues/197), phases #201–#204) append to this section as they land: the `/claudron` engine skill, engine-preferred recall and capture, reflect-at-compaction, and the notes/lessons disposition.
+### 7.3 The `/claudron` engine skill
+
+`/claudna:claudron` is the deliberate-save door to the vault — `write` (capture a note), `lookup` (search it), `status` (vault health, or whether Claudron is installed at all). It shells out to the `claudron` CLI per `skills/_shared/claudron-engine.md` and degrades loudly: with no vault, `write` points you at `/claudna:publish --to vault` and `status` reports the absence as a diagnostic rather than erroring. The skill never sets note maturity — the engine stamps `draft`. `/claudna:publish --to vault` routes through the same engine when a vault is present, and falls back to the raw tree otherwise.
+
+**Permissions.** The engine runs `claudron` subcommands plus a detection probe. Add to `permissions.allow` to avoid prompts:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(claudron *)",
+      "Bash(command -v claudron)"
+    ]
+  }
+}
+```
+
+> Later phases of the integration epic ([#197](https://github.com/Claudfather/clauDNA/issues/197), phases #202–#204) append to this section as they land: engine-preferred recall and capture, reflect-at-compaction, and the notes/lessons disposition.
 
 ---
 

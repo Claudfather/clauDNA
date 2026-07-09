@@ -1,7 +1,7 @@
 ---
 name: learn
 user-invocable: true
-description: "Use when the user shares external content worth keeping — an article, repo, video transcript, or documentation — and it should be ingested into the shared knowledge base. For capturing insights from the current session, use /claudna:reflect."
+description: "Use when the user shares external content worth keeping — an article, repo, video transcript, or documentation — and it should be ingested into the shared knowledge base. For capturing insights from the current session, use /claudna:reflect; for deliberately saving your own note to the fleet vault, use /claudna:claudron."
 argument-hint: "<url|path|text> [--repo name] [--tags a,b] [--full] [--update]"
 ---
 
