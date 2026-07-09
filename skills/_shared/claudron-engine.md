@@ -4,7 +4,7 @@ The Claudron-specific engine behavior, layered on `skills/_shared/infra-cli-cont
 
 `claudron` is a pre-1.0 external CLI. Two rules follow from that and govern everything below: **validate its envelope on every call** (never parse-and-guess an unrecognized shape), and **degrade loudly** (a fallback taken or an error hit is always visible, never silent).
 
-**Verb vocabulary.** clauDNA's vault-facing verbs are named for Claudron's CLI verbs — one word per concept across both tools, the same deference #199 set for the frontmatter *vocabulary* (rendered from Claudron's `SCHEMA.md`, output-guide §3), applied to verbs. Where a clauDNA skill wraps a Claudron primitive 1:1 it takes that primitive's name: `/claudna:claudron capture` → `capture`, `/claudna:claudron lookup` → `lookup`. `/claudna:recall` is the retrieve verb (Claudron's `recall`) — it prefers the engine once #202 wires it, and scans INDEX.md until then. The occasion-workflows `/claudna:learn`, `/claudna:reflect`, and `/claudna:publish` stay clauDNA-native: distinct authoring workflows that terminate in `capture`, not the primitive itself.
+**Verb vocabulary.** clauDNA's vault-facing verbs are named for Claudron's CLI verbs — one word per concept, extending to verbs the deference #199 set for the frontmatter *vocabulary* (output-guide §3). `/claudna:claudron`'s verbs mirror the CLI commands they wrap (the §2 table); `/claudna:recall` shares its name with Claudron's `recall`. The vault-writing occasion-workflows (documentation-standard §10's which-door table) stay clauDNA-native — they terminate in `capture`, they don't rename it.
 
 ## 1. The detection ladder
 

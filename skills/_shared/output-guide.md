@@ -53,7 +53,7 @@ The output target is a persistence decision, not a quality decision.
 >
 > **Claudron is not required.** This table remains the complete contract `/claudna:publish` enforces, and no skill invokes `claudron` at runtime — the SSOT link governs where vocabulary *changes* are ratified, not what users must install. Docs written without Claudron adopt cleanly later: its lenient tier accepts this vocabulary as-is (warnings at most, never errors).
 >
-> **Verbs, too.** The same deference governs clauDNA's vault-facing *verbs* — `/claudna:recall`, `/claudna:claudron capture`, and `/claudna:claudron lookup` are named for Claudron's `recall` / `capture` / `lookup` primitives, one word per concept across both tools. The verb contract lives in `skills/_shared/claudron-engine.md`.
+> **Verbs, too.** The same deference governs clauDNA's vault-facing *verbs*, named for Claudron's CLI primitives — the verb contract lives in `skills/_shared/claudron-engine.md`.
 
 Every doc an author hands to `/claudna:publish` carries YAML frontmatter. Publish validates these (and rejects malformed docs):
 

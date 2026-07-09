@@ -583,7 +583,7 @@ Declined the seam during init? Re-run `/claudna:init-project` and Step 7.5 offer
 
 ### 7.3 The `/claudron` engine skill
 
-`/claudna:claudron` is the deliberate-save door to the vault — `write` (capture a note), `lookup` (search it), `status` (vault health, or whether Claudron is installed at all). It shells out to the `claudron` CLI per `skills/_shared/claudron-engine.md` and degrades loudly: with no vault, `write` points you at `/claudna:publish --to vault` and `status` reports the absence as a diagnostic rather than erroring. The skill never sets note maturity — the engine stamps `draft`. `/claudna:publish --to vault` routes through the same engine when a vault is present, and falls back to the raw tree otherwise.
+`/claudna:claudron` is the deliberate-save door to the vault — `capture` (save a note), `lookup` (search it), `status` (vault health, or whether Claudron is installed at all). It shells out to the `claudron` CLI per `skills/_shared/claudron-engine.md` and degrades loudly: with no vault, `capture` points you at `/claudna:publish --to vault` and `status` reports the absence as a diagnostic rather than erroring. The skill never sets note maturity — the engine stamps `draft`. `/claudna:publish --to vault` routes through the same engine when a vault is present, and falls back to the raw tree otherwise.
 
 **Permissions.** The engine runs `claudron` subcommands plus a detection probe. Add to `permissions.allow` to avoid prompts:
 
