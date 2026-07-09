@@ -1,4 +1,4 @@
-Invoked by /claudna:claudron in write mode — the detection ladder (claudron-engine.md §1) has already run and returned a verdict. `write` needs **present-with-vault**; on present-no-vault or absent it fails loudly (Step 0). Do NOT skip the confirmation gate in Step 4.
+Invoked by /claudna:claudron in write mode — the detection ladder (claudron-engine.md §1) has already run. `write` needs present-with-vault (Step 0 gates). Do NOT skip the Step 4 confirmation gate.
 
 # Write
 

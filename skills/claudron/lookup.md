@@ -24,7 +24,7 @@ Validate the envelope (claudron-engine.md §2): `data.query` and `data.results` 
 - **Results present** → render each entry (title, path, status, and score if present), most-relevant first.
 - **Empty `results`** (exit 0) → report **"no results for '<terms>'"**. Claudron has no nearest-title / "did-you-mean" fallback — do **not** fabricate candidates. Suggest broadening the terms or adding `--include-archived`.
 
-Optionally, for a single clearly-top match, read and show its note body from that entry's `path` (resolve relative to the vault `root` reported by `claudron status`).
+Optionally, for a single clearly-top match, read and show its note body from that entry's `path` (resolve relative to the vault `root` already in the pre-flight status envelope — claudron-engine.md §1; no fresh `claudron status` call).
 
 ## Step 3: Report
 

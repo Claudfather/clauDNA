@@ -6,7 +6,7 @@ Report Claudron / vault health, or the fact that neither is configured. Read-onl
 
 ## Step 1: Resolve the verdict (claudron-engine.md §1)
 
-Run the detection ladder as separate Bash calls:
+`status` runs the detection ladder as its own body — as separate Bash calls:
 
 ```bash
 command -v claudron
@@ -16,7 +16,7 @@ command -v claudron
 claudron status --json
 ```
 
-Classify by result: **absent** (`command -v` fails) / **present-no-vault** (`status` exits 3 with `no vault found` on stderr) / **present-with-vault** (`status` exits 0 with an envelope).
+Classify strictly by the **§1 verdict table** (absent / present-no-vault / present-with-vault / engine-failure). Don't restate the criteria here — they can't be allowed to drift from §1.
 
 ## Step 2: Report the verdict
 
@@ -52,4 +52,4 @@ Classify by result: **absent** (`command -v` fails) / **present-no-vault** (`sta
 
 ## Step 3: `--auto`
 
-Emit the structured result (orchestration-guide.md "Structured Result Shape"): `artifacts.engine` = `"claudron"` (present-with-vault) / `"fallback"` (present-no-vault) / `"absent"`; `artifacts.verdict` = the ladder verdict. `outcome: "completed"` in **all three** states — a status report that ran is complete, and absence is a valid, non-error result, so `errors[]` stays empty for a clean absent / no-vault verdict. Only a malformed envelope or an unexpected non-zero exit populates `errors[]`.
+Emit the structured result (orchestration-guide.md "Structured Result Shape") with `artifacts.verdict` = the ladder verdict (`absent` / `present-no-vault` / `present-with-vault`). `status` reports state and never falls back, so it carries no `artifacts.engine` (claudron-engine.md §3). `outcome: "completed"` in **all three** states — a status report that ran is complete, and absence is a valid, non-error result, so `errors[]` stays empty for a clean verdict. Only a malformed envelope or an unexpected non-zero exit populates `errors[]`.

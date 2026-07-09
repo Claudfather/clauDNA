@@ -15,7 +15,7 @@ Run before any engine call, as separate Bash calls (never chained — infra-cli-
 | `claudron status --json` | exit 3 (stderr `no vault found`) | **present-no-vault** — installed but unconfigured |
 | `claudron status --json` | other non-zero | **engine failure** (§3) — surface stderr |
 
-`CLAUDRON_VAULT` (bare — the only var the CLI reads; `CLAUDRON_VAULT_PATH` is a clauDNA consumer alias the CLI does **not** honor) or a walk-up from cwd is how the CLI resolves the vault; the ladder never sets it (no clauDNA skill sets env — documentation-standard §10). If a `## Shared Documentation` section or `CLAUDRON_VAULT_PATH` names a root but `CLAUDRON_VAULT` is unset, the CLI will not see it — note the mismatch and point at `CLAUDRON_VAULT`.
+The CLI resolves the vault from `CLAUDRON_VAULT` or a walk-up from cwd; **which env var wins, and the section-vs-env precedence + mismatch behavior, live once in `documentation-standard.md` §10** ("locating the root"). The ladder only *acts* on that: it never sets env (no clauDNA skill does), and it flags a root the CLI can't see — a `## Shared Documentation` section or `CLAUDRON_VAULT_PATH` set while the bare `CLAUDRON_VAULT` the CLI reads is unset.
 
 Verdict → action:
 - **present-with-vault** → use the engine.
@@ -36,31 +36,41 @@ Assert on every call: top-level `ok` (bool) / `command` (matches the verb) / `da
 
 | Verb → CLI | `data` keys asserted |
 |---|---|
-| `write` → `capture` | `action` ∈ {`created`,`updated`,`suggest_update`,`suggest_supersede`,`rejected`}, `path`, `reason` |
+| `write` → `capture` | `action`, `path`, `reason` |
 | `lookup` → `lookup` | `query`, `results` (list) |
 | `status` → `status` | `root`, `tiers`, `total_docs`, `total_stale`, `projects`, `fleets`, `quarantined`, `index_present`, `index_fresh`, `warnings` |
 
 A missing top-level key, a `command` mismatch, or an absent expected `data` key is an **unrecognized envelope** → engine failure (§3). Do not parse a partial or guessed shape.
 
-`path` is **absolute** for `created`/`updated` but **vault-relative** for `suggest_*` — resolve accordingly.
+The `capture` `action` value drives the write flow — its five values and their meaning (the source of truth; consumers branch on these, they don't redefine them):
+
+| `action` | Meaning | `path` |
+|---|---|---|
+| `created` | new note written | absolute |
+| `updated` | addendum appended (only via `capture --update`) | absolute |
+| `suggest_update` | a **current** note already covers this | vault-relative |
+| `suggest_supersede` | the near-duplicate is **stale** | vault-relative |
+| `rejected` | validation failed; nothing written (exit 1) | — |
+
+The engine always stamps a new note `draft`; **consumers never set or promote `maturity`** — promotion is Claudron curation.
 
 ## 3. Failure posture — branch on the exit code, then degrade loudly
 
 | Exit | Meaning | Posture |
 |---|---|---|
 | **0** | success | parse the envelope; if `ok:false` with `errors[]`, surface them |
-| **1** | application refusal — `rejected` capture, or note already exists | surface `data.reason` + `errors[]`; **deterministic, never retry** |
-| **2** | usage / bad input — malformed args or stdin JSON | the skill built the call wrong — a **bug**; surface stderr verbatim, loud; never retry |
+| **1** | application refusal — `rejected` capture, or note already exists | surface `data.reason` + `errors[]`; deterministic, never retry |
+| **2** | usage / bad input — malformed args or stdin JSON | the skill built the call wrong — a bug; surface stderr verbatim; never retry |
 | **3** | environment — no vault, or `SyncError` (not a git repo / git missing / timeout) | the **degrade** case (below) |
 
-Transient failures (a retryable environment op) get a **bounded retry — 2 attempts, short backoff — then degrade**. `capture` is a local write with no lock in v0.2.0 (single-writer-per-machine; cross-machine serialization is git's job in `sync`), so retry targets genuinely transient exit-3 conditions — not lock contention (there is none), and never the deterministic exits 1/2.
+Transient exit-3 conditions get a **bounded retry — 2 attempts, short backoff** (a deliberate widening of infra-cli-contract §7's single retry) — then degrade. (`capture` is an unlocked local write in v0.2.0, so there is no lock contention to retry — cross-machine serialization is git's job in `sync`.)
 
-**Degrade loudly** on exit 3 or an unrecognized envelope:
-- **Consumer has a fallback** (`publish --to vault`, and later `learn`/`reflect`): take the raw-tree path and **say so** in the same breath — "Claudron vault unavailable — wrote to the raw tree; run `/claudna:index`."
-- **Consumer has none** (`/claudron write`): fail with the explicit reason + remedy (init pointer for no-vault; the git remedy for `SyncError`). There is no raw-tree fallback for `/claudron write` by design — an unguarded write door recreates the noise problem the vault exists to avoid.
+**Degrade loudly** on exit 3 or an unrecognized envelope — whether the ladder returned a non-usable verdict *or* a usable verdict turned into a failure mid-call:
+- **Consumer has a fallback** (`publish --to vault`, and later `learn`/`reflect`): take the raw-tree path and **say so** — "Claudron vault unavailable — wrote to the raw tree; run `/claudna:index`."
+- **Consumer has none** (`/claudron write`): fail with the explicit reason + remedy (init pointer for no-vault; the git remedy for `SyncError`). There is no raw-tree fallback for `/claudron write` by design — an unguarded write door recreates the noise the vault avoids.
 
-**In `--auto`** (orchestration-guide.md "Structured Result Shape"): any degradation lands in `errors[]`, and a taken fallback sets `artifacts.engine: "fallback"` (vs `"claudron"` on the engine path). Silence is the only forbidden outcome.
+**`--auto` result vocabulary** (the block itself is orchestration-guide.md's "Structured Result Shape"): writing consumers carry `artifacts.engine` — `"claudron"` on the engine path, `"fallback"` when degraded to the raw tree; reporting verbs (`status`) carry the ladder outcome in `artifacts.verdict` — `absent` / `present-no-vault` / `present-with-vault`. Any degradation lands in `errors[]`. Silence is the only forbidden outcome.
 
 ## 4. Fallback-freeze
 
-The raw-tree path is **frozen** compatibility behavior: the vault write + `/claudna:index` that runs when the engine is absent. No new capability lands on it — new features go on the engine path only. When the ladder says present-with-vault, prefer the engine; the raw tree is for degrade and absence, nothing else.
+The raw-tree path is **frozen** compatibility behavior: the vault write + `/claudna:index` that runs when the engine is absent. No new capability lands on it — new features go on the engine path only.

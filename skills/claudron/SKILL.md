@@ -28,17 +28,12 @@ For the selected verb, read ONLY its depth file in this skill directory and foll
 
 ## Pre-flight deltas (contract §4)
 
-Before any verb, run the **detection ladder in `skills/_shared/claudron-engine.md` §1** — it replaces the generic CLI-installed / auth / target-discovery ladder. It yields one of three verdicts (present-with-vault / present-no-vault / absent), and every verb branches on it:
-
-- `write` and `lookup` need **present-with-vault**. On present-no-vault or absent, `write` fails loudly — there is no raw-tree fallback for it (claudron-engine.md §3) — and `lookup` reports the same.
-- `status` runs in **all three** states: reporting the verdict + remedy *is* its job, so it never errors on a missing CLI or vault (see `status.md`).
-
-Every `--json` call is envelope-validated per claudron-engine.md §2, and failures follow the exit-code posture in §3.
+Each verb resolves its state through the **detection ladder in `skills/_shared/claudron-engine.md` §1** — it replaces the generic CLI-installed / auth / target-discovery pre-flight and yields one of three verdicts (present-with-vault / present-no-vault / absent). `write` and `lookup` run it at pre-flight and require present-with-vault; `status` runs it as its own Step 1 and reports the verdict in all three states. Each verb gates on the verdict in its depth file's Step 0. Every `--json` call is envelope-validated per §2; failures follow the exit-code posture in §3.
 
 **Door note (F1).** clauDNA ships no MCP servers — this engine *is* the CLI. If Claudron's own MCP tools are configured in the session, they are the same engine with equivalent semantics; the CLI is the contract floor this skill targets.
 
 ## Structured result (`--auto`)
 
-In `--auto`, each verb emits the single **structured result** JSON block defined in `skills/_shared/orchestration-guide.md` ("Structured Result Shape") as its final output — `artifacts.action` / `artifacts.path` / `artifacts.engine` (`"claudron"` on the engine path, `"fallback"` when degraded), any degradation in `errors[]`, and no interactive prompts. Per-verb details are in the depth files.
+In `--auto`, each verb's final output is the single **structured result** JSON block defined in `skills/_shared/orchestration-guide.md` ("Structured Result Shape") — writing verbs carry `artifacts.engine`, `status` carries `artifacts.verdict` (per claudron-engine.md §3), any degradation in `errors[]`, and no interactive prompts. Per-verb fields are defined in the depth files.
 
 `write` is this engine's mutating verb — its confirmation gate lives in `write.md`; `lookup` and `status` are read-only and never gate.
