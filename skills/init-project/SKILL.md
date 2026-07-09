@@ -3,6 +3,9 @@ name: init-project
 user-invocable: true
 description: "Use when setting up a new project or adding standard Claude Code configuration (CLAUDE.md, CHANGELOG.md, .claude/, documentation/) to an existing project."
 allowed-tools: Read(*), Write(*), Edit(*), Glob(*), Grep(*), Bash(git *), Bash(ls *), Bash(mkdir *), Bash(printenv *), Bash(command -v *), Bash(claudron status *)
+requires:
+  - cli: claudron
+    reason: "Optional — Step 7.5 vault detection only; every ladder branch degrades gracefully when absent (this is a soft dependency, not a functional requirement)"
 ---
 
 # Initialize Project
@@ -162,7 +165,7 @@ Provision the `## Shared Documentation` CLAUDE.md section — the root that `/cl
 
 Detect which of three states applies, in order:
 
-**(a) Vault resolvable.** `CLAUDRON_VAULT_PATH` is set (check with `printenv CLAUDRON_VAULT_PATH`), or `claudron` is on PATH (`command -v claudron`) and `claudron status --json` reports a vault path. Write the section with the resolved path (prefer the `~`-relative form when it's under the home directory) and the `(claudron vault)` annotation:
+**(a) Vault resolvable.** `CLAUDRON_VAULT` or `CLAUDRON_VAULT_PATH` is set (check with `printenv CLAUDRON_VAULT CLAUDRON_VAULT_PATH` — Claudron's shipped CLI reads the bare form; accept both, bare form first), or `claudron` is on PATH (`command -v claudron`) and `claudron status --json` reports a vault path. Write the section with the resolved path (prefer the `~`-relative form when it's under the home directory) and the `(claudron vault)` annotation:
 
 ```markdown
 ## Shared Documentation
@@ -173,16 +176,17 @@ Cross-project knowledge lives here — see /claudna:remember.
 
 Detection is read-only (`claudron status` is safe to run). **Print-not-execute for anything mutating:** never run `claudron init`, `claudron migrate`, or any other writing claudron command — show the command and let the user run it.
 
-**(b) claudron present, no vault.** `claudron` is on PATH but no vault resolves (no env var, and `claudron status --json` errors or reports no vault). Print the remedy — do not run it, and do **not** scaffold a raw tree (it would shadow the vault the user is about to create):
+**(b) claudron present, no vault.** `claudron` is on PATH but no vault resolves (no env var, and `claudron status` exits non-zero with a stderr message — it never emits JSON on the no-vault path). Print the remedy — do not run it, and do **not** scaffold a raw tree (it would shadow the vault the user is about to create):
 
 ```
 claudron is installed but no vault is initialized. Run:
 
-  claudron init --personal
+  claudron init ~/vault --personal
 
-(if that flag is rejected, the CLI has moved — `claudron --help` shows the
-current form) then re-invoke /claudna:init-project — Step 7.5 will detect
-the vault and write the CLAUDE.md section.
+(the path is where your vault will live — pick your own; if the command is
+rejected, the CLI has moved — `claudron --help` shows the current form) then
+re-invoke /claudna:init-project — Step 7.5 will detect the vault and write
+the CLAUDE.md section.
 ```
 
 Offer to re-run this step's detection once the user has initialized.

@@ -562,7 +562,7 @@ The `/claudna:worktree` skill manages this interactively if you'd rather not mem
 
 Knowledge skills (`/claudna:remember`, `/claudna:index`) resolve the shared-docs root through two doors, env first:
 
-1. **Env override:** `CLAUDRON_VAULT_PATH` (engine-managed vault) or `SHARED_DOCS_PATH` (raw tree). Set these yourself if you want them — the plugin never writes env vars, shell profiles, or `~/.claude/settings.json`.
+1. **Env override:** `CLAUDRON_VAULT` or `CLAUDRON_VAULT_PATH` (engine-managed vault — Claudron's CLI reads the bare form; clauDNA accepts both) or `SHARED_DOCS_PATH` (raw tree). Set these yourself if you want them — the plugin never writes env vars, shell profiles, or `~/.claude/settings.json`.
 2. **CLAUDE.md section:** a `## Shared Documentation` section whose first non-empty line is the root path, optionally annotated `(claudron vault)` for engine-managed roots. `/claudna:init-project` (Step 7.5) provisions it; the parse contract lives in `skills/_shared/documentation-standard.md` §10.
 
 **Precedence:** env wins. If both are set and disagree, consumers use the env value and print a mismatch notice.
@@ -575,7 +575,7 @@ Knowledge skills (`/claudna:remember`, `/claudna:index`) resolve the shared-docs
 
 | State | What init-project does |
 |---|---|
-| **Vault resolvable** — `CLAUDRON_VAULT_PATH` set, or `claudron status --json` resolves | Writes the CLAUDE.md section with the vault path + `(claudron vault)` annotation. Detection is read-only; nothing mutating is executed. |
+| **Vault resolvable** — `CLAUDRON_VAULT` (or `CLAUDRON_VAULT_PATH`) set, or `claudron status --json` resolves | Writes the CLAUDE.md section with the vault path + `(claudron vault)` annotation. Detection is read-only; nothing mutating is executed. |
 | **claudron installed, no vault** | Prints `claudron init --personal` for you to run, then offers to re-detect. No raw tree is scaffolded — it would shadow the vault you're about to create. |
 | **No claudron** | Offers a minimal raw tree (`knowledge/<repo>/`, `planning/active/`, `decisions/` + stub INDEX.md files) at a path you choose — default `~/shared`, stable and absolute — then writes the section without annotation. |
 
