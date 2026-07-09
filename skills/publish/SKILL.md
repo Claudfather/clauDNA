@@ -34,22 +34,14 @@ Validate required fields exist and are well-formed:
 | Field | Rule |
 |-------|------|
 | `title` | non-empty string |
-| `type` | one of: `plan`, `decision`, `knowledge`, `runbook`, `audit`, `review` |
-| `status` | valid for the `type` (see table) |
+| `type` | a valid note type — vocabulary table in `skills/_shared/output-guide.md` §3 (the repo's only enum table, rendered from the Claudron SSOT) |
+| `status` | valid for the `type` per the §3 vocabulary table: canonical values pass silently; accepted legacy values (e.g. `active` on a knowledge doc) pass with a one-line mapping note — never a rejection |
 | `owner` | non-empty string |
 | `created` | valid `YYYY-MM-DD` |
 
-Type-dependent `status` values:
-
-| Type | Valid statuses |
-|------|----------------|
-| `plan` | draft, active, completed, superseded |
-| `knowledge` | current, stale, superseded |
-| `decision` | draft, ratified, superseded |
-| `runbook` | current, stale, superseded |
-| `audit`, `review` | draft, completed |
-
 Optional fields: `tags` (→ issue labels), `repos` (→ vault dir + repo inference), `links` (publish writes the destination URL back here), `updated`, `expires`, `description`.
+
+Pass-through fields (accepted, never rejected, never required — output-guide §3): `maturity`, `schema_version`, and any `x-*`-prefixed field. Publish carries them through untouched and never validates their values.
 
 ### 1b. Body skeleton (per `type:`)
 
