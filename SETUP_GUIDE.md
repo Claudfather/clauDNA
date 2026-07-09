@@ -17,8 +17,9 @@ If all you need is "install clauDNA", read the README. Come here when something 
 4. [Headless / CI / Docker Provisioning](#4-headless--ci--docker-provisioning)
 5. [Snowflake Key-Pair Authentication](#5-snowflake-key-pair-authentication)
 6. [Shell Configuration](#6-shell-configuration)
-7. [Telemetry](#7-telemetry)
-8. [Troubleshooting](#8-troubleshooting)
+7. [Claudron Integration](#7-claudron-integration)
+8. [Telemetry](#8-telemetry)
+9. [Troubleshooting](#9-troubleshooting)
 9. [Appendix A: Boris Cherny's Key Tips](#appendix-a-boris-chernys-key-tips)
 10. [Appendix B: Workflow Orchestration Principles](#appendix-b-workflow-orchestration-principles)
 
@@ -514,7 +515,7 @@ output_format = psql
 snowsql -c default -q "SELECT CURRENT_USER(), CURRENT_ROLE(), CURRENT_WAREHOUSE();"
 ```
 
-No browser should open. If one does, see [Troubleshooting](#7-troubleshooting).
+No browser should open. If one does, see [Troubleshooting](#9-troubleshooting).
 
 ---
 
@@ -553,7 +554,38 @@ The `/claudna:worktree` skill manages this interactively if you'd rather not mem
 
 ---
 
-## 7. Telemetry
+## 7. Claudron Integration
+
+[Claudron](https://github.com/Claudfather/Claudron) is the shared-knowledge engine clauDNA's knowledge skills integrate with. The integration is deliberately loose: everything works without Claudron, and every seam degrades to plain files.
+
+### 7.1 The shared-docs seam
+
+Knowledge skills (`/claudna:remember`, `/claudna:index`) resolve the shared-docs root through two doors, env first:
+
+1. **Env override:** `CLAUDRON_VAULT_PATH` (engine-managed vault) or `SHARED_DOCS_PATH` (raw tree). Set these yourself if you want them — the plugin never writes env vars, shell profiles, or `~/.claude/settings.json`.
+2. **CLAUDE.md section:** a `## Shared Documentation` section whose first non-empty line is the root path, optionally annotated `(claudron vault)` for engine-managed roots. `/claudna:init-project` (Step 7.5) provisions it; the parse contract lives in `skills/_shared/documentation-standard.md` §10.
+
+**Precedence:** env wins. If both are set and disagree, consumers use the env value and print a mismatch notice.
+
+**Annotation semantics:** a `(claudron vault)` root is engine-indexed and carries no INDEX.md. Consumers never INDEX-scan it or suggest `/claudna:index` against it — without the engine they degrade with "engine-managed root; install claudron or point the section at a raw tree."
+
+### 7.2 The three detection states
+
+`/claudna:init-project` Step 7.5 detects which state you're in and provisions accordingly:
+
+| State | What init-project does |
+|---|---|
+| **Vault resolvable** — `CLAUDRON_VAULT_PATH` set, or `claudron status --json` resolves | Writes the CLAUDE.md section with the vault path + `(claudron vault)` annotation. Detection is read-only; nothing mutating is executed. |
+| **claudron installed, no vault** | Prints `claudron init --personal` for you to run, then offers to re-detect. No raw tree is scaffolded — it would shadow the vault you're about to create. |
+| **No claudron** | Offers a minimal raw tree (`knowledge/<repo>/`, `planning/active/`, `decisions/` + stub INDEX.md files) at a path you choose — default `~/shared`, stable and absolute — then writes the section without annotation. |
+
+Declined the seam during init, or set up shared docs later? Re-run `/claudna:init-project` — re-runs detect an existing section and offer an update, never a duplicate.
+
+> Later phases of the integration epic ([#197](https://github.com/Claudfather/clauDNA/issues/197), phases #201–#204) append to this section as they land: the `/claudron` engine skill, engine-preferred recall and capture, reflect-at-compaction, and the notes/lessons disposition.
+
+---
+
+## 8. Telemetry
 
 clauDNA can emit lightweight telemetry events when skills are invoked. Events are **local-only** -- written to a JSONL file on disk. clauDNA does not phone home. The fleet observability system (Claudlobby) can optionally push these events to Claudosseum.
 
@@ -601,7 +633,7 @@ Claudlobby's fleet observability system can read `skill-events.jsonl` and option
 
 ---
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 ### Snowflake: "JWT token is invalid"
 
