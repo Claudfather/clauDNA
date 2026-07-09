@@ -25,7 +25,7 @@ An engine's `SKILL.md` contains routing and contract references only: frontmatte
 Run before any verb, in order, stopping at the first failure with concrete guidance:
 
 1. **CLI installed** — `<tool> --version`. Engines declare their fallback (e.g. modal: `python -m modal --version`; if only the fallback works, prefix all subsequent commands accordingly) and their minimum-version gate where one exists (e.g. railway ≥ 4.27.3 → `npm update -g @railway/cli`). Run candidate checks as separate parallel Bash calls, never chained.
-2. **Authenticated** — the tool's auth probe (`modal token info`, `railway whoami`, `vercel whoami`, `neonctl me`). On failure, give the tool's login command; do not continue.
+2. **Authenticated** — the tool's auth probe (`modal token info`, `railway whoami --json`, `vercel whoami --token "$VERCEL_TOKEN"`, `neonctl me`). The probe **must be non-interactive**: fail fast on missing/invalid credentials — never launch an interactive or device-code login, which blocks forever unattended (#216). Where a bare probe would fall through to interactive login (vercel), the engine's delta supplies the guarded form. On failure, give the tool's login command; do not continue.
 3. **Target discovery** — the verb's subject (app file, service, project, connection string) per the engine's delta: config files first (`.modal.toml`, `railway.json`, `vercel.json`, `.env`/`DATABASE_URL`), then codebase search, then ask the user.
 
 ## 5. Execution conventions
