@@ -167,7 +167,7 @@ Four surfaces write vault-ward — partitioned by intent:
 
 | Intent | Door |
 |---|---|
-| Deliberate save — "note this down for the fleet" | The `/claudron` engine's write verb (ships with epic #197 P4; until then, `/claudna:publish --to vault`) |
+| Deliberate save — "note this down for the fleet" | `/claudna:claudron write` — needs the Claudron CLI; without it, `/claudna:publish --to vault` |
 | Ingest external content — article, repo, transcript | `/claudna:learn` |
 | Distill the current session's learnings | `/claudna:reflect` |
 | Route a finished, frontmattered doc | `/claudna:publish --to vault` |

@@ -1,7 +1,7 @@
 ---
 name: publish
 user-invocable: true
-description: "Use when a finished markdown document — plan, audit or review findings, retro, decision, or knowledge page — needs to reach its destination: the shared-docs vault, the repo's documentation/ tree, a GitHub issue, a PR description, the chat session, or a Notion page. The single output sink: skills author content, publish delivers it."
+description: "Use when a finished markdown document — plan, audit or review findings, retro, decision, or knowledge page — needs to reach its destination: the shared-docs vault, the repo's documentation/ tree, a GitHub issue, a PR description, the chat session, or a Notion page. The single output sink: skills author content, publish delivers it. For a quick vault note rather than a finished document, use /claudna:claudron."
 argument-hint: "<source-file-or-dir> [--to vault|docs|github-issue|github-pr|session|notion] [--dir <path>] [--update <issue#|url>] [--repo <name>] [--dry-run]"
 ---
 
@@ -67,7 +67,17 @@ Two disk-backed adapters serve two different planes — the plane doctrine and w
 
 *(`--to disk` is the deprecated alias — warn once, continue as `vault`.)*
 
-Write the doc to the appropriate shared-docs vault directory based on the `type:` field:
+This plane has two backends — a Claudron vault (engine) and a raw tree (fallback). Run the **detection ladder in `skills/_shared/claudron-engine.md` §1** first, then route:
+
+**Engine path — verdict present-with-vault.** Route the finished doc through Claudron rather than writing files directly; map its frontmatter onto a capture call:
+
+```bash
+claudron capture --type <type> --title "<title>" --body "<body>" --tags "<tags>" --project <repo> --json
+```
+
+`--project` comes from the doc's `repos:` / `--repo` (omit if unscoped); for a long body pass the finding as JSON via `--stdin` (write.md Step 3). Validate the envelope (claudron-engine.md §2) and branch on `data.action`: `created` → report `data.path`; `suggest_update` / `suggest_supersede` → surface `data.reason` and the existing note to the caller (the engine's index-backed dedup replaces the raw adapter's file-compare); `rejected` (exit 1) → surface the validation errors. Do **not** run `/claudna:index` — the vault is engine-indexed (documentation-standard §10). Maturity is never set here; the engine stamps `draft`.
+
+**Fallback path — verdict present-no-vault or absent** (frozen behavior). Say so — "Claudron vault unavailable — writing the raw tree" — then write the doc to the raw-tree directory for its `type:`:
 
 | Type | Destination |
 |------|-------------|
@@ -77,13 +87,9 @@ Write the doc to the appropriate shared-docs vault directory based on the `type:
 | runbook | `shared/runbooks/` |
 | audit, review | `shared/planning/active/` |
 
-If the file already exists at the destination, compare and warn before overwriting (this is the vault adapter's dedup).
+If the file already exists, compare and warn before overwriting (the raw adapter's dedup). After writing: (1) run `/claudna:index` on the destination to update INDEX.md; (2) report the path. In `--auto`, the fallback sets `artifacts.engine: "fallback"` and notes the degradation in `errors[]` (claudron-engine.md §3).
 
-**Plane-fit advisory:** a `plan`/`audit`/`review` doc landing here gets a one-line note — "unusual plane for this type: work-in-flight planning usually belongs in the repo's `documentation/` tree (docs adapter)". Advisory only, never a block — fleet workflows legitimately share plans vault-side.
-
-After writing:
-1. Run `/claudna:index` on the destination directory to update INDEX.md.
-2. Report the file path written.
+**Plane-fit advisory** (either path): a `plan`/`audit`/`review` doc landing vault-ward gets a one-line note — "unusual plane for this type: work-in-flight planning usually belongs in the repo's `documentation/` tree (docs adapter)". Advisory only, never a block — fleet workflows legitimately share plans vault-side.
 
 ### Adapter: docs
 
