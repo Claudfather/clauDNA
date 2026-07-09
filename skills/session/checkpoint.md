@@ -1,6 +1,6 @@
 Invoked by /claudna:session in checkpoint mode — a mid-session save without the full handoff ceremony. New in the engine (no standalone predecessor): use it before risky work, before a compaction, or whenever losing the last hour would hurt — without ending the session.
 
-**What checkpoint deliberately does NOT do** (that `handoff` does): no reaper pass, no full live scan, no `.gitignore` management, no user approval round, no legacy-path handling. It appends and refreshes — the ceremony stays with `handoff`.
+**What checkpoint deliberately does NOT do**: no reaper pass, no full live scan, no `.gitignore` management, no user approval round, and no legacy-path import, which lives in `resume`. It appends and refreshes — the ceremony stays with `handoff`.
 
 Target: under 20 seconds.
 
