@@ -57,6 +57,18 @@ After ANY correction from the user:
 
 <!-- Static sections above, project-specific sections below. Keep this order for prompt cache efficiency. -->
 
+<!-- Optional: shared-docs seam. /claudna:init-project Step 7.5 replaces this block with a
+     real section when a shared knowledge root exists; to add it by hand, uncomment and set
+     the path (first non-empty line = root path; append `(claudron vault)` only for an
+     engine-managed root). Contract: skills/_shared/documentation-standard.md §10.
+     Delete this block if the project doesn't use shared docs.
+
+## Shared Documentation
+
+~/shared
+Cross-project knowledge lives here — see /claudna:remember.
+-->
+
 ---
 
 ## Project Overview
