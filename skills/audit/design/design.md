@@ -80,7 +80,7 @@ Ask: **"Which would you like me to design? Pick by number or adjust."** Wait for
 
 ### Step 6: Generate Phased Design Docs
 
-Output to `documentation/planning/phases/<session_name>_<YYYY-MM-DD>/`. Overview + numbered docs (1 PR each). Orchestration guide Section 9.
+Output lands in `documentation/planning/phases/<session_name>_<YYYY-MM-DD>/` — Plan agents write the family to the session's scratch docs directory and the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/phases/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide Section 3). Overview + numbered docs (1 PR each). Orchestration guide Section 9.
 
 Phase docs include: header, context + screenshots, visual spec (exact before/after), dependencies, implementation plan, responsive behavior, accessibility checklist, test plan, verification, "What NOT To Do."
 
@@ -111,7 +111,7 @@ This lens supports `--output github`, `--output session` (the engine default, co
 Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Apply `design` label. Include SAFE vs RISK classification in issue body.
 - For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs`: follow the subagent workflow in the orchestration guide
+- For `docs`: follow the subagent workflow in the orchestration guide (publish step: `--dir documentation/planning/phases/<session_name>_<YYYY-MM-DD>/`)
 
 After creating issues, present the batch summary and return issue URLs for audit tracking.
 

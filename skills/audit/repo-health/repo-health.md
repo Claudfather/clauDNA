@@ -79,7 +79,7 @@ Follow the output guide at `skills/_shared/output-guide.md`. Beyond the shared `
 
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Create one issue per repo with actionable findings (stale branches, failing CI, PRs needing review). Label with `auto-audit` and `repo-health`.
 - For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs`: write the dashboard and priority recommendations to `documentation/planning/repo_health/<session_name>_<YYYY-MM-DD>/` (underscore form, matching the `tech_debt/` planning-dir convention)
+- For `docs`: author the dashboard and priority recommendations as a publishable doc in scratch named `00_REPO_HEALTH.md` (master-class: no §4.1 skeleton required — publish Step 1b), then `/claudna:publish <file> --to docs --dir documentation/planning/repo_health/<session_name>_<YYYY-MM-DD>/` (underscore form, matching the `tech_debt/` planning-dir convention)
 
 ---
 

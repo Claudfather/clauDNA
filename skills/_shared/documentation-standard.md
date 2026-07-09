@@ -1,6 +1,6 @@
 # Documentation Standard
 
-Shared reference for skills that read from or write to the `documentation/` directory. Skills reference this file at `skills/_shared/documentation-standard.md`.
+Shared reference for skills that read from or write to the two documentation planes — the per-project `documentation/` tree (§1–§9) and the plane doctrine covering both it and the shared-docs vault (§10). Skills reference this file at `skills/_shared/documentation-standard.md`.
 
 ---
 
@@ -30,19 +30,27 @@ Every repo initialized with `/claudna:init-project` has this structure:
     └── archive/                     # Completed plans moved here
 ```
 
-## 2. Planning Output Paths
+## 2. Planning Output Paths — the `--dir` registry
 
-When writing planning output (default `--output docs` target), use these paths:
+Planning output (the default `--output docs` target) routes through `/claudna:publish --to docs --dir <path>` — the author writes its doc(s) to a scratch directory and publish validates + places them. This table is the `--dir` registry: each skill passes its category directory **with its session directory appended** (`<category>/<session-name>_<YYYY-MM-DD>/`, §3) — publish places docs into exactly the `--dir` it receives, no path composition of its own.
 
-| Skill | Output directory |
+| Skill | `--dir` |
 |-------|-----------------|
 | `/claudna:audit tech-debt` | `documentation/planning/tech_debt/` |
-| `/claudna:product-enhance` | `documentation/planning/phases/` |
 | `/claudna:audit security` | `documentation/planning/security/` |
 | `/claudna:audit access-path` | `documentation/planning/access-paths/` |
+| `/claudna:audit frontend-perf` | `documentation/planning/performance/` |
+| `/claudna:audit design` | `documentation/planning/phases/` |
+| `/claudna:audit repo-health` | `documentation/planning/repo_health/` |
+| `/claudna:audit data-model` | `documentation/planning/data-model/` |
+| `/claudna:product-enhance` | `documentation/planning/phases/` |
 | `/claudna:product-vision` | `documentation/planning/product-vision/` |
+| `/claudna:investigate-app` | `documentation/planning/investigations/` |
+| `/claudna:development-retro` | `documentation/planning/retros/` |
+| `/claudna:weigh-development-paths` | `documentation/planning/decisions/` |
+| `/claudna:forge` (docs output) | `documentation/planning/<topic-slug>/` |
 
-If the target directory doesn't exist, create it (with `.gitkeep`) before writing. Don't fail on missing directories.
+If the target directory doesn't exist, publish creates it before writing (Write tool creates parents). Don't fail on missing directories. Categories beyond §1's scaffolded tree (`performance/`, `repo_health/`, `data-model/`, `retros/`, `decisions/`) are created on demand the same way.
 
 ## 3. Session Naming
 
@@ -114,3 +122,29 @@ grep -r "PENDING" documentation/planning/
 ## 9. PROJECT_MISSION.md
 
 Lives at repo root (not in `documentation/`). Contains a one-paragraph mission statement: what this project does, who it's for, what success looks like. Read by `/claudna:product-vision` to anchor ideation. Created by `/claudna:init-project`, refined by `/mission`.
+
+## 10. The Two Documentation Planes
+
+Documentation lives on two planes, and `/claudna:publish` is the single router over both. Plane fit is advised, never blocked (see the publish adapters).
+
+| | `documentation/` (this standard, §1–§9) | The shared-docs vault |
+|---|---|---|
+| **Content** | Work-in-flight + repo-coupled records: plans, audits, reviews, ADRs, specs, guides | Cross-project referential knowledge: knowledge pages, runbooks, cross-repo decisions, reflections |
+| **Lives** | In the repo, versioned with the code | Outside any one repo (`shared/{knowledge,decisions,runbooks,planning/…}` raw tree, or a Claudron vault) |
+| **Reviewed via** | Pull requests | Lifecycle management (status/supersession; curation) |
+| **Discovered via** | git + status-marker greps (§8) | INDEX.md (`/claudna:index` writes it, `/claudna:remember` scans it) |
+| **Visibility** | Public when the repo is | Private by default |
+| **Publish adapter** | `--to docs --dir <path>` (§2 registry) | `--to vault` (the default adapter) |
+
+### Which door writes the vault?
+
+Four surfaces write vault-ward — partitioned by intent:
+
+| Intent | Door |
+|---|---|
+| Deliberate save — "note this down for the fleet" | The `/claudron` engine's write verb (ships with epic #197 P4; until then, `/claudna:publish --to vault`) |
+| Ingest external content — article, repo, transcript | `/claudna:learn` |
+| Distill the current session's learnings | `/claudna:reflect` |
+| Route a finished, frontmattered doc | `/claudna:publish --to vault` |
+
+Skills writing the `documentation/` plane are not listed here — they all go through `publish --to docs` per the §2 registry.

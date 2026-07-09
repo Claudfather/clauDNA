@@ -19,7 +19,7 @@ Parse `$ARGUMENTS` at invocation:
 - **First positional arg:** Topic description, issue URL, or path to an existing rough plan. If omitted, prompt for it.
 - `--auto`: Non-interactive mode. Suppresses Plan Mode and all interactive gates. Requires topic in `$ARGUMENTS`. Emits structured-result JSON and stops.
 - `--output github`: Publish the plan as a §4.1 GitHub Issue via `/claudna:publish --to github-issue` — the shared, implement-plan-ready contract. The Issue body is the canonical, iterable plan.
-- `--output docs`: Publish to disk via `/claudna:publish` — a PR-reviewable plan directory; choose this when git diffs matter (large or contentious plans).
+- `--output docs`: Publish to the repo's `documentation/` tree via `/claudna:publish --to docs` — a PR-reviewable plan directory; choose this when git diffs matter (large or contentious plans).
 - `--output session`: Present the plan in chat only (default).
 
 Default (no flag): Interactive mode, session output.
@@ -85,7 +85,7 @@ For each risk, draft a mitigation. If no mitigation exists, flag it as an open r
 
 Forge authors in the **shared §4.1 publishable-doc contract** (`skills/_shared/output-guide.md` §3 frontmatter + §4.1 body) — the same contract the audit lenses (`/claudna:audit tech-debt`, `/claudna:audit security`, et al.) emit — so `/claudna:publish` can route it and `/implement-plan` can consume it. Forge's distinctive sections (Decision Forks, Architecture, Sequencing) ride **alongside** the §4.1 skeleton as added sections; publish validates the skeleton's presence, not its exclusivity.
 
-Per **F7**, a multi-phase plan is **one epic/overview doc + one §4.1 doc per phase** (§4.1 is "one phase per issue"; this mirrors the disk `00_overview` + phase-docs pattern). A single-phase plan is one §4.1 doc.
+Per **F7**, a multi-phase plan is **one epic/overview doc + one §4.1 doc per phase** (§4.1 is "one phase per issue"; this mirrors the docs-plane `00_overview` + phase-docs pattern). A single-phase plan is one §4.1 doc.
 
 **Per-phase doc** — one phase = one issue / one PR's worth of work:
 
@@ -200,10 +200,10 @@ Present the plan in chat with a summary:
 Forge is an *author*, not a publisher: it produces a §4.1 publishable doc and hands it to `/claudna:publish` — the same shared adapter every other planning skill uses (`skills/_shared/output-guide.md` §7). Forge never calls `gh` directly and never writes a bespoke planning PR.
 
 1. Write the plan as a publishable doc: house-style frontmatter (output-guide §3) + the §4.1 body skeleton (§4.1 — `## Summary`, `## Evidence`, `## Implementation Plan` with `### Dependencies`/`### Blocks`/`### Steps`, `## Test Plan`, `## Verification Checklist`, `## What NOT To Do`, `## Context`), plus a `## Decision Forks` section.
-2. **Multi-phase → epic + per-phase docs (F7).** §4.1 is "one phase per issue," so a multi-phase plan becomes an epic/overview doc plus one §4.1 doc per phase (mirrors the disk `00_overview` + phase-docs pattern). A single-phase plan may be one doc.
+2. **Multi-phase → epic + per-phase docs (F7).** §4.1 is "one phase per issue," so a multi-phase plan becomes an epic/overview doc plus one §4.1 doc per phase (mirrors the docs-plane `00_overview` + phase-docs pattern). A single-phase plan may be one doc.
 3. Route to the requested target:
    - `--output github` → `/claudna:publish <doc> --to github-issue --repo <repo>`
-   - `--output docs` → `/claudna:publish <doc>` (disk → a PR-reviewable plan directory)
+   - `--output docs` → write the doc(s) to a scratch directory — multi-phase named `00_OVERVIEW.md` + `NN_<slug>.md` (family mode's required shape) — then `/claudna:publish <scratch-file-or-dir> --to docs --dir documentation/planning/<topic-slug>/<session>_<date>/` (the PR-reviewable plan directory)
 4. **F7 issue generation** — with `--output github` and a multi-phase plan, forge publishes the *whole family*, epic first, then cross-links:
    1. Publish the epic doc → note its issue number `E`.
    2. Publish each per-phase doc in phase order. Every phase doc's `## Summary` opens with `Part of #E (<track>). Size: <S/M/L/XL>.` and its `### Dependencies` names the phase issues it waits on — the numbers exist because publication follows phase order.
@@ -247,7 +247,7 @@ The hardening loop's **author** step. `/ironclad` posts lens findings as comment
 
 1. **Read the live Issue** — the body (canonical plan) plus every comment since the last re-forge: lens findings + collaborator input. Treat the Issue head as truth; never overwrite from a stale local copy.
 2. **Fold each open finding** — make the smallest body edit that resolves it, or, if it's a genuine choice, add/update a `## Decision Forks` entry. **Preserve locked content**: do not reopen a `[FORK-LOCK]`'d fork or rewrite a settled phase without a `[FORK-REOPEN F<N>]`.
-3. **Snapshot before rewrite** — post the prior body as a comment so the comment ledger is the version history (the diff you'd otherwise get from a PR; this is why F6 keeps disk/PR available when diffs matter more).
+3. **Snapshot before rewrite** — post the prior body as a comment so the comment ledger is the version history (the diff you'd otherwise get from a PR; this is why F6 keeps the docs/PR target available when diffs matter more).
 4. **Lock decided forks** — when a fork is ratified, post `[FORK-LOCK F<N>]` (ratifier + evidence) and mirror `Status: locked` into the body.
 5. **Re-publish** the updated body via `/claudna:publish <doc> --to github-issue --repo <repo> --update <issue>` — the explicit in-place path, not the dedup-mediated create path. Report what changed this cycle.
 

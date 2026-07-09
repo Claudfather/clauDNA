@@ -434,7 +434,7 @@ For direct paths (A and B): the queue contains a single item. Steps 2-9 execute 
 
 After the work item is loaded into the queue (Step 1), validate that the plan body has enough detail to implement.
 
-**A plan is "implementable" if its body contains an `## Implementation Plan` section** with a `### Steps` (or equivalent step-by-step prose) sub-section. This convention is set by the output-guide (`skills/_shared/output-guide.md` §4.1) — every planning skill writing to GitHub Issues produces this section. Plans on disk (`documentation/planning/`) follow the phase-doc structure (orchestration guide §5) which always includes a "Detailed Implementation Plan" section.
+**A plan is "implementable" if its body contains an `## Implementation Plan` section** with a `### Steps` (or equivalent step-by-step prose) sub-section. This convention is set by the output-guide (`skills/_shared/output-guide.md` §4.1) — every planning skill produces this section on every target: GitHub Issues carry it directly, and phase docs on disk (`documentation/planning/`) are the same publishable-doc shape (planning-standard's content sections map onto the §4.1 skeleton — see its mapping table; older docs may carry the legacy "Detailed Implementation Plan" heading instead).
 
 **If the plan IS implementable:** proceed to Step 2.
 

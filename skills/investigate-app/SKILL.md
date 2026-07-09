@@ -73,7 +73,7 @@ Ask the user: **"Which fixes would you like me to plan? Pick by number, or tell 
 
 Generate implementation plans for approved fixes. Ask user for a session name (e.g., `api-500s`).
 
-**Output:** `documentation/planning/investigations/<session_name>_<YYYY-MM-DD>/` -- `00_INVESTIGATION.md` (full record) plus numbered fix docs. Archive convention: orchestration guide, Section 8.
+**Output** lands in `documentation/planning/investigations/<session_name>_<YYYY-MM-DD>/` -- `00_INVESTIGATION.md` (full record) plus numbered fix docs. Plan agents write the family to the session's scratch docs directory and the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/investigations/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide, Section 3). Archive convention: orchestration guide, Section 8.
 
 **Subagent workflow:** Orchestration guide, Section 9. Plan agents read from the scratch directory. Keep fix docs proportional to complexity.
 

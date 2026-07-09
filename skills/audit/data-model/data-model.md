@@ -81,7 +81,7 @@ This lens supports `--output github` and `--output session` (contract §2) in ad
 Follow the output guide at `skills/_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Create one issue per ranked finding (Schema Gap, Structural Friction, Performance Anti-pattern, etc.). Label with `auto-audit` and the finding category.
 - For `session` (default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs`: write the full ranked findings report to `documentation/planning/data-model/<session_name>_<YYYY-MM-DD>/`
+- For `docs`: author the full ranked findings report as a publishable doc in scratch named `00_DATA_MODEL_AUDIT.md` (master-class: no §4.1 skeleton required — publish Step 1b), then `/claudna:publish <file> --to docs --dir documentation/planning/data-model/<session_name>_<YYYY-MM-DD>/`
 
 ---
 

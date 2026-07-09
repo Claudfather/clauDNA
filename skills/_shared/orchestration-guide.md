@@ -74,7 +74,7 @@ Full research: /tmp/audit-2026-02-17_143022/research/auth-flow.md
 
 ## 3. Plan Agent → Disk Pattern
 
-Plan agents read research from disk, read this guide for quality standards, and write final docs directly to the output directory.
+Plan agents read research from disk, read this guide for quality standards, and write final docs into the session's **scratch docs directory** (`/tmp/<skill>-<timestamp>/docs/`). The orchestrator then publishes the finished family in one call — placement into `documentation/` is `/claudna:publish`'s job, never the agents' and never the orchestrator's own Write calls.
 
 ### Launch prompt template for Plan agents
 
@@ -84,14 +84,16 @@ The orchestrator constructs a prompt for each Plan agent that includes:
 ## Setup
 
 1. Read skills/_shared/planning-standard.md — follow the Quality
-   Standard and Phase Doc Structure exactly.
+   Standard and Phase Doc Structure exactly (docs are publishable docs:
+   output-guide §3 frontmatter + the §4.1 body skeleton; the standard's
+   content sections map onto it — see its mapping table).
 2. Read the research file(s) at: /tmp/<skill>-<timestamp>/research/<slug>.md
 3. [Any skill-specific quality requirements, inlined by the calling skill]
 
 ## Task
 
 Write a phase document for: <enhancement title>
-Output path: documentation/planning/<subdirectory>/<session>/<NN>_<slug>.md
+Output path: /tmp/<skill>-<timestamp>/docs/<NN>_<slug>.md
 
 ## When done
 
@@ -107,9 +109,20 @@ Return ONLY a metadata summary in this format:
 Do NOT return the full document content.
 ```
 
+### Publishing the family (orchestrator step)
+
+After all Plan agents complete, the **orchestrator composes the `00_` master** from the Plan agents' metadata summaries and writes it to the same scratch docs directory — the sole exception to "never write docs" (§6's read-the-first-15-20-lines allowance exists for exactly this), with output-guide §3 frontmatter like every family member. Then it places the family with one call:
+
+```
+/claudna:publish /tmp/<skill>-<timestamp>/docs/ --to docs --dir documentation/planning/<subdirectory>/<session_name>_<YYYY-MM-DD>/
+```
+
+Family mode validates each doc — `NN_*` phase docs against the full §4.1 skeleton, the `00_*` master under the presence-only exemption — and writes nothing on any failure (see `skills/publish/SKILL.md` Step 1b / the docs adapter). The `--dir` value comes from the registry in `skills/_shared/documentation-standard.md` §2.
+
 ### What the orchestrator MUST NOT do
 
-- **MUST NOT write docs itself** — it does not have the research context or quality standards to produce adequate output. Always delegate to Plan subagents.
+- **MUST NOT write docs itself** — it does not have the research context or quality standards to produce adequate output. Always delegate to Plan subagents. (Sole exception: the `00_` master, composed from metadata summaries — above.)
+- **MUST NOT write into `documentation/` directly** — placement goes through `/claudna:publish --to docs` (family mode), the single writer for that plane.
 - **MUST NOT collect full doc content** from Plan agents into its context.
 - **MUST NOT read finished docs** into its context (except the first 15-20 lines for header metadata if needed for the overview doc).
 
@@ -136,7 +149,7 @@ The orchestrator session is long-running and must stay within context limits. Th
 ### Launching Plan agents
 
 - Launch ALL Plan agents in parallel using `run_in_background: true`
-- Each Plan agent writes its output directly to disk via the Write tool
+- Each Plan agent writes its output to the scratch docs directory via the Write tool
 - Collect Plan agent completions via TaskOutput one at a time
 - Each TaskOutput response contains only the metadata summary (not the full doc)
 - After all agents complete, present the summary table to the user
@@ -174,7 +187,8 @@ Both Read and Write are blanket-allowed via the `claude-workflow` permission cat
 - Research subagents writing research to `/tmp/` → **no permission prompt**
 - Plan agents reading research from `/tmp/` → **no permission prompt**
 - Plan agents reading this guide from `skills/_shared/` → **no permission prompt**
-- Plan agents writing docs to `documentation/planning/` → **no permission prompt**
+- Plan agents writing docs to the scratch docs directory (`/tmp/…/docs/`) → **no permission prompt**
+- `/claudna:publish --to docs` placing the family under `documentation/planning/` (Read/Write tools) → **no permission prompt**
 
 Subagents launched via the Task tool inherit the parent session's permissions. No additional permission grants are needed.
 
@@ -210,7 +224,7 @@ For Python virtual environments, use the venv binary directly: `./venv/bin/pytho
 
 ## 8. Archive Convention
 
-Output directories follow this pattern per skill:
+Output directories follow this pattern per skill (reached via `publish --to docs --dir` — the registry in `skills/_shared/documentation-standard.md` §2; skills never *place finished docs* here directly. Documented exceptions: `/claudna:implement-plan`'s status-marker write-backs and its `git mv` archive move):
 
 ```
 documentation/planning/<subdirectory>/<session_name>_<YYYY-MM-DD>/
@@ -243,7 +257,7 @@ When a skill's doc generation step (typically the final step) delegates to Plan 
 > - Archive convention (Section 8)
 > - Pre-handoff adversarial review (`skills/_shared/pre-handoff-checklist.md`)
 >
-> Plan agents read research from the session's scratch directory, write docs directly to the output directory, and return only a metadata summary.
+> Plan agents read research from the session's scratch directory, write docs into the scratch docs directory (the orchestrator publishes the family via `/claudna:publish --to docs` — §3), and return only a metadata summary.
 >
 > **The orchestrator MUST NOT write docs itself.** Always delegate to Plan subagents.
 
