@@ -132,7 +132,7 @@ Documentation lives on two planes, and `/claudna:publish` is the single router o
 | **Content** | Work-in-flight + repo-coupled records: plans, audits, reviews, ADRs, specs, guides | Cross-project referential knowledge: knowledge pages, runbooks, cross-repo decisions, reflections |
 | **Lives** | In the repo, versioned with the code | Outside any one repo (`shared/{knowledge,decisions,runbooks,planning/…}` raw tree, or a Claudron vault) |
 | **Reviewed via** | Pull requests | Lifecycle management (status/supersession; curation) |
-| **Discovered via** | git + status-marker greps (§8) | INDEX.md (`/claudna:index` writes it, `/claudna:remember` scans it) |
+| **Discovered via** | git + status-marker greps (§8) | Raw tree: INDEX.md (`/claudna:index` writes it, `/claudna:remember` scans it) · Claudron vault: engine-indexed, no INDEX.md (annotation semantics below) |
 | **Visibility** | Public when the repo is | Private by default |
 | **Publish adapter** | `--to docs --dir <path>` (§2 registry) | `--to vault` (the default adapter) |
 
