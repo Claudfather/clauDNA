@@ -71,7 +71,7 @@ Write the doc to the appropriate shared-docs vault directory based on the `type:
 
 | Type | Destination |
 |------|-------------|
-| plan | `shared/planning/active/` (or `completed/` if status is completed) |
+| plan | `shared/planning/active/` (or `completed/` for terminal statuses) |
 | decision | `shared/decisions/` |
 | knowledge | `shared/knowledge/<repo>/` (requires `repos:` field or `--repo` flag) |
 | runbook | `shared/runbooks/` |

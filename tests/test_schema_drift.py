@@ -365,6 +365,22 @@ class TestRunCheckOnline:
         assert errors == []
         assert any("update available" in w for w in warnings)
 
+    def test_bad_stamped_ref_with_network_up_errors(self, tmp_path):
+        # A typo'd/unpushed stamped SHA must NOT silently disable drift
+        # protection: main fetches fine, so the network is provably up and
+        # the stamp is provably bad (review Major 1).
+        root = make_repo(tmp_path, guide=guide_text(sha="deadbee"))
+        fetch = fetch_from({"main": upstream_text()})  # stamped ref unmapped -> None
+        errors, _, notes = csd.run_check(root, offline=False, fetch=fetch)
+        assert any("does not resolve" in e and "deadbee" in e for e in errors)
+        assert not any("network unavailable" in n for n in notes)
+
+    def test_unparseable_schema_at_stamped_ref_errors(self, tmp_path):
+        root = make_repo(tmp_path, guide=guide_text(sha="abc1234"))
+        fetch = fetch_from({"abc1234": "# SCHEMA.md\n\nno table here\n", "main": upstream_text()})
+        errors, _, _ = csd.run_check(root, offline=False, fetch=fetch)
+        assert any("not found/parseable at the stamped ref" in e for e in errors)
+
     def test_network_failure_degrades_to_note(self, tmp_path):
         root = make_repo(tmp_path, guide=guide_text(sha="abc1234"))
         errors, warnings, notes = csd.run_check(root, offline=False, fetch=fetch_from({}))
@@ -408,3 +424,57 @@ class TestRealRepoIsClean:
         assert stamp is not None
         sha, date = stamp
         assert 7 <= len(sha) <= 40
+
+
+class TestReviewAdditions:
+    def test_maturity_axis_missing_errors(self):
+        # A guide with a valid marked table but no maturity enum anywhere in §3.
+        text = (
+            "## 3. The Publishable Doc\n\nRendered from Claudfather/Claudron "
+            "SCHEMA.md @ abc1234 (2026-07-08)\n\n"
+            f"{csd.TABLE_MARKER} -->\n"
+            "| Type | Canonical | Terminal | Legacy |\n|---|---|---|---|\n"
+            "| plan | `draft`, `active` | `completed` | — |\n"
+        )
+        vocab, errors = csd.parse_rendered_vocab(text)
+        assert vocab is None
+        assert any("maturity axis" in e for e in errors)
+
+    def test_field_keyed_enum_row_is_flagged(self):
+        # A Field/Rule-style row restating the vocabulary (first cell `status`)
+        # must trip the heuristic just like a type-keyed row.
+        text = "| `status` | audit/review: `draft`\\|`completed`; plan: `draft`\\|`active`\\|`superseded` |\n"
+        msgs = csd.find_inline_enum_rows(text)
+        assert msgs and "status" in msgs[0]
+
+    def test_current_pointer_files_stay_clean_under_field_heuristic(self):
+        # The tightened heuristic must not fire on the real repo's pointer files.
+        for rel in csd.POINTER_FILES_REL + (csd.OUTPUT_GUIDE_REL,):
+            text = (REPO_ROOT / rel).read_text(encoding="utf-8")
+            exclude = rel == csd.OUTPUT_GUIDE_REL
+            assert csd.find_inline_enum_rows(text, exclude_marked=exclude) == []
+
+
+class TestValidatorWiring:
+    def test_validate_skills_wires_the_gate(self):
+        # Deleting the run_schema_drift_check call must not pass silently.
+        src = (REPO_ROOT / "scripts" / "validate-skills.py").read_text(encoding="utf-8")
+        assert "from check_schema_drift import run_check" in src
+        assert "run_schema_drift_check(" in src
+        assert '"schema-drift"' in src
+
+    def test_validate_skills_executes_the_gate_offline(self):
+        # End-to-end: the validator actually runs the gate (offline, no flake).
+        import os
+        import subprocess
+
+        env = dict(os.environ, SCHEMA_DRIFT_OFFLINE="1")
+        proc = subprocess.run(
+            [sys.executable, str(REPO_ROOT / "scripts" / "validate-skills.py")],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=120,
+        )
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert "schema-drift" in proc.stdout

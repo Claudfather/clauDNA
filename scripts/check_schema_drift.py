@@ -15,11 +15,14 @@ Offline checks (always run; the default posture — network is never required):
      enum table — publish Step 1a and index Step 2 must point at §3 and must
      not restate per-type status enums.
 
-Online checks (attempted opportunistically; ANY fetch failure degrades to a
-note, never an error — CI must not flake when the network is down):
+Online checks (attempted opportunistically; a down network degrades to a
+note, never an error — CI must not flake offline):
   4. Fetch SCHEMA.md at the STAMPED ref and diff the vocabulary.
      Mismatch = FAILURE: content at an immutable commit cannot change, so the
      rendered copy was hand-edited. Re-render from the SSOT and restamp.
+     A stamped ref that fails to fetch while the default branch fetches fine
+     is a provably bad stamp (typo / unpushed commit) = FAILURE too — only a
+     double fetch failure reads as network-down.
   5. Fetch SCHEMA.md at the SSOT's default branch and diff against the
      rendered copy. Mismatch = WARNING only: an update is available upstream;
      re-render + restamp when convenient.
@@ -188,7 +191,11 @@ def parse_rendered_vocab(text: str) -> tuple[dict | None, list[str]]:
     if ext is None:
         return None, [f"{OUTPUT_GUIDE_REL}: no table follows the STATUS_TABLE marker"]
     types, errors = _parse_status_rows(ext[0], source=OUTPUT_GUIDE_REL)
-    maturity = parse_maturity(text)
+    # Scope the maturity search to §3 onward so a future pre-§3 mention with a
+    # pipe-shaped phrase can't shadow the axis (the §3 banner is the intended
+    # first match). Fall back to the full text if the heading ever renames.
+    sec3 = re.search(r"^## 3\..*$", text, re.M)
+    maturity = parse_maturity(text[sec3.start():] if sec3 else text)
     if maturity is None:
         errors.append(f"{OUTPUT_GUIDE_REL}: maturity axis (draft | verified | canonical form) not found in §3")
     if errors:
@@ -248,11 +255,13 @@ def find_inline_enum_rows(text: str, *, exclude_marked: bool = False) -> list[st
     """Flag table rows that restate a per-type status enum.
 
     Heuristic: a table row whose first cell is exactly one or more note-type
-    names and whose remaining cells mention >=3 distinct status tokens. Rows
-    like the vault destination map (`| plan | shared/planning/active/ … |`)
-    stay clean (<3 tokens); a restated enum table trips on its 3+-value rows
-    (an audit/review-only 2-value row alone would slip through — accepted:
-    real enum tables carry the richer sibling rows).
+    names — or a field name (`status`/`type`, the shape of a Field/Rule row
+    restating the vocabulary) — and whose remaining cells mention >=3
+    distinct status tokens. Rows like the vault destination map
+    (`| plan | shared/planning/active/ … |`) stay clean (<3 tokens); a
+    restated enum table trips on its 3+-value rows (an audit/review-only
+    2-value row alone would slip through — accepted: real enum tables carry
+    the richer sibling rows).
     """
     lines = text.splitlines()
     excluded: set[int] = set()
@@ -268,13 +277,13 @@ def find_inline_enum_rows(text: str, *, exclude_marked: bool = False) -> list[st
         if len(cells) < 2:
             continue
         first_types = {t.strip() for t in _norm(cells[0]).lower().split(",") if t.strip()}
-        if not first_types or not first_types <= TYPE_NAMES:
+        if not first_types or not (first_types <= TYPE_NAMES or first_types <= {"status", "type"}):
             continue
         rest = _norm(" ".join(cells[1:])).lower()
         hits = {tok for tok in STATUS_TOKENS if re.search(rf"\b{tok}\b", rest)}
         if len(hits) >= 3:
             msgs.append(
-                f"line {i + 1}: inline status-enum table row for type(s) {sorted(first_types)} -- "
+                f"line {i + 1}: inline status-enum table row keyed {sorted(first_types)} -- "
                 f"the vocabulary lives only in {OUTPUT_GUIDE_REL} §3; point there instead of restating"
             )
     return msgs
@@ -312,12 +321,12 @@ def run_check(
     warnings: list[str] = []
     notes: list[str] = []
     if offline is None:
-        offline = os.environ.get("SCHEMA_DRIFT_OFFLINE") == "1"
+        offline = os.environ.get("SCHEMA_DRIFT_OFFLINE", "").strip().lower() in {"1", "true", "yes", "on"}
 
     guide_path = repo_root / OUTPUT_GUIDE_REL
     if not guide_path.is_file():
         return [f"{OUTPUT_GUIDE_REL}: file missing"], warnings, notes
-    guide_text = guide_path.read_text()
+    guide_text = guide_path.read_text(encoding="utf-8")
 
     stamp = parse_stamp(guide_text)
     if stamp is None:
@@ -336,7 +345,7 @@ def run_check(
         if not path.is_file():
             errors.append(f"{rel}: file missing")
             continue
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
         if not POINTER_RE.search(text):
             errors.append(f"{rel}: no pointer to the output-guide §3 vocabulary table (expected 'output-guide … §3')")
         errors.extend(f"{rel}: {m}" for m in find_inline_enum_rows(text))
@@ -350,7 +359,20 @@ def run_check(
     sha = stamp[0]
     pinned_text = fetch(sha)
     if pinned_text is None:
-        notes.append(f"network unavailable -- online drift comparison at stamped ref {sha} skipped (offline posture)")
+        # Discriminate a bad stamp from a down network: if the default branch
+        # fetches fine, the network is up and the stamped ref is provably
+        # unresolvable — a silent skip here would disable drift protection
+        # permanently while blaming the network.
+        if fetch(SSOT_HEAD_REF) is not None:
+            errors.append(
+                f"{OUTPUT_GUIDE_REL}: stamped ref {sha} does not resolve at {SSOT_REPO} "
+                f"(while {SSOT_HEAD_REF} fetches fine, so the network is up) -- stamp typo or "
+                "unpushed commit? Re-render from a real SCHEMA.md commit and restamp."
+            )
+        else:
+            notes.append(
+                f"network unavailable -- online drift comparison at stamped ref {sha} skipped (offline posture)"
+            )
         return errors, warnings, notes
     upstream = parse_upstream_vocab(pinned_text)
     if upstream is None:
