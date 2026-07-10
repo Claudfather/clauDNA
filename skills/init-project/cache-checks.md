@@ -8,7 +8,7 @@ Six checks to run. Score each PASS / WARN / FAIL.
 
 Read the project's `CLAUDE.md`. Identify each `##`-level section and classify it:
 
-- **STATIC**: Content that does not change between sessions. Examples: workflow orchestration, core principles, task management, self-improvement loop, project overview (filled in once).
+- **STATIC**: Content that does not change between sessions. Examples: workflow orchestration, core principles, task management, project overview (filled in once).
 - **DYNAMIC**: Content that changes over time or varies per session. Examples: development workflow (project-specific commands), code style & conventions, commands reference, "things Claude should NOT do" (grows over time).
 
 Check whether any STATIC section appears AFTER a DYNAMIC section. The ideal layout is all static sections first, then all dynamic sections last.

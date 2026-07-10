@@ -14,7 +14,6 @@ Every repo initialized with `/claudna:init-project` has this structure:
 ├── CHANGELOG.md
 ├── CLAUDE.md
 ├── .claude/
-│   ├── lessons.md
 │   └── settings.json
 └── documentation/
     ├── planning/                    # Active plans and audits (skill output)
@@ -141,7 +140,7 @@ Documentation lives on two planes, and `/claudna:publish` is the single router o
 Consumers find the shared-docs root through two doors, env first:
 
 1. **Env override:** `CLAUDRON_VAULT` or `CLAUDRON_VAULT_PATH` (engine-managed vault — Claudron's shipped CLI reads the bare form, its CLI-contract doc names the `_PATH` form; consumers accept both) or `SHARED_DOCS_PATH` (raw tree). If several are set, that order wins. User-managed — no clauDNA skill ever sets env vars.
-2. **CLAUDE.md section:** a section headed exactly `## Shared Documentation`. `/claudna:init-project` (Step 6.5) is the sole producer; `/claudna:recall` and `/claudna:index` parse it.
+2. **CLAUDE.md section:** a section headed exactly `## Shared Documentation`. `/claudna:init-project`'s shared-docs seam step is the sole producer; `/claudna:recall` and `/claudna:index` parse it.
 
 The section format is parseable, not prose:
 
