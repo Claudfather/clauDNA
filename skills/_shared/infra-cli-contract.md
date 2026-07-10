@@ -40,10 +40,11 @@ Run before any verb, in order, stopping at the first failure with concrete guida
 - **Before a destructive action:** a boxed summary (target, environment, git branch/commit, uncommitted-changes warning, whether an existing deployment will be updated).
 - **After any verb:** a boxed report (status, target, key metrics, errors found), followed by concrete next steps on failure — the exact diagnostic command, and the rollback/stop options with their plan caveats.
 - **Secrets are names, never values:** status/list output shows secret and env-var *names* (and timestamps) only — never their values. Verbs whose purpose is returning a credential (e.g. a branch connection string) are exempt by design.
+- **Scrub CLI output before surfacing it.** The rule above is prose, and prose has leaked keys — this contract inlines `--api-key`/`--token` and connection strings into commands (§4/§5), so a raw stdout/stderr echo carries a live credential. Before quoting any command output in a report or error, scrub it with the shared redactor: capture the output to a file and run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/redact.py" <file>` — a bare command, no pipe (falls back to the highest-versioned `~/.claude/plugins/cache/Claudfather/claudna/*/scripts/redact.py` when `${CLAUDE_PLUGIN_ROOT}` is unset). It masks inlined credential-flag values, `scheme://user:pass@host` connection strings, and vendor key shapes while leaving hosts, project IDs, and `file:line` intact — the same convention as orchestration-guide §7. The credential-returning verbs exempted above are the only exception.
 
 ## 7. Failure handling
 
-- Surface the CLI's stderr verbatim; never paraphrase an error into vagueness.
+- Surface the CLI's stderr, scrubbed through the redactor (§6) — never paraphrase an error into vagueness, but never paste it raw either. An auth failure that echoes an inlined `--api-key`/`--token`, or a connection string in a DSN error, is a live credential: redact it, then show the rest verbatim.
 - One retry for transient network failures; anything else stops with the error and the next diagnostic step.
 - A failed health check after a deploy is a loud flag, not a footnote — show the failing endpoint/status first.
 

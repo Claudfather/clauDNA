@@ -1,6 +1,6 @@
 # Vercel — Deploy
 
-Invoked by /claudna:vercel in deploy mode. Pre-flight (CLI installed, authenticated, project linked) has already passed per the engine SKILL.md. Execution, output, and failure conventions: `skills/_shared/infra-cli-contract.md` §§5–7 — separate Bash calls, boxed summaries, verbatim stderr.
+Invoked by /claudna:vercel in deploy mode. Pre-flight (CLI installed, authenticated, project linked) has already passed per the engine SKILL.md. Execution, output, and failure conventions: `skills/_shared/infra-cli-contract.md` §§5–7 — separate Bash calls, boxed summaries, redactor-scrubbed stderr (§7).
 
 Deploy to Vercel with pre-deploy checks, build monitoring, health verification, and post-deploy review. Deploy is this engine's destructive verb: it gates on explicit user confirmation (contract §5).
 
