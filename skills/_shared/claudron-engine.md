@@ -6,6 +6,8 @@ The Claudron-specific engine behavior, layered on `skills/_shared/infra-cli-cont
 
 **Verb vocabulary.** clauDNA's vault-facing verbs are named for Claudron's CLI verbs — one word per concept, extending the deference #199 set for the frontmatter *vocabulary* (output-guide §3). `/claudna:claudron`'s verbs mirror the CLI commands they wrap (the §2 table); `/claudna:recall` and `/claudna:capture` share their names with Claudron's `recall` and `capture` — the read and write doors. The other vault-writing occasion-workflows (documentation-standard §10's which-door table — `publish`, `reflect`) keep clauDNA-native names: they terminate in `capture`, they don't rename it.
 
+**Layer boundary.** clauDNA is the skills / presentation / reasoning layer; `claudron` is the CLI / fetch layer it wraps when available. A skill consumes the CLI's `--json` data and owns the presentation on top of it (e.g. `/claudna:recall` labels tiers and picks the adaptive lead from `recall --json`). Claudron's *own* rendered output — `recall`'s human brief via `render_brief` — is for consumers with **no clauDNA skill in the loop**, most concretely the SessionStart hook injecting a token-budgeted brief. A skill reaches for `--json`, never the bare rendered form; the two are separate presentation surfaces over one fetched dataset, not a duplication to reconcile.
+
 ## 1. The detection ladder
 
 Run before any engine call, as separate Bash calls (never chained — infra-cli-contract §5). Three terminal verdicts:
