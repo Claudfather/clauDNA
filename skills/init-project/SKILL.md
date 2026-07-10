@@ -5,7 +5,7 @@ description: "Use when setting up a new project or adding standard Claude Code c
 allowed-tools: Read(*), Write(*), Edit(*), Glob(*), Grep(*), Bash(git *), Bash(ls *), Bash(mkdir *), Bash(printenv *), Bash(command -v *), Bash(claudron status *)
 requires:
   - cli: claudron
-    reason: "Optional — Step 7.5 vault detection only; every ladder branch degrades gracefully when absent (this is a soft dependency, not a functional requirement)"
+    reason: "Optional — Step 6.5 vault detection only; every ladder branch degrades gracefully when absent (this is a soft dependency, not a functional requirement)"
 ---
 
 # Initialize Project
@@ -172,7 +172,7 @@ claudron is installed but no vault is initialized. Run:
 
 (the path is where your vault will live — pick your own; if the command is
 rejected, the CLI has moved — `claudron --help` shows the current form) then
-re-invoke /claudna:init-project — Step 7.5 will detect the vault and write
+re-invoke /claudna:init-project — Step 6.5 will detect the vault and write
 the CLAUDE.md section.
 ```
 
@@ -221,7 +221,7 @@ If yes, stage only the created/modified files and commit with:
 docs: initialize project configuration (CLAUDE.md, CHANGELOG.md, .claude/, documentation/)
 ```
 
-A Step 7.5 raw-tree scaffold lives outside the repo — never stage it; only the CLAUDE.md section ships with the commit.
+A Step 6.5 raw-tree scaffold lives outside the repo — never stage it; only the CLAUDE.md section ships with the commit.
 
 ---
 

@@ -81,7 +81,7 @@ Scan `CLAUDE.md` for instructions that encourage editing CLAUDE.md during an act
 
 The correct pattern: update CLAUDE.md at session boundaries (during `/claudna:session handoff`), not mid-session. Mid-session edits invalidate the cached system prompt.
 
-Also check the Self-Improvement Loop section — "Update `.claude/lessons.md`" is fine (lessons are not in the system prompt), but "Update CLAUDE.md" is a cache-busting pattern.
+In older projects that still carry a Self-Improvement Loop section, treat its "Update CLAUDE.md" instruction as a cache-busting pattern (current clauDNA templates ship no such section).
 
 **Scoring:**
 - **PASS**: No mid-session CLAUDE.md edit instructions found, or edits are explicitly deferred to session boundaries
