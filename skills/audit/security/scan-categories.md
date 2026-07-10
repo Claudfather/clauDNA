@@ -31,12 +31,12 @@ If none of these tools are installed, note: "No dependency scanner available. In
 
 ## B. Secret Detection
 
-Search for hardcoded secrets in the codebase. **Never print the actual secret value — show file:line but mask the value.**
+Search for hardcoded secrets in the codebase. **Never surface a raw secret value — report file:line + variable name, and scrub the findings file through the redactor (`python3 scripts/redact.py <file>`; orchestration-guide §7) before it leaves the subagent.** Secret Detection is the exact producer of non-`sk-` matches, so hand-masking is not enough.
 
 Use the Grep tool for each pattern below. For each match:
 - Report the file and line number
 - Show the variable/key name
-- Mask the value: `API_KEY=sk-****` (never the full value)
+- Never print the full value — the redactor masks it to `[REDACTED]`
 - Note whether the file is gitignored
 
 ## C. OWASP Top 10 Patterns

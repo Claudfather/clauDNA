@@ -265,7 +265,7 @@ Then tell the user:
 | Missing LLM-mediated paths | Slack → ChatService → LLM → ToolExecutor is an indirect access path. Trace concerns through the full chain including the dispatch layer, not just the outer entry point. |
 | Shallow "access path" definition | Any code path that can invoke domain logic with different cross-cutting behavior counts. Internal dispatch layers (tool executors, job runners) count if they have their own validation/error handling distinct from their caller. |
 | Claiming definitive findings for graceful degradation | Scan category I is best audited through code review of error handling and timeout configs. Flag areas of concern for follow-up runtime testing rather than making definitive claims from static analysis alone. |
-| Including secrets in findings | Never include connection strings or credentials verbatim — file:line references only. |
+| Including secrets in findings | Never include connection strings or credentials verbatim — file:line references only, and scrub the findings file through the redactor (orchestration-guide §7) before handoff. |
 
 ## Notes
 
