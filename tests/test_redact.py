@@ -48,6 +48,8 @@ BENIGN = [
     "Branched off main at 57f5c06; full sha 9636154a1b2c3d4e5f60718293a4b5c6d7e8f900.",
     "Request id a1b2c3d4-e5f6-7890-abcd-ef1234567890 appears in the log line.",
     "Rename SomeVeryLongDescriptiveComponentName to a shorter identifier.",
+    "https://ep-cool-lab-12345678.us-east-2.aws.neon.tech/neondb",  # URL, no user:pass@
+    "neonctl branches list --project-id proj_12345 --org-id org_67890 --json",  # no credential flag
 ]
 
 
@@ -175,3 +177,42 @@ class TestCliFileMode:
         )
         assert FAKE["github_pat"] not in a.read_text()
         assert FAKE["aws_access_key_id"] not in b.read_text()
+
+
+class TestConnectionStrings:
+    """DB/service URLs with embedded credentials — the neon `query` verb's
+    DATABASE_URL is the primary neon credential and slips every prefix rule."""
+
+    def test_redacts_postgres_url_password(self):
+        pw = "npg_" + "Fk3" * 6
+        url = "postgresql://owner:" + pw + "@ep-cool-lab-12345678.us-east-2.aws.neon.tech/neondb"
+        out = redact_text(f"DATABASE_URL={url}")
+        assert pw not in out
+        assert MASK in out
+        assert "ep-cool-lab-12345678.us-east-2.aws.neon.tech" in out  # host stays readable
+
+    def test_redacts_generic_scheme_userinfo(self):
+        pw = "s3Kr3t" + "Pwd0rd"
+        out = redact_text("redis://user:" + pw + "@redis.internal:6379")
+        assert pw not in out
+        assert MASK in out
+
+
+class TestInlinedFlagValues:
+    """Infra engines inline secrets as CLI flags; a failed command echoed
+    verbatim (contract §7) leaks the value regardless of its own shape."""
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "neonctl me --api-key " + "nk9Qz2Rt7Vw3Xy8",
+            "vercel whoami --token " + "AbCd1234" + "EfGh5678" + "IjKl90",
+            "modal token set --token-secret " + "as-" + "Fk3" * 6,
+            "railway up --token " + "1111abcd-2222-3333-4444-555566667777",
+        ],
+    )
+    def test_redacts_inlined_credential_flag(self, cmd):
+        value = cmd.rsplit(" ", 1)[1]
+        out = redact_text(f"Error: command failed: {cmd}")
+        assert value not in out
+        assert MASK in out

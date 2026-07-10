@@ -1,6 +1,6 @@
 # Vercel — Logs
 
-Invoked by /claudna:vercel in logs mode. Pre-flight (CLI installed, authenticated, project linked) has already passed per the engine SKILL.md. Execution, output, and failure conventions: `skills/_shared/infra-cli-contract.md` §§5–7 — separate Bash calls, verbatim stderr. Logs is read-only: it never gates on confirmation (contract §5).
+Invoked by /claudna:vercel in logs mode. Pre-flight (CLI installed, authenticated, project linked) has already passed per the engine SKILL.md. Execution, output, and failure conventions: `skills/_shared/infra-cli-contract.md` §§5–7 — separate Bash calls, redactor-scrubbed stderr (§7). Logs is read-only: it never gates on confirmation (contract §5).
 
 View and filter Vercel deployment logs. The CLI supports native filtering by level, status code, source type, time range, and full-text search — with JSON output for parsing. If the verb arguments carry a deployment URL/ID or filter hints, apply them in the steps below.
 

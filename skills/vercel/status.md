@@ -1,6 +1,6 @@
 # Vercel — Status
 
-Invoked by /claudna:vercel in status mode. Pre-flight (CLI installed, authenticated, project linked) has already passed per the engine SKILL.md. Execution, output, and failure conventions: `skills/_shared/infra-cli-contract.md` §§5–7 — separate Bash calls, verbatim stderr. Status is read-only: it never gates on confirmation (contract §5).
+Invoked by /claudna:vercel in status mode. Pre-flight (CLI installed, authenticated, project linked) has already passed per the engine SKILL.md. Execution, output, and failure conventions: `skills/_shared/infra-cli-contract.md` §§5–7 — separate Bash calls, redactor-scrubbed stderr (§7). Status is read-only: it never gates on confirmation (contract §5).
 
 Quick dashboard for your Vercel project. Shows project info, deployments, domains, environment variables, and framework details at a glance.
 
