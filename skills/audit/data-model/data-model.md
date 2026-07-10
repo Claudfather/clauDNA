@@ -89,7 +89,7 @@ Follow the output guide at `skills/_shared/output-guide.md`:
 
 - **Subagent pattern.** Disk-write pattern per `skills/_shared/orchestration-guide.md` Sections 2 & 6. Three subagents: two parallel (Step 2), one sequential (Step 3). Orchestrator coordinates only.
 - **Pass focus area** from Step 1 into both Step 2 subagent prompts.
-- **Secrets masking.** Never include connection strings verbatim — file:line only.
+- **Secrets masking.** Never include connection strings verbatim — file:line only, and scrub the findings file through the redactor (orchestration-guide §7) before handoff.
 - **User gates.** Confirmation required after Step 3 before fit analysis.
 - **Terminal at report.** Diagnostic only — no artifacts. User acts via `/claudna:implement-plan` if desired.
 - Orchestration guide: Section 9 N/A (no Plan subagents). Section 10: "Respect existing architecture" applies; doc/testing rules do not.
