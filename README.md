@@ -22,7 +22,7 @@ Optional, in any order:
 1. **Recommended `settings.json` tweaks** — permissions, statusLine, sandbox config. See [SETUP_GUIDE §3](./SETUP_GUIDE.md#3-bootstrapping-claudesettingsjson).
 2. **Snowflake setup** — only if you use the Snowflake skills. See [SETUP_GUIDE §5](./SETUP_GUIDE.md#5-snowflake-key-pair-authentication).
 3. **Shell aliases** — power-user worktree commands. See [SETUP_GUIDE §6](./SETUP_GUIDE.md#6-shell-configuration).
-4. **Project setup** — in any project, run `/claudna:init-project` to generate `CLAUDE.md`, `CHANGELOG.md`, and `.claude/lessons.md`.
+4. **Project setup** — in any project, run `/claudna:init-project` to generate `CLAUDE.md` and `CHANGELOG.md`.
 
 ### Headless / CI / Docker
 
@@ -32,7 +32,7 @@ For bots, CI runners, and Docker images, drop a `settings.json` with `enabledPlu
 
 | Directory | Count | Contents |
 |-----------|-------|----------|
-| `skills/` | 38 | User-invocable slash commands |
+| `skills/` | 37 | User-invocable slash commands |
 | `agents/` | 8 | `snowflake-analyst`, `dbt-engineer`, `neon-analyst`, `modal-ops`, `railway-ops`, `vercel-ops`, `code-reviewer`, `spec-reviewer` |
 | `plugin-hooks/` | 6 wired + 1 opt-in | SessionStart briefing (opt-out `CLAUDNA_SESSION_BRIEFING=0`), auto-format on Write/Edit, PreToolUse permission expansion, PreCompact reflect gate, opt-in skill telemetry, macOS notifications. (`statusline.sh` is opt-in — see [SETUP_GUIDE §3.2](./SETUP_GUIDE.md#32-statusline-optional).) Named `plugin-hooks/` to avoid a Claude Code bug that deletes any project-root `hooks/` directory between tool calls. |
 
@@ -65,7 +65,6 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:audit t
 |-------|-------------|
 | `/audit` | Codebase-audit engine — `security` / `tech-debt` / `docs` / `design` / `access-path` / `data-model` / `frontend-perf` / `repo-health` lenses (replaces the eight standalone audit skills) |
 | `/review-work` | Review engine — `changes` (uncommitted work) / `pr` (one PR) / `multi-pr` (parallel subagent reviews + synthesis) modes (replaces the two review skills) |
-| `/lessons` | Capture and review lessons from corrections |
 | `/verify-completion` | Verify work is actually complete before claiming success |
 | `/visual-crawl` | Autonomous visual crawl — discover routes, screenshot at 3 viewports, file issues for findings |
 
@@ -114,7 +113,6 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:audit t
 
 | Skill | Description |
 |-------|-------------|
-| `/notes` | Persistent notes across sessions |
 | `/find-skills` | Discover and install new agent skills |
 | `/heist` | Raid a GitHub repo for skills, config patterns, and novel approaches |
 | `/init-project` | Set up CLAUDE.md, CHANGELOG.md, and .claude/ for a new or existing project |
@@ -181,7 +179,7 @@ The marketplace install is managed by Claude Code: plugins live under `~/.claude
 
 **Never touched by claudna:**
 - `~/.claude/settings.json` — user-managed. claudna never writes here. Recommended snippets are documented in SETUP_GUIDE for you to merge manually.
-- `~/.claude/notes/` — personal data (lessons, decisions, patterns).
+- `~/.claude/notes/` — your personal files. claudna never reads or writes here.
 
 ## Project Template
 
@@ -191,7 +189,6 @@ The marketplace install is managed by Claude Code: plugins live under `~/.claude
 |------|---------|
 | `CLAUDE.md` | Project instructions with workflow principles |
 | `.claude/settings.json` | Project-specific permissions |
-| `.claude/lessons.md` | Project-specific lessons from corrections |
 
 ## Contributing
 

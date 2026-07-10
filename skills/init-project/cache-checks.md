@@ -46,7 +46,7 @@ Check whether `.claude/lessons.md` is being auto-loaded or referenced in a way t
 2. Check if `CLAUDE.md` contains instructions to "always read lessons at session start" or similar auto-load directives
 3. Check if `.claude/settings.json` exists and references lessons in any auto-load configuration
 
-The correct pattern: lessons should be available on-demand (via `/claudna:lessons` or `/review-self`) but NOT auto-loaded into every session. Auto-loading adds variable content to the system prompt, which hurts caching.
+The correct pattern: lessons files, where a project still has one, should be available on-demand but NOT auto-loaded into every session. Auto-loading adds variable content to the system prompt, which hurts caching.
 
 **Scoring:**
 - **PASS**: No auto-load references found. Lessons are on-demand only.

@@ -37,14 +37,6 @@ Copy this to your project root and customize.
 3. **Track Progress**: Mark items complete as you go
 4. **Explain Changes**: High-level summary at each step
 5. **Document Results**: Add review section to `.claude/todo.md`
-6. **Capture Lessons**: Update `.claude/lessons.md` after corrections
-
-## Self-Improvement Loop
-
-After ANY correction from the user:
-1. Update `.claude/lessons.md` with the pattern
-2. Write rules for yourself that prevent the same mistake
-3. Review lessons when relevant (via `/lessons`)
 
 ## Core Principles
 
@@ -103,6 +95,6 @@ After ANY correction from the user:
 
 ---
 
-_Update this file at session boundaries (e.g., during `/claudna:session handoff`). After corrections, update `.claude/lessons.md`._
+_Update this file at session boundaries (e.g., during `/claudna:session handoff`)._
 
 _If this file grows beyond ~200 lines, move domain-specific details into `.claude/rules/` files with `paths:` frontmatter for on-demand loading._

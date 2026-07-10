@@ -119,17 +119,6 @@ Claude Code reads configuration from multiple locations, merged in this order (l
 
 Claude Code manages this directory itself — you should not edit files there. Updates land in a new version directory; old versions are kept for ~7 days before automatic cleanup.
 
-### The lessons system
-
-Two-tier, by intent:
-
-| Tier | Location | Scope |
-|------|----------|-------|
-| Global | `~/.claude/notes/lessons/global.md` | Universal patterns (tool quirks, general rules) |
-| Project | `<project>/.claude/lessons.md` | Project-specific conventions |
-
-The `/claudna:lessons` skill captures lessons after corrections. `/claudna:init-project` creates the project-level file.
-
 ---
 
 ## 3. Bootstrapping `~/.claude/settings.json`
@@ -771,11 +760,6 @@ The clauDNA project template (`project-template/CLAUDE.md`) embeds these princip
 - When given a bug report: just fix it. Don't ask for hand-holding
 - Point at logs, errors, failing tests — then resolve them
 - Zero context switching required from the user
-
-### Self-Improvement Loop
-- After ANY correction from the user: update `.claude/lessons.md` with the pattern
-- Write rules for yourself that prevent the same mistake
-- Review lessons when relevant (via `/claudna:lessons`)
 
 ### Core Principles
 - **Simplicity First** — make every change as simple as possible

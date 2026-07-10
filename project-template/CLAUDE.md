@@ -38,14 +38,6 @@ This file provides project-specific guidance for Claude Code.
 - When given a bug report: just fix it. Don't ask for hand-holding
 - Go fix failing CI tests without being told how
 
-## Self-Improvement Loop
-
-After ANY correction from the user:
-1. Acknowledge the correction
-2. Update `.claude/lessons.md` with the pattern
-3. Write rules that prevent the same mistake
-4. Review lessons when relevant (via `/lessons`)
-
 ## Task Management
 
 1. **Plan First**: Write plan to `.claude/todo.md` with checkable items
@@ -53,7 +45,6 @@ After ANY correction from the user:
 3. **Track Progress**: Mark items complete as you go
 4. **Explain Changes**: High-level summary at each step
 5. **Document Results**: Add review section to `.claude/todo.md`
-6. **Capture Lessons**: Update `.claude/lessons.md` after corrections
 
 <!-- Static sections above, project-specific sections below. Keep this order for prompt cache efficiency. -->
 
@@ -116,6 +107,6 @@ git diff
 
 ---
 
-_Update this file at session boundaries (e.g., during `/claudna:session handoff`). After corrections, update `.claude/lessons.md`._
+_Update this file at session boundaries (e.g., during `/claudna:session handoff`)._
 
 _If this file grows beyond ~200 lines, move domain-specific details into `.claude/rules/` files with `paths:` frontmatter for on-demand loading._

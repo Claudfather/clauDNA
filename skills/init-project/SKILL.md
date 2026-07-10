@@ -10,7 +10,7 @@ requires:
 
 # Initialize Project
 
-Set up a project with standard clauDNA configuration: `CLAUDE.md`, `CHANGELOG.md`, `.claude/lessons.md`, `PROJECT_MISSION.md`, the `documentation/` planning structure, and the shared-docs seam (a `## Shared Documentation` section in CLAUDE.md — Step 7.5). Works for both new repos and existing projects that lack these files.
+Set up a project with standard clauDNA configuration: `CLAUDE.md`, `CHANGELOG.md`, `PROJECT_MISSION.md`, the `documentation/` planning structure, and the shared-docs seam (a `## Shared Documentation` section in CLAUDE.md — Step 6.5). Works for both new repos and existing projects that lack these files.
 
 ## Procedure
 
@@ -22,10 +22,9 @@ Scan the project root for existing configuration:
 
 - `CLAUDE.md` — project instructions for Claude Code
 - `CHANGELOG.md` — structured change history
-- `.claude/lessons.md` — project-specific lessons
 - `PROJECT_MISSION.md` — project mission statement
 - `documentation/planning/` — planning structure for skills
-- CLAUDE.md `## Shared Documentation` section — the shared-docs seam (Step 7.5)
+- CLAUDE.md `## Shared Documentation` section — the shared-docs seam (Step 6.5)
 
 Also scan for signals about the project:
 
@@ -45,7 +44,6 @@ Project Assessment
 
   CLAUDE.md:            ✓ exists / ✗ missing
   CHANGELOG.md:         ✓ exists / ✗ missing
-  .claude/lessons.md:   ✓ exists / ✗ missing
   PROJECT_MISSION.md:   ✓ exists / ✗ missing
   documentation/:       ✓ exists / ✗ missing
   Shared docs seam:     ✓ declared (<root path>) / ✗ not declared
@@ -75,14 +73,13 @@ Generate `CLAUDE.md` using the template at [references/CLAUDE_MD_TEMPLATE.md](re
 - Fill in Commands Reference with the actual commands
 - Add any gotchas from Step 2 to "Things Claude Should NOT Do"
 - Keep all static sections (Workflow Orchestration, Core Principles, etc.) exactly as templated — these are universal
-- Remove placeholder comments (`<!-- Customize -->`) after filling in — but leave the commented `## Shared Documentation` block alone; Step 7.5 owns it
+- Remove placeholder comments (`<!-- Customize -->`) after filling in — but leave the commented `## Shared Documentation` block alone; Step 6.5 owns it
 
 **For large projects** (200+ lines after customization): Consider creating `.claude/rules/` files with `paths:` frontmatter to scope domain-specific rules to matching files. Keep CLAUDE.md under 200 lines — only universal rules and safety constraints.
 
 **Cache efficiency guidelines** (these affect prompt cache hit rates across every API call). For detailed scoring criteria (PASS/WARN/FAIL for each check), see [cache-checks.md](cache-checks.md) in this skill directory.
 - Static sections first, dynamic sections last. Add `<!-- Static sections above, project-specific sections below. Keep this order for prompt cache efficiency. -->` at the boundary.
 - Keep CLAUDE.md under 200 lines (WARN). Over 350 lines is a FAIL — significant token cost per call.
-- Don't auto-load `.claude/lessons.md` — keep lessons on-demand via `/claudna:lessons`.
 - Don't add instructions to edit CLAUDE.md mid-session — defer edits to session boundaries (`/claudna:session handoff`).
 - Don't add instructions to switch models or tools mid-session — both invalidate the entire prompt cache.
 - If using `.claude/rules/`, ensure each file has `paths:` frontmatter (not `globs:`) to scope when each rule loads.
@@ -103,17 +100,7 @@ Generate `CHANGELOG.md` using the template at [references/CHANGELOG_TEMPLATE.md]
 - Follow the Keep a Changelog format: `### Added`, `### Fixed`, `### Changed`, `### Removed`, `### Refactored`
 - Entry format: `- **Feature Name** — Description`
 
-### Step 5: Create .claude/lessons.md
-
-Create `.claude/lessons.md` with any gotchas from Step 2. If none were provided, create the file with a header only:
-
-```markdown
-# Lessons
-```
-
-This file will accumulate organically as Claude makes mistakes and gets corrected.
-
-### Step 6: Create PROJECT_MISSION.md
+### Step 5: Create PROJECT_MISSION.md
 
 If `PROJECT_MISSION.md` doesn't exist, create it. Use the project name and description from Step 2:
 
@@ -125,7 +112,7 @@ If `PROJECT_MISSION.md` doesn't exist, create it. Use the project name and descr
 
 If the user provided a clear description in Step 2, write a real mission statement. If not, create the stub and note that `/claudna:product-vision` will flesh it out. This file anchors `/claudna:product-vision` ideation and gives all skills a shared understanding of the project's purpose.
 
-### Step 7: Scaffold documentation/
+### Step 6: Scaffold documentation/
 
 If `documentation/planning/` doesn't exist, create the standard planning structure. This is the shared directory layout that planning and audit skills write to (see `skills/_shared/documentation-standard.md` for the full spec).
 
@@ -155,7 +142,7 @@ If `documentation/` already exists, scan for missing subdirectories and create o
 - `guides/` — Setup guides, onboarding, runbooks. Living docs.
 - `archive/` — Completed planning sessions moved here after all phases merge.
 
-### Step 7.5: Shared Knowledge Seam
+### Step 6.5: Shared Knowledge Seam
 
 Provision the `## Shared Documentation` CLAUDE.md section — the root that `/claudna:recall` and `/claudna:index` resolve. The section format, `(claudron vault)` annotation semantics, and env-over-section precedence are contract-bound in `skills/_shared/documentation-standard.md` §10 — write exactly that format.
 
@@ -206,7 +193,7 @@ Cross-project knowledge lives here — see /claudna:recall.
 
 The scaffold is the only write this skill makes outside the project, and only at the path the user chose. If the user declines, skip the seam entirely and point at SETUP_GUIDE's "Claudron Integration" section for setting it up later.
 
-### Step 8: Verify & Confirm
+### Step 7: Verify & Confirm
 
 Show the user what was created:
 
@@ -216,7 +203,6 @@ Project Initialized
   Created:
     ✓ CLAUDE.md              (N lines — project instructions)
     ✓ CHANGELOG.md           (N lines — change history)
-    ✓ .claude/lessons.md     (N lines — lessons)
     ✓ PROJECT_MISSION.md     (N lines — mission statement)
     ✓ documentation/         (10 directories: planning, decisions, specs, guides, archive)
     ✓ Shared docs seam       (## Shared Documentation → ~/shared; raw tree scaffolded)
@@ -226,7 +212,7 @@ Project Initialized
 ═══════════════════════════════════════════════════════
 ```
 
-Report the seam line as whichever Step 7.5 branch ran: the annotated vault section, the raw-tree scaffold + section, printed `claudron init` guidance (nothing written), or skipped.
+Report the seam line as whichever Step 6.5 branch ran: the annotated vault section, the raw-tree scaffold + section, printed `claudron init` guidance (nothing written), or skipped.
 
 Ask: **"Want me to commit these files?"**
 
@@ -243,7 +229,7 @@ A Step 7.5 raw-tree scaffold lives outside the repo — never stage it; only the
 
 - **Never overwrite existing files without asking.** If `CLAUDE.md` already exists, ask before replacing or merging.
 - **Infer before asking.** Read the codebase first. Ask the user to confirm/correct, not to describe from scratch.
-- **Keep static sections intact and ordered first.** The Workflow Orchestration, Core Principles, Self-Improvement Loop, and Task Management sections are universal clauDNA conventions. They must appear before project-specific dynamic sections for cache efficiency.
+- **Keep static sections intact and ordered first.** The Workflow Orchestration, Core Principles, and Task Management sections are universal clauDNA conventions. They must appear before project-specific dynamic sections for cache efficiency.
 - **Architecture must be real.** Scan the actual directory tree. Don't write a placeholder tree structure.
 - **CHANGELOG must reflect real history.** Use `git log` and `git tag`. Don't invent entries.
 
@@ -251,7 +237,7 @@ A Step 7.5 raw-tree scaffold lives outside the repo — never stage it; only the
 
 ## Optional: Notification Setup (macOS)
 
-During Step 8, if the user is on macOS, mention notification options:
+During Step 7, if the user is on macOS, mention notification options:
 
 **iTerm2 (recommended):** Profiles → Terminal → check "Send notification when idle" (set idle time to ~5 seconds). iTerm2 will alert when any terminal tab is waiting for input.
 
