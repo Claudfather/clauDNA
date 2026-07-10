@@ -66,7 +66,7 @@ After ANY correction from the user:
 ## Shared Documentation
 
 ~/shared
-Cross-project knowledge lives here — see /claudna:remember.
+Cross-project knowledge lives here — see /claudna:recall.
 -->
 
 ---

@@ -560,7 +560,7 @@ The `/claudna:worktree` skill manages this interactively if you'd rather not mem
 
 ### 7.1 The shared-docs seam
 
-Knowledge skills (`/claudna:remember`, `/claudna:index`) resolve the shared-docs root through two doors, env first:
+Knowledge skills (`/claudna:recall`, `/claudna:index`) resolve the shared-docs root through two doors, env first:
 
 1. **Env override:** `CLAUDRON_VAULT` or `CLAUDRON_VAULT_PATH` (engine-managed vault — Claudron's CLI reads the bare form; clauDNA accepts both) or `SHARED_DOCS_PATH` (raw tree). Set these yourself if you want them — the plugin never writes env vars, shell profiles, or `~/.claude/settings.json`.
 2. **CLAUDE.md section:** a `## Shared Documentation` section whose first non-empty line is the root path, optionally annotated `(claudron vault)` for engine-managed roots. `/claudna:init-project` (Step 7.5) provisions it; the parse contract lives in `skills/_shared/documentation-standard.md` §10.
@@ -583,7 +583,7 @@ Declined the seam during init? Re-run `/claudna:init-project` and Step 7.5 offer
 
 ### 7.3 The `/claudron` engine skill
 
-`/claudna:claudron` is the deliberate-save door to the vault — `write` (capture a note), `lookup` (search it), `status` (vault health, or whether Claudron is installed at all). It shells out to the `claudron` CLI per `skills/_shared/claudron-engine.md` and degrades loudly: with no vault, `write` points you at `/claudna:publish --to vault` and `status` reports the absence as a diagnostic rather than erroring. The skill never sets note maturity — the engine stamps `draft`. `/claudna:publish --to vault` routes through the same engine when a vault is present, and falls back to the raw tree otherwise.
+`/claudna:claudron` is the deliberate-save door to the vault — `capture` (save a note), `lookup` (search it), `status` (vault health, or whether Claudron is installed at all). It shells out to the `claudron` CLI per `skills/_shared/claudron-engine.md` and degrades loudly: with no vault, `capture` points you at `/claudna:publish --to vault` and `status` reports the absence as a diagnostic rather than erroring. The skill never sets note maturity — the engine stamps `draft`. `/claudna:publish --to vault` routes through the same engine when a vault is present, and falls back to the raw tree otherwise.
 
 **Permissions.** The engine runs `claudron` subcommands plus a detection probe. Add to `permissions.allow` to avoid prompts:
 

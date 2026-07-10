@@ -1,15 +1,15 @@
 ---
-name: remember
+name: recall
 user-invocable: true
-description: "Use before starting substantive work in a repo with shared docs — recalls prior decisions, patterns, and lessons relevant to the task at hand. First verb in the knowledge lifecycle loop."
+description: "Use before starting substantive work in a repo with shared docs — recalls prior decisions, patterns, and lessons relevant to the task at hand. First verb in the knowledge lifecycle loop. Replaces /remember."
 argument-hint: "[task description or repo name] [--repo <name>] [--full] [--include-stale]"
 ---
 
-# Remember
+# Recall
 
 Knowledge consumption — discover what the fleet already knows before starting work. Scan INDEX.md files, filter for relevance, and surface the docs that matter.
 
-This is the **first verb** in the knowledge lifecycle: remember → work → learn → reflect → index → remember (next session).
+This is the **first verb** in the knowledge lifecycle: recall → work → learn → reflect → index → recall (next session).
 
 ## Arguments
 
@@ -66,7 +66,7 @@ Found 4 matching docs for "shuffify auth rework":
 2. [Shuffify Auth Rework Plan](planning/active/shuffify-auth-rework.md) — OAuth migration plan (status: active, owner: greg)
 3. [OAuth Token Refresh Patterns](knowledge/shuffify/oauth-token-refresh.md) — refresh flow and edge cases (status: current, owner: craig)
 
-Review these before starting. Read specific docs with /claudna:remember --full or by opening the file directly.
+Review these before starting. Read specific docs with /claudna:recall --full or by opening the file directly.
 ```
 
 ### --full Mode

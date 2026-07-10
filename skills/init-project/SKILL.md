@@ -157,7 +157,7 @@ If `documentation/` already exists, scan for missing subdirectories and create o
 
 ### Step 7.5: Shared Knowledge Seam
 
-Provision the `## Shared Documentation` CLAUDE.md section — the root that `/claudna:remember` and `/claudna:index` resolve. The section format, `(claudron vault)` annotation semantics, and env-over-section precedence are contract-bound in `skills/_shared/documentation-standard.md` §10 — write exactly that format.
+Provision the `## Shared Documentation` CLAUDE.md section — the root that `/claudna:recall` and `/claudna:index` resolve. The section format, `(claudron vault)` annotation semantics, and env-over-section precedence are contract-bound in `skills/_shared/documentation-standard.md` §10 — write exactly that format.
 
 **Idempotency first.** If CLAUDE.md already has a `## Shared Documentation` section, show it and offer to update it by re-running the detection below — never write a second section. (The CLAUDE.md template ships the section as a commented placeholder — treat that as absent, and replace the commented block with the real section when writing.)
 
@@ -171,7 +171,7 @@ Detect which of three states applies, in order:
 ## Shared Documentation
 
 ~/vault  (claudron vault)
-Cross-project knowledge lives here — see /claudna:remember.
+Cross-project knowledge lives here — see /claudna:recall.
 ```
 
 Detection is read-only (`claudron status` is safe to run). **Print-not-execute for anything mutating:** never run `claudron init`, `claudron migrate`, or any other writing claudron command — show the command and let the user run it.
@@ -201,7 +201,7 @@ Offer to re-run this step's detection once the user has initialized.
 ## Shared Documentation
 
 ~/shared
-Cross-project knowledge lives here — see /claudna:remember.
+Cross-project knowledge lives here — see /claudna:recall.
 ```
 
 The scaffold is the only write this skill makes outside the project, and only at the path the user chose. If the user declines, skip the seam entirely and point at SETUP_GUIDE's "Claudron Integration" section for setting it up later.

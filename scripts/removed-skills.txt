@@ -1,8 +1,9 @@
 # Skills removed by consolidation releases (epic #165, F4: hard removal,
 # per-phase releases). One name per line. The removed-names gate in
-# validate-skills.py blocks any repo surface (outside CHANGELOG.md and
-# documentation/archive/) from mentioning these names in any form;
-# `Replaces ...` breadcrumb lines are exempt.
+# validate-skills.py blocks any living repo surface from mentioning these names
+# in any reference form. Exempt point-in-time records: CHANGELOG.md and
+# documentation/{archive,decisions,planning,specs}/; also skills/cleanup-legacy-install/;
+# and `Replaces ...` breadcrumb lines.
 #
 # P5 (0.11.0) — review engine: /review-work
 review-changes
@@ -47,3 +48,6 @@ vercel-status
 neon-branch
 neon-info
 neon-query
+#
+# Vocabulary alignment (#221, epic #197) — /remember renamed /recall
+remember
