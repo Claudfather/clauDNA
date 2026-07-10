@@ -57,7 +57,7 @@ If `data.conventions` is non-null, render it under a `## Vault conventions` head
 - **A query was given** → lead with the **Fleet** tier (you asked about a topic — relevance first), then Project.
 - **Bare recall** → lead with the **Project** tier (recency — what's fresh here), then Fleet.
 
-Render each note as one line (matching `claudron`'s own brief format):
+Render each note as one line:
 ```
 - **<title>** (<type>[, <maturity>]) — <summary> `<path>`
 ```
@@ -67,7 +67,7 @@ Omit `, <maturity>` when it is empty. Label each tier so the source is unambiguo
 ### Fleet — most relevant to "<query>"
 ```
 
-With `--full`, additionally read and summarize the top note in each tier from its `path`. If `data.notes` is empty, say **"No prior notes recalled"** (conventions may still have shown). Never fabricate notes.
+With `--full`, additionally read and summarize the top note in each tier from its `path` (vault-relative per §2 — resolve it against the vault `root` already in the Step 0 pre-flight envelope; no fresh `claudron status` call). If `data.notes` is empty, say **"No prior notes recalled"** (conventions may still have shown). Never fabricate notes.
 
 ## Step 3: Orient
 
@@ -77,7 +77,7 @@ Close with a one-line orientation, not just a dump: point at the single most rel
 
 When the ladder returns **present-no-vault** or **absent**, Claudron can't assemble the briefing. Fall back to the **frozen** INDEX.md scan — no new capability lands here (claudron-engine.md §4); it exists so recall still works on a raw tree. Say so first: *"Claudron vault unavailable — scanning the raw tree's INDEX.md instead."* Then:
 
-1. **Resolve the docs root.** `CLAUDRON_VAULT` / `CLAUDRON_VAULT_PATH` / `SHARED_DOCS_PATH` win (in that order); else parse the CLAUDE.md `## Shared Documentation` section (contract: documentation-standard §10). A `(claudron vault)`-annotated root — or one from `CLAUDRON_VAULT`/`CLAUDRON_VAULT_PATH` — is engine-managed and carries no INDEX.md: do not scan it; degrade with "engine-managed root; install claudron or point the section at a raw tree." No root resolves → say so and point at `/claudna:init-project` (its shared-docs seam step provisions the section).
+1. **Resolve the docs root** per documentation-standard §10 ("locating the root" — env override, else the CLAUDE.md `## Shared Documentation` section). If §10's annotation semantics mark the root engine-managed (a `(claudron vault)` annotation, or an env-derived `CLAUDRON_VAULT`/`CLAUDRON_VAULT_PATH` root), it carries no INDEX.md — do not scan it; degrade with §10's engine-managed-root message. No root resolves → say so and point at `/claudna:init-project` (its shared-docs seam step provisions the section).
 
 2. **Scan INDEX.md only** (never walk directories) under the root:
 

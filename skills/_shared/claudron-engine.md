@@ -47,7 +47,7 @@ Assert on every call: top-level `ok` (bool) / `command` (matches the verb) / `da
 
 A missing top-level key, a `command` mismatch, or an absent expected `data` key is an **unrecognized envelope** → engine failure (§3). Do not parse a partial or guessed shape.
 
-For `lookup`, each entry in `data.results` is `title` / `score` / `match_type` / `tier` / `path` / `tags` (no `status`). For `recall`, each entry in `data.notes` carries `title` / `path` / `tier` / `type` / `status` / `maturity` / `updated` / `summary` / `score`, where `score` is `null` on project-tier notes (membership, not relevance) and an integer on fleet/shared-tier notes — the null is the tier signal.
+For `lookup`, each entry in `data.results` is `title` / `score` / `match_type` / `tier` / `path` / `tags` (no `status`). For `recall`, each entry in `data.notes` carries `title` / `path` (vault-relative) / `tier` / `type` / `status` / `maturity` / `updated` / `summary` / `score`, where `score` is `null` on project-tier notes (membership, not relevance) and an integer on fleet/shared-tier notes — the null is the tier signal.
 
 The `capture` `action` value drives the capture flow — its five values and their meaning (the source of truth; consumers branch on these, they don't redefine them):
 

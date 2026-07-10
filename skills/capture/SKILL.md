@@ -113,7 +113,7 @@ Vault capture
 
 When the ladder returns **present-no-vault** / **absent**, write to the raw tree instead — **frozen** compatibility behavior (claudron-engine.md §4); no new capability lands here. Say so first: *"Claudron vault unavailable — wrote to the raw tree; run `/claudna:index`."* Then:
 
-1. Resolve the docs root (documentation-standard §10: `CLAUDRON_VAULT` / `CLAUDRON_VAULT_PATH` / `SHARED_DOCS_PATH`, else the CLAUDE.md `## Shared Documentation` section). A `(claudron vault)`-annotated root is engine-managed — never write a raw tree into it; report the no-vault remedy (`claudron init <path> --personal`) instead.
+1. Resolve the docs root per documentation-standard §10 ("locating the root" — env override, else the CLAUDE.md `## Shared Documentation` section). If §10's annotation semantics mark the root engine-managed, there is no raw tree to write — do not write into it; surface §10's engine-managed-root message and stop.
 2. Extract/format the content as a frontmattered doc (`title`, `type`, `status: current`, `owner`, `created`, provenance in the body, `tags`). Slug the title (lowercase, hyphenate, ≤40 chars on a word boundary, `-N` on collision).
 3. Write to `<root>/knowledge/<project-or-topic>/<slug>.md`, creating the directory if needed.
 4. Auto-run `/claudna:index` on the target directory to regenerate INDEX.md.
