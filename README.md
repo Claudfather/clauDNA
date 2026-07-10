@@ -79,12 +79,12 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:audit t
 
 | Skill | Description |
 |-------|-------------|
-| `/learn` | Ingest a document or repo into the shared knowledge store |
+| `/capture` | Save knowledge to the vault — a note you write, or external content (URL / file / text) |
 | `/reflect` | Pre-compact synthesis — capture session context before it evaporates |
 | `/index` | Organize the shared knowledge store; regenerate INDEX.md |
-| `/recall` | Pull relevant prior knowledge at session start |
+| `/recall` | Orientation briefing — what the fleet and this project already know, before you start |
 | `/publish` | Distribute knowledge to other surfaces (bots, docs sites) |
-| `/claudron` | Claudron vault engine — `capture` / `lookup` / `status` over the shared knowledge vault (needs the Claudron CLI) |
+| `/claudron` | Claudron vault engine — `lookup` / `status` over the shared knowledge vault (needs the Claudron CLI); save via `/capture` |
 
 ### Git
 

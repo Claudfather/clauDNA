@@ -1,106 +1,102 @@
 ---
 name: recall
 user-invocable: true
-description: "Use before starting substantive work in a repo with shared docs — recalls prior decisions, patterns, and lessons relevant to the task at hand. First verb in the knowledge lifecycle loop. Replaces /remember."
-argument-hint: "[task description or repo name] [--repo <name>] [--full] [--include-stale]"
+description: "Use before starting substantive work in a repo — surfaces what the fleet and this project already know (prior decisions, patterns, conventions) so you don't rework solved problems. Orientation briefing over `claudron recall`; falls back to scanning INDEX.md when Claudron is absent. First verb in the knowledge loop. To search the vault by term, use /claudna:claudron lookup; to save new knowledge, use /claudna:capture. Replaces /remember."
+argument-hint: "[query terms] [--project <name>] [--limit <n>] [--full] [--include-stale]"
+requires:
+  - cli: claudron>=0.2
+    reason: "Claudron CLI — `recall` assembles the briefing (conventions + project/fleet tiers); without it, recall falls back to the frozen INDEX.md scan"
 ---
 
 # Recall
 
-Knowledge consumption — discover what the fleet already knows before starting work. Scan INDEX.md files, filter for relevance, and surface the docs that matter.
+Orientation briefing: surface what the fleet and this project already know before you start, so prior decisions and patterns inform the work instead of being rediscovered. Engine-preferred — renders `claudron recall`. Read-only.
 
-This is the **first verb** in the knowledge lifecycle: recall → work → learn → reflect → index → recall (next session).
+First verb in the knowledge lifecycle: **recall → work → capture** (next session recalls what you captured).
 
 ## Arguments
 
-Parse `$ARGUMENTS` at invocation:
-- **First positional arg:** Task description, repo name, or topic query. Used to filter INDEX.md entries by relevance.
-- `--repo <name>`: Scope to a specific repo's knowledge directory.
-- `--full`: Read and summarize matched docs (default: titles and one-line descriptions only).
-- `--include-stale`: Also show docs with terminal statuses (stale, superseded, completed, archived — hidden by default).
+Parse `$ARGUMENTS`:
+- **Positional (query terms):** relevance terms for the fleet tier. Omit for a bare recall that leads with this project's most-recent notes.
+- `--project <name>` — override the project scope (default: `claudron` derives it from the cwd git root).
+- `--limit <n>` — notes **per tier** (default 5 → up to 5 project + 5 fleet).
+- `--full` — read and show the body of the top match in each tier, not just its one-line summary.
+- `--include-stale` — fallback (INDEX-scan) only: include terminal-status docs.
 
----
+## Step 0: Detection ladder
 
-## Step 1: Locate INDEX.md Files
+Run the detection ladder (`skills/_shared/claudron-engine.md` §1) before anything else. Route on the verdict:
+- **present-with-vault** → the engine path (Step 1).
+- **present-no-vault** / **absent** → the frozen INDEX.md-scan fallback (below). Degrade loudly — say which path you took and why.
 
-Determine the shared docs root: `CLAUDRON_VAULT` / `CLAUDRON_VAULT_PATH` / `SHARED_DOCS_PATH` env vars win (in that order); otherwise parse the current CLAUDE.md `## Shared Documentation` section — first non-empty line is the root path, or the first backtick-quoted path when that line is templated prose (contract: `skills/_shared/documentation-standard.md` §10). If env and section disagree, use the env value and note the mismatch.
+## Step 1: Recall from the engine
 
-- **Root annotated `(claudron vault)` (or resolved from `CLAUDRON_VAULT`/`CLAUDRON_VAULT_PATH`):** the root is engine-managed and carries no INDEX.md — do not INDEX-scan it and do not suggest `/claudna:index`. Degrade with: "engine-managed root; install claudron or point the section at a raw tree." — appending, when the root came from env: "(root came from `CLAUDRON_VAULT`/`CLAUDRON_VAULT_PATH` — unset it to fall back)".
-- **No root resolves:** say so and point at `/claudna:init-project` — its shared-docs seam step provisions the section.
+Build the relevance query: join the positional terms into `--query "<terms>"`. With no terms, omit `--query` — `claudron recall` then leads with project membership (recency) and uses the project name as the implicit relevance term (index-only, no full-text scan).
 
-Scan these INDEX.md files:
-
-| Path (under the resolved root) | Why |
-|------|-----|
-| `<root>/planning/active/INDEX.md` | Active plans that may affect the task |
-| `<root>/knowledge/<repo>/INDEX.md` | Repo-specific learnings (if `--repo` set or repo inferrable from task) |
-| `<root>/knowledge/INDEX.md` | Top-level knowledge index |
-| `<root>/decisions/INDEX.md` | Ratified decisions that constrain the work |
-
-If `--repo` is set, prioritize `knowledge/<repo>/`. If the task mentions a repo name, infer it.
-
-## Step 2: Filter for Relevance
-
-For each INDEX.md entry, match against the query:
-- **Title match** — does the title contain keywords from the task?
-- **Tag match** — do inline tags overlap with the task's domain?
-- **Repo match** — does the entry's repo tag match the target repo?
-- **Status filter** — include only `active`, `current`, `ratified`, `draft`. Exclude `stale`, `superseded`, `completed`, `archived` unless `--include-stale` is set.
-
-Rank matches by: exact repo match > tag overlap > title keyword match.
-
-## Step 3: Present Results
-
-**Context budget: never read more than 5 docs.** This is a hard cap.
-
-### Default Mode (titles only)
-
-Return the top 3-5 matches with title and one-line description:
-
-```
-## Relevant Knowledge
-
-Found 4 matching docs for "shuffify auth rework":
-
-1. [Spotify API Rate Limits](knowledge/shuffify/spotify-api-rate-limits.md) — rate limit quirks and retry patterns (status: current, owner: greg)
-2. [Shuffify Auth Rework Plan](planning/active/shuffify-auth-rework.md) — OAuth migration plan (status: active, owner: greg)
-3. [OAuth Token Refresh Patterns](knowledge/shuffify/oauth-token-refresh.md) — refresh flow and edge cases (status: current, owner: craig)
-
-Review these before starting. Read specific docs with /claudna:recall --full or by opening the file directly.
+```bash
+claudron recall [--query "<terms>"] [--project <name>] --limit 5 --json
 ```
 
-### --full Mode
+`--limit` is **per tier**. Validate the envelope (claudron-engine.md §2): assert `data` carries `project`, `query`, `conventions`, and `notes` (a list). On exit 3 or an unrecognized envelope, degrade to the fallback and say so (claudron-engine.md §3).
 
-Read the top matches (up to 5) and provide a brief summary of each:
+## Step 2: Render the orientation briefing
 
+Two parts, in this order:
+
+### Vault conventions (never capped)
+
+If `data.conventions` is non-null, render it under a `## Vault conventions` heading — verbatim and uncapped. These are the fleet's standing operating rules; surfacing all of them is the point. (Drop only a leading `# ` H1, since you supply the heading.)
+
+### Recalled notes — two tiers, adaptive lead
+
+`data.notes` is one flat list carrying both tiers. Split it by each entry's `tier` (equivalently, by `score`):
+- **Project tier** — `tier` begins `project:` (`score` is `null`). *Membership*, most-recently-updated first — what THIS project knows.
+- **Fleet tier** — integer `score` (`tier` `fleet`/`shared`). *Relevance*-ranked against the query — what the FLEET knows.
+
+**Lead adaptively:**
+- **A query was given** → lead with the **Fleet** tier (you asked about a topic — relevance first), then Project.
+- **Bare recall** → lead with the **Project** tier (recency — what's fresh here), then Fleet.
+
+Render each note as one line (matching `claudron`'s own brief format):
 ```
-## Relevant Knowledge (detailed)
-
-### 1. Spotify API Rate Limits
-**Path:** knowledge/shuffify/spotify-api-rate-limits.md
-**Summary:** Spotify enforces 30 req/sec per app. 429 responses include Retry-After header. Batch endpoints exist for tracks/albums but not for user playlists. Rate limits reset per rolling window, not per calendar second.
-
-### 2. Shuffify Auth Rework Plan
-**Path:** planning/active/shuffify-auth-rework.md
-**Summary:** Active plan to migrate from implicit grant to PKCE auth flow. Phase 1 (token storage) is complete. Phase 2 (refresh logic) is in progress. Depends on the token refresh patterns doc below.
-
-[...up to 5 docs...]
+- **<title>** (<type>[, <maturity>]) — <summary> `<path>`
+```
+Omit `, <maturity>` when it is empty. Label each tier so the source is unambiguous:
+```
+### This project — most recent
+### Fleet — most relevant to "<query>"
 ```
 
-## Step 4: Flag Conflicts
+With `--full`, additionally read and summarize the top note in each tier from its `path`. If `data.notes` is empty, say **"No prior notes recalled"** (conventions may still have shown). Never fabricate notes.
 
-If any active plans touch the same repo as the current task, flag them explicitly:
+## Step 3: Orient
 
-```
-⚠ Active plan in scope: "Shuffify Auth Rework Plan" (owner: greg, status: active)
-Check planning/active/shuffify-auth-rework.md before starting to avoid contradicting in-flight work.
-```
+Close with a one-line orientation, not just a dump: point at the single most relevant note for the task, and flag any note whose `type` is `plan` with a non-terminal `status` — an in-flight plan the work might collide with. If nothing is relevant, say so plainly.
+
+## Fallback: no engine (frozen)
+
+When the ladder returns **present-no-vault** or **absent**, Claudron can't assemble the briefing. Fall back to the **frozen** INDEX.md scan — no new capability lands here (claudron-engine.md §4); it exists so recall still works on a raw tree. Say so first: *"Claudron vault unavailable — scanning the raw tree's INDEX.md instead."* Then:
+
+1. **Resolve the docs root.** `CLAUDRON_VAULT` / `CLAUDRON_VAULT_PATH` / `SHARED_DOCS_PATH` win (in that order); else parse the CLAUDE.md `## Shared Documentation` section (contract: documentation-standard §10). A `(claudron vault)`-annotated root — or one from `CLAUDRON_VAULT`/`CLAUDRON_VAULT_PATH` — is engine-managed and carries no INDEX.md: do not scan it; degrade with "engine-managed root; install claudron or point the section at a raw tree." No root resolves → say so and point at `/claudna:init-project` (its shared-docs seam step provisions the section).
+
+2. **Scan INDEX.md only** (never walk directories) under the root:
+
+   | Path | Why |
+   |---|---|
+   | `<root>/planning/active/INDEX.md` | Active plans that may affect the task |
+   | `<root>/knowledge/<repo>/INDEX.md` | Repo-specific learnings (if `--project` set or inferrable) |
+   | `<root>/knowledge/INDEX.md` | Top-level knowledge index |
+   | `<root>/decisions/INDEX.md` | Ratified decisions that constrain the work |
+
+3. **Filter for relevance:** title / tag / repo match against the query; include only `active` / `current` / `ratified` / `draft` (exclude `stale` / `superseded` / `completed` / `archived` unless `--include-stale`). Rank: exact repo match > tag overlap > title keyword.
+
+4. **Present** the top 3–5 (hard cap 5): title + one-line description (or bodies with `--full`). Flag active plans touching the task's repo. If INDEX.md is missing or empty on a raw tree, note it and suggest `/claudna:index` — never against a `(claudron vault)` root.
 
 ## Rules
 
-- **5-doc cap is non-negotiable.** If more than 5 docs match, show the top 5 and note how many were omitted.
-- Scan INDEX.md only — never walk directories to find docs. If INDEX.md is missing or empty on a raw tree, note it and suggest running `/claudna:index` — but never against a `(claudron vault)`-annotated root (Step 1's degraded message applies instead).
-- Don't modify any files. This is a read-only skill.
-- If no matches are found, say so clearly — don't fabricate relevant docs.
+- **Read-only.** Recall never writes. (To save: `/claudna:capture`. To search by term: `/claudna:claudron lookup`.)
+- **Never fabricate.** No relevant notes → say so.
+- **Degrade loudly.** A fallback taken is always visible — never silently swap the engine for the INDEX scan.
+- **Conventions are uncapped; notes are tier-limited** (5 per tier via `--limit`). On the fallback, the 5-doc cap holds.
 
 $ARGUMENTS

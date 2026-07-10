@@ -1,10 +1,10 @@
 # Claudron Engine Contract
 
-The Claudron-specific engine behavior, layered on `skills/_shared/infra-cli-contract.md`. One place defines how clauDNA skills talk to the `claudron` CLI and what they do when it is degraded or absent. Referenced by the `/claudron` engine skill and by every fallback consumer that writes or reads the shared vault — `/claudna:publish --to vault` today, `/claudna:recall` / `/claudna:learn` / `/claudna:reflect` as epic #197 lands them.
+The Claudron-specific engine behavior, layered on `skills/_shared/infra-cli-contract.md`. One place defines how clauDNA skills talk to the `claudron` CLI and what they do when it is degraded or absent. Referenced by the `/claudron` engine skill and by every consumer that reads or writes the shared vault — `/claudna:recall` (read) and `/claudna:capture` (write) on the engine, `/claudna:publish --to vault`, with `/claudna:reflect` to follow (#203).
 
 `claudron` is a pre-1.0 external CLI. Two rules follow from that and govern everything below: **validate its envelope on every call** (never parse-and-guess an unrecognized shape), and **degrade loudly** (a fallback taken or an error hit is always visible, never silent).
 
-**Verb vocabulary.** clauDNA's vault-facing verbs are named for Claudron's CLI verbs — one word per concept, extending to verbs the deference #199 set for the frontmatter *vocabulary* (output-guide §3). `/claudna:claudron`'s verbs mirror the CLI commands they wrap (the §2 table); `/claudna:recall` shares its name with Claudron's `recall`. The vault-writing occasion-workflows (documentation-standard §10's which-door table) stay clauDNA-native — they terminate in `capture`, they don't rename it.
+**Verb vocabulary.** clauDNA's vault-facing verbs are named for Claudron's CLI verbs — one word per concept, extending the deference #199 set for the frontmatter *vocabulary* (output-guide §3). `/claudna:claudron`'s verbs mirror the CLI commands they wrap (the §2 table); `/claudna:recall` and `/claudna:capture` share their names with Claudron's `recall` and `capture` — the read and write doors. The other vault-writing occasion-workflows (documentation-standard §10's which-door table — `publish`, `reflect`) keep clauDNA-native names: they terminate in `capture`, they don't rename it.
 
 ## 1. The detection ladder
 
@@ -40,9 +40,12 @@ Assert on every call: top-level `ok` (bool) / `command` (matches the verb) / `da
 |---|---|
 | `capture` → `capture` | `action`, `path`, `reason` |
 | `lookup` → `lookup` | `query`, `results` (list) |
+| `recall` → `recall` | `project`, `query`, `conventions`, `notes` (list) |
 | `status` → `status` | `root`, `tiers`, `total_docs`, `total_stale`, `projects`, `fleets`, `quarantined`, `index_present`, `index_fresh`, `warnings` |
 
 A missing top-level key, a `command` mismatch, or an absent expected `data` key is an **unrecognized envelope** → engine failure (§3). Do not parse a partial or guessed shape.
+
+For `lookup`, each entry in `data.results` is `title` / `score` / `match_type` / `tier` / `path` / `tags` (no `status`). For `recall`, each entry in `data.notes` carries `title` / `path` / `tier` / `type` / `status` / `maturity` / `updated` / `summary` / `score`, where `score` is `null` on project-tier notes (membership, not relevance) and an integer on fleet/shared-tier notes — the null is the tier signal.
 
 The `capture` `action` value drives the capture flow — its five values and their meaning (the source of truth; consumers branch on these, they don't redefine them):
 
@@ -68,11 +71,11 @@ The engine always stamps a new note `draft`; **consumers never set or promote `m
 Transient exit-3 conditions get a **bounded retry — 2 attempts, short backoff** (a deliberate widening of infra-cli-contract §7's single retry) — then degrade. (`capture` is an unlocked local write in v0.2.0, so there is no lock contention to retry — cross-machine serialization is git's job in `sync`.)
 
 **Degrade loudly** on exit 3 or an unrecognized envelope — whether the ladder returned a non-usable verdict *or* a usable verdict turned into a failure mid-call:
-- **Consumer has a fallback** (`publish --to vault`, and later `learn`/`reflect`): take the raw-tree path and **say so** — "Claudron vault unavailable — wrote to the raw tree; run `/claudna:index`."
-- **Consumer has none** (`/claudron capture`): fail with the explicit reason + remedy (init pointer for no-vault; the git remedy for `SyncError`). There is no raw-tree fallback for `/claudron capture` by design — an unguarded write door recreates the noise the vault avoids.
+- **Writing consumer** (`/claudna:capture`, `publish --to vault`, `reflect`): take the frozen raw-tree path (write + `/claudna:index`) and **say so** — "Claudron vault unavailable — wrote to the raw tree; run `/claudna:index`." The *vault* is never written unguarded; the raw tree is the compat holding pen, not a second vault door.
+- **Reading consumer** (`/claudron lookup`, `/claudron status`): nothing to fall back to — report the verdict + remedy (init pointer for no-vault; the git remedy for `SyncError`) and stop. `/claudna:recall` is the exception: its frozen fallback is the INDEX.md scan (§4).
 
 **`--auto` result vocabulary** (the block itself is orchestration-guide.md's "Structured Result Shape"): writing consumers carry `artifacts.engine` — `"claudron"` on the engine path, `"fallback"` when degraded to the raw tree; reporting verbs (`status`) carry the ladder outcome in `artifacts.verdict` — `absent` / `present-no-vault` / `present-with-vault`. Any degradation lands in `errors[]`. Silence is the only forbidden outcome.
 
 ## 4. Fallback-freeze
 
-The raw-tree path is **frozen** compatibility behavior: the vault write + `/claudna:index` that runs when the engine is absent. No new capability lands on it — new features go on the engine path only.
+The raw-tree paths are **frozen** compatibility behavior — the vault write + `/claudna:index` on the write side (`/claudna:capture`, `publish`, `reflect`), and the INDEX.md scan on the read side (`/claudna:recall`). No new capability lands on them; new features go on the engine path only.

@@ -9,7 +9,7 @@ argument-hint: "[directory-path] [--validate-only] [--recursive] [--fix] [--stal
 
 Scan, validate, and index shared documentation. INDEX.md is the discovery layer — other bots scan it to find relevant docs without reading every file.
 
-**This skill is the SOLE writer of INDEX.md files.** Other skills (/claudna:learn, /claudna:reflect, /claudna:publish) create or update docs, then call /claudna:index to regenerate the index.
+**This skill is the SOLE writer of INDEX.md files.** Other skills (/claudna:capture, /claudna:reflect, /claudna:publish) create or update docs, then call /claudna:index to regenerate the index.
 
 ## Arguments
 

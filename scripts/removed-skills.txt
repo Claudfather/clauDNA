@@ -57,3 +57,8 @@ remember
 # and the Claudron vault are the knowledge stores.
 notes
 lessons
+#
+# Knowledge-surface unification (#202, epic #197) — /learn folds into /capture,
+# the one write door. (/claudron capture is absorbed too, but as a subcommand —
+# not a top-level skill name — it is repointed to /capture, not gated here.)
+learn

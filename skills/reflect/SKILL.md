@@ -1,7 +1,7 @@
 ---
 name: reflect
 user-invocable: true
-description: "Use when a session produced process learnings worth keeping — after corrections, surprises, or hard-won fixes — and before compacting a long session. Distills session experience into shared knowledge. For ingesting external content, use /claudna:learn."
+description: "Use when a session produced process learnings worth keeping — after corrections, surprises, or hard-won fixes — and before compacting a long session. Distills session experience into shared knowledge. For ingesting external content, use /claudna:capture."
 argument-hint: "[--target local|shared] [--notes file]"
 ---
 
@@ -152,7 +152,7 @@ Do not wait for human confirmation between `/claudna:reflect` and `/compact` —
 
 ## Notes
 
-- This skill is one verb in the knowledge lifecycle: `/claudna:learn` (ingest) -> work -> `/claudna:reflect` (synthesize) -> `/claudna:index` (organize) -> next session reads indexed knowledge.
+- This skill is one verb in the knowledge lifecycle: `/claudna:capture` (ingest) -> work -> `/claudna:reflect` (synthesize) -> `/claudna:index` (organize) -> next session reads indexed knowledge.
 - Speed over completeness. A quick, concrete reflection captured before `/compact` is worth more than a thorough retrospective written from faded memory.
 - The structured template exists to prevent platitudes. If you catch yourself writing generic advice ("always test first"), either make it specific ("the `auth_callback` endpoint needs integration tests because mocking the OAuth flow hides redirect bugs") or skip the field.
 - Same-day appending prevents file explosion during active sprint days where a bot may reflect multiple times.
