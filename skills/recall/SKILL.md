@@ -26,7 +26,7 @@ Parse `$ARGUMENTS` at invocation:
 Determine the shared docs root: `CLAUDRON_VAULT` / `CLAUDRON_VAULT_PATH` / `SHARED_DOCS_PATH` env vars win (in that order); otherwise parse the current CLAUDE.md `## Shared Documentation` section — first non-empty line is the root path, or the first backtick-quoted path when that line is templated prose (contract: `skills/_shared/documentation-standard.md` §10). If env and section disagree, use the env value and note the mismatch.
 
 - **Root annotated `(claudron vault)` (or resolved from `CLAUDRON_VAULT`/`CLAUDRON_VAULT_PATH`):** the root is engine-managed and carries no INDEX.md — do not INDEX-scan it and do not suggest `/claudna:index`. Degrade with: "engine-managed root; install claudron or point the section at a raw tree." — appending, when the root came from env: "(root came from `CLAUDRON_VAULT`/`CLAUDRON_VAULT_PATH` — unset it to fall back)".
-- **No root resolves:** say so and point at `/claudna:init-project` — its Step 7.5 provisions the section.
+- **No root resolves:** say so and point at `/claudna:init-project` — its shared-docs seam step provisions the section.
 
 Scan these INDEX.md files:
 

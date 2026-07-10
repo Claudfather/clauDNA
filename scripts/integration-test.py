@@ -129,7 +129,7 @@ _SKIP_REF_PATTERNS = re.compile(
     r"|^/"  # absolute paths: /tmp/...
     r"|^rm "  # shell commands mistakenly captured
     r"|^00_"  # output naming conventions: 00_OVERVIEW.md, 00_TECH_DEBT.md
-    r"|^\."  # dotfile-relative paths: .claude/lessons.md
+    r"|^\."  # dotfile-relative paths: .claude/settings.json
 )
 
 # Common project files that skills reference but don't ship — they exist in
@@ -141,7 +141,6 @@ _EXTERNAL_PROJECT_FILES = {
     "INDEX.md",
     "PROJECT_MISSION.md",
     "MEMORY.md",
-    ".claude/lessons.md",
 }
 
 

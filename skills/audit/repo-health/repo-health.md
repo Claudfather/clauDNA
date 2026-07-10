@@ -27,7 +27,7 @@ Ask the user how to find repos:
 
 1. **"Scan a parent directory?"** — provide a path (e.g., `~/Projects`). Use Glob with `*/.git` to find repos one level deep.
 2. **"Specific repos?"** — provide a list of paths.
-3. **"Use saved list?"** — check `~/.claude/notes/repo-health-repos.txt` for a previously saved list.
+3. **"Use saved list?"** — check `~/.claude/repo-health-repos.txt` for a previously saved list.
 
 Present discovered repos and ask the user to confirm. Offer to save the list for next time.
 
@@ -59,11 +59,10 @@ Present as a short numbered list with specific actions. Ask: **"Which repo do yo
 
 ### Step 5: Hygiene Check
 
-After the main dashboard, run a quick hygiene scan. Skip entirely if everything is clean. Check three areas (see `health-checks.md` for criteria and output formats):
+After the main dashboard, run a quick hygiene scan. Skip entirely if everything is clean. Check two areas (see `health-checks.md` for criteria and output formats):
 
 - **Stale planning sessions** — abandoned or never-started sessions in `documentation/planning/`. Offer to archive, delete, or skip each.
 - **Backup retention** — old clauDNA backups in `~/.local/share/clauDNA/backups/`. Offer to prune backups older than 30 days.
-- **Orphaned context-resume files** — dirs in `~/.claude/notes/projects/` whose repos no longer exist. Offer to remove.
 
 ---
 
@@ -87,7 +86,7 @@ Follow the output guide at `skills/_shared/output-guide.md`. Beyond the shared `
 
 - **Speed matters.** Triage tool, not a deep audit. Scan fast, present concisely.
 - **Subagent parallelism.** Launch one Explore subagent per repo for speed.
-- **Saved repo list.** `~/.claude/notes/repo-health-repos.txt` — one path per line, never synced.
+- **Saved repo list.** `~/.claude/repo-health-repos.txt` — one path per line, never synced.
 - **CI is best-effort.** Skip gracefully if `gh` is unavailable; note "no CI data."
 - **Mostly read-only.** Steps 1–4 and 6 don't modify anything. Step 5 modifies only with explicit user confirmation.
 - **Stale branch threshold.** 14 days, configurable if the user asks.

@@ -115,7 +115,3 @@ clauDNA Backups
 ```
 
 Ask: **"Prune backups older than 30 days?"** If confirmed, delete the old directories.
-
-### Orphaned Context-Resume Files
-
-Check `~/.claude/notes/projects/` for directories whose repos no longer exist in the saved repo list (or on disk). Report any orphans and offer to remove them.

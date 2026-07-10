@@ -51,3 +51,9 @@ neon-query
 #
 # Vocabulary alignment (#221, epic #197) — /remember renamed /recall
 remember
+#
+# notes/lessons retirement (#204, epic #197) — the global personal store
+# (~/.claude/notes/) + per-repo .claude/lessons.md scaffold are retired; memory/
+# and the Claudron vault are the knowledge stores.
+notes
+lessons

@@ -101,7 +101,7 @@ Skills that only use built-in Claude Code tools (Read, Write, Bash, Grep, etc.) 
 The body is markdown. There is no rigid template, but the following conventions hold across the canonical set:
 
 1. **Lead with a one-line restatement** of what the skill does. Useful for the agent loading the file.
-2. **`## Procedure`** is the standard heading for the executable steps. Skills that don't fit a linear procedure (`/notes`) use other headings.
+2. **`## Procedure`** is the standard heading for the executable steps. Skills that don't fit a linear procedure — verb-dispatch engines like `/claudna:session`, phase-based workflows — use other headings.
 3. **Numbered steps** when ordering matters. Subagent-driven skills often have an explicit `EnterPlanMode` step early.
 4. **Reference long supporting material via filename** rather than inlining (`See subagent-prompts.md in this skill directory`). This keeps `SKILL.md` scannable; the orchestrator reads the file, subagents read the deep references at runtime.
 5. **Hard gates** — when a step blocks proceeding without evidence, mark it with `<HARD-GATE>` tags or "Iron Law" language. See `/implement-plan` and `/review-work` for examples.

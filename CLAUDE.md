@@ -43,7 +43,7 @@ scripts/
 ### Don't
 
 - **Never write to `~/.claude/settings.json`** — that's user-managed. Recommended settings tweaks are documented in SETUP_GUIDE for the user to apply manually; the plugin never modifies user settings.
-- **Never touch `~/.claude/notes/`** — personal data (lessons, decisions, patterns).
+- **Never touch `~/.claude/notes/`** — personal data (decisions, patterns).
 - **Never touch `~/.claude/plugins/cache/Claudfather/claudna/<ver>/`** directly — Claude Code manages that directory. Make changes in this repo and bump `version` in `plugin.json` to ship them.
 - **Use Read/Write tools for file operations** — Not shell `cp`. This gives visibility into what changes and avoids permission issues.
 

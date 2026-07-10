@@ -8,7 +8,7 @@ Six checks to run. Score each PASS / WARN / FAIL.
 
 Read the project's `CLAUDE.md`. Identify each `##`-level section and classify it:
 
-- **STATIC**: Content that does not change between sessions. Examples: workflow orchestration, core principles, task management, self-improvement loop, project overview (filled in once).
+- **STATIC**: Content that does not change between sessions. Examples: workflow orchestration, core principles, task management, project overview (filled in once).
 - **DYNAMIC**: Content that changes over time or varies per session. Examples: development workflow (project-specific commands), code style & conventions, commands reference, "things Claude should NOT do" (grows over time).
 
 Check whether any STATIC section appears AFTER a DYNAMIC section. The ideal layout is all static sections first, then all dynamic sections last.
@@ -46,7 +46,7 @@ Check whether `.claude/lessons.md` is being auto-loaded or referenced in a way t
 2. Check if `CLAUDE.md` contains instructions to "always read lessons at session start" or similar auto-load directives
 3. Check if `.claude/settings.json` exists and references lessons in any auto-load configuration
 
-The correct pattern: lessons should be available on-demand (via `/claudna:lessons` or `/review-self`) but NOT auto-loaded into every session. Auto-loading adds variable content to the system prompt, which hurts caching.
+The correct pattern: lessons files, where a project still has one, should be available on-demand but NOT auto-loaded into every session. Auto-loading adds variable content to the system prompt, which hurts caching.
 
 **Scoring:**
 - **PASS**: No auto-load references found. Lessons are on-demand only.
@@ -81,7 +81,7 @@ Scan `CLAUDE.md` for instructions that encourage editing CLAUDE.md during an act
 
 The correct pattern: update CLAUDE.md at session boundaries (during `/claudna:session handoff`), not mid-session. Mid-session edits invalidate the cached system prompt.
 
-Also check the Self-Improvement Loop section — "Update `.claude/lessons.md`" is fine (lessons are not in the system prompt), but "Update CLAUDE.md" is a cache-busting pattern.
+In older projects that still carry a Self-Improvement Loop section, treat its "Update CLAUDE.md" instruction as a cache-busting pattern (current clauDNA templates ship no such section).
 
 **Scoring:**
 - **PASS**: No mid-session CLAUDE.md edit instructions found, or edits are explicitly deferred to session boundaries

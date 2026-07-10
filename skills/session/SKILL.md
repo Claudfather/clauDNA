@@ -8,7 +8,7 @@ allowed-tools: Bash(git *), Bash(gh *), Bash(ls *), Bash(wc *), Bash(date *), Ba
 
 # Session
 
-One engine for session continuity — `handoff`, `resume`, `name`, and `checkpoint` as verb modes over the per-cwd substrate: `<cwd>/.claude/session.md`, reaped by `skills/_shared/reaper-rules.md`. Session continuity only — knowledge capture (lessons, durable findings) is `/claudna:lessons` and `/claudna:notes` territory.
+One engine for session continuity — `handoff`, `resume`, `name`, and `checkpoint` as verb modes over the per-cwd substrate: `<cwd>/.claude/session.md`, reaped by `skills/_shared/reaper-rules.md`. Session continuity only — durable knowledge capture is `/claudna:reflect` and `/claudna:learn` territory.
 
 ## Mode dispatch
 

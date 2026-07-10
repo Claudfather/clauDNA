@@ -19,7 +19,7 @@ dbt typically needs Snowflake credentials available in the shell before any comm
 - A project-specific helper (e.g., `source <auth-helper>`) that exports `SNOWFLAKE_*` vars
 - Direct env vars exported in `~/.zshrc` / `~/.bashrc`
 
-If the project's CLAUDE.md or `~/.claude/notes/projects/<project>.md` documents an auth helper, use that. Otherwise ask the user how their dbt profile expects to authenticate.
+If the project's CLAUDE.md documents an auth helper, use that. Otherwise ask the user how their dbt profile expects to authenticate.
 
 ## Quick Commands
 
