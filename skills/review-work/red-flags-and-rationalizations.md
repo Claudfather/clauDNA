@@ -12,6 +12,7 @@ If you catch yourself thinking any of these during PR review, STOP -- you are ab
 - Producing a review with zero Blockers AND zero Suggestions -- Either the PR is genuinely flawless (rare) or you didn't look hard enough. If your review is all Nits and Questions, re-examine Correctness, Edge Cases, and Error Handling from Step 4.
 - Skipping Step 3 (Understand Intent) -- Jumping to critique without understanding purpose leads to wrong feedback. Read the PR description, linked issues, and plan docs FIRST.
 - Posting "Approve" with a one-line summary -- Approval requires evidence. Show what you checked. A review that says "LGTM" is a review that didn't happen.
+- Quoting a raw secret into a finding -- a diff line, `gh`/CLI output, or a connection string can carry a live credential (bot token, API key). Before findings leave the subagent, scrub the findings file with the clauDNA redactor (`scripts/redact.py` -- see orchestration-guide §7 "Redacting credentials in CLI output"). A review that surfaces a live credential is a security incident, not a review.
 
 ## Common Rationalizations
 
@@ -26,3 +27,4 @@ If you catch yourself thinking any of these during PR review, STOP -- you are ab
 | "The plan was already approved" | Plans can be implemented incorrectly. Review against the plan AND against correctness. |
 | "No security concerns in this area" | Did you actually check? Injection, auth bypass, and data exposure hide in unexpected places. |
 | "LGTM" | "LGTM" is not a review. Name what you verified. |
+| "I'll just paste the diff/CLI output" | Raw output can carry a live credential. Scrub findings with `scripts/redact.py` (orchestration-guide §7) before they leave the subagent. |
