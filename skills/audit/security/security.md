@@ -90,7 +90,7 @@ Each doc represents **exactly 1 PR** and must include:
 
 Follow Section 9 of the orchestration guide (`skills/_shared/orchestration-guide.md`). Plan agents must also read `skills/_shared/planning-standard.md` for quality standards and phase doc structure. Scratch directory: `/tmp/security-audit-<YYYY-MM-DD_HHMMSS>/research/`.
 
-**Security-specific rule:** All subagents MUST mask secret values in research files and docs. Show `API_KEY=sk-****` — never the full value.
+**Security-specific rule:** Never surface a raw secret value. Prose masking is not the mechanism — "show `sk-****`" leaked live tokens twice (a Telegram bot token, then a neon API key) because it relied on the model remembering to mask and only illustrated the `sk-` shape. Each subagent MUST scrub its research/findings file **in place** with the bundled redactor before handoff — `python3 scripts/redact.py <file>` (resolve the path per `skills/_shared/orchestration-guide.md` §7 "Redacting credentials in CLI output"). It masks the known token shapes and `SECRET=value` assignments to `[REDACTED]` while sparing `file:line`, so keep reporting file:line + the variable name for readability; the redactor is the deterministic backstop, not a substitute for it.
 
 ---
 
@@ -100,7 +100,7 @@ Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. The adv
 
 ### Security-specific rules
 
-- The adversarial-review subagent inherits the secret-masking rule: critics MUST NOT reproduce secret values in their findings.
+- The adversarial-review subagent inherits the secret-masking rule: critics MUST NOT reproduce secret values in their findings. And before the family is published, the orchestrator scrubs every doc in the session's scratch directory through the redactor (`python3 scripts/redact.py <scratch-dir>/*.md`; redactor path per orchestration-guide §7) — the mechanical gate that catches any raw value a scan or critic subagent quoted, independent of per-subagent memory.
 - Prioritize `concern_area` values: `security`, `data-integrity`, `error-handling`.
 - If the adversarial review surfaces a NEW security risk introduced by the remediation plan itself (e.g., "this auth change creates a session-fixation window"), elevate that finding's severity to CRITICAL regardless of the critic's default labeling.
 
@@ -145,7 +145,7 @@ Then tell the user:
 
 ## Notes
 
-- **Never print secret values.** Show file:line and the variable name, but mask the actual value.
+- **Never print secret values.** Report file:line and the variable name; the redactor (orchestration-guide §7) is the deterministic backstop that scrubs any raw value to `[REDACTED]` before findings leave the subagent.
 - **Severity is explicit.** Use the definitions in `severity-definitions.md` — don't inflate or deflate.
 - **Group related fixes.** One finding per PR creates review fatigue. Group logically.
 - **Skip missing tools gracefully.** If `pip-audit` isn't installed, note it and move on. Don't block the audit.
@@ -177,7 +177,7 @@ When `--auto` is set (implies `--output github`; see the lens contract §4 and o
 4. Create GitHub Issues for all findings (CRITICAL and HIGH immediately, MEDIUM batched)
 5. Skip LOW/INFO findings unless particularly noteworthy
 6. Return structured summary for audit tracking
-7. **Security-specific:** Never include actual secret values in issue bodies. Mask as `sk-****`.
+7. **Security-specific:** Never include a raw secret value in issue bodies — scrub the doc with the redactor (`python3 scripts/redact.py <file>`; path per orchestration-guide §7) before publishing, and report file:line + variable name only.
 8. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after (skill `audit`, lens inside `artifacts`, per the lens contract §4):
 
 ```json
@@ -198,4 +198,4 @@ When `--auto` is set (implies `--output github`; see the lens contract §4 and o
 ```
 
 - `outcome` is `completed` on success, `partial` if some issue creates failed, `blocked` if the scan couldn't run.
-- Secret values MUST remain masked in `summary` and all artifact fields.
+- Secret values MUST remain masked in `summary` and all artifact fields — run each published doc through the redactor (orchestration-guide §7) so structured-result fields carry `[REDACTED]`, never a raw value.
