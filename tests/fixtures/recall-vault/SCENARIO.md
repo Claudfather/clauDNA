@@ -29,7 +29,7 @@ fresh **here**:
 
 ### This project — most recent
 - **Auth key rotation runbook** (runbook, draft) — Rotate the signing key quarterly… `knowledge/demo-service/auth-rotation-runbook.md`
-- **Rate-limit the public API at 30 req/s** (decision, current) — The public API caps at 30 req/s per key… `knowledge/demo-service/rate-limit-decision.md`
+- **Rate-limit the public API at 30 req/s** (decision, canonical) — The public API caps at 30 req/s per key… `knowledge/demo-service/rate-limit-decision.md`
 ```
 
 ### Queried recall — leads with the fleet (relevance)
@@ -42,12 +42,15 @@ briefing leads with **what the fleet knows about the topic**, project second:
 <CONVENTIONS.md body>
 
 ### Fleet — most relevant to "rate limit"
-- **API rate-limit patterns across the fleet** (knowledge, current) — Most upstreams return 429 with a Retry-After… `shared/api-rate-limits.md`
+- **API rate-limit patterns across the fleet** (knowledge, verified) — Most upstreams return 429 with a Retry-After… `shared/api-rate-limits.md`
 
 ### This project — most recent
-- **Rate-limit the public API at 30 req/s** (decision, current) — The public API caps at 30 req/s per key… `knowledge/demo-service/rate-limit-decision.md`
+- **Auth key rotation runbook** (runbook, draft) — Rotate the signing key quarterly… `knowledge/demo-service/auth-rotation-runbook.md`
+- **Rate-limit the public API at 30 req/s** (decision, canonical) — The public API caps at 30 req/s per key… `knowledge/demo-service/rate-limit-decision.md`
 ```
 
 The delta is the **lead**: a bare recall orients you to this project's fresh
 context; a queried recall orients you to the fleet's most relevant knowledge —
-same vault, different door in.
+same vault, different door in. The **project tier is identical in both** — its
+membership is query-independent (`session.py` `recall()` scopes it to the
+project, not the query); only the lead and the fleet tier's contents change.

@@ -21,7 +21,7 @@ Parse `$ARGUMENTS`:
 - `--project <name>` — override the project scope (default: `claudron` derives it from the cwd git root).
 - `--limit <n>` — notes **per tier** (default 5 → up to 5 project + 5 fleet).
 - `--full` — read and show the body of the top match in each tier, not just its one-line summary.
-- `--include-stale` — fallback (INDEX-scan) only: include terminal-status docs.
+- `--include-stale` — include terminal-status notes (`stale` / `superseded` / `completed` / `archived`) that Step 2 otherwise filters out. Applies on **both** the engine path and the fallback.
 
 ## Step 0: Detection ladder
 
@@ -34,7 +34,7 @@ Run the detection ladder (`skills/_shared/claudron-engine.md` §1) before anythi
 Build the relevance query: join the positional terms into `--query "<terms>"`. With no terms, omit `--query` — `claudron recall` then leads with project membership (recency) and uses the project name as the implicit relevance term (index-only, no full-text scan).
 
 ```bash
-claudron recall [--query "<terms>"] [--project <name>] --limit 5 --json
+claudron recall [--query "<terms>"] [--project <name>] --limit <n> --json   # <n> from --limit, default 5
 ```
 
 `--limit` is **per tier**. Validate the envelope (claudron-engine.md §2): assert `data` carries `project`, `query`, `conventions`, and `notes` (a list). On exit 3 or an unrecognized envelope, degrade to the fallback and say so (claudron-engine.md §3).
@@ -57,6 +57,8 @@ If `data.conventions` is non-null, render it under a `## Vault conventions` head
 - **A query was given** → lead with the **Fleet** tier (you asked about a topic — relevance first), then Project.
 - **Bare recall** → lead with the **Project** tier (recency — what's fresh here), then Fleet.
 
+**Filter terminal-status notes** (parity with the fallback, which already excludes them at Step 3): the engine's project tier returns notes regardless of `status`, so drop any whose `status` is `stale` / `superseded` / `completed` / `archived` before rendering — a superseded decision shown as current is exactly what an orientation briefing must not do. `--include-stale` keeps them; `ratified` / `current` are live constraints and are always kept.
+
 Render each note as one line:
 ```
 - **<title>** (<type>[, <maturity>]) — <summary> `<path>`
@@ -66,6 +68,7 @@ Omit `, <maturity>` when it is empty. Label each tier so the source is unambiguo
 ### This project — most recent
 ### Fleet — most relevant to "<query>"
 ```
+Skip a tier's header entirely when its split is empty — never print a heading with nothing under it. On a **bare** recall (no query), title the fleet header `### Fleet — related to <project>` rather than interpolating an empty `"<query>"`.
 
 With `--full`, additionally read and summarize the top note in each tier from its `path` (vault-relative per §2 — resolve it against the vault `root` already in the Step 0 pre-flight envelope; no fresh `claudron status` call). If `data.notes` is empty, say **"No prior notes recalled"** (conventions may still have shown). Never fabricate notes.
 

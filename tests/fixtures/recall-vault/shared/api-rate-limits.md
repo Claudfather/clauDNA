@@ -2,7 +2,7 @@
 title: API rate-limit patterns across the fleet
 type: knowledge
 status: current
-maturity: current
+maturity: verified
 created: 2026-04-10
 updated: 2026-06-28
 tags: [rate-limit, api, retry]

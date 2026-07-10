@@ -2,7 +2,7 @@
 name: capture
 user-invocable: true
 description: "Use to save knowledge to the shared fleet vault — a note you write, or external content worth keeping (an article URL, a file, a transcript). One write door: routes text / URL / file to `claudron capture`. For recalling what the vault already knows, use /claudna:recall; to search it by term, use /claudna:claudron lookup; to route a finished, frontmattered doc across planes, use /claudna:publish. Replaces /learn."
-argument-hint: "<text | url | file> [--type t] [--title s] [--project p] [--tags a,b] [--full] [--auto]"
+argument-hint: "<text | url | file> [--type t] [--title s] [--project p | --fleet f] [--tags a,b] [--full] [--auto]"
 requires:
   - cli: claudron>=0.2
     reason: "Claudron CLI — `capture` writes the note to the vault with index-backed dedup; without it, capture falls back to the frozen raw-tree write + /claudna:index"
@@ -42,12 +42,12 @@ Classify the first positional argument (or the supplied content):
 | Shape | Mode | Action |
 |---|---|---|
 | starts `http://` / `https://` | **URL** | Fetch via `WebFetch`; extract the main content — strip nav, ads, sidebars, cookie banners; keep code blocks, tables, examples. |
-| starts `/` or `./` | **file** | `Read` the file. |
-| anything else | **text** | Use the inline text as-is. |
+| starts `/` or `./` **and names an existing file** | **file** | `Read` the file. |
+| anything else | **text** | Use it as-is — including a `/`-leading string that isn't a file (`/api/v2/users returns 500`), a bare domain, a `file://` URL, or a Windows path. Only an explicit `http(s)://` scheme triggers a fetch. |
 
-If a fetch fails (network, 404, auth wall), report the error verbatim and stop — never fabricate content.
+If a URL fetch or a real file `Read` fails (network, 404, auth wall, missing file), report the error verbatim and stop — never fabricate content.
 
-**Provenance.** For URL/file input, the origin matters but `claudron capture` has no `--source-url` flag (and stdin keys it doesn't know are dropped). Fold provenance into the note instead: a first body line — `Source: <url-or-path> (captured <today>)` — and a tag (the domain, or `source:file`).
+**Provenance.** For URL/file input, the origin matters but `claudron capture` has no `--source-url` flag (and stdin keys it doesn't know are dropped). Fold provenance into the note instead: a **trailing** body line — `Source: <url-or-path> (captured <today>)` — plus a tag (the domain, or `source:file`). Keep it **last**, never the first body line: Claudron derives a note's one-line recall summary from the first non-heading body line (`session.py` `_summary`), so a leading `Source:` line would hijack the summary every recall shows.
 
 ## Step 2: Boundary check
 
@@ -58,18 +58,20 @@ If the content is **skill-shaped** — an imperative how-to, a reusable procedur
 Decide the fields:
 - **type** — from `--type`, else inferred (an article or transcript → `knowledge`; a decision record → `decision`; etc.). Required by the CLI.
 - **title** — from `--title`, else derived from the content's own title/heading. Required.
-- **body** — the processed content. Default is a tight summary (30–50% length, keep all technical substance, strip boilerplate); `--full` captures verbatim. Prepend the provenance line for URL/file input.
-- **tags**, **project/fleet** — from flags or inferred from context.
+- **body** — the processed content. Default is a tight summary (30–50% length, keep all technical substance, strip boilerplate); `--full` captures verbatim. **Append** the provenance line at the end for URL/file input (never first — Step 1: the first body line becomes the recall summary).
+- **tags** — from flags or inferred from context.
+- **project / fleet** — decide scope deliberately, because Claudron's `capture` (unlike `recall`) does **not** derive the project from cwd: an unscoped note lands in the fleet-wide `shared/` tier, and a next-session *bare* `/claudna:recall` (which scopes to the cwd project) can miss it. A note **about this repo** takes `--project <cwd-git-root-name>` (the derivation `recall` uses); genuinely cross-project knowledge (an article, a fleet-wide pattern) takes `--fleet <name>` or stays unscoped. When in doubt for a repo-context capture, default to the cwd project.
 
 ## Step 4: Build the capture call
 
 Prefer flags (verified against v0.2.0):
 
 ```bash
+# repo-scoped: --project <name>; fleet-wide: --fleet <name> instead
 claudron capture --type <type> --title "<title>" --body "<body>" --tags "<a,b>" --project <project> --json
 ```
 
-For a multi-paragraph body awkward to quote inline, write the fields to a scratch JSON file (`type`, `title`, `body`, `tags`, `owner`, `project`) and pipe it:
+For a multi-paragraph body awkward to quote inline, write the fields to a scratch JSON file (`type`, `title`, `body`, `tags`, `owner`, `project` or `fleet`) and pipe it:
 
 ```bash
 claudron capture --stdin --json < <scratch-note.json>
@@ -86,7 +88,7 @@ Validate the envelope (claudron-engine.md §2), then branch on `data.action`:
   - *append* → `claudron capture --update <path> --body "<addendum>" --json` (→ `updated`).
   - *create* → re-run Step 4 with `--force` (→ `created`, `-N` slug suffix).
   - *cancel* → stop, nothing written.
-- **`suggest_supersede`** (the near-dup is **stale**) → present `data.reason`. True supersession is Claudron curation, not v0.2.0 — offer the same three routes: **"A stale note is near this — append, create fresh, or cancel? (append/create/cancel)"**
+- **`suggest_supersede`** (the near-dup is **stale**) → present `data.reason` (the CLI emits this action when the matched note's status is `stale`). Automatic supersession — marking the old note superseded for you — is Claudron curation, not this skill's job; offer the same three routes: **"A stale note is near this — append, create fresh, or cancel? (append/create/cancel)"**
 - **`rejected`** (exit 1) → surface `data.reason` + the `errors[]` Findings verbatim. Validation failure, not transient — fix the inputs; do not loop.
 
 **`--auto` (no prompts, never `--force`):**

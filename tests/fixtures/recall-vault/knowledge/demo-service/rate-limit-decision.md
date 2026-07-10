@@ -2,7 +2,7 @@
 title: Rate-limit the public API at 30 req/s
 type: decision
 status: ratified
-maturity: current
+maturity: canonical
 created: 2026-05-02
 updated: 2026-05-04
 tags: [rate-limit, api, demo-service]
