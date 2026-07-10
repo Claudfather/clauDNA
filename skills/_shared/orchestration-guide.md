@@ -220,6 +220,18 @@ This eliminates the `&&` operator AND makes skills portable across projects that
 
 For Python virtual environments, use the venv binary directly: `./venv/bin/python -m pytest` — never `source venv/bin/activate && pytest`.
 
+### Redacting credentials in CLI output
+
+Never quote raw infra/CLI output that could contain a credential into a finding, a report, or a returned summary. Prose masking ("show `sk-****`") has leaked live tokens — a Telegram bot token, then a neon API key — because it relied on the model remembering to mask and only illustrated the `sk-` shape.
+
+Scrub deterministically with the bundled redactor at `scripts/redact.py` (`${CLAUDE_PLUGIN_ROOT}/scripts/redact.py`, or the highest-versioned `~/.claude/plugins/cache/Claudfather/claudna/*/scripts/redact.py` when that variable is unset). The disk-write pattern (§2) already writes findings to disk, so scrub the file **in place** — a bare command, no pipe (per the shell-operator restriction above):
+
+```bash
+python3 "<redactor>" <findings-file>
+```
+
+Run it over any research or findings file that captured command output before that file is returned or published. The redactor masks Telegram / OpenAI / GitHub / AWS / Slack / Google / neon key shapes, `SECRET=value` assignments, and high-entropy tokens, and leaves git SHAs, UUIDs, and `file:line` references intact. It is idempotent — a redundant pass is harmless.
+
 ---
 
 ## 8. Archive Convention
