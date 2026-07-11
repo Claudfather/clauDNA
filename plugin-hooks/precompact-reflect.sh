@@ -5,6 +5,9 @@
 # Claude to run /claudna:capture first (a bare capture distills the session).
 # On the second attempt (after capture has run), allows compaction to proceed.
 #
+# Filename, the CLAUDNA_PRECOMPACT_REFLECT opt-out, and the marker keep their
+# historical names for now; the hook restructure (SessionEnd + stacking) is #203.
+#
 # Env vars:
 #   CLAUDNA_PRECOMPACT_REFLECT  — "0" to disable (default: enabled)
 #   CLAUDE_SESSION_ID           — session identifier (set by Claude Code)

@@ -587,7 +587,7 @@ Declined the seam during init? Re-run `/claudna:init-project` and its seam step 
 }
 ```
 
-> Later phases of the integration epic ([#197](https://github.com/Claudfather/clauDNA/issues/197), phases #202–#203) append to this section as they land: engine-preferred recall and capture, and reflect-at-compaction.
+> Later phases of the integration epic ([#197](https://github.com/Claudfather/clauDNA/issues/197), phases #202–#203) append to this section as they land: engine-preferred recall and capture, and capture-at-compaction.
 
 ---
 

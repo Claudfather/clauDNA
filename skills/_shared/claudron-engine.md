@@ -73,11 +73,11 @@ The engine always stamps a new note `draft`; **consumers never set or promote `m
 Transient exit-3 conditions get a **bounded retry — 2 attempts, short backoff** (a deliberate widening of infra-cli-contract §7's single retry) — then degrade. (`capture` is an unlocked local write in v0.2.0, so there is no lock contention to retry — cross-machine serialization is git's job in `sync`.)
 
 **Degrade loudly** on exit 3 or an unrecognized envelope — whether the ladder returned a non-usable verdict *or* a usable verdict turned into a failure mid-call:
-- **Writing consumer** (`/claudna:capture`, `publish --to vault`, `reflect`): take the frozen raw-tree path (write + `/claudna:index`) and **say so** — "Claudron vault unavailable — wrote to the raw tree; run `/claudna:index`." The *vault* is never written unguarded; the raw tree is the compat holding pen, not a second vault door.
+- **Writing consumer** (`/claudna:capture`, `publish --to vault`): take the frozen raw-tree path (write + `/claudna:index`) and **say so** — "Claudron vault unavailable — wrote to the raw tree; run `/claudna:index`." The *vault* is never written unguarded; the raw tree is the compat holding pen, not a second vault door.
 - **Reading consumer** (`/claudron lookup`, `/claudron status`): nothing to fall back to — report the verdict + remedy (init pointer for no-vault; the git remedy for `SyncError`) and stop. `/claudna:recall` is the exception: its frozen fallback is the INDEX.md scan (§4).
 
 **`--auto` result vocabulary** (the block itself is orchestration-guide.md's "Structured Result Shape"): writing consumers carry `artifacts.engine` — `"claudron"` on the engine path, `"fallback"` when degraded to the raw tree; reporting verbs (`status`) carry the ladder outcome in `artifacts.verdict` — `absent` / `present-no-vault` / `present-with-vault`. Any degradation lands in `errors[]`. Silence is the only forbidden outcome.
 
 ## 4. Fallback-freeze
 
-The raw-tree paths are **frozen** compatibility behavior — the vault write + `/claudna:index` on the write side (`/claudna:capture`, `publish`, `reflect`), and the INDEX.md scan on the read side (`/claudna:recall`). No new capability lands on them; new features go on the engine path only.
+The raw-tree paths are **frozen** compatibility behavior — the vault write + `/claudna:index` on the write side (`/claudna:capture`, `publish`), and the INDEX.md scan on the read side (`/claudna:recall`). No new capability lands on them; new features go on the engine path only.

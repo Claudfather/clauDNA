@@ -1,7 +1,7 @@
 ---
 name: capture
 user-invocable: true
-description: "Use to save knowledge to the vault — a note you write, external content (an article URL, a file, a transcript), or the current session's learnings (bare `/claudna:capture` distills what happened after corrections, surprises, or fixes, before compaction). One write door, scoped by what the note is about. To read the vault use /claudna:recall; to search by term use /claudna:claudron lookup; to route a finished doc use /claudna:publish. Replaces /learn and /reflect."
+description: "Use to save knowledge to the vault — a note you write, external content (an article URL, a file, a transcript), or the current session's learnings (bare `/claudna:capture` distills what happened after corrections, surprises, or fixes, before compaction). One write door. To read the vault use /claudna:recall; to search by term use /claudna:claudron lookup; to route a finished doc use /claudna:publish. Replaces /learn and /reflect."
 argument-hint: "[<text | url | file>] [--type t] [--title s] [--project p | --fleet f] [--tags a,b] [--full] [--auto]"
 requires:
   - cli: claudron>=0.2
@@ -17,7 +17,7 @@ Second verb in the knowledge lifecycle: recall → work → **capture** (next se
 ## Arguments
 
 Parse `$ARGUMENTS`:
-- **First positional** — the thing to capture. Routed by shape (Step 1): a `http(s)://` URL, a `/`- or `./`-path, or inline text. **Omitted, with nothing supplied in the request and a session worth distilling → session mode** (Step 1a). Omitted but content supplied in the request ("capture this finding: …") → route that content by shape.
+- **First positional** — the thing to capture. Routed by shape (Step 1): a `http(s)://` URL, a `/`- or `./`-path, or inline text. **Omitted with nothing supplied in the request → session mode** (Step 1a): distill the current session. Omitted but content supplied ("capture this finding: …") → route that content by shape.
 - `--type <t>` — vault note type: `knowledge`, `decision`, `runbook`, `plan`, `audit`, `review` (no `skill` — see Step 2).
 - `--title <s>` — short, unique title.
 - `--project <p>` / `--fleet <f>` — **manual overrides** on the scope Step 3 infers (mutually exclusive).
@@ -41,7 +41,7 @@ Classify the first positional argument (or the supplied content):
 
 | Shape | Mode | Action |
 |---|---|---|
-| nothing to capture (no positional, none supplied) mid-session | **session** | Distill the live session — **Step 1a**. |
+| nothing to capture — no positional, none supplied | **session** | Distill the live session — **Step 1a**. |
 | starts `http://` / `https://` | **URL** | Fetch via `WebFetch`; extract the main content — strip nav, ads, sidebars, cookie banners; keep code blocks, tables, examples. |
 | starts `/` or `./` **and names an existing file** | **file** | `Read` the file. |
 | anything else | **text** | Use it as-is — including a `/`-leading string that isn't a file (`/api/v2/users returns 500`), a bare domain, a `file://` URL, or a Windows path. Only an explicit `http(s)://` scheme triggers a fetch. |
@@ -52,7 +52,7 @@ If a URL fetch or a real file `Read` fails (network, 404, auth wall, missing fil
 
 ## Step 1a: Session mode — distill what happened
 
-Reached only on a bare invocation with nothing to capture. Scan the live session and pull concrete, durable learnings before compaction loses them — a quick snapshot, not a retrospective. If context is already near-full, hit the high points rather than skip.
+Reached from Step 1's session row. Scan the live session and pull concrete, durable learnings before compaction loses them — a quick snapshot, not a retrospective. If context is already near-full, hit the high points rather than skip.
 
 Extract against this rubric; every field concrete and specific, never a platitude:
 
@@ -80,10 +80,10 @@ Decide the fields:
 - **body** — the processed content. Default is a tight summary (30–50% length, keep all technical substance, strip boilerplate); `--full` captures verbatim. **Append** the provenance line at the end for URL/file input (never first — Step 1: the first body line becomes the recall summary).
 - **wikilinks** — if the note relates to one already in the vault (Step 5's dedup surfaces near-matches, or you know its title), link it in the body as `[[Exact Title]]`. Claudron resolves `[[Title]]` at write time; the vault's convention is to **relate** notes, not duplicate them.
 - **tags** — from flags or inferred from context.
-- **project / fleet — scope by what the note is *about*, and state the call.** Claudron files by location (there is no `scope:` field): an unscoped note lands in the vault-wide `_shared/` tier, `--project <name>` in that project's tier, `--fleet <name>` in that fleet's. Read the scope from the content, then **say which you chose and why** (`Scoped to project clauDNA — a gotcha in this repo`); the flags are manual overrides on that inference. When genuinely ambiguous, pick the narrower tier, state it, and proceed.
-  - **General / foreign / cross-project** (an article, a reusable pattern, a foreign repo) → **unscoped → `_shared/`**. The default; `claudron capture` does not derive a project, so leaving both flags off is correct here.
+- **project / fleet — scope by what the note is *about*, and state the call.** Claudron files by location — there is no `scope:` field; the tier follows the flag you pass, or none. Read the scope from the content, then **say which you chose and why** (`Scoped to project clauDNA — a gotcha in this repo`); the flags are manual overrides on that inference. When genuinely ambiguous, pick the narrower tier, state it, and proceed. The three tiers:
+  - **General / foreign / cross-project** (an article, a reusable pattern, a foreign repo) → **unscoped → `_shared/`**. The default — leave both flags off.
   - **Specifically about this repo** (session learnings, a decision or gotcha about this codebase) → `--project <cwd-git-root-name>`. Pass it **explicitly** — capture, unlike recall, won't infer it from cwd — so a bare `/claudna:recall` later surfaces it in the project tier.
-  - **A fleet-wide workflow or process** (how the fleet's tools interoperate, a protocol spanning repos) → `--fleet <name>`, when the ambient vault registers that fleet (`claudron status --json` → `data.fleets`; a Claudlobby-provisioned bot vault carries them). No fleet registered → it falls to `_shared/`; never invent a `--fleet` name.
+  - **A fleet-wide workflow or process** (how the fleet's tools interoperate, a protocol spanning repos) → `--fleet <name>`, when the ambient vault registers that fleet — read the names from the Step 0 status envelope's `fleets` (claudron-engine.md §2 owns that shape; a Claudlobby-provisioned bot vault carries them). No fleet registered → it falls to `_shared/`; never invent a `--fleet` name.
 
 ## Step 4: Build the capture call
 
@@ -148,7 +148,7 @@ When the ladder returns **present-no-vault** / **absent**, write to the raw tree
 ## Rules
 
 - **One write door.** Deliberate notes, external ingestion, and session distillation all come through here — there is no separate ingest or reflect command. (To *read* the vault: `/claudna:recall`; to *search* it: `/claudna:claudron lookup`; to route a finished doc across planes: `/claudna:publish`.)
-- **Read scope from content; state it.** Never force scope from cwd. General → `_shared/`, this repo → `--project`, fleet process → `--fleet`. Announce the tier and why.
+- **Read scope from content; state it.** Never force scope from cwd; announce the tier you chose and why (Step 3 owns the tier map).
 - **Never set maturity.** The engine stamps `draft`; promotion is curation.
 - **Degrade loudly.** A raw-tree fallback is always announced — never silently swap the vault for the tree.
 - **Don't fabricate.** A failed fetch stops the capture; a session with nothing worth keeping writes nothing.
