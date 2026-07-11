@@ -1,8 +1,8 @@
 ---
 name: audit
 user-invocable: true
-description: "Use for codebase audits across eight concerns — security vulnerabilities, technical debt, stale documentation, visual and UX design, frontend performance (janky scroll, slow loads), cross-cutting consistency of interfaces, data model fit, and a birds-eye view across repositories. Replaces /security-audit, /tech-debt, /docs-review, /design-review, /access-path-audit, /data-model-audit, /frontend-performance-audit, /repo-health."
-argument-hint: "[security|tech-debt|docs|design|access-path|data-model|frontend-perf|repo-health] [--auto] [--output github|session] [focus]"
+description: "Use for codebase audits across nine concerns — security vulnerabilities, technical debt, stale documentation, visual and UX design, frontend performance (janky scroll, slow loads), cross-cutting consistency of interfaces, data model fit, a birds-eye view across repositories, and whole-system comprehension reviews. Replaces /security-audit, /tech-debt, /docs-review, /design-review, /access-path-audit, /data-model-audit, /frontend-performance-audit, /repo-health."
+argument-hint: "[security|tech-debt|docs|design|access-path|data-model|frontend-perf|repo-health|system] [--auto] [--output github|session] [focus]"
 requires:
   - cli: gh
     reason: "GitHub CLI for --output github issue filing (via publish) and the repo-health lens's PR/CI listing"
@@ -10,7 +10,7 @@ requires:
 
 # Audit
 
-One engine for codebase audits — eight concern lenses as verb modes. Shared behavior (arguments, output routing, autonomous mode, orchestration) lives in `skills/_shared/audit-lens-contract.md`; this file supplies only the lens table and dispatch rules.
+One engine for codebase audits — nine concern lenses as verb modes. Shared behavior (arguments, output routing, autonomous mode, orchestration) lives in `skills/_shared/audit-lens-contract.md`; this file supplies only the lens table and dispatch rules.
 
 ## Lens dispatch (contract §2, §4)
 
@@ -28,6 +28,7 @@ No lens token → infer only when the request wording is unambiguous (e.g. "chec
 | `data-model` | How well the data model serves the application — schema-to-intent mismatches, awkward code-to-DB paths | no | `data-model/data-model.md` |
 | `frontend-perf` | Frontend performance symptoms — flickering, slow loads, janky scroll, re-renders, layout shifts | yes | `frontend-perf/frontend-perf.md` |
 | `repo-health` | Birds-eye view across multiple repositories — activity, staleness, CI health, open work | no | `repo-health/repo-health.md` |
+| `system` | An unfamiliar whole system (or subsystem) to understand and triage at rest — comprehension maps plus cross-concern correctness/reliability/performance/data-quality risk, filed as junior-executable, tracker-deduplicated issues | no | `system/system.md` |
 
 For the selected lens, read ONLY its depth file in this skill directory and follow it exactly — never load another lens's depth (contract §1).
 
@@ -38,4 +39,4 @@ For the selected lens, read ONLY its depth file in this skill directory and foll
 
 ## Related
 
-For production outages and live debugging, use /claudna:investigate-app — audits examine systems at rest. For reviewing a plan or PR rather than a codebase, use /claudna:ironclad.
+For production outages and live debugging, use /claudna:investigate-app — audits examine systems at rest. For reviewing an uncommitted diff or a specific PR (a change, not a system at rest), use /claudna:review-work; for hardening a plan Issue with the lens panel, use /claudna:ironclad.

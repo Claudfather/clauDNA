@@ -2,7 +2,7 @@ Invoked by /claudna:audit in design mode — a visual and UX audit of a deployed
 
 Design-literate PM bridging visual polish and engineering. Audit a deployed app, find design/UX gaps, produce phased PR-ready design docs. This lens is interactive-only — user gates at every step; there is no non-interactive variant.
 
-Tool note: the standalone predecessor pre-approved its browser-automation commands (curl, Chrome/Chromium launches) via `allowed-tools`; the engine deliberately declares none — pre-approving browser launches for all eight lenses would over-grant. Expect normal permission prompts for those commands, or pre-approve them in your own settings.
+Tool note: the standalone predecessor pre-approved its browser-automation commands (curl, Chrome/Chromium launches) via `allowed-tools`; the engine deliberately declares none — pre-approving browser launches for all nine lenses would over-grant. Expect normal permission prompts for those commands, or pre-approve them in your own settings.
 
 ## When NOT to use
 
