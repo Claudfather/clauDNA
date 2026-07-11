@@ -79,8 +79,7 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:audit t
 
 | Skill | Description |
 |-------|-------------|
-| `/capture` | Save knowledge to the vault — a note you write, or external content (URL / file / text) |
-| `/reflect` | Pre-compact synthesis — capture session context before it evaporates |
+| `/capture` | Save knowledge to the vault — a note you write, external content (URL / file / text), or the current session's learnings (bare `/capture`) |
 | `/index` | Organize the shared knowledge store; regenerate INDEX.md |
 | `/recall` | Orientation briefing — what the fleet and this project already know, before you start |
 | `/publish` | Distribute knowledge to other surfaces (bots, docs sites) |

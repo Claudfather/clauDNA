@@ -1,9 +1,9 @@
 #!/bin/bash
-# PreCompact hook: auto-invoke /claudna:reflect before context compaction.
+# PreCompact hook: auto-invoke /claudna:capture before context compaction.
 #
 # On first compaction attempt per session, blocks compaction and instructs
-# Claude to run /claudna:reflect first. On the second attempt (after reflect
-# has run), allows compaction to proceed.
+# Claude to run /claudna:capture first (a bare capture distills the session).
+# On the second attempt (after capture has run), allows compaction to proceed.
 #
 # Env vars:
 #   CLAUDNA_PRECOMPACT_REFLECT  — "0" to disable (default: enabled)
@@ -36,11 +36,11 @@ MARKER_DIR="${TMPDIR:-/tmp}"
 MARKER="${MARKER_DIR}/claudna-reflected-${SESSION_ID}"
 
 if [ -f "$MARKER" ]; then
-    # Reflect already ran this session — allow compaction
+    # Capture already ran this session — allow compaction
     rm -f "$MARKER"
     exit 0
 fi
 
-# First compaction attempt — block and request reflect
+# First compaction attempt — block and request capture
 touch "$MARKER"
-printf '{"decision":"block","reason":"Run /claudna:reflect to capture session learnings before compacting. Then run /compact again."}\n'
+printf '{"decision":"block","reason":"Run /claudna:capture to distill session learnings before compacting. Then run /compact again."}\n'

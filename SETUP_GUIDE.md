@@ -252,15 +252,15 @@ If you enable sandbox, you may also want the sandbox filesystem extensions for t
 
 ### 3.4 Plugin-provided hooks (no action required)
 
-The PreToolUse permission-expansion hook, the PostToolUse auto-format hook, the Notification hook, and the PreCompact reflect hook all ship with the plugin and auto-wire on enable. You don't need to add anything to `settings.json` for them. To verify they're firing, run `/plugin list` and confirm `claudna` is enabled, then trigger a `Write` to a `.py` file and watch `ruff` run.
+The PreToolUse permission-expansion hook, the PostToolUse auto-format hook, the Notification hook, and the PreCompact capture hook all ship with the plugin and auto-wire on enable. You don't need to add anything to `settings.json` for them. To verify they're firing, run `/plugin list` and confirm `claudna` is enabled, then trigger a `Write` to a `.py` file and watch `ruff` run.
 
-### 3.5 PreCompact reflect hook
+### 3.5 PreCompact capture hook
 
-The plugin ships a `PreCompact` hook that automatically triggers `/claudna:reflect` before context compaction, so session learnings get captured before they're lost.
+The plugin ships a `PreCompact` hook that automatically triggers `/claudna:capture` before context compaction, so session learnings get captured before they're lost.
 
-**How it works:** On the first compaction attempt in a session (manual `/compact` or auto-compaction), the hook blocks compaction and instructs Claude to run `/claudna:reflect`. After reflect completes, Claude retries `/compact` and the hook allows it through. A per-session marker file prevents the hook from blocking more than once per session.
+**How it works:** On the first compaction attempt in a session (manual `/compact` or auto-compaction), the hook blocks compaction and instructs Claude to run `/claudna:capture` (a bare capture distills the session). After capture completes, Claude retries `/compact` and the hook allows it through. A per-session marker file prevents the hook from blocking more than once per session.
 
-**Opt-out:** Set `CLAUDNA_PRECOMPACT_REFLECT=0` in your environment to disable the hook entirely. Compaction will proceed without a reflect step.
+**Opt-out:** Set `CLAUDNA_PRECOMPACT_REFLECT=0` in your environment to disable the hook entirely. Compaction will proceed without a capture step.
 
 | Context | Default | How to change |
 |---------|---------|---------------|

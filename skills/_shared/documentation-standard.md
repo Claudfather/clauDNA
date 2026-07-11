@@ -166,8 +166,7 @@ Three doors write vault-ward — partitioned by intent:
 
 | Intent | Door |
 |---|---|
-| Save knowledge — a note you write, or external content (article, repo, transcript, file) | `/claudna:capture` — routes text / URL / file to the vault; needs the Claudron CLI, else falls back to the raw tree |
-| Distill the current session's learnings | `/claudna:reflect` |
+| Save knowledge — a note you write, external content (article, repo, transcript, file), or the current session's learnings (bare `/claudna:capture`) | `/claudna:capture` — routes text / URL / file / session to the vault; needs the Claudron CLI, else falls back to the raw tree |
 | Route a finished, frontmattered doc | `/claudna:publish --to vault` |
 
 Skills writing the `documentation/` plane are not listed here — they all go through `publish --to docs` per the §2 registry.
