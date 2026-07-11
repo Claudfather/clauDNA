@@ -60,7 +60,7 @@ Decide the fields:
 - **title** — from `--title`, else derived from the content's own title/heading. Required.
 - **body** — the processed content. Default is a tight summary (30–50% length, keep all technical substance, strip boilerplate); `--full` captures verbatim. **Append** the provenance line at the end for URL/file input (never first — Step 1: the first body line becomes the recall summary).
 - **tags** — from flags or inferred from context.
-- **project / fleet — default to the current project.** Claudron's `capture` (unlike `recall`) does **not** derive the project from cwd, so an unscoped note silently lands in the fleet-wide `shared/` tier — and a next-session *bare* `/claudna:recall` (which scopes to the cwd project) can miss it. **That fleet-always default is not the target state:** pass `--project <cwd-git-root-name>` (the same derivation `recall` uses) for any note about the work at hand. Reserve `--fleet <name>` for knowledge that is *plainly* cross-project — a general article, a fleet-wide pattern. Never leave a repo-context capture unscoped.
+- **project / fleet — scope by what the note is *about*, not where you ran it.** Claudron files by location (there is no `scope:` field); an unscoped note lands in the vault-wide `_shared/` tier. General / foreign / cross-project knowledge (an article, a reusable pattern) stays **unscoped → `_shared/`**; a note **specifically about this repo** takes `--project <cwd-git-root-name>` so a bare `/claudna:recall` surfaces it in the project tier; a specific fleet's knowledge takes `--fleet <name>`. Read the scope from the content — never force it from cwd.
 
 ## Step 4: Build the capture call
 
