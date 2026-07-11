@@ -260,7 +260,7 @@ The plugin ships a `PreCompact` hook that automatically triggers `/claudna:captu
 
 **How it works:** On the first compaction attempt in a session (manual `/compact` or auto-compaction), the hook blocks compaction and instructs Claude to run `/claudna:capture` (a bare capture distills the session). After capture completes, Claude retries `/compact` and the hook allows it through. A per-session marker file prevents the hook from blocking more than once per session.
 
-**Opt-out:** Set `CLAUDNA_PRECOMPACT_REFLECT=0` in your environment to disable the hook entirely. Compaction will proceed without a capture step.
+**Opt-out:** Set `CLAUDNA_PRECOMPACT_REFLECT=0` in your environment to disable the hook entirely (the env var keeps its historical name; the rename lands with #203). Compaction will proceed without a capture step.
 
 | Context | Default | How to change |
 |---------|---------|---------------|
