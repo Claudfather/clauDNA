@@ -21,7 +21,7 @@ Follow the phases in order. Call `EnterPlanMode` first — every phase through t
 
 Do NOT read CLAUDE.md or MEMORY.md — already in the system prompt. Use them for project understanding; spend scan effort on the code.
 
-**Scratch directory** for this run: `/tmp/audit-<YYYY-MM-DD_HHMMSS>/system/`. Subagents write maps and findings here; the orchestrator reads them (at the gate) but never dumps them into the working tree (see Phase 7). The Write tool creates the directory on a subagent's first write; do not `mkdir`.
+**Scratch root** for this run: `/tmp/audit-<YYYY-MM-DD_HHMMSS>/`. All system-lens artifacts live under its `system/` subdirectory — every `system/<file>` path in this procedure is relative to the scratch root, so the maps are `/tmp/audit-<TS>/system/system-map.md`, `.../system/code-map.md`, `.../system/data-model-map.md` and the findings are `/tmp/audit-<TS>/system/findings-<lane>.md` (never a doubled `system/system/`). Subagents write here; the orchestrator reads them (at the gate) but never dumps them into the reviewed repo's working tree (see Phase 7). The Write tool creates the directory on a subagent's first write; do not `mkdir`.
 
 ---
 
@@ -92,7 +92,7 @@ No finding proceeds to drafting until it has been reconciled against the live is
 
 To reconcile, the orchestrator now reads the `system/findings-<lane>.md` files from scratch (still read-only — this is why the findings are on disk: retrievable at the gate without having flowed through the fan-out returns). For any lane whose subagent returned `SCRATCH-WRITE-BLOCKED` (write-blocked fallback, `subagent-prompts.md`), reconcile from its compact inline table instead — the file is absent by design, not by error. Assemble the deduplicated candidate list, then:
 
-1. **Fetch the tracker.** `gh issue list --repo <owner/repo> --state open --limit 300` plus the recently-closed set (`--state closed --limit 60`). **A bulk fetch can miss issues outside that window**, so for each candidate also run a targeted `gh issue list --repo <owner/repo> --search "<key terms>"` (the same per-candidate search publish's dedup uses). If the repo has no GitHub remote or `gh` is unavailable, say so and reconcile against whatever tracker exists (`documentation/`, a TODO file) — never silently skip.
+1. **Fetch the tracker.** `gh issue list --repo <owner/repo> --state open --limit 300` plus the recently-closed set (`--state closed --limit 60`). **A bulk fetch can miss issues outside that window**, so for each candidate also run a targeted `gh issue list --repo <owner/repo> --search "<key terms>" --state all --limit 50` — `--state all` is mandatory here: `gh issue list` defaults to open-only, and the `regressed` bucket depends on the search returning *closed* matches. Bucket from the returned state: open exact match → `duplicate of #N`; open related → `extends #N`; closed exact/near recurrence → `regressed #N`; no match → `net-new`. If the repo has no GitHub remote or `gh` is unavailable, say so and reconcile against whatever tracker exists (`documentation/`, a TODO file) — never silently skip.
 2. **Reconcile every candidate** into exactly one bucket:
 
    | Bucket | Meaning | Fate |
@@ -122,13 +122,16 @@ If `<a+b+c>` is **0** — every candidate is already tracked — do not print th
 
 The value of this review is the draft set surfaced *cleanly* — the duplicate column is what proves the review respected the team's existing work.
 
-**Exit Plan Mode.** On confirmation, call `ExitPlanMode` — Phases 6 and 7 need the Write tool and `/claudna:publish`. (For `session` output there are still no repo writes; the exit is what lets subagents author the doc that publish prints back.)
+**Plan-mode transition (mode-specific).** On confirmation:
+- **`--output github`:** call `ExitPlanMode` — the orchestrator itself invokes `/claudna:publish` (which runs `gh issue create`, a mutation plan mode blocks), so it must exit.
+- **`--output session`:** stay in Plan Mode (consistent with output-guide §5, "Plan Mode remains active throughout"). The findings docs are authored by subagents to scratch — subagents run in separate sessions and are not bound by the orchestrator's plan mode — and `/claudna:publish --to session` only prints to chat (no mutation). No `ExitPlanMode` needed, and no write ever reaches the reviewed repo.
+- **Phase 7 map promotion (either mode):** if the user opts in, that is a genuine write — call `ExitPlanMode` at that point if still in plan mode.
 
 ---
 
 ## Phase 6: Findings output (draft set only)
 
-Delegate issue-doc authoring to **Plan subagents** (output guide §4.7; orchestration guide §3) — the orchestrator must not author docs itself. Launch one Plan subagent per finding (or per umbrella cluster from Phase 5.3); each reads its `findings-<lane>.md` from scratch (or, for a write-blocked lane, receives the finding detail inline in its prompt from the orchestrator's gate reconciliation), reads `issue-depth-standard.md` for the depth bar, writes a doc (frontmatter + the output-guide §4.1 body skeleton, junior-executable per the depth standard) to scratch, and returns only a metadata summary (path, title, severity, effort). The §4.1 body is what publish validates; the depth standard is what makes the issue self-sufficient.
+Delegate issue-doc authoring to **`general-purpose` subagents acting as Plan agents** (output guide §4.7; orchestration guide §3) — "Plan agent" is a role, not a subagent type, and only `general-purpose` has the Write tool (Explore is read-only). The orchestrator must not author docs itself. Launch one per finding (or per umbrella cluster from Phase 5.3); each reads its `findings-<lane>.md` from scratch (or, for a write-blocked lane, receives the finding detail inline in its prompt from the orchestrator's gate reconciliation), reads `issue-depth-standard.md` for the depth bar, writes a doc (frontmatter + the output-guide §4.1 body skeleton, junior-executable per the depth standard) to scratch, and returns only a metadata summary (path, title, severity, effort). The §4.1 body is what publish validates; the depth standard is what makes the issue self-sufficient.
 
 Before publishing, scrub every authored doc in scratch through the redactor (`python3 scripts/redact.py <scratch-dir>/*.md`; path per orchestration guide §7) — the mechanical gate that catches any raw value the security or other lanes quoted, independent of per-subagent memory. Then the orchestrator routes each doc through `/claudna:publish` (see Output Targets) — **always publish, never `gh` directly**. Publish validates, dedups a second time per-medium, applies labels, and files. File sequentially so publish's dedup sees prior creations; carry the Phase-5 bucket into each doc (`Related: #N` for extends, a regression note referencing #N for regressed); collect the returned URLs; end with a batch summary that also lists the dropped duplicates (per the Phase 5 partition).
 
@@ -138,9 +141,9 @@ Before publishing, scrub every authored doc in scratch through the redactor (`py
 
 The comprehension maps are the review's most reusable artifact — but they default to **scratch-only** (the target working tree stays clean; house rules). At the end, offer:
 
-> "The system/code/data maps (plus the repo-intake and validation log) are in scratch. Promote them as durable knowledge? I can route them through `/claudna:publish` to the wiki, `documentation/`, or a knowledge doc (`type: knowledge`) — or leave them ephemeral."
+> "The system/code/data maps (plus the repo-intake and validation log) are in scratch. Promote them as durable knowledge? Default home is the vault as `type: knowledge` (`/claudna:publish --to vault`) — maps are reference knowledge, not planning docs, so they don't belong under `documentation/planning/`. I can also drop them in `documentation/` if you give an explicit `--dir` — or leave them ephemeral."
 
-On explicit opt-in, write `repo-intake.md` and `validation-log.md` (from the context held since Phases 1 and 3) alongside the subagent-written maps, and promote the set via publish. Never write any of it into the target repo's tree unprompted.
+Prefer `--to vault` (`type: knowledge`); the audit lens's `documentation/planning/` archive convention (orchestration guide §8) does not register a `system` subdirectory, so route to `documentation/` only with a user-supplied `--dir` rather than inventing a path. On explicit opt-in, write `repo-intake.md` and `validation-log.md` (from the context held since Phases 1 and 3) alongside the subagent-written maps and promote the set via publish. Never write any of it into the reviewed repo's tree unprompted.
 
 ---
 
