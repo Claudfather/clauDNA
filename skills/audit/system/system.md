@@ -15,11 +15,11 @@ Interactive-only lens: there is no `--auto` variant. The engine owns the `--auto
 
 ## Procedure
 
-Follow the phases in order. Call `EnterPlanMode` first — every phase through the gate (1–5) is read-only for the orchestrator. Then `ExitPlanMode` at the gate, once the user confirms the partition, so the write phases (6 issue authoring, 7 map promotion) can run.
+Follow the phases in order. Call `EnterPlanMode` first — every phase through the gate (1–5) is read-only for the orchestrator. After the Phase 5 gate, follow the **mode-specific** Plan-mode transition defined there: `--output github` exits before publishing issues; `--output session` stays in Plan Mode unless the user opts into map promotion (Phase 7). Do not exit unconditionally.
 
 **Who writes what.** The orchestrator itself writes nothing to disk before the gate — it runs read-only discovery (Read/Grep/Glob, read-only Bash), launches subagents, and reads what they write. All pre-gate scratch files are written by **subagents** (Task = separate sessions, not bound by the orchestrator's plan mode): maps in Phase 2, findings in Phase 4. This is the house pattern (orchestration guide §2–§3, §6) and it is what makes plan mode viable for a lens that ultimately writes.
 
-Do NOT read CLAUDE.md or MEMORY.md — already in the system prompt. Use them for project understanding; spend scan effort on the code.
+Do not spend scan budget re-reading CLAUDE.md or MEMORY.md if they are already loaded into context — use them for project understanding and spend scan effort on the code. If project instructions appear missing or contradictory (this lens ships to arbitrary marketplace repos where they may not have loaded as expected), read them once for routing and safety context before scanning.
 
 **Scratch root** for this run: `/tmp/audit-<YYYY-MM-DD_HHMMSS>/`. All system-lens artifacts live under its `system/` subdirectory — every `system/<file>` path in this procedure is relative to the scratch root, so the maps are `/tmp/audit-<TS>/system/system-map.md`, `.../system/code-map.md`, `.../system/data-model-map.md` and the findings are `/tmp/audit-<TS>/system/findings-<lane>.md` (never a doubled `system/system/`). Subagents write here; the orchestrator reads them (at the gate) but never dumps them into the reviewed repo's working tree (see Phase 7). The Write tool creates the directory on a subagent's first write; do not `mkdir`.
 
@@ -133,7 +133,7 @@ The value of this review is the draft set surfaced *cleanly* — the duplicate c
 
 Delegate issue-doc authoring to **`general-purpose` subagents acting as Plan agents** (output guide §4.7; orchestration guide §3) — "Plan agent" is a role, not a subagent type, and only `general-purpose` has the Write tool (Explore is read-only). The orchestrator must not author docs itself. Launch one per finding (or per umbrella cluster from Phase 5.3); each reads its `findings-<lane>.md` from scratch (or, for a write-blocked lane, receives the finding detail inline in its prompt from the orchestrator's gate reconciliation), reads `issue-depth-standard.md` for the depth bar, writes a doc (frontmatter + the output-guide §4.1 body skeleton, junior-executable per the depth standard) to scratch, and returns only a metadata summary (path, title, severity, effort). The §4.1 body is what publish validates; the depth standard is what makes the issue self-sufficient.
 
-Before publishing, scrub every authored doc in scratch through the redactor (`python3 scripts/redact.py <scratch-dir>/*.md`; path per orchestration guide §7) — the mechanical gate that catches any raw value the security or other lanes quoted, independent of per-subagent memory. Then the orchestrator routes each doc through `/claudna:publish` (see Output Targets) — **always publish, never `gh` directly**. Publish validates, dedups a second time per-medium, applies labels, and files. File sequentially so publish's dedup sees prior creations; carry the Phase-5 bucket into each doc (`Related: #N` for extends, a regression note referencing #N for regressed); collect the returned URLs; end with a batch summary that also lists the dropped duplicates (per the Phase 5 partition).
+Before publishing, scrub every authored doc in scratch through the redactor — `python3 "<redactor>" <scratch-dir>/<file>.md` per doc, where `<redactor>` is resolved per orchestration guide §7 (not the literal `scripts/redact.py`, which won't exist in an arbitrary reviewed repo) — the mechanical gate that catches any raw value the security or other lanes quoted, independent of per-subagent memory. Then the orchestrator routes each doc through `/claudna:publish` (see Output Targets) — **always publish, never `gh` directly**. Publish validates, dedups a second time per-medium, applies labels, and files. File sequentially so publish's dedup sees prior creations; carry the Phase-5 bucket into each doc (`Related: #N` for extends, a regression note referencing #N for regressed); collect the returned URLs; end with a batch summary that also lists the dropped duplicates (per the Phase 5 partition).
 
 ---
 
@@ -141,9 +141,27 @@ Before publishing, scrub every authored doc in scratch through the redactor (`py
 
 The comprehension maps are the review's most reusable artifact — but they default to **scratch-only** (the target working tree stays clean; house rules). At the end, offer:
 
-> "The system/code/data maps (plus the repo-intake and validation log) are in scratch. Promote them as durable knowledge? Default home is the vault as `type: knowledge` (`/claudna:publish --to vault`) — maps are reference knowledge, not planning docs, so they don't belong under `documentation/planning/`. I can also drop them in `documentation/` if you give an explicit `--dir` — or leave them ephemeral."
+> "The system/code/data maps (plus the repo-intake and validation log) are in scratch. Promote them as a durable `type: knowledge` doc in the vault, drop them in `documentation/` if you give an explicit `--dir`, or leave them ephemeral?"
 
-Prefer `--to vault` (`type: knowledge`); the audit lens's `documentation/planning/` archive convention (orchestration guide §8) does not register a `system` subdirectory, so route to `documentation/` only with a user-supplied `--dir` rather than inventing a path. On explicit opt-in, write `repo-intake.md` and `validation-log.md` (from the context held since Phases 1 and 3) alongside the subagent-written maps and promote the set via publish. Never write any of it into the reviewed repo's tree unprompted.
+**The scratch maps are research artifacts, not publish-ready docs** — `/claudna:publish` deep-validates frontmatter and rejects a malformed manuscript, and a `knowledge` doc requires frontmatter plus a non-trivial body with a leading heading (output-guide §3, publish §1a). So on opt-in, first **compose one consolidated `system-knowledge.md`** in scratch with valid frontmatter, then publish that single file:
+
+```yaml
+---
+title: "System map — <owner/repo or scope>"
+type: knowledge
+status: current
+owner: audit
+created: <YYYY-MM-DD>
+tags: [system-map, audit, knowledge]
+repos: [<owner/repo>]
+---
+```
+
+Body = a leading `# System map — <scope>` heading, then the repo-intake, validation-log, system-map, code-map, and (if present) data-model-map as `##` sections. Then `/claudna:publish <scratch>/system/system-knowledge.md --to vault` (vault is the default `--to`).
+
+- **Publish a *file*, never the scratch directory** — a directory source is the docs adapter's family mode only (`--dir`, docs-only); the vault adapter takes a single doc.
+- **`documentation/` needs an explicit `--dir`** — the archive convention (orchestration guide §8) registers no `system` subdirectory, so `/claudna:publish <file> --to docs --dir <user-supplied>` rather than inventing a path. (Maps are reference knowledge, not planning docs, so vault is the better default.)
+- Never write any of it into the reviewed repo's tree unprompted.
 
 ---
 
@@ -162,7 +180,7 @@ Reconciliation (Phase 5) happens **before** either target — it is not a github
 
 - **Subagent pattern.** Disk-write, per orchestration guide §2, §3 & §6. Map lanes (Phase 2) and concern lanes (Phase 4) run in parallel and write to scratch; authoring (Phase 6) is delegated to Plan subagents. The orchestrator coordinates, works from 2-4 line summaries during fan-out, and reads the findings files only at the gate — it never holds a full map.
 - **Severity vocabulary.** The sweep uses `CRITICAL | HIGH | MEDIUM | LOW` (matching the sibling lenses and output-guide §4.4) — not a P0–P3 scale. CRITICAL = data loss / security exposure / outage risk / broken critical path; HIGH = high-impact bug, major data-quality issue, serious reliability problem; MEDIUM = medium correctness/observability/test gap; LOW = cleanup/docs/naming.
-- **Secrets.** Never print a raw secret value. Report file:line + the variable name; the redactor (orchestration guide §7) is the deterministic backstop — each subagent scrubs its findings file in place (`python3 scripts/redact.py <file>`) before returning, masking any captured value to `[REDACTED]`, and the orchestrator scrubs the scratch dir again before publishing (Phase 6).
+- **Secrets.** Never print a raw secret value. Report file:line + the variable name; the redactor (orchestration guide §7) is the deterministic backstop — each subagent scrubs its findings file in place (`python3 "<redactor>" <file>`, `<redactor>` resolved per §7 — never the literal `scripts/redact.py`, which the reviewed repo won't contain) before returning, masking any captured value to `[REDACTED]`, and the orchestrator scrubs the scratch docs again before publishing (Phase 6).
 - **Evidence over vibes.** Every finding cites `file:line` and carries a `Confirmed | Likely | Hypothesis` label. Hypotheses state what would confirm or falsify them.
 - **This lens produces maps + issues, not code.** Remediation is `/claudna:implement-plan`'s job. Do not build, branch, or open PRs from here.
 - **Terminal at the gate for a clean repo.** If Phase 5 finds every candidate already tracked, say so and stop — a review that confirms the tracker is current is a successful review, not a failed one.
