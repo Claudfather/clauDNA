@@ -252,15 +252,15 @@ If you enable sandbox, you may also want the sandbox filesystem extensions for t
 
 ### 3.4 Plugin-provided hooks (no action required)
 
-The PreToolUse permission-expansion hook, the PostToolUse auto-format hook, the Notification hook, and the PreCompact reflect hook all ship with the plugin and auto-wire on enable. You don't need to add anything to `settings.json` for them. To verify they're firing, run `/plugin list` and confirm `claudna` is enabled, then trigger a `Write` to a `.py` file and watch `ruff` run.
+The PreToolUse permission-expansion hook, the PostToolUse auto-format hook, the Notification hook, and the PreCompact capture hook all ship with the plugin and auto-wire on enable. You don't need to add anything to `settings.json` for them. To verify they're firing, run `/plugin list` and confirm `claudna` is enabled, then trigger a `Write` to a `.py` file and watch `ruff` run.
 
-### 3.5 PreCompact reflect hook
+### 3.5 PreCompact capture hook
 
-The plugin ships a `PreCompact` hook that automatically triggers `/claudna:reflect` before context compaction, so session learnings get captured before they're lost.
+The plugin ships a `PreCompact` hook that automatically triggers `/claudna:capture` before context compaction, so session learnings get captured before they're lost.
 
-**How it works:** On the first compaction attempt in a session (manual `/compact` or auto-compaction), the hook blocks compaction and instructs Claude to run `/claudna:reflect`. After reflect completes, Claude retries `/compact` and the hook allows it through. A per-session marker file prevents the hook from blocking more than once per session.
+**How it works:** On the first compaction attempt in a session (manual `/compact` or auto-compaction), the hook blocks compaction and instructs Claude to run `/claudna:capture` (a bare capture distills the session). After capture completes, Claude retries `/compact` and the hook allows it through. A per-session marker file prevents the hook from blocking more than once per session.
 
-**Opt-out:** Set `CLAUDNA_PRECOMPACT_REFLECT=0` in your environment to disable the hook entirely. Compaction will proceed without a reflect step.
+**Opt-out:** Set `CLAUDNA_PRECOMPACT_REFLECT=0` in your environment to disable the hook entirely (the env var keeps its historical name; the rename lands with #203). Compaction will proceed without a capture step.
 
 | Context | Default | How to change |
 |---------|---------|---------------|
@@ -587,7 +587,19 @@ Declined the seam during init? Re-run `/claudna:init-project` and its seam step 
 }
 ```
 
-> Later phases of the integration epic ([#197](https://github.com/Claudfather/clauDNA/issues/197), phases #202–#203) append to this section as they land: engine-preferred recall and capture, and reflect-at-compaction.
+### 7.4 Hook stacking with Claudron's session loop
+
+Claudron ships its own hook pack (`claudron hooks install` writes SessionStart / PreCompact / SessionEnd into `~/.claude/settings.json`). Claude Code fires **every** hook registered for an event, so with both installed the two packs coexist per event — deliberately, along the layer boundary (**clauDNA = skills; Claudron = the vault engine + git sync**):
+
+| Event | clauDNA | Claudron | Together |
+|---|---|---|---|
+| **SessionStart** | continuity briefing (branch / handoff / open PRs) | `sync --pull` + a vault recall brief | **Both** inject — different content (your session vs the vault's knowledge), both short. Opt out of clauDNA's with `CLAUDNA_SESSION_BRIEFING=0`. |
+| **PreCompact** | blocks once → run `/claudna:capture` (distills the session before compaction) | prompts capture too — but **defers** when clauDNA is installed | **One** prompt: clauDNA's. Claudron detects clauDNA (by plugin dir) and stays silent, so the event isn't double-prompted. Opt out of clauDNA's with `CLAUDNA_PRECOMPACT_REFLECT=0` (§3.5). |
+| **SessionEnd** | *(none)* | `sync --push` | **Claudron's** — clauDNA adds no SessionEnd hook. |
+
+So capture-at-compaction is clauDNA's (`/claudna:capture`, which falls back to the raw tree without the engine); the vault's git sync at session start/end is Claudron's. The PreCompact defer ships in Claudron via [Claudfather/Claudron#45](https://github.com/Claudfather/Claudron/pull/45); on an older Claudron both prompt once on a compaction — harmless, since it's the same capture and the engine dedups. One edge: if clauDNA is *installed but disabled*, Claudron defers but clauDNA is silent, so that session gets no capture prompt — re-enable clauDNA (or unset Claudron's hook to take the prompt back).
+
+> This section was built across the integration epic ([#197](https://github.com/Claudfather/clauDNA/issues/197)): the shared-docs seam (§7.1–7.2, #200), the `/claudron` engine (§7.3, #201), engine-preferred recall + capture (#202), and the hook stacking above (§7.4, #203).
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: claudron
 user-invocable: true
-description: "Use to search the shared fleet vault by term, or check vault health — the lookup and status verbs over the Claudron CLI. Requires the Claudron CLI. To save knowledge to the vault, use /claudna:capture; to recall prior knowledge before starting work, use /claudna:recall; to distill the current session's learnings, use /claudna:reflect."
+description: "Use to search the shared fleet vault by term, or check vault health — the lookup and status verbs over the Claudron CLI. Requires the Claudron CLI. To save knowledge to the vault (a note, external content, or the current session's learnings), use /claudna:capture; to recall prior knowledge before starting work, use /claudna:recall."
 argument-hint: "[lookup|status] [--project p] [--fleet f] [--limit n] [--auto]"
 requires:
   - cli: claudron>=0.2
