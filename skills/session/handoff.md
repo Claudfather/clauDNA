@@ -74,7 +74,7 @@ This is idempotent — step 1 catches both "already there" and "ignored by paren
 ### 9. Confirm
 
 - **With `--auto`:** Skip this confirmation — proceed to step 10.
-- **Without `--auto`:** "Handoff written to `<cwd>/.claude/session.md`. Use `/claudna:session resume` next session."
+- **Without `--auto`:** "Handoff written to `<cwd>/.claude/session.md`. Use `/claudna:session resume` next session." If the session produced durable, cross-session knowledge (a gotcha, a decision, a hard-won fix), add a one-line nudge: "worth persisting beyond this handoff? `/claudna:capture` distills it into the vault so the next session *recalls* it." The handoff is ephemeral session continuity; the vault is durable knowledge — different stores, so this is a genuine second step, not a duplicate.
 
 ### 10. Structured-result emission (`--auto` only)
 
