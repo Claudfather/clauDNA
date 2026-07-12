@@ -35,3 +35,7 @@ For the selected mode, read ONLY its depth file in this skill directory and foll
 ## Shared support files
 
 The three support files in this skill directory — `review-dimensions.md`, `severity-categories.md`, `red-flags-and-rationalizations.md` — are `pr.md`'s references and are shared by all modes: depth files and their subagents cite them by bare filename (same directory). Only the `pr` and `multi-pr` modes need `gh`; `changes` runs on git alone.
+
+## After the review
+
+Whatever the verdict, if the review surfaced a **reusable lesson** — a non-obvious gotcha, a pattern worth repeating, a mistake worth not repeating — close with a one-line nudge: "worth keeping? `/claudna:capture` distills it into the vault for the next session." Keep it optional and light; skip it when the findings are purely local to this diff.

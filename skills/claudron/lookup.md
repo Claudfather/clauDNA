@@ -21,7 +21,7 @@ claudron lookup <terms...> --json
 
 Validate the envelope (claudron-engine.md §2): `data.query` and `data.results` (a list).
 
-- **Results present** → render each entry (title, path, status, and score if present), most-relevant first.
+- **Results present** → render each entry (title, path, tier, and score), most-relevant first. (The result shape is `title` / `score` / `match_type` / `tier` / `path` / `tags` — there is no `status` field.)
 - **Empty `results`** (exit 0) → report **"no results for '<terms>'"**. Claudron has no nearest-title / "did-you-mean" fallback — do **not** fabricate candidates. Suggest broadening the terms or adding `--include-archived`.
 
 Optionally, for a single clearly-top match, read and show its note body from that entry's `path` (resolve relative to the vault `root` already in the pre-flight status envelope — claudron-engine.md §1; no fresh `claudron status` call).
@@ -32,7 +32,7 @@ Interactive — a compact list:
 
 ```
 Vault lookup: "<terms>"  (N results)
-  1. <title>   <path>   (status: current)
+  1. <title>   <path>   (fleet · score 42)
   2. …
 ```
 

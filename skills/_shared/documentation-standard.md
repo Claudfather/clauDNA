@@ -128,7 +128,7 @@ Documentation lives on two planes, and `/claudna:publish` is the single router o
 
 | | `documentation/` (this standard, §1–§9) | The shared-docs vault |
 |---|---|---|
-| **Content** | Work-in-flight + repo-coupled records: plans, audits, reviews, ADRs, specs, guides | Cross-project referential knowledge: knowledge pages, runbooks, cross-repo decisions, reflections |
+| **Content** | Work-in-flight + repo-coupled records: plans, audits, reviews, ADRs, specs, guides | Cross-project referential knowledge: knowledge pages, runbooks, cross-repo decisions |
 | **Lives** | In the repo, versioned with the code | Outside any one repo (`shared/{knowledge,decisions,runbooks,planning/…}` raw tree, or a Claudron vault) |
 | **Reviewed via** | Pull requests | Lifecycle management (status/supersession; curation) |
 | **Discovered via** | git + status-marker greps (§8) | Raw tree: INDEX.md (`/claudna:index` writes it, `/claudna:recall` scans it) · Claudron vault: engine-indexed, no INDEX.md (annotation semantics below) |
@@ -162,13 +162,11 @@ Cross-project knowledge lives here — see /claudna:recall.
 
 ### Which door writes the vault?
 
-Four surfaces write vault-ward — partitioned by intent:
+Three doors write vault-ward — partitioned by intent:
 
 | Intent | Door |
 |---|---|
-| Deliberate save — "note this down for the fleet" | `/claudna:claudron capture` — needs the Claudron CLI; without it, `/claudna:publish --to vault` |
-| Ingest external content — article, repo, transcript | `/claudna:learn` |
-| Distill the current session's learnings | `/claudna:reflect` |
+| Save knowledge — a note you write, external content (article, repo, transcript, file), or the current session's learnings (bare `/claudna:capture`) | `/claudna:capture` — routes text / URL / file / session to the vault; needs the Claudron CLI, else falls back to the raw tree |
 | Route a finished, frontmattered doc | `/claudna:publish --to vault` |
 
 Skills writing the `documentation/` plane are not listed here — they all go through `publish --to docs` per the §2 registry.

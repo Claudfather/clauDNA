@@ -57,3 +57,14 @@ remember
 # and the Claudron vault are the knowledge stores.
 notes
 lessons
+#
+# Knowledge-surface unification (#202, epic #197) — /learn folds into /capture,
+# the one write door. (/claudron capture is absorbed too, but as a subcommand —
+# not a top-level skill name — it is repointed to /capture, not gated here.)
+learn
+#
+# Context-aware capture (#203, epic #197) — /reflect folds into /capture's session
+# mode: a bare /capture distills the current session's learnings. capture is now
+# the sole write door (note / external content / session), scoped by what the note
+# is about; the PreCompact hook fires /capture in place of /reflect.
+reflect

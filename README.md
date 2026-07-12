@@ -32,9 +32,9 @@ For bots, CI runners, and Docker images, drop a `settings.json` with `enabledPlu
 
 | Directory | Count | Contents |
 |-----------|-------|----------|
-| `skills/` | 37 | User-invocable slash commands |
+| `skills/` | 36 | User-invocable slash commands |
 | `agents/` | 8 | `snowflake-analyst`, `dbt-engineer`, `neon-analyst`, `modal-ops`, `railway-ops`, `vercel-ops`, `code-reviewer`, `spec-reviewer` |
-| `plugin-hooks/` | 6 wired + 1 opt-in | SessionStart briefing (opt-out `CLAUDNA_SESSION_BRIEFING=0`), auto-format on Write/Edit, PreToolUse permission expansion, PreCompact reflect gate, opt-in skill telemetry, macOS notifications. (`statusline.sh` is opt-in — see [SETUP_GUIDE §3.2](./SETUP_GUIDE.md#32-statusline-optional).) Named `plugin-hooks/` to avoid a Claude Code bug that deletes any project-root `hooks/` directory between tool calls. |
+| `plugin-hooks/` | 6 wired + 1 opt-in | SessionStart briefing (opt-out `CLAUDNA_SESSION_BRIEFING=0`), auto-format on Write/Edit, PreToolUse permission expansion, PreCompact capture gate, opt-in skill telemetry, macOS notifications. (`statusline.sh` is opt-in — see [SETUP_GUIDE §3.2](./SETUP_GUIDE.md#32-statusline-optional).) Named `plugin-hooks/` to avoid a Claude Code bug that deletes any project-root `hooks/` directory between tool calls. |
 
 ## Design Philosophy
 
@@ -79,12 +79,11 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:audit t
 
 | Skill | Description |
 |-------|-------------|
-| `/learn` | Ingest a document or repo into the shared knowledge store |
-| `/reflect` | Pre-compact synthesis — capture session context before it evaporates |
+| `/capture` | Save knowledge to the vault — a note you write, external content (URL / file / text), or the current session's learnings (bare `/capture`) |
 | `/index` | Organize the shared knowledge store; regenerate INDEX.md |
-| `/recall` | Pull relevant prior knowledge at session start |
+| `/recall` | Orientation briefing — what the fleet and this project already know, before you start |
 | `/publish` | Distribute knowledge to other surfaces (bots, docs sites) |
-| `/claudron` | Claudron vault engine — `capture` / `lookup` / `status` over the shared knowledge vault (needs the Claudron CLI) |
+| `/claudron` | Claudron vault engine — `lookup` / `status` over the shared knowledge vault (needs the Claudron CLI); save via `/capture` |
 
 ### Git
 
