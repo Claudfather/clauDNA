@@ -72,9 +72,23 @@ Skip a tier's header entirely when its split is empty — never print a heading 
 
 With `--full`, additionally read and summarize the top note in each tier from its `path` (vault-relative per §2 — resolve it against the vault `root` already in the Step 0 pre-flight envelope; no fresh `claudron status` call). If `data.notes` is empty, say **"No prior notes recalled"** (conventions may still have shown). Never fabricate notes.
 
+## Harness memory — re-read on both paths
+
+Runs regardless of which retrieval path ran — the harness's per-project auto-memory is a **separate substrate** from the vault. The harness injects this project's `MEMORY.md` **once** at session start, a frozen snapshot: it can miss a topic that only turns relevant later, and it never re-fires if memory changes mid-session (a sibling session, or `/claudna:capture`'s fallback, can write to it while yours is open). So re-read it live on every recall.
+
+1. **Locate it:** `~/.claude/projects/<cwd-slug>/memory/MEMORY.md`, where `<cwd-slug>` is the cwd path with every `/` replaced by `-`. No `memory/` dir or no `MEMORY.md` → skip silently (not every project has harness memory).
+2. **Read the index:** `MEMORY.md` is a flat list of `- [Title](file.md) — hook` lines. Score each against the query terms (title + hook); on a bare recall, take the most-recently-updated few. Cap by `--limit`, like a tier.
+3. **With `--full`,** read the linked `memory/<file.md>` body for the top match and summarize it.
+4. **Render** under its own header — additive to the vault tiers, never a duplicate:
+   ```
+   ### This project — harness memory
+   - **<Title>** — <hook> `memory/<file.md>`
+   ```
+   Skip the header when nothing scores. Read-only, like the rest of recall.
+
 ## Step 3: Orient
 
-Close with a one-line orientation, not just a dump: point at the single most relevant note for the task, and flag any note whose `type` is `plan` with a non-terminal `status` — an in-flight plan the work might collide with. If nothing is relevant, say so plainly.
+Close with a one-line orientation, not just a dump: point at the single most relevant note or harness-memory entry for the task, and flag any note whose `type` is `plan` with a non-terminal `status` — an in-flight plan the work might collide with. If nothing is relevant, say so plainly.
 
 ## Fallback: no engine (frozen)
 
@@ -94,6 +108,8 @@ When the ladder returns **present-no-vault** or **absent**, Claudron can't assem
 3. **Filter for relevance:** title / tag / repo match against the query; include only `active` / `current` / `ratified` / `draft` (exclude `stale` / `superseded` / `completed` / `archived` unless `--include-stale`). Rank: exact repo match > tag overlap > title keyword.
 
 4. **Present** the top 3–5 (hard cap 5): title + one-line description (or bodies with `--full`). Flag active plans touching the task's repo. If INDEX.md is missing or empty on a raw tree, note it and suggest `/claudna:index` — never against a `(claudron vault)` root.
+
+Then re-read the **Harness memory** section above (it runs on both paths) before orienting.
 
 ## Rules
 
