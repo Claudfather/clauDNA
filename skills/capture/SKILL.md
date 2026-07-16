@@ -113,12 +113,14 @@ Validate the envelope (claudron-engine.md §2), then branch on `data.action`:
   - *cancel* → stop, nothing written.
 - **`suggest_supersede`** (the near-dup is **stale**) → present `data.reason` (the CLI emits this action when the matched note's status is `stale`). Automatic supersession — marking the old note superseded for you — is Claudron curation, not this skill's job; offer the same three routes: **"A stale note is near this — append, create fresh, or cancel? (append/create/cancel)"**
 - **`rejected`** (exit 1) → surface `data.reason` + the `errors[]` Findings verbatim. Validation failure, not transient — fix the inputs; do not loop.
+- **Anything else — terminal, whatever the exit code.** An `action` value this step doesn't list, an absent `action`, or a partial/unrecognized envelope (§2) → **STOP.** Surface the raw envelope and stderr **verbatim** and report engine failure (claudron-engine.md §3). Never improvise success, report a path you didn't get from a recognized envelope, or retry. Do **not** take the raw-tree fallback from this gate — the call reached the engine, so the vault state is unknown and a second write risks a silent duplicate. The loud-fail rule applies **at this decision point**, not just in the engine contract: an envelope the skill doesn't recognize has no success branch.
 
 **`--auto` (no prompts, never `--force`):**
 - `created` → done.
 - `suggest_update` → take the suggested route: `claudron capture --update <path> --body "<body>" --json`.
 - `suggest_supersede` → do **not** write (force is forbidden; appending current knowledge to a stale note mislabels it). Record the suggestion in `errors[]`, set `outcome: "needs-input"` naming the stale path.
 - `rejected` → `outcome: "blocked"`, `blocker_description` = the validation reason.
+- anything else (unlisted/absent `action`, partial/unrecognized envelope) → `outcome: "blocked"`, `blocker_description` = the engine failure, the raw envelope + stderr verbatim in `errors[]`. No `artifacts.action`/`artifacts.path` from an unrecognized envelope, and no raw-tree fallback (vault state unknown) — a loud blocked result, never an improvised success.
 
 ## Step 6: Report
 
