@@ -38,6 +38,15 @@ scripts/
 - **Skills are thinking frameworks, not SKUs.** Before adding a skill, ask whether it can be a lens or mode inside an existing skill — consolidation over fragmentation. Every skill description loads into every session; each one must earn its context cost.
 - **Descriptions are routing surfaces.** State when to use the skill (trigger conditions first), name the confusable sibling ("For X, use /claudna:Y"), keep CLI flags in `argument-hint`, and never summarize the skill's workflow in its description — the model follows the summary instead of reading the body. Grammar is contract-bound: [SKILL_CONTRACT.md §2.1](./SKILL_CONTRACT.md).
 
+## Ecosystem boundary
+
+clauDNA is the stack's **behavior system**: procedural content — skills, agents, hooks — that steers what an agent does. Reference knowledge lives in Claudron; fleet composition and policy live in Claudlobby. The full placement test is the boundary spec (Claudron repo, `documentation/plans/2026-07-20-claudfather-boundary-separation.md` §10.3); the local rules:
+
+- **Procedural is a coupling, not a format.** A skill belongs here when it versions with an engineering workflow. Fleet-operations commands (dispatch, restart, pulse) are Claudlobby's even when they use the skill format.
+- **Reference payloads follow Q-closure.** Content that changes with your *method* stays in the skill (closure); content that tracks the *world or a sibling SSOT* becomes a Claudron vault note or a rendered copy with a CI drift gate (`skills/_shared/output-guide.md` §3 is the pattern).
+- **The engine is consumed through the door, never reimplemented.** Vault access is the `claudron` CLI per its contract (`docs/CLI_CONTRACT.md` in the Claudron repo); consumer policy lives in `skills/_shared/claudron-engine.md`. No transport, index, ranking, or schema logic lands here.
+- **The raw-tree fallback is frozen** — no new capability on the no-engine paths (`claudron-engine.md` §4).
+
 ## Rules
 
 ### Don't
