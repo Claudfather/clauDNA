@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 from check_schema_drift import run_check as run_schema_drift_check
+from check_vault_address import run_check as run_vault_address_check
 from skill_checks import (
     STALE_PATH_RE,
     check_removed_name_mentions,
@@ -217,6 +218,13 @@ def main() -> int:
     # -- CI must not flake when the SSOT host is unreachable.
     drift_errors, drift_warnings, drift_notes = run_schema_drift_check(REPO_ROOT)
 
+    # Vault-address conformance (boundary phase D1). ALWAYS-BLOCKING for the
+    # same reason as the removed-names gate: main is clean of the removed
+    # variable, so any hit was introduced by the change under test. Offline
+    # and textual by design -- §10 holds a pointer, not a rendered copy, so
+    # there is no local copy to diff (see check_vault_address's docstring).
+    vault_errors, vault_warnings, vault_notes = run_vault_address_check(REPO_ROOT)
+
     total_skills = len(skill_dirs) - len(SKIP_SKILLS)
 
     # In CI mode, partition errors into blocking (touched) vs warnings (untouched).
@@ -253,12 +261,23 @@ def main() -> int:
     for msg in drift_errors:
         blocking_errors.setdefault("schema-drift", []).append(msg)
 
+    # Vault-address conformance blocks in BOTH modes (rationale above).
+    for msg in vault_errors:
+        blocking_errors.setdefault("vault-address", []).append(msg)
+
     # Drift notes/warnings are advisory — always printed, never blocking.
     if drift_notes or drift_warnings:
         for n in drift_notes:
             print(f"NOTE(schema-drift): {n}")
         for w in drift_warnings:
             print(f"WARN(schema-drift): {w}")
+        print()
+
+    if vault_notes or vault_warnings:
+        for n in vault_notes:
+            print(f"NOTE(vault-address): {n}")
+        for w in vault_warnings:
+            print(f"WARN(vault-address): {w}")
         print()
 
     # Print advisory warnings (never blocking)

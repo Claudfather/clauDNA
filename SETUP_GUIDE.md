@@ -551,7 +551,7 @@ The `/claudna:worktree` skill manages this interactively if you'd rather not mem
 
 Knowledge skills (`/claudna:recall`, `/claudna:index`) resolve the shared-docs root through two doors, env first:
 
-1. **Env override:** `CLAUDRON_VAULT_PATH` (engine-managed vault) or `SHARED_DOCS_PATH` (raw tree, fallback mode only). `CLAUDRON_VAULT` — the bare form — was removed in Claudron 0.3.0 and is read by neither the engine nor clauDNA; rename it if you still export it. The ladder is owned by [Claudron's CLI_CONTRACT §Environment](https://github.com/Claudfather/Claudron/blob/main/docs/CLI_CONTRACT.md#environment). Set these yourself if you want them — the plugin never writes env vars, shell profiles, or `~/.claude/settings.json`.
+1. **Env override:** `CLAUDRON_VAULT_PATH` (engine-managed vault) or `SHARED_DOCS_PATH` (raw tree, fallback mode only) — see `skills/_shared/documentation-standard.md` §10. **`CLAUDRON_VAULT` was removed** in Claudron 0.3.0; rename it if you still export it. Set these yourself if you want them — the plugin never writes env vars, shell profiles, or `~/.claude/settings.json`.
 2. **CLAUDE.md section:** a `## Shared Documentation` section whose first non-empty line is the root path, optionally annotated `(claudron vault)` for engine-managed roots. `/claudna:init-project`'s shared-docs seam step provisions it; the parse contract lives in `skills/_shared/documentation-standard.md` §10.
 
 **Precedence:** env wins. If both are set and disagree, consumers use the env value and print a mismatch notice.

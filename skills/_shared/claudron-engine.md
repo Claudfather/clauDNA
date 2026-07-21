@@ -19,9 +19,9 @@ Run before any engine call, as separate Bash calls (never chained — infra-cli-
 | `claudron status --json` | exit 3 (stderr `no vault found`) | **present-no-vault** — installed but unconfigured |
 | `claudron status --json` | other non-zero | **engine failure** (§3) — surface stderr |
 
-**How the CLI resolves a vault is Claudron's contract, not ours** — the precedence-ordered table lives once in [Claudron's `docs/CLI_CONTRACT.md` §Environment](https://github.com/Claudfather/Claudron/blob/main/docs/CLI_CONTRACT.md#environment); the clauDNA-side consequences (section-vs-env precedence, the mismatch notice) live once in `documentation-standard.md` §10 ("locating the root"). Neither is restated here. This ladder only *acts* on them: it never sets env (no clauDNA skill does), and it flags a root the CLI can't see — a `## Shared Documentation` section pointing somewhere `claudron status` does not resolve.
+**Vault resolution is Claudron's contract, not ours** — see `documentation-standard.md` §10 ("locating the root"), which owns the clauDNA-side statement and cites the owner. Not restated here. This ladder only *acts* on it: it never sets env (no clauDNA skill does), and it flags a root the CLI can't see.
 
-**Version probe.** On **present-with-vault**, `data.engine_version` reports the installed engine (Claudron ≥ 0.3.0). Guard any engine capability on that value rather than on an install pin — the ecosystem installs from git between tags, so a pin describes what was *imported*, never what will *run*. Absent field ⇒ treat as pre-0.3.0.
+**Version probe.** On **present-with-vault**, `data.engine_version` (Claudron ≥ 0.3.0) is the capability probe — guard on it, not on an install pin. Absent ⇒ pre-0.3.0.
 
 Verdict → action:
 - **present-with-vault** → use the engine.
