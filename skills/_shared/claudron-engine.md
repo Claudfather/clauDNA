@@ -19,7 +19,9 @@ Run before any engine call, as separate Bash calls (never chained — infra-cli-
 | `claudron status --json` | exit 3 (stderr `no vault found`) | **present-no-vault** — installed but unconfigured |
 | `claudron status --json` | other non-zero | **engine failure** (§3) — surface stderr |
 
-The CLI resolves the vault from `CLAUDRON_VAULT` or a walk-up from cwd; **which env var wins, and the section-vs-env precedence + mismatch behavior, live once in `documentation-standard.md` §10** ("locating the root"). The ladder only *acts* on that: it never sets env (no clauDNA skill does), and it flags a root the CLI can't see — a `## Shared Documentation` section or `CLAUDRON_VAULT_PATH` set while the bare `CLAUDRON_VAULT` the CLI reads is unset.
+**Vault resolution is Claudron's contract, not ours** — see `documentation-standard.md` §10 ("locating the root"), which owns the clauDNA-side statement and cites the owner. Not restated here. This ladder only *acts* on it: it never sets env (no clauDNA skill does), and it flags the one divergence §10's mismatch rule does not reach — §10 pairs env against the section, but once the engine is present the binding pair is **engine vs section**: a `## Shared Documentation` section path that differs from `data.root` in `claudron status --json`. Report both paths; the engine's is the one in force for every engine call.
+
+**Version probe.** On **present-with-vault**, `data.engine_version` (Claudron ≥ 0.3.0) is the capability probe — guard on it, not on an install pin. Absent ⇒ pre-0.3.0.
 
 Verdict → action:
 - **present-with-vault** → use the engine.

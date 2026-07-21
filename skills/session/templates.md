@@ -1,6 +1,6 @@
 # Handoff File Format — `<cwd>/.claude/session.md`
 
-Schema version: 2. Written by `/claudna:session` handoff and checkpoint modes, read by resume mode. Optimized for agent consumption.
+Schema version: 2. Written by `/claudna:session` handoff and checkpoint modes, read by resume mode. Optimized for agent consumption. This file has a small **stable surface** for readers outside clauDNA — declared at the bottom.
 
 ```markdown
 ---
@@ -45,3 +45,12 @@ in_flight_branches:
 Legacy files at `~/.claude/notes/projects/<slug>/context-resume.md` use schema_version: 1 (no per-item timestamps; bullets in plain `- text` form; frontmatter with `session_date` only).
 
 When resume mode imports a v1 file, it assigns the file's `session_date` as the timestamp for every imported item, then runs the reaper. Most v1 items will hard-drop on first reap because they exceed TTL (Activity > 7d, etc.) — which is the correct behavior.
+
+## Stable surface
+
+This file is read outside clauDNA, so two things are promised and the rest is not:
+
+- **The file exists** at `<cwd>/.claude/session.md` after handoff or checkpoint, and a reader sees a complete file or none.
+- **`last_updated:`** is an ISO-8601 UTC timestamp in the frontmatter — the freshness signal.
+
+Everything else — section names, ordering, `schema_version`, every field below the frontmatter — is **informal and may change without notice**. Changing either promise is a breaking change and gets a CHANGELOG entry under a breaking heading.

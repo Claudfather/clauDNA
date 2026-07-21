@@ -139,7 +139,9 @@ Documentation lives on two planes, and `/claudna:publish` is the single router o
 
 Consumers find the shared-docs root through two doors, env first:
 
-1. **Env override:** `CLAUDRON_VAULT` or `CLAUDRON_VAULT_PATH` (engine-managed vault — Claudron's shipped CLI reads the bare form, its CLI-contract doc names the `_PATH` form; consumers accept both) or `SHARED_DOCS_PATH` (raw tree). If several are set, that order wins. User-managed — no clauDNA skill ever sets env vars.
+1. **Env override**, by mode — not a precedence chain: engine present ⇒ `CLAUDRON_VAULT_PATH`; no engine ⇒ `SHARED_DOCS_PATH` (raw tree). User-managed; no clauDNA skill ever sets env vars.
+   - `CLAUDRON_VAULT_PATH` is **Claudron's** name, owned by [its `docs/CLI_CONTRACT.md` §Environment](https://github.com/Claudfather/Claudron/blob/main/docs/CLI_CONTRACT.md#environment) — how the engine resolves a vault is not restated here or downstream; changing it is a PR against that repo.
+   - **`CLAUDRON_VAULT` (no `_PATH`) was removed** in Claudron 0.3.0. Neither the engine nor clauDNA reads it; honoring it would resolve a different vault than the engine does. Tell users to rename it.
 2. **CLAUDE.md section:** a section headed exactly `## Shared Documentation`. `/claudna:init-project`'s shared-docs seam step is the sole producer; `/claudna:recall` and `/claudna:index` parse it.
 
 The section format is parseable, not prose:
@@ -158,7 +160,7 @@ Cross-project knowledge lives here — see /claudna:recall.
 
 **Precedence.** Env wins. When an env var and the section disagree, consumers use the env value and print a mismatch notice naming both paths.
 
-**Annotation semantics.** A `(claudron vault)` root — or any root resolved from `CLAUDRON_VAULT`/`CLAUDRON_VAULT_PATH` — is engine-indexed and carries **no INDEX.md**: fallback consumers must never INDEX-scan it and never suggest `/claudna:index` against it. Their degraded message: "engine-managed root; install claudron or point the section at a raw tree." (For env-derived roots, append: "(root came from `CLAUDRON_VAULT`/`CLAUDRON_VAULT_PATH` — unset it to fall back)", since the section remedy alone can't override env precedence.) An unannotated root is a raw tree — INDEX.md discovery per this standard applies.
+**Annotation semantics.** A `(claudron vault)` root — or any root resolved from `CLAUDRON_VAULT_PATH` — is engine-indexed and carries **no INDEX.md**: fallback consumers must never INDEX-scan it and never suggest `/claudna:index` against it. Their degraded message: "engine-managed root; install claudron or point the section at a raw tree." (For env-derived roots, append: "(root came from `CLAUDRON_VAULT_PATH` — unset it to fall back)", since the section remedy alone can't override env precedence.) An unannotated root is a raw tree — INDEX.md discovery per this standard applies.
 
 ### Which door writes the vault?
 

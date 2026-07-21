@@ -34,7 +34,7 @@ Classify strictly by the **§1 verdict table** (absent / present-no-vault / pres
   ```
   Claudron: installed, no vault configured
     Create one:  claudron init <path> --personal
-    Or point at: export CLAUDRON_VAULT=<path>
+    Or point at: export CLAUDRON_VAULT_PATH=<path>
   ```
 
 - **present-with-vault** → parse `data` (envelope §2) and render:

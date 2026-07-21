@@ -14,7 +14,7 @@ Scan, validate, and index shared documentation. INDEX.md is the discovery layer 
 ## Arguments
 
 Parse `$ARGUMENTS` at invocation:
-- **First positional arg:** Directory path to index. Defaults to the shared docs root — `CLAUDRON_VAULT`/`CLAUDRON_VAULT_PATH`/`SHARED_DOCS_PATH` env vars (in that order), else CLAUDE.md's `## Shared Documentation` section (contract: `skills/_shared/documentation-standard.md` §10; env wins on disagreement, note the mismatch), else detect from cwd.
+- **First positional arg:** Directory path to index. Defaults to the shared docs root, resolved per `skills/_shared/documentation-standard.md` §10 ("locating the root" — env override, else the CLAUDE.md `## Shared Documentation` section; env wins on disagreement, note the mismatch). §10 owns which env name applies; do not re-derive it here. No root resolves → detect from cwd.
 - `--validate-only`: Check frontmatter without regenerating INDEX.md.
 - `--recursive`: Index all subdirectories, not just the target.
 - `--fix`: Auto-fill missing required fields where inferrable.
@@ -24,7 +24,7 @@ Parse `$ARGUMENTS` at invocation:
 
 ## Step 1: Discover Documents
 
-**Engine-managed roots are never indexed.** If the target is a root annotated `(claudron vault)` in CLAUDE.md's `## Shared Documentation` section (or came from `CLAUDRON_VAULT`/`CLAUDRON_VAULT_PATH`), stop with: "engine-managed root; install claudron or point the section at a raw tree." — appending, when the root came from env: "(root came from `CLAUDRON_VAULT`/`CLAUDRON_VAULT_PATH` — unset it to fall back)". The engine owns vault indexing — an INDEX.md written there would be stale on arrival.
+**Engine-managed roots are never indexed.** If the target is a root annotated `(claudron vault)` in CLAUDE.md's `## Shared Documentation` section, or came from the engine env var, stop and emit §10's engine-managed-root message (`skills/_shared/documentation-standard.md` §10, Annotation semantics — including its env-derived suffix). The engine owns vault indexing; an INDEX.md written there would be stale on arrival.
 
 Walk all `.md` files in the target directory (excluding `INDEX.md` itself).
 
