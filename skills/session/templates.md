@@ -2,6 +2,26 @@
 
 Schema version: 2. Written by `/claudna:session` handoff and checkpoint modes, read by resume mode. Optimized for agent consumption.
 
+## Stable surface
+
+This file is consumed **outside clauDNA** — Claudlobby age-gates bot resume on it
+and parses `last_updated:` — so a minimal subset is a declared promise rather
+than an implementation detail. Two things, and only two:
+
+| Guarantee | Detail |
+|---|---|
+| **The file exists** at `<cwd>/.claude/session.md` after a handoff or checkpoint | Written atomically (`.tmp` then `mv`), so a reader sees a complete file or none |
+| **`last_updated:`** is present in the frontmatter, an **ISO-8601 UTC** timestamp | The freshness signal external consumers gate on |
+
+**Everything else here is informal** and may change without notice: section
+names, ordering, `schema_version`, and every field below the frontmatter. An
+external consumer that parses those is reading an implementation detail and
+will break.
+
+Changing either guarantee is a breaking change: it gets a CHANGELOG entry, and
+the consumers named above are told before it ships. Consumers needing more than
+this subset should open an issue rather than widening their parser.
+
 ```markdown
 ---
 cwd: <absolute path to current working directory>

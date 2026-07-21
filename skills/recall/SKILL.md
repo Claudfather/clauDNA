@@ -80,7 +80,7 @@ Close with a one-line orientation, not just a dump: point at the single most rel
 
 When the ladder returns **present-no-vault** or **absent**, Claudron can't assemble the briefing. Fall back to the **frozen** INDEX.md scan — no new capability lands here (claudron-engine.md §4); it exists so recall still works on a raw tree. Say so first: *"Claudron vault unavailable — scanning the raw tree's INDEX.md instead."* Then:
 
-1. **Resolve the docs root** per documentation-standard §10 ("locating the root" — env override, else the CLAUDE.md `## Shared Documentation` section). If §10's annotation semantics mark the root engine-managed (a `(claudron vault)` annotation, or an env-derived `CLAUDRON_VAULT`/`CLAUDRON_VAULT_PATH` root), it carries no INDEX.md — do not scan it; degrade with §10's engine-managed-root message. No root resolves → say so and point at `/claudna:init-project` (its shared-docs seam step provisions the section).
+1. **Resolve the docs root** per documentation-standard §10 ("locating the root" — env override, else the CLAUDE.md `## Shared Documentation` section). If §10's annotation semantics mark the root engine-managed (a `(claudron vault)` annotation, or an env-derived `CLAUDRON_VAULT_PATH` root), it carries no INDEX.md — do not scan it; degrade with §10's engine-managed-root message. No root resolves → say so and point at `/claudna:init-project` (its shared-docs seam step provisions the section).
 
 2. **Scan INDEX.md only** (never walk directories) under the root:
 

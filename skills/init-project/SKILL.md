@@ -152,7 +152,7 @@ Provision the `## Shared Documentation` CLAUDE.md section — the root that `/cl
 
 Detect which of three states applies, in order:
 
-**(a) Vault resolvable.** `CLAUDRON_VAULT` or `CLAUDRON_VAULT_PATH` is set (check with `printenv CLAUDRON_VAULT CLAUDRON_VAULT_PATH` — Claudron's shipped CLI reads the bare form; accept both, bare form first), or `claudron` is on PATH (`command -v claudron`) and `claudron status --json` reports a vault path. Write the section with the resolved path (prefer the `~`-relative form when it's under the home directory) and the `(claudron vault)` annotation:
+**(a) Vault resolvable.** `CLAUDRON_VAULT_PATH` is set (check with `printenv CLAUDRON_VAULT_PATH`), or `claudron` is on PATH (`command -v claudron`) and `claudron status --json` reports a vault path. Write the section with the resolved path (prefer the `~`-relative form when it's under the home directory) and the `(claudron vault)` annotation:
 
 ```markdown
 ## Shared Documentation
