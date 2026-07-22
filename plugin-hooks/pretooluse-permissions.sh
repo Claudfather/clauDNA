@@ -4,7 +4,7 @@ set -eo pipefail
 # PreToolUse permissions hook for Claude Code
 #
 # Auto-approves Bash commands where every sub-command matches a pattern
-# in permissions.allow. Handles compound commands (&&, ||, |, ;) by
+# in permissions.allow. Handles compound commands (&&, ||, |, ;, &) by
 # splitting and validating each part independently.
 #
 # Security note: This hook bypasses Claude Code's undocumented "write
@@ -23,7 +23,10 @@ set -eo pipefail
 #
 # Compound-command splitting scope:
 #   Handled (split + each part validated independently):
-#     &&   ||   |   ;
+#     &&   ||   |   ;   &   (lone & = background operator, splits like ;)
+#
+#   `&` stays literal inside a redirection (2>&1, >&, <&, &>) — there it is
+#   fd-duplication, not a control operator, so it is not a split point.
 #
 #   NOT handled (detected early and falls through — user gets a permission prompt):
 #     $( )       command substitution
@@ -145,12 +148,25 @@ split_commands() {
                     current+="$char"
                     ;;
                 "&")
+                    # && → logical-AND separator (both sides run in sequence)
                     if [[ "${cmd:i+1:1}" == "&" ]]; then
                         printf '%s\n' "$current"
                         current=""
                         i=$((i + 2)); continue
                     fi
-                    current+="$char"
+                    # Keep & literal inside a redirection — 2>&1 / >& / <&
+                    # (preceded by > or <), and &> / &>> (followed by >).
+                    if { (( i > 0 )) && [[ "${cmd:i-1:1}" == ">" || "${cmd:i-1:1}" == "<" ]]; } \
+                       || [[ "${cmd:i+1:1}" == ">" ]]; then
+                        current+="$char"
+                    else
+                        # Lone & is the background control operator: the command
+                        # before it runs AND execution continues to what follows,
+                        # so it separates exactly like ; — each side must match
+                        # on its own or the whole command prompts.
+                        printf '%s\n' "$current"
+                        current=""
+                    fi
                     ;;
                 "|")
                     if [[ "${cmd:i+1:1}" == "|" ]]; then

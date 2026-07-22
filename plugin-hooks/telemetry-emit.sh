@@ -43,6 +43,15 @@ esac
 # Strip "claudna:" prefix — emit bare slug per Claudosseum ingestion contract
 SKILL_NAME="${SKILL_NAME#claudna:}"
 
+# Guard the slug charset before it is interpolated into the hand-built JSON
+# fallback below (the no-jq path). A real claudna skill slug is
+# [A-Za-z0-9:_-]; anything else can't be one and would corrupt the JSON line
+# (e.g. a stray backslash is an invalid escape). Drop the event rather than
+# write malformed telemetry.
+case "$SKILL_NAME" in
+    ""|*[!A-Za-z0-9:_-]*) exit 0 ;;
+esac
+
 # Determine output path
 TELEMETRY_PATH="${CLAUDNA_TELEMETRY_PATH:-${HOME}/.claude/telemetry/skill-events.jsonl}"
 TELEMETRY_DIR=$(dirname "$TELEMETRY_PATH")

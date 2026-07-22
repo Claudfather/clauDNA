@@ -29,6 +29,14 @@ if command -v jq &>/dev/null; then
 fi
 SESSION_ID="${SESSION_ID:-${CLAUDE_SESSION_ID:-}}"
 
+# Validate before the id becomes part of a filesystem path below. A value
+# bearing '/' (or other path metacharacters) could point the marker outside
+# the marker dir. Claude Code generates a UUID here, so a value outside this
+# charset is malformed — treat it like a missing id and fail-open.
+case "$SESSION_ID" in
+    *[!A-Za-z0-9._-]*) SESSION_ID="" ;;
+esac
+
 # No stable session ID available — fail-open to avoid infinite block loop
 # ($$ changes per subprocess invocation, so marker files would never match)
 if [ -z "$SESSION_ID" ]; then
