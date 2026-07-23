@@ -72,10 +72,13 @@ This plane has two backends — a Claudron vault (engine) and a raw tree (fallba
 **Engine path — verdict present-with-vault.** Route the finished doc through Claudron rather than writing files directly; map its frontmatter onto a capture call:
 
 ```bash
+# provenance (flags-capable engine only — see below): add --source-url <url> --source-type <url|file|inline>
 claudron capture --type <type> --title "<title>" --body "<body>" --tags "<tags>" --project <repo> --json
 ```
 
 `--project` comes from the doc's `repos:` / `--repo` (omit if unscoped); for a long body pass the finding as JSON via `--stdin` (`/claudna:capture` Step 4). Validate the envelope (claudron-engine.md §2) and branch on `data.action`: `created` → report `data.path`; `suggest_update` / `suggest_supersede` → surface `data.reason` and the existing note to the caller (the engine's index-backed dedup replaces the raw adapter's file-compare); `rejected` (exit 1) → surface the validation errors. An engine failure *during* capture (exit 3 or an unrecognized envelope) degrades to the fallback path below, per claudron-engine.md §3 — say so. Do **not** run `/claudna:index` — the vault is engine-indexed (documentation-standard §10). Maturity is never set here; the engine stamps `draft`.
+
+**Provenance (capability-probed — F7).** If the doc's frontmatter carries `source_url` / `source_type` (SCHEMA optional fields), map them onto `--source-url` / `--source-type` — but **only on a flags-capable engine**: `data.engine_version` present and ≥ **0.4.0** (the Claudron C2 release that added the flags; the same version probe `/claudna:capture` Step 1 uses, and the same floor its PreCompact defer keys on — unreleased at this writing, so verify it when that release cuts). An older / absent / unreadable version omits them (it would reject the flags, exit 2). Provenance is **never** folded into the body here: that trailing `Source:` workaround was capture's alone, and the github-pr adapter's `Source:` footer is an unrelated surface.
 
 **Fallback path — verdict present-no-vault or absent** (frozen behavior). Say so — "Claudron vault unavailable — writing the raw tree" — then write the doc to the raw-tree directory for its `type:`:
 

@@ -48,7 +48,12 @@ Classify the first positional argument (or the supplied content):
 
 If a URL fetch or a real file `Read` fails (network, 404, auth wall, missing file), report the error verbatim and stop — never fabricate content.
 
-**Provenance.** For URL/file input, the origin matters but `claudron capture` has no `--source-url` flag (and stdin keys it doesn't know are dropped). Fold provenance into the note instead: a **trailing** body line — `Source: <url-or-path> (captured <today>)` — plus a tag (the domain, or `source:file`). Keep it **last**, never the first body line: Claudron derives a note's one-line recall summary from the first non-heading body line (`session.py` `_summary`), so a leading `Source:` line would hijack the summary every recall shows.
+**Provenance (capability-probed — F7).** For URL/file input the origin matters; how it is recorded depends on the engine Step 0 detected, read from `data.engine_version`:
+
+- **Flags-capable engine** — `engine_version` present and **≥ 0.4.0** (the Claudron C2 release that added `--source-url` / `--source-type`) → carry provenance in **frontmatter**: pass `--source-url <url-or-path>` and `--source-type <url|file>` (URL input → `url`, file input → `file`) on the Step 4 call, plus a discovery tag (the domain, or `source:file`). Do **not** add a `Source:` body line.
+- **Older / absent / unreadable version** — including a between-tags git build reporting a dev version below 0.4.0 → **keep the fold**: record provenance as a **trailing** body line — `Source: <url-or-path> (captured <today>)` — plus the tag. Keep it **last**, never first.
+
+The guard is the version probe, never an install pin (claudron-engine.md §1): a git-installed engine between tags degrades to the fold rather than erroring on a flag it doesn't have. Why the body line must stay last, and why frontmatter is preferred once available: Claudron derives a note's one-line recall summary from the first non-heading body line (`session.py` `_summary`), so a leading `Source:` line hijacks every recall summary — and folding provenance into the body at all couples this skill to how that summary is picked (Claudron `docs/CLI_CONTRACT.md` §capture: *provenance rides in frontmatter, not in the body*). **0.4.0 is unreleased at this writing** — the C2 flags and the PreCompact shim removal ship in the same next Claudron release; verify this floor when that release cuts (it must match the release that actually adds the flags). The identical constant gates `plugin-hooks/precompact-reflect.sh`'s capture-prompt defer.
 
 ## Step 1a: Session mode — distill what happened
 
@@ -77,7 +82,7 @@ If the content is **skill-shaped** — an imperative how-to, a reusable procedur
 Decide the fields:
 - **type** — from `--type`, else inferred (an article or transcript → `knowledge`; a decision record → `decision`; session distillation → `knowledge`). Required by the CLI.
 - **title** — from `--title`, else derived from the content's own title/heading (session mode: a short topic, e.g. `Session — <what you worked on>`). Required.
-- **body** — the processed content. Default is a tight summary (30–50% length, keep all technical substance, strip boilerplate); `--full` captures verbatim. **Append** the provenance line at the end for URL/file input (never first — Step 1: the first body line becomes the recall summary).
+- **body** — the processed content. Default is a tight summary (30–50% length, keep all technical substance, strip boilerplate); `--full` captures verbatim. Provenance for URL/file input follows the Step 1 branch: on a flags-capable engine it rides frontmatter (`--source-url` / `--source-type`, Step 4), **not** the body; on an older engine, **append** the `Source:` line at the end (never first — the first body line becomes the recall summary).
 - **wikilinks** — if the note relates to one already in the vault (Step 5's dedup surfaces near-matches, or you know its title), link it in the body as `[[Exact Title]]`. This is the vault's authoring convention — **relate** notes, don't duplicate them; capture just writes the `[[Title]]` into the body (Claudron resolves those references on demand, read-side — not at write time).
 - **tags** — from flags or inferred from context.
 - **project / fleet — scope by what the note is *about*, and state the call.** Claudron files by location — there is no `scope:` field; the tier follows the flag you pass, or none. Read the scope from the content, then **say which you chose and why** (`Scoped to project clauDNA — a gotcha in this repo`); the flags are manual overrides on that inference. When genuinely ambiguous, state your reasoning and pick — but **reusable / general knowledge wins `_shared/` even when it is also repo-flavored** (filing it in a project tier hides it from cross-repo recall); reserve the narrower tier for notes that are genuinely repo- or fleet-bound. The three tiers:
@@ -87,20 +92,21 @@ Decide the fields:
 
 ## Step 4: Build the capture call
 
-Prefer flags (verified against v0.2.0):
+Prefer flags (base capture flags verified against v0.2.0):
 
 ```bash
 # repo-scoped (incl. session mode): --project <name>; fleet-wide: --fleet <name>; general: omit both
+# provenance (URL/file input, flags-capable engine — Step 1): add --source-url <url-or-path> --source-type <url|file>
 claudron capture --type <type> --title "<title>" --body "<body>" --tags "<a,b>" --project <project> --json
 ```
 
-For a multi-paragraph body awkward to quote inline (session distillations usually are), write the fields to a scratch JSON file (`type`, `title`, `body`, `tags`, `owner`, `project` or `fleet`) and pipe it:
+For a multi-paragraph body awkward to quote inline (session distillations usually are), write the fields to a scratch JSON file (`type`, `title`, `body`, `tags`, `owner`, `project` or `fleet`, and — flags-capable engine only — `source_url` / `source_type`) and pipe it:
 
 ```bash
 claudron capture --stdin --json < <scratch-note.json>
 ```
 
-`--type` and `--title` are required (the CLI exits 2 without them). Do **not** pass `--force` here — dedup routing (Step 5) decides that.
+`--type` and `--title` are required (the CLI exits 2 without them). `--source-type` (and the `source_type` stdin key) accept only `url|file|inline` — the SCHEMA vocabulary; capture emits `url`/`file`. An engine without the flags rejects them (exit 2), which is why Step 1 gates provenance on the version probe. Do **not** pass `--force` here — dedup routing (Step 5) decides that.
 
 ## Step 5: Confirmation gate + envelope (contract §5)
 
