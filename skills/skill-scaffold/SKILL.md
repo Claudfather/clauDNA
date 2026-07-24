@@ -32,7 +32,7 @@ If the user provided a skill name as an argument, use it. Otherwise prompt for t
    - None (uses only defaults): omit the field
 4. **Argument hint** — does the skill accept arguments? If yes, what format? (e.g. `[--flag] [positional]`)
 5. **Uses subagents?** — will the skill delegate to Agent/subagents for parallel work?
-6. **External CLI dependencies** — does it need tools beyond git/curl/jq? (e.g. `gh>=2.0`, `vercel`, `neonctl`)
+6. **External CLI dependencies** — does it need tools beyond git/curl/jq? (e.g. `gh>=2.0`, `vercel`, `neon`)
 
 ### Step 2: Validate Inputs
 
