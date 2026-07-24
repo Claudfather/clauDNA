@@ -27,15 +27,15 @@ source .env
 psql "$NEON_PROD_URL" -c "BEGIN TRANSACTION READ ONLY; YOUR QUERY; COMMIT;"
 ```
 
-### For neonctl management (branches, etc.)
+### For neon management (branches, etc.)
 
 Check auth first:
 ```bash
-source .env && timeout 10 npx neonctl me ${NEON_API_KEY:+--api-key "$NEON_API_KEY"} 2>&1
+source .env && timeout 10 npx neon me ${NEON_API_KEY:+--api-key "$NEON_API_KEY"} 2>&1
 ```
 
 - **Table with Login/Email/Name** → auth works, proceed
-- **"Awaiting authentication"** → tell the user: "Neon CLI auth needed. Run `npx neonctl auth` to authenticate via browser, or set `NEON_API_KEY` in `.env` for headless operation (create at https://console.neon.tech/app/settings/api-keys)."
+- **"Awaiting authentication"** → tell the user: "Neon CLI auth needed. Run `npx neon auth` to authenticate via browser, or set `NEON_API_KEY` in `.env` for headless operation (create at https://console.neon.tech/app/settings/api-keys)."
 
 ## Connection
 
@@ -52,7 +52,7 @@ source .env && psql "$NEON_DEV_URL" -c "YOUR QUERY;"
 
 For a branch (read-write OK):
 ```bash
-source .env && BRANCH_URL=$(npx neonctl connection-string "<branch-name>" \
+source .env && BRANCH_URL=$(npx neon connection-string "<branch-name>" \
   --project-id "$NEON_PROJECT_ID" --org-id "$NEON_ORG_ID" \
   ${NEON_API_KEY:+--api-key "$NEON_API_KEY"} \
   --pooled --database-name myproject --role-name neondb_owner)
@@ -65,7 +65,7 @@ Only create branches when analysis requires mutations or destructive queries. Si
 
 ### Create a branch
 ```bash
-source .env && npx neonctl branches create \
+source .env && npx neon branches create \
   --project-id "$NEON_PROJECT_ID" --org-id "$NEON_ORG_ID" \
   ${NEON_API_KEY:+--api-key "$NEON_API_KEY"} \
   --name "claude/analyst-$(date +%Y%m%d-%H%M)" \
@@ -74,7 +74,7 @@ source .env && npx neonctl branches create \
 
 ### Get its connection string
 ```bash
-source .env && BRANCH_URL=$(npx neonctl connection-string "claude/analyst-..." \
+source .env && BRANCH_URL=$(npx neon connection-string "claude/analyst-..." \
   --project-id "$NEON_PROJECT_ID" --org-id "$NEON_ORG_ID" \
   ${NEON_API_KEY:+--api-key "$NEON_API_KEY"} \
   --pooled --database-name myproject --role-name neondb_owner)
@@ -82,7 +82,7 @@ source .env && BRANCH_URL=$(npx neonctl connection-string "claude/analyst-..." \
 
 ### Clean up when done
 ```bash
-source .env && npx neonctl branches delete "claude/analyst-..." \
+source .env && npx neon branches delete "claude/analyst-..." \
   --project-id "$NEON_PROJECT_ID" --org-id "$NEON_ORG_ID" \
   ${NEON_API_KEY:+--api-key "$NEON_API_KEY"}
 ```

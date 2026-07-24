@@ -257,5 +257,5 @@ class TestParseFrontmatterWithRequires:
         fm, _ = parsed
         assert "requires" in fm
         cli_names = [e["cli"] for e in fm["requires"]]
-        assert "neonctl" in cli_names
+        assert "neon" in cli_names
         assert "psql" in cli_names
