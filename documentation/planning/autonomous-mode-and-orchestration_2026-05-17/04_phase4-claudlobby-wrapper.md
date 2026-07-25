@@ -9,7 +9,7 @@ repos: [Claudlobby]
 links: []
 ---
 
-> **Mostly ✅ COMPLETE, Claudlobby-side (verified 2026-07-06 docs audit).** Every deliverable in this plan lives in the sibling Claudlobby repo, not clauDNA — ordinarily **UNVERIFIABLE FROM THIS REPO ALONE**. A live local checkout was available at `/Users/chris/Projects/claudlobby` (real git history, GitHub remote `Claudfather/Claudlobby`) for this audit; treat the findings below as a point-in-time spot-check, not something clauDNA's own CI/repo verifies going forward.
+> **Mostly ✅ COMPLETE, Claudlobby-side (verified 2026-07-06 docs audit).** Every deliverable in this plan lives in the sibling Claudlobby repo, not clauDNA — ordinarily **UNVERIFIABLE FROM THIS REPO ALONE**. A live local checkout was available at `/path/to/claudlobby` (real git history, GitHub remote `Claudfather/Claudlobby`) for this audit; treat the findings below as a point-in-time spot-check, not something clauDNA's own CI/repo verifies going forward.
 >
 > **Timeline:** clauDNA Phases 1-3 (the prerequisite contract this phase depends on) merged 2026-05-17/18 (`d46699c`, `31accf6`, `765b2c7`). Claudlobby Phase 4 **Part A** (Tasks 1-5, schema layer — [Claudfather/Claudlobby#278](https://github.com/Claudfather/Claudlobby/issues/278)) and **Part B** (Tasks 6-9 + 11, skill body + docs — [Claudfather/Claudlobby#279](https://github.com/Claudfather/Claudlobby/issues/279)) both merged the same day, 2026-05-18 (`d98e7e0`, `a541004`) — within hours of clauDNA Phase 3 landing. **Task 10 (end-to-end validation deployment)** was deliberately descoped into its own tracked issue, **[Claudfather/Claudlobby#294 — "Phase 4 Part C — autonomous-runner validation deployment"](https://github.com/Claudfather/Claudlobby/issues/294), still OPEN** as of this audit. That is the one real gap — this phase is not abandoned or blocked; it shipped fast and the remainder is explicitly tracked.
 >
@@ -25,12 +25,12 @@ links: []
 
 **Tech Stack:** Python 3 (claudlobby's compositor) + Markdown (skill body) + YAML (fleet config schema). Existing claudlobby idioms: `dataclass`, `yaml.safe_load`, file overlays via `Paths`.
 
-**Repo:** claudlobby (`/Users/chris/Projects/claudlobby`). NOTE: this phase is in a different repo from Phases 1-3.
+**Repo:** claudlobby (`/path/to/claudlobby`). NOTE: this phase is in a different repo from Phases 1-3.
 
 **Prerequisites:**
 - Phases 1-3 merged in clauDNA. The structured-result shape (§10.C), `/implement-plan --auto`, `/tech-debt --auto` (and the other 8 `--auto` skills) are live.
-- Read the design spec at `/Users/chris/Projects/claudna/documentation/specs/2026-05-17-autonomous-mode-and-orchestration-design.md` §6 in full.
-- Read `/Users/chris/Projects/claudlobby/README.md` and `/Users/chris/Projects/claudlobby/CLAUDE.md` to understand claudlobby's compositor model.
+- Read the design spec at `/path/to/clauDNA/documentation/specs/2026-05-17-autonomous-mode-and-orchestration-design.md` §6 in full.
+- Read `/path/to/claudlobby/README.md` and `/path/to/claudlobby/CLAUDE.md` to understand claudlobby's compositor model.
 
 ---
 
@@ -62,7 +62,7 @@ This phase is in an unfamiliar codebase (vs. Phases 1-3 in clauDNA). Do not skip
 
 - [ ] **Step 1: Read the design spec §6 end-to-end**
 
-Open `/Users/chris/Projects/claudna/documentation/specs/2026-05-17-autonomous-mode-and-orchestration-design.md` and read §6 (claudlobby changes) twice. Pay attention to:
+Open `/path/to/clauDNA/documentation/specs/2026-05-17-autonomous-mode-and-orchestration-design.md` and read §6 (claudlobby changes) twice. Pay attention to:
 - §6.1 New skill: `library/skills/autonomous-runner`
 - §6.1's "Configuration via fleet.yaml" — note exact field names, types, and the `args:` block
 - §6.1's Procedure (steps 1-10)
@@ -73,8 +73,8 @@ Open `/Users/chris/Projects/claudna/documentation/specs/2026-05-17-autonomous-mo
 - [ ] **Step 2: Read claudlobby's README and CLAUDE.md**
 
 ```bash
-cat /Users/chris/Projects/claudlobby/README.md
-cat /Users/chris/Projects/claudlobby/CLAUDE.md
+cat /path/to/claudlobby/README.md
+cat /path/to/claudlobby/CLAUDE.md
 ```
 
 Note especially:
@@ -86,7 +86,7 @@ Note especially:
 - [ ] **Step 3: Read claudlobby's config.py end-to-end**
 
 ```bash
-cat /Users/chris/Projects/claudlobby/claudlobby/config.py
+cat /path/to/claudlobby/claudlobby/config.py
 ```
 
 Identify the existing dataclasses: `BotConfig`, `FleetConfig`, related sub-configs (TelegramConfig, McpEntry, etc.). Note the patterns: how dataclasses are composed, how YAML maps to fields, what defaults look like.
@@ -94,8 +94,8 @@ Identify the existing dataclasses: `BotConfig`, `FleetConfig`, related sub-confi
 - [ ] **Step 4: Read claudlobby's loader.py and composer.py**
 
 ```bash
-cat /Users/chris/Projects/claudlobby/claudlobby/loader.py
-cat /Users/chris/Projects/claudlobby/claudlobby/composer.py
+cat /path/to/claudlobby/claudlobby/loader.py
+cat /path/to/claudlobby/claudlobby/composer.py
 ```
 
 Note:
@@ -106,7 +106,7 @@ Note:
 - [ ] **Step 5: Read claudlobby/validator.py**
 
 ```bash
-cat /Users/chris/Projects/claudlobby/claudlobby/validator.py
+cat /path/to/claudlobby/claudlobby/validator.py
 ```
 
 Note the existing per-bot validation pattern (expertise, voice, skills, mcp, etc.). The new validation in Phase 4 follows the same pattern.
@@ -114,7 +114,7 @@ Note the existing per-bot validation pattern (expertise, voice, skills, mcp, etc
 - [ ] **Step 6: Read templates/claude.md.j2**
 
 ```bash
-cat /Users/chris/Projects/claudlobby/templates/claude.md.j2
+cat /path/to/claudlobby/templates/claude.md.j2
 ```
 
 Note where in the template each section goes: persona → voice → skills → guardrails → protocols → resources. The autonomous-runner block needs a place in this template.
@@ -122,7 +122,7 @@ Note where in the template each section goes: persona → voice → skills → g
 - [ ] **Step 7: Read fleet.yaml.example**
 
 ```bash
-cat /Users/chris/Projects/claudlobby/fleet.yaml.example
+cat /path/to/claudlobby/fleet.yaml.example
 ```
 
 Note the existing bot block structure. The new `autonomous_runner` field is a nested map under a bot.
@@ -130,9 +130,9 @@ Note the existing bot block structure. The new `autonomous_runner` field is a ne
 - [ ] **Step 8: Read an existing library/skills/ entry for style reference**
 
 ```bash
-ls /Users/chris/Projects/claudlobby/library/skills/
-cat /Users/chris/Projects/claudlobby/library/skills/autonomous-sprint/SKILL.md
-cat /Users/chris/Projects/claudlobby/library/skills/dispatch/SKILL.md
+ls /path/to/claudlobby/library/skills/
+cat /path/to/claudlobby/library/skills/autonomous-sprint/SKILL.md
+cat /path/to/claudlobby/library/skills/dispatch/SKILL.md
 ```
 
 Match the style: frontmatter conventions, prose tone, procedure formatting. The new `autonomous-runner` skill should feel native to claudlobby.
@@ -242,7 +242,7 @@ def test_botconfig_has_autonomous_runner_field():
 Run the tests:
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 python3 -m pytest tests/test_autonomous_runner_config.py -v
 ```
 
@@ -301,7 +301,7 @@ class BotConfig:
 - [ ] **Step 3: Run the tests**
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 python3 -m pytest tests/test_autonomous_runner_config.py -v
 ```
 
@@ -310,7 +310,7 @@ Expected: all tests PASS.
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 git add claudlobby/config.py tests/test_autonomous_runner_config.py
 git commit -m "$(cat <<'EOF'
 feat(config): add AutonomousRunnerConfig dataclass
@@ -451,7 +451,7 @@ autonomous_runner:
 Run:
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 python3 -m pytest tests/test_autonomous_runner_loader.py -v
 ```
 
@@ -521,7 +521,7 @@ If there is no existing `parse_bot_config` function (the loader uses a different
 - [ ] **Step 3: Run the tests**
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 python3 -m pytest tests/test_autonomous_runner_loader.py -v
 ```
 
@@ -530,7 +530,7 @@ Expected: all tests pass.
 - [ ] **Step 4: Run the full claudlobby test suite to confirm no regressions**
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 python3 -m pytest tests/ -v
 ```
 
@@ -539,7 +539,7 @@ Expected: existing tests still pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 git add claudlobby/loader.py claudlobby/config.py tests/test_autonomous_runner_loader.py
 git commit -m "$(cat <<'EOF'
 feat(loader): parse autonomous_runner block in fleet.yaml
@@ -677,7 +677,7 @@ def test_validator_warns_on_unknown_on_outcome_action(tmp_path):
 Run:
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 python3 -m pytest tests/test_autonomous_runner_validator.py -v
 ```
 
@@ -789,7 +789,7 @@ Also add `import re` to the imports if not already present.
 - [ ] **Step 3: Run the tests**
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 python3 -m pytest tests/test_autonomous_runner_validator.py -v
 ```
 
@@ -798,7 +798,7 @@ Expected: all tests pass.
 - [ ] **Step 4: Run the full claudlobby test suite**
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 python3 -m pytest tests/ -v
 ```
 
@@ -807,7 +807,7 @@ Expected: no regressions.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 git add claudlobby/validator.py tests/test_autonomous_runner_validator.py
 git commit -m "$(cat <<'EOF'
 feat(validator): validate autonomous_runner config block
@@ -931,7 +931,7 @@ def test_compose_without_autonomous_runner_omits_section():
 Run:
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 python3 -m pytest tests/test_autonomous_runner_compose.py -v
 ```
 
@@ -944,7 +944,7 @@ If the template change has issues (incorrect Jinja2 syntax, missing context, etc
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 git add claudlobby/composer.py templates/claude.md.j2 tests/test_autonomous_runner_compose.py
 git commit -m "$(cat <<'EOF'
 feat(composer): render autonomous_runner block into bot's CLAUDE.md
@@ -1072,14 +1072,14 @@ The classifier itself is the same regardless of the bot's policy. The policy is 
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-ls /Users/chris/Projects/claudlobby/library/skills/autonomous-runner/
-wc -l /Users/chris/Projects/claudlobby/library/skills/autonomous-runner/risk-classifier-prompt.md
+ls /path/to/claudlobby/library/skills/autonomous-runner/
+wc -l /path/to/claudlobby/library/skills/autonomous-runner/risk-classifier-prompt.md
 ```
 
 Expected: file present.
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 git add library/skills/autonomous-runner/risk-classifier-prompt.md
 git commit -m "$(cat <<'EOF'
 docs: add risk-classifier subagent prompt template
@@ -1407,14 +1407,14 @@ Currently `report`, `report_and_pause`, `silent`. To add (e.g., `escalate` that 
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-ls /Users/chris/Projects/claudlobby/library/skills/autonomous-runner/
-wc -l /Users/chris/Projects/claudlobby/library/skills/autonomous-runner/SKILL.md
+ls /path/to/claudlobby/library/skills/autonomous-runner/
+wc -l /path/to/claudlobby/library/skills/autonomous-runner/SKILL.md
 ```
 
 Expected: SKILL.md present, ~300 lines.
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 git add library/skills/autonomous-runner/SKILL.md
 git commit -m "$(cat <<'EOF'
 feat(autonomous-runner): add the wrapper skill body
@@ -1488,7 +1488,7 @@ Find a bot in `fleet.yaml.example`. Add (or append a new commented example bot) 
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 git add fleet.yaml.example
 git commit -m "docs(example): add autonomous_runner example bot to fleet.yaml.example"
 ```
@@ -1569,7 +1569,7 @@ Recommended defaults:
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 git add docs/bot-archetypes.md
 git commit -m "docs(archetypes): add Autonomous Worker bot archetype"
 ```
@@ -1649,7 +1649,7 @@ bots:
 - [ ] **Step 3: Compose and validate**
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 claudlobby --fleet autonomous-runner-validation validate
 claudlobby --fleet autonomous-runner-validation generate
 ```
@@ -1659,7 +1659,7 @@ Expected: validates cleanly (some warnings about missing env vars are OK if inte
 Inspect the generated CLAUDE.md:
 
 ```bash
-cat /Users/chris/Projects/claudlobby/local/autonomous-runner-validation/runtime/bots/validation-worker/CLAUDE.md | grep -A 20 "Autonomous Runner"
+cat /path/to/claudlobby/local/autonomous-runner-validation/runtime/bots/validation-worker/CLAUDE.md | grep -A 20 "Autonomous Runner"
 ```
 
 Expected: the Autonomous Runner section appears with the configured skill, cadence, target repo, etc.
@@ -1669,7 +1669,7 @@ Expected: the Autonomous Runner section appears with the configured skill, caden
 Start the bot's Claude Code session:
 
 ```bash
-cd /Users/chris/Projects/claudlobby/local/autonomous-runner-validation/runtime/bots/validation-worker/
+cd /path/to/claudlobby/local/autonomous-runner-validation/runtime/bots/validation-worker/
 ./<bot>.service start  # or systemctl/launchd command per the generated unit file
 ```
 
@@ -1755,7 +1755,7 @@ If `CHANGELOG.md` does not exist in claudlobby, create it. Add:
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 git add CHANGELOG.md
 git commit -m "docs(changelog): record Phase 4 autonomous-runner wrapper additions"
 ```
@@ -1769,7 +1769,7 @@ git commit -m "docs(changelog): record Phase 4 autonomous-runner wrapper additio
 - [ ] **Step 1: Full test suite passes**
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 python3 -m pytest tests/ -v
 ```
 
@@ -1782,9 +1782,9 @@ Confirm Task 10's smoke tests passed against a real target repo. The phase is no
 - [ ] **Step 3: Documentation in place**
 
 ```bash
-ls /Users/chris/Projects/claudlobby/library/skills/autonomous-runner/
-grep -c "Autonomous Worker" /Users/chris/Projects/claudlobby/docs/bot-archetypes.md
-grep -c "autonomous_runner" /Users/chris/Projects/claudlobby/fleet.yaml.example
+ls /path/to/claudlobby/library/skills/autonomous-runner/
+grep -c "Autonomous Worker" /path/to/claudlobby/docs/bot-archetypes.md
+grep -c "autonomous_runner" /path/to/claudlobby/fleet.yaml.example
 ```
 
 Expected: skill files present, archetype documented, example present.
@@ -1792,7 +1792,7 @@ Expected: skill files present, archetype documented, example present.
 - [ ] **Step 4: Push for review**
 
 ```bash
-cd /Users/chris/Projects/claudlobby
+cd /path/to/claudlobby
 git push -u origin <branch-name>
 gh pr create --title "Phase 4: autonomous-runner wrapper skill" \
   --body "$(cat <<'EOF'

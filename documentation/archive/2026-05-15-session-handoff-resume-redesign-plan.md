@@ -629,14 +629,14 @@ rm -rf ~/.claude/skills/context-resume
 
 - [ ] **Step 1: Run `/session-handoff --auto` in this clauDNA repo**
 
-In a fresh terminal in `/Users/chris/Projects/clauDNA`:
+In a fresh terminal in `/path/to/clauDNA`:
 ```
 /session-handoff --auto
 ```
 
 Verify:
-- File created: `ls -la /Users/chris/Projects/clauDNA/.claude/session.md` → exists
-- Schema correct: `head -10 /Users/chris/Projects/clauDNA/.claude/session.md` → has frontmatter with `cwd:`, `last_updated:`, `schema_version: 2`
+- File created: `ls -la /path/to/clauDNA/.claude/session.md` → exists
+- Schema correct: `head -10 /path/to/clauDNA/.claude/session.md` → has frontmatter with `cwd:`, `last_updated:`, `schema_version: 2`
 - `.gitignore` updated: `git check-ignore .claude/session.md` → exit 0
 - No writes to `~/.claude/`: `find ~/.claude/notes/projects -newer documentation/planning/2026-05-15-session-handoff-resume-redesign-plan.md 2>/dev/null` → no output
 

@@ -19,7 +19,7 @@ links: []
 
 **Tech Stack:** Markdown only. Python only if the optional validator extension is chosen.
 
-**Repo:** clauDNA (`/Users/chris/Projects/claudna`)
+**Repo:** clauDNA (`/path/to/clauDNA`)
 
 **Prerequisites:** Read the design spec at `documentation/specs/2026-05-17-autonomous-mode-and-orchestration-design.md` end-to-end before starting. Especially §5.1, §5.2, §5.6, §5.7.
 
@@ -209,7 +209,7 @@ And this `new_string`:
 Run:
 
 ```bash
-grep -n "implement-plan" /Users/chris/Projects/claudna/skills/_shared/orchestration-guide.md | head -5
+grep -n "implement-plan" /path/to/clauDNA/skills/_shared/orchestration-guide.md | head -5
 ```
 
 Expected: `implement-plan` appears in the compatibility matrix row, alongside the new sub-section above.
@@ -217,7 +217,7 @@ Expected: `implement-plan` appears in the compatibility matrix row, alongside th
 Run:
 
 ```bash
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 Expected: `OK: N skills validated, no violations` (orchestration-guide.md is in `_shared/`, which the validator only lint-checks for stale paths — should still pass).
@@ -225,7 +225,7 @@ Expected: `OK: N skills validated, no violations` (orchestration-guide.md is in 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/_shared/orchestration-guide.md
 git commit -m "$(cat <<'EOF'
 docs: extend orchestration-guide §10 with Tier-3 sub-section
@@ -348,7 +348,7 @@ Emit the structured result block as the final output of the run:
 Run:
 
 ```bash
-grep -n "Structured Result Shape" /Users/chris/Projects/claudna/skills/_shared/orchestration-guide.md
+grep -n "Structured Result Shape" /path/to/clauDNA/skills/_shared/orchestration-guide.md
 ```
 
 Expected: one match showing the new heading.
@@ -356,7 +356,7 @@ Expected: one match showing the new heading.
 Run:
 
 ```bash
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 Expected: no violations.
@@ -364,7 +364,7 @@ Expected: no violations.
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/_shared/orchestration-guide.md
 git commit -m "$(cat <<'EOF'
 docs: define structured-result shape in orchestration-guide §10.C
@@ -479,8 +479,8 @@ If review cannot proceed (e.g., plan body is empty or unreadable), emit `outcome
 Run:
 
 ```bash
-grep -n "## --dispatch" /Users/chris/Projects/claudna/skills/adversarial-review/SKILL.md
-grep -n "Structured Result Emission" /Users/chris/Projects/claudna/skills/adversarial-review/SKILL.md
+grep -n "## --dispatch" /path/to/clauDNA/skills/adversarial-review/SKILL.md
+grep -n "Structured Result Emission" /path/to/clauDNA/skills/adversarial-review/SKILL.md
 ```
 
 Expected: both grep commands return one match each.
@@ -488,7 +488,7 @@ Expected: both grep commands return one match each.
 Run:
 
 ```bash
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 Expected: no violations.
@@ -496,7 +496,7 @@ Expected: no violations.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/adversarial-review/SKILL.md
 git commit -m "$(cat <<'EOF'
 feat(adversarial-review): make --dispatch non-interactive and emit structured result
@@ -644,8 +644,8 @@ If outcome is `blocked`, `decisions_unresolved` > 0 and `blocker_description` li
 Run:
 
 ```bash
-grep -n "## Autonomous Mode" /Users/chris/Projects/claudna/skills/weigh-development-paths/SKILL.md
-grep -n "argument-hint" /Users/chris/Projects/claudna/skills/weigh-development-paths/SKILL.md
+grep -n "## Autonomous Mode" /path/to/clauDNA/skills/weigh-development-paths/SKILL.md
+grep -n "argument-hint" /path/to/clauDNA/skills/weigh-development-paths/SKILL.md
 ```
 
 Expected: each returns at least one match.
@@ -653,7 +653,7 @@ Expected: each returns at least one match.
 Run:
 
 ```bash
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 Expected: no violations.
@@ -661,7 +661,7 @@ Expected: no violations.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/weigh-development-paths/SKILL.md
 git commit -m "$(cat <<'EOF'
 feat(weigh-development-paths): add --auto synthesis mode
@@ -738,7 +738,7 @@ And `new_string`:
 Run:
 
 ```bash
-grep -n "Emit the structured-result shape" /Users/chris/Projects/claudna/skills/tech-debt/SKILL.md
+grep -n "Emit the structured-result shape" /path/to/clauDNA/skills/tech-debt/SKILL.md
 ```
 
 Expected: one match.
@@ -746,7 +746,7 @@ Expected: one match.
 Run:
 
 ```bash
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 Expected: no violations.
@@ -754,7 +754,7 @@ Expected: no violations.
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/tech-debt/SKILL.md
 git commit -m "feat(tech-debt): emit §10.C structured result in --auto mode"
 ```
@@ -813,14 +813,14 @@ The `new_string`:
 Run:
 
 ```bash
-grep -n "Emit the structured-result shape" /Users/chris/Projects/claudna/skills/security-audit/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Emit the structured-result shape" /path/to/clauDNA/skills/security-audit/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 Expected: one grep match, validator passes.
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/security-audit/SKILL.md
 git commit -m "feat(security-audit): emit §10.C structured result in --auto mode"
 ```
@@ -875,12 +875,12 @@ Use Edit with `old_string`:
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "Emit the structured-result shape" /Users/chris/Projects/claudna/skills/product-enhance/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Emit the structured-result shape" /path/to/clauDNA/skills/product-enhance/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/product-enhance/SKILL.md
 git commit -m "feat(product-enhance): emit §10.C structured result in --auto mode"
 ```
@@ -936,12 +936,12 @@ Use Edit. `old_string`:
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "Emit the structured-result shape" /Users/chris/Projects/claudna/skills/frontend-performance-audit/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Emit the structured-result shape" /path/to/clauDNA/skills/frontend-performance-audit/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/frontend-performance-audit/SKILL.md
 git commit -m "feat(frontend-performance-audit): emit §10.C structured result in --auto mode"
 ```
@@ -1005,12 +1005,12 @@ Use Edit. `old_string`:
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "Emit the structured-result shape" /Users/chris/Projects/claudna/skills/docs-review/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Emit the structured-result shape" /path/to/clauDNA/skills/docs-review/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/docs-review/SKILL.md
 git commit -m "feat(docs-review): emit §10.C structured result in --auto mode"
 ```
@@ -1067,12 +1067,12 @@ Use Edit. `old_string`:
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "Emit the structured-result shape" /Users/chris/Projects/claudna/skills/access-path-audit/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Emit the structured-result shape" /path/to/clauDNA/skills/access-path-audit/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/access-path-audit/SKILL.md
 git commit -m "feat(access-path-audit): emit §10.C structured result in --auto mode"
 ```
@@ -1131,12 +1131,12 @@ Use Edit. `old_string`:
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "Emit the structured-result shape" /Users/chris/Projects/claudna/skills/product-vision/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Emit the structured-result shape" /path/to/clauDNA/skills/product-vision/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/product-vision/SKILL.md
 git commit -m "feat(product-vision): emit §10.C structured result in --auto mode"
 ```
@@ -1199,12 +1199,12 @@ Interactive mode (no `--auto`) does NOT emit the JSON block — it presents huma
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "Structured Result Emission" /Users/chris/Projects/claudna/skills/session-handoff/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Structured Result Emission" /path/to/clauDNA/skills/session-handoff/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/session-handoff/SKILL.md
 git commit -m "feat(session-handoff): emit §10.C structured result in --auto mode"
 ```
@@ -1265,12 +1265,12 @@ Use Edit. `old_string`:
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "Emit the structured-result shape" /Users/chris/Projects/claudna/skills/visual-crawl/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Emit the structured-result shape" /path/to/clauDNA/skills/visual-crawl/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/visual-crawl/SKILL.md
 git commit -m "feat(visual-crawl): emit §10.C structured result in --auto mode"
 ```
@@ -1292,8 +1292,8 @@ This task is OPTIONAL but recommended. It prevents future skills from claiming `
 Run:
 
 ```bash
-ls /Users/chris/Projects/claudna/scripts/
-cat /Users/chris/Projects/claudna/scripts/skill_checks.py | head -100
+ls /path/to/clauDNA/scripts/
+cat /path/to/clauDNA/scripts/skill_checks.py | head -100
 ```
 
 Note the existing check functions and the conventions for adding a new check.
@@ -1365,7 +1365,7 @@ Emit the structured-result shape per skills/_shared/orchestration-guide.md §10.
 Run the tests:
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 python3 -m pytest scripts/test_skill_checks.py -v
 ```
 
@@ -1408,7 +1408,7 @@ def has_structured_result_emission(skill_md_path) -> bool:
 - [ ] **Step 4: Run the tests to confirm they pass**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 python3 -m pytest scripts/test_skill_checks.py -v
 ```
 
@@ -1450,7 +1450,7 @@ from skill_checks import (
 - [ ] **Step 6: Run the full validator against the repo**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 python3 scripts/validate-skills.py
 ```
 
@@ -1459,7 +1459,7 @@ Expected: all 9 `--auto` skills pass (because Tasks 6-14 added the emission). If
 - [ ] **Step 7: Commit**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add scripts/validate-skills.py scripts/skill_checks.py scripts/test_skill_checks.py
 git commit -m "$(cat <<'EOF'
 test: add validator check for structured-result emission
@@ -1500,7 +1500,7 @@ Find the existing `## [Unreleased]` section (or add one at the top under the tit
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add CHANGELOG.md
 git commit -m "docs(changelog): record Phase 1 autonomous-mode contract changes"
 ```
@@ -1516,7 +1516,7 @@ After all tasks complete, run end-to-end verification.
 - [ ] **Step 1: Run the full validator**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 python3 scripts/validate-skills.py
 ```
 
@@ -1541,7 +1541,7 @@ Do the same spot-check for `/claudna:adversarial-review` (confirm `--dispatch` n
 - [ ] **Step 4: Run the validator with the optional structured-result check if Task 15 was implemented**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 python3 scripts/validate-skills.py
 ```
 
@@ -1550,7 +1550,7 @@ Expected: still passes (all 9 skills emit the structured result now).
 - [ ] **Step 5: Push for review**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git push -u origin <branch-name>
 gh pr create --title "Phase 1: Autonomous-mode contract & structured result shape" \
   --body "$(cat <<'EOF'

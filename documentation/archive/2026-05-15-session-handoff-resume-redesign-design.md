@@ -58,7 +58,7 @@ The handoff is keyed by **cwd** — the working directory of the Claude Code pro
 
 ```markdown
 ---
-cwd: /Users/chris/Projects/clauDNA
+cwd: /path/to/clauDNA
 last_updated: 2026-05-15T14:30:00Z
 schema_version: 2
 ---

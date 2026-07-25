@@ -21,7 +21,7 @@ links: []
 
 **Tech Stack:** Markdown only.
 
-**Repo:** clauDNA (`/Users/chris/Projects/claudna`)
+**Repo:** clauDNA (`/path/to/clauDNA`)
 
 **Prerequisites:**
 - Phase 1 merged: `/claudna:weigh-development-paths --auto` exists; structured-result shape is documented; `/claudna:adversarial-review --dispatch` is non-interactive.
@@ -153,12 +153,12 @@ Use Edit. `old_string`:
 - [ ] **Step 3: Verify and commit**
 
 ```bash
-grep -n "auto.*Fully non-interactive" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "auto.*Fully non-interactive" /path/to/clauDNA/skills/implement-plan/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/implement-plan/SKILL.md
 git commit -m "feat(implement-plan): add --auto argument to frontmatter and Arguments section"
 ```
@@ -317,15 +317,15 @@ When `outcome != "completed"`, populate `blocker_description` with 1-2 sentences
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "## Autonomous Mode" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-grep -n "Synthesis pass" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "## Autonomous Mode" /path/to/clauDNA/skills/implement-plan/SKILL.md
+grep -n "Synthesis pass" /path/to/clauDNA/skills/implement-plan/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 Expected: matches found, validator passes.
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/implement-plan/SKILL.md
 git commit -m "$(cat <<'EOF'
 docs(implement-plan): add canonical Autonomous Mode reference section
@@ -403,12 +403,12 @@ Do NOT attempt to write code or branch. Do NOT attempt heuristic expansion in `-
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "Step 1.5: Plan-Detail Check" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Step 1.5: Plan-Detail Check" /path/to/clauDNA/skills/implement-plan/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/implement-plan/SKILL.md
 git commit -m "$(cat <<'EOF'
 feat(implement-plan): add Step 1.5 plan-detail check
@@ -517,12 +517,12 @@ Add a `needs-input` label to the issue via `gh issue edit <number> --add-label "
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "Step 2.5: Scope-Expansion Tripwire" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Step 2.5: Scope-Expansion Tripwire" /path/to/clauDNA/skills/implement-plan/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/implement-plan/SKILL.md
 git commit -m "$(cat <<'EOF'
 feat(implement-plan): add Step 2.5 scope-expansion tripwire
@@ -711,13 +711,13 @@ In `--auto` mode, Step 3 is replaced by the Step 3-AUTO synthesis pass above. 3A
 - [ ] **Step 3: Verify and commit**
 
 ```bash
-grep -n "Step 3-AUTO" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-grep -n "Synthesis pass" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Step 3-AUTO" /path/to/clauDNA/skills/implement-plan/SKILL.md
+grep -n "Synthesis pass" /path/to/clauDNA/skills/implement-plan/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/implement-plan/SKILL.md
 git commit -m "$(cat <<'EOF'
 feat(implement-plan): add --auto Step 3 synthesis pass
@@ -805,12 +805,12 @@ This makes the work visible without prematurely opening a PR with incomplete con
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "Mode branch for" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Mode branch for" /path/to/clauDNA/skills/implement-plan/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/implement-plan/SKILL.md
 git commit -m "feat(implement-plan): in --auto, 'feels wrong' exits outcome: blocked"
 ```
@@ -876,12 +876,12 @@ Do NOT open a PR in this case. Push the branch (`git push -u origin implement/<s
 - [ ] **Step 3: Verify and commit**
 
 ```bash
-grep -n "verification_failed_after_revert" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "verification_failed_after_revert" /path/to/clauDNA/skills/implement-plan/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/implement-plan/SKILL.md
 git commit -m "feat(implement-plan): handle persistent verification failure post-revert in --auto"
 ```
@@ -936,12 +936,12 @@ Substitute the bracketed text per the actual run.
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "Opened by \`/claudna:implement-plan --auto\`" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Opened by \`/claudna:implement-plan --auto\`" /path/to/clauDNA/skills/implement-plan/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/implement-plan/SKILL.md
 git commit -m "feat(implement-plan): in --auto, add bot-opened footer to PR body"
 ```
@@ -988,12 +988,12 @@ Tell the user: **"Say `merge` to merge and wrap up, or `stop` to end here."**
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "SKIPPED ENTIRELY" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "SKIPPED ENTIRELY" /path/to/clauDNA/skills/implement-plan/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/implement-plan/SKILL.md
 git commit -m "feat(implement-plan): skip Step 8 merge gate entirely in --auto"
 ```
@@ -1070,12 +1070,12 @@ For non-`completed` outcomes (`bypassed`, `blocked`, `needs-input`, `partial`), 
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "Implemented '" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Implemented '" /path/to/clauDNA/skills/implement-plan/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/implement-plan/SKILL.md
 git commit -m "feat(implement-plan): emit §10.C structured result in --auto Step 9"
 ```
@@ -1170,13 +1170,13 @@ If `--auto` is set, EXIT with `outcome: "blocked"`, `blocker_description: "--sou
 - [ ] **Step 3: Verify and commit**
 
 ```bash
-grep -n "directory source not supported in --auto" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-grep -n "no source provided in --auto" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "directory source not supported in --auto" /path/to/clauDNA/skills/implement-plan/SKILL.md
+grep -n "no source provided in --auto" /path/to/clauDNA/skills/implement-plan/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/implement-plan/SKILL.md
 git commit -m "feat(implement-plan): disallow picker/queue modes in --auto"
 ```
@@ -1403,7 +1403,7 @@ digraph implement_plan {
 - [ ] **Step 3: Verify the DOT block parses (optional, requires graphviz)**
 
 ```bash
-sed -n '/```dot/,/```/p' /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md | sed '1d;$d' > /tmp/implement-plan-flow.dot
+sed -n '/```dot/,/```/p' /path/to/clauDNA/skills/implement-plan/SKILL.md | sed '1d;$d' > /tmp/implement-plan-flow.dot
 dot -Tsvg /tmp/implement-plan-flow.dot -o /tmp/implement-plan-flow.svg
 ```
 
@@ -1412,7 +1412,7 @@ If `dot` is installed, open the SVG to visually verify. If not, skip — the val
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 python3 scripts/validate-skills.py
 git add skills/implement-plan/SKILL.md
 git commit -m "docs(implement-plan): rewrite flowchart for --auto branches"
@@ -1528,7 +1528,7 @@ Add to the `## [Unreleased]` section:
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add CHANGELOG.md
 git commit -m "docs(changelog): record Phase 3 --auto additions to /implement-plan"
 ```
@@ -1542,18 +1542,18 @@ git commit -m "docs(changelog): record Phase 3 --auto additions to /implement-pl
 - [ ] **Step 1: Validator passes**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 python3 scripts/validate-skills.py
 ```
 
 - [ ] **Step 2: All new sections present**
 
 ```bash
-grep -c "## Autonomous Mode" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-grep -c "Step 1.5:" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-grep -c "Step 2.5:" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-grep -c "Step 3-AUTO:" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-grep -c "SKIPPED ENTIRELY" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
+grep -c "## Autonomous Mode" /path/to/clauDNA/skills/implement-plan/SKILL.md
+grep -c "Step 1.5:" /path/to/clauDNA/skills/implement-plan/SKILL.md
+grep -c "Step 2.5:" /path/to/clauDNA/skills/implement-plan/SKILL.md
+grep -c "Step 3-AUTO:" /path/to/clauDNA/skills/implement-plan/SKILL.md
+grep -c "SKIPPED ENTIRELY" /path/to/clauDNA/skills/implement-plan/SKILL.md
 ```
 
 Expected: each at least 1.
@@ -1565,7 +1565,7 @@ Confirm Task 14's smoke tests passed (or any deviations documented). The phase i
 - [ ] **Step 4: Push for review**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git push -u origin <branch-name>
 gh pr create --title "Phase 3: /implement-plan --auto mode" \
   --body "$(cat <<'EOF'

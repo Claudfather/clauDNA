@@ -21,7 +21,7 @@ links: []
 
 **Tech Stack:** Markdown only.
 
-**Repo:** clauDNA (`/Users/chris/Projects/claudna`)
+**Repo:** clauDNA (`/path/to/clauDNA`)
 
 **Prerequisites:**
 - Phase 1 must be merged. The structured-result shape and `/claudna:adversarial-review --dispatch` non-interactive mode are required.
@@ -203,8 +203,8 @@ Findings sorted by severity (critical → high → medium → low → info).
 - [ ] **Step 2: Verify the file is well-formed**
 
 ```bash
-ls -la /Users/chris/Projects/claudna/skills/_shared/subagent-prompts/
-wc -l /Users/chris/Projects/claudna/skills/_shared/subagent-prompts/adversarial-chain.md
+ls -la /path/to/clauDNA/skills/_shared/subagent-prompts/
+wc -l /path/to/clauDNA/skills/_shared/subagent-prompts/adversarial-chain.md
 ```
 
 Expected: file exists, ~80 lines.
@@ -212,7 +212,7 @@ Expected: file exists, ~80 lines.
 Run the validator:
 
 ```bash
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 Expected: no violations. The `_shared/` directory is lint-checked for stale paths only.
@@ -220,7 +220,7 @@ Expected: no violations. The `_shared/` directory is lint-checked for stale path
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/_shared/subagent-prompts/adversarial-chain.md
 git commit -m "$(cat <<'EOF'
 docs: add shared adversarial-chain subagent dispatch prompt
@@ -311,12 +311,12 @@ Having /simplify's edits in their own commit makes revert trivial (`git reset --
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-ls -la /Users/chris/Projects/claudna/skills/_shared/subagent-prompts/
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+ls -la /path/to/clauDNA/skills/_shared/subagent-prompts/
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/_shared/subagent-prompts/simplify-chain.md
 git commit -m "docs: add shared simplify-chain dispatch prompt"
 ```
@@ -383,14 +383,14 @@ If Phase 2 produced zero phase docs (no findings worth a plan), skip Phase 2.5 e
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "Phase 2.5: Adversarial Review Pass" /Users/chris/Projects/claudna/skills/tech-debt/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Phase 2.5: Adversarial Review Pass" /path/to/clauDNA/skills/tech-debt/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 Expected: one match, validator passes.
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/tech-debt/SKILL.md
 git commit -m "$(cat <<'EOF'
 feat(tech-debt): add adversarial-review chain after plan generation
@@ -463,12 +463,12 @@ Same as Phase 1 contract — see `skills/tech-debt/SKILL.md` Phase 2.5 for the p
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "Phase 2.5: Adversarial Review Pass" /Users/chris/Projects/claudna/skills/security-audit/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Phase 2.5: Adversarial Review Pass" /path/to/clauDNA/skills/security-audit/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/security-audit/SKILL.md
 git commit -m "feat(security-audit): add adversarial-review chain after plan generation"
 ```
@@ -529,12 +529,12 @@ Apply in all modes (interactive, `--auto`). Skip only if Phase 5 generated zero 
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "Step 5.5: Adversarial Review Pass" /Users/chris/Projects/claudna/skills/product-enhance/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Step 5.5: Adversarial Review Pass" /path/to/clauDNA/skills/product-enhance/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/product-enhance/SKILL.md
 git commit -m "feat(product-enhance): add adversarial-review chain after design doc generation"
 ```
@@ -604,12 +604,12 @@ Parallel dispatch and `--output github` adaptation: same as Phase 1 contract —
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "Phase 4.5: Adversarial Review Pass" /Users/chris/Projects/claudna/skills/frontend-performance-audit/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Phase 4.5: Adversarial Review Pass" /path/to/clauDNA/skills/frontend-performance-audit/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/frontend-performance-audit/SKILL.md
 git commit -m "feat(frontend-performance-audit): add adversarial-review chain after plan generation"
 ```
@@ -678,12 +678,12 @@ If Step 5 identified zero gaps requiring new content, skip Step 5.5.
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "Step 5.5: Adversarial Review Pass" /Users/chris/Projects/claudna/skills/docs-review/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Step 5.5: Adversarial Review Pass" /path/to/clauDNA/skills/docs-review/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/docs-review/SKILL.md
 git commit -m "feat(docs-review): add adversarial-review chain on gap proposals"
 ```
@@ -741,12 +741,12 @@ Parallel dispatch and `--output github` adaptation: see `skills/tech-debt/SKILL.
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "Phase 2.5: Adversarial Review Pass" /Users/chris/Projects/claudna/skills/access-path-audit/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Phase 2.5: Adversarial Review Pass" /path/to/clauDNA/skills/access-path-audit/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/access-path-audit/SKILL.md
 git commit -m "feat(access-path-audit): add adversarial-review chain after plan generation"
 ```
@@ -865,15 +865,15 @@ In `--auto` mode (added by Phase 3), Step 3 is replaced entirely by a synthesis 
 - [ ] **Step 3: Verify and commit**
 
 ```bash
-grep -n "Step 3A:" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-grep -n "Step 3B:" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Step 3A:" /path/to/clauDNA/skills/implement-plan/SKILL.md
+grep -n "Step 3B:" /path/to/clauDNA/skills/implement-plan/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 Expected: both grep commands return one match each, validator passes.
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/implement-plan/SKILL.md
 git commit -m "$(cat <<'EOF'
 feat(implement-plan): split Step 3 challenge round into 3A (seed) + 3B (matrix)
@@ -981,12 +981,12 @@ git reset --hard HEAD~1
 - [ ] **Step 3: Verify and commit**
 
 ```bash
-grep -n "Step 6.5: Simplification Pass" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Step 6.5: Simplification Pass" /path/to/clauDNA/skills/implement-plan/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/implement-plan/SKILL.md
 git commit -m "$(cat <<'EOF'
 feat(implement-plan): add Step 6.5 simplification pass
@@ -1093,9 +1093,9 @@ Replace with:
 - [ ] **Step 3: Verify the dot block is well-formed**
 
 ```bash
-grep -A 1 "step3a" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md | head -10
-grep "step6_5" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -A 1 "step3a" /path/to/clauDNA/skills/implement-plan/SKILL.md | head -10
+grep "step6_5" /path/to/clauDNA/skills/implement-plan/SKILL.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 Expected: matches found, validator passes.
@@ -1103,7 +1103,7 @@ Expected: matches found, validator passes.
 Optionally render the dot block to visually verify (requires graphviz installed):
 
 ```bash
-sed -n '/```dot/,/```/p' /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md | sed '1d;$d' > /tmp/implement-plan-flow.dot
+sed -n '/```dot/,/```/p' /path/to/clauDNA/skills/implement-plan/SKILL.md | sed '1d;$d' > /tmp/implement-plan-flow.dot
 dot -Tsvg /tmp/implement-plan-flow.dot -o /tmp/implement-plan-flow.svg
 ```
 
@@ -1112,7 +1112,7 @@ Open the SVG in a browser to confirm the flowchart is coherent. If `dot` is not 
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/implement-plan/SKILL.md
 git commit -m "docs(implement-plan): update flowchart for Step 3A/3B split and Step 6.5"
 ```
@@ -1151,12 +1151,12 @@ If a finding's `concern_area` does not have a direct matrix category, fall back 
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-grep -n "Concern-Area Alignment" /Users/chris/Projects/claudna/skills/implement-plan/challenge-round-questions.md
-python3 /Users/chris/Projects/claudna/scripts/validate-skills.py
+grep -n "Concern-Area Alignment" /path/to/clauDNA/skills/implement-plan/challenge-round-questions.md
+python3 /path/to/clauDNA/scripts/validate-skills.py
 ```
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add skills/implement-plan/challenge-round-questions.md
 git commit -m "docs(implement-plan): note concern-area alignment between matrix and adversarial-review"
 ```
@@ -1190,7 +1190,7 @@ Add to the `## [Unreleased]` section (under `### Added` or create as needed):
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git add CHANGELOG.md
 git commit -m "docs(changelog): record Phase 2 discipline chain additions"
 ```
@@ -1204,7 +1204,7 @@ git commit -m "docs(changelog): record Phase 2 discipline chain additions"
 - [ ] **Step 1: Run the validator**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 python3 scripts/validate-skills.py
 ```
 
@@ -1215,7 +1215,7 @@ Expected: `OK: N skills validated, no violations`.
 ```bash
 for skill in tech-debt security-audit product-enhance frontend-performance-audit docs-review access-path-audit; do
   echo "=== $skill ==="
-  grep -c "Adversarial Review Pass" /Users/chris/Projects/claudna/skills/$skill/SKILL.md
+  grep -c "Adversarial Review Pass" /path/to/clauDNA/skills/$skill/SKILL.md
 done
 ```
 
@@ -1224,9 +1224,9 @@ Expected: each prints `1`.
 - [ ] **Step 3: Confirm `/implement-plan` has Step 3A, 3B, and 6.5**
 
 ```bash
-grep -c "Step 3A:" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-grep -c "Step 3B:" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
-grep -c "Step 6.5:" /Users/chris/Projects/claudna/skills/implement-plan/SKILL.md
+grep -c "Step 3A:" /path/to/clauDNA/skills/implement-plan/SKILL.md
+grep -c "Step 3B:" /path/to/clauDNA/skills/implement-plan/SKILL.md
+grep -c "Step 6.5:" /path/to/clauDNA/skills/implement-plan/SKILL.md
 ```
 
 Expected: each prints `1`.
@@ -1234,7 +1234,7 @@ Expected: each prints `1`.
 - [ ] **Step 4: Confirm shared dispatch prompts exist**
 
 ```bash
-ls /Users/chris/Projects/claudna/skills/_shared/subagent-prompts/
+ls /path/to/clauDNA/skills/_shared/subagent-prompts/
 ```
 
 Expected: `adversarial-chain.md` and `simplify-chain.md` both present.
@@ -1242,7 +1242,7 @@ Expected: `adversarial-chain.md` and `simplify-chain.md` both present.
 - [ ] **Step 5: Push for review**
 
 ```bash
-cd /Users/chris/Projects/claudna
+cd /path/to/clauDNA
 git push -u origin <branch-name>
 gh pr create --title "Phase 2: clauDNA discipline chains (adversarial-review + /simplify)" \
   --body "$(cat <<'EOF'
