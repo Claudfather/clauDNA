@@ -10,6 +10,16 @@ Any panel lens dispatched by `/claudna:ironclad` — the panel-internal lens fil
 
 `/claudna:ironclad` — reads `result.md` files from the scratch directory, parses YAML frontmatter and markdown body, aggregates findings across lenses, and posts to the target Issue or PR. A fleet override (compositor-injected) substitutes the dispatch step only; lens addressing post-P6 is by panel-file path (`skills/ironclad/lenses/<name>.md`), not skill name — an *absent* protocol (or `FLEET_STATE_PATH` set with no protocol) degrades safely to subagent mode with the loud mode indicator; a present-but-stale protocol runs in fleet mode and recovers per-lens via the Phase-6 retry.
 
+## Dispatch Rules
+
+Every panel lens runs dispatched, non-interactively. The dispatcher provides the source (plan document path or PR URL/source file) and the result path; the lens then follows the discipline below. Lens files reference this section rather than restating it, carrying only their own blocked condition.
+
+- **Do NOT call `EnterPlanMode`.** The dispatcher owns the lifecycle.
+- **Do NOT call `AskUserQuestion`.** No human is present.
+- **Do NOT prompt for clarification.** If the source is too incomplete to assess, emit `status: blocked` with a description of what is missing. Each lens declares its own blocked condition (see the lens file).
+- Execute the lens procedure silently.
+- Emit the structured markdown result as the FINAL output and stop. No text after the result document.
+
 ## Emission Rules (Producer Side)
 
 - The producer writes a single markdown file with YAML frontmatter to the path specified by the dispatcher (typically `RESULT_PATH`).

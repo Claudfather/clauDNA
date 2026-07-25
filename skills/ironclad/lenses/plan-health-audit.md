@@ -11,12 +11,9 @@ Most checks in this lens are deterministic -- section presence, frontmatter comp
 
 ## Dispatch Rules
 
-- The dispatcher provides the plan document path and the result path.
-- **Do NOT call `EnterPlanMode`.** The dispatcher owns the lifecycle.
-- **Do NOT call `AskUserQuestion`.** No human is present.
-- **Do NOT prompt for clarification.** If the plan is unreadable or not a markdown document, emit `status: blocked` with a description of what is wrong.
-- Execute the procedure below silently.
-- Emit the structured markdown result as the FINAL output and stop. No text after the result document.
+Follow the dispatch discipline in `skills/_shared/contracts/lens-result-contract.md` (§ Dispatch Rules): run non-interactively (no `EnterPlanMode`, no `AskUserQuestion`), execute silently, and emit the structured result as the FINAL output with no text after it.
+
+**Blocked condition:** If the plan is unreadable or not a markdown document, emit `status: blocked` with a description of what is wrong.
 
 ## Procedure
 
@@ -222,8 +219,6 @@ Map findings to body sections:
 | **Observations** | None-identified density below threshold; minor numbering inconsistencies; health verdict summary |
 
 ## Structured Result Emission
-
-After Step 11, emit a single markdown document with YAML frontmatter as the FINAL output. No text before or after this document.
 
 **Format:** Follow the canonical schema at `skills/_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all panel lens output.
 

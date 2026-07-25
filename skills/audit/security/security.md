@@ -14,7 +14,7 @@ Invoked by /claudna:audit in security mode — scan the codebase for security vu
 
 Follow these steps exactly in order.
 
-**Enter Plan Mode.** Call `EnterPlanMode` to enter deliberation mode. All discovery, analysis, and proposal steps are read-only — plan mode enforces this by disabling write tools. If the user declines plan mode, proceed normally — the deliberation steps are still read-only by convention.
+**Enter Plan Mode.** Call `EnterPlanMode` per `skills/_shared/audit-lens-contract.md` §6 — the discovery, analysis, and proposal steps below are read-only.
 
 ---
 
@@ -34,7 +34,7 @@ Present the findings table and ask:
 
 Do NOT proceed to Phase 2 without explicit confirmation.
 
-**Exit Plan Mode.** Call `ExitPlanMode` to transition to execution mode. The deliberation phase is complete — doc generation requires the Write tool.
+**Exit Plan Mode.** Call `ExitPlanMode` per `skills/_shared/audit-lens-contract.md` §6 — doc generation past this point requires the Write tool.
 
 ---
 
@@ -139,7 +139,7 @@ Then tell the user:
 
 **"Plans are ready. Run `/claudna:implement-plan documentation/planning/security/<session>/` to start building — it will handle challenge review, branching, implementation, and PRs for each phase doc."**
 
-**This lens produces plans, not code.** Implementation is always handled by `/claudna:implement-plan`, which provides its own challenge round, verification, and PR workflow. Do NOT build, branch, or create PRs from this lens.
+**This lens produces plans, not code** — see the shared reminder in `skills/_shared/orchestration-guide.md` §11: build, branch, and PR steps are always `/claudna:implement-plan`'s job.
 
 ---
 
@@ -178,7 +178,7 @@ When `--auto` is set (implies `--output github`; see the lens contract §4 and o
 5. Skip LOW/INFO findings unless particularly noteworthy
 6. Return structured summary for audit tracking
 7. **Security-specific:** Never include a raw secret value in issue bodies — scrub the doc with the redactor (`python3 scripts/redact.py <file>`; path per orchestration-guide §7) before publishing, and report file:line + variable name only.
-8. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after (skill `audit`, lens inside `artifacts`, per the lens contract §4):
+8. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
 ```json
 {

@@ -31,3 +31,11 @@ Every lens accepts, via the engine:
 ## 5. Orchestration
 
 Lenses that fan out (multi-area scans, per-repo sweeps) follow `skills/_shared/orchestration-guide.md`: research subagents write findings to the scratch dir, the lens procedure aggregates; subagents never return long results through the orchestrator's context. Lens procedures reference their own `subagent-prompts.md` where one exists.
+
+## 6. Plan-mode discipline (interactive lenses)
+
+Interactive lenses (every mode except `--auto`, which §4 governs) bracket their read-only deliberation with plan mode: all scan, analysis, and proposal steps sit between the Enter and Exit calls. Each lens references the two paragraphs below rather than restating them.
+
+**Enter Plan Mode.** Call `EnterPlanMode` to enter deliberation mode. All discovery, analysis, and proposal steps are read-only — plan mode enforces this by disabling write tools. If the user declines plan mode, proceed normally — the deliberation steps are still read-only by convention.
+
+**Exit Plan Mode.** Call `ExitPlanMode` to transition to execution mode. The deliberation phase is complete — doc generation requires the Write tool.

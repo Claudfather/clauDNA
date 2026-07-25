@@ -30,7 +30,7 @@ Not every difference across access paths is a bug. A CLI having no auth is corre
 
 Follow these steps exactly in order.
 
-**Enter Plan Mode.** Call `EnterPlanMode` to enter deliberation mode. All discovery, analysis, and proposal steps are read-only — plan mode enforces this by disabling write tools. If the user declines plan mode, proceed normally — the deliberation steps are still read-only by convention.
+**Enter Plan Mode.** Call `EnterPlanMode` per `skills/_shared/audit-lens-contract.md` §6 — the discovery, analysis, and proposal steps below are read-only.
 
 Do NOT read CLAUDE.md or MEMORY.md — already in system prompt.
 
@@ -129,7 +129,7 @@ Present the findings and ask:
 
 Do NOT proceed to Phase 2 without explicit confirmation.
 
-**Exit Plan Mode.** Call `ExitPlanMode` to transition to execution mode. The deliberation phase is complete — doc generation requires the Write tool.
+**Exit Plan Mode.** Call `ExitPlanMode` per `skills/_shared/audit-lens-contract.md` §6 — doc generation past this point requires the Write tool.
 
 ---
 
@@ -251,7 +251,7 @@ Then tell the user:
 
 **"Plans are ready. Run `/claudna:implement-plan documentation/planning/access-paths/<session>/` to start building — it will handle challenge review, branching, implementation, and PRs for each phase doc."**
 
-**This lens produces plans, not code.** Implementation is always handled by `/claudna:implement-plan`, which provides its own challenge round, verification, and PR workflow. Do NOT build, branch, or create PRs from this lens.
+**This lens produces plans, not code** — see the shared reminder in `skills/_shared/orchestration-guide.md` §11: build, branch, and PR steps are always `/claudna:implement-plan`'s job.
 
 ---
 
