@@ -11,7 +11,7 @@ Templates for the deep-dive comparison subagent (Step 5) and the ADOPT / ENHANCE
 > **Foreign item:** Read the full source. If API mode, fetch via `gh api repos/<org>/<repo>/contents/<path>` or WebFetch on `https://raw.githubusercontent.com/<org>/<repo>/<branch>/<path>`. If local mode, read from `/tmp/heist-<timestamp>/repo/<path>`.
 > Also read the scout's research file at `/tmp/heist-<timestamp>/research/<relevant-scout>.md` for additional context.
 >
-> **Our equivalent:** Read `~/.claude/skills/<similar-skill>/SKILL.md`
+> **Our equivalent:** Read `skills/<similar-skill>/SKILL.md` in the clauDNA repo checkout
 > [Or: "We have nothing similar — this is a potential adoption target."]
 >
 > **Write comparison to:** `/tmp/heist-<timestamp>/comparisons/<item-slug>.md` using the Write tool. (The Write tool creates parent directories automatically — do not use `mkdir`.)
@@ -60,9 +60,9 @@ Source: https://github.com/org/repo — [specific file path]
 >
 > **Read:** `/tmp/heist-<timestamp>/comparisons/<item-slug>.md` for the full comparison.
 > **Read:** The foreign source file(s). If API mode, fetch via `gh api` or WebFetch. If local mode, read from `/tmp/heist-<timestamp>/repo/<path>`.
-> **Read:** 2-3 existing clauDNA skills from `~/.claude/skills/` to match conventions.
+> **Read:** 2-3 existing clauDNA skills from `skills/` in the repo to match conventions.
 >
-> **Write to:** `~/.claude/skills/<name>/SKILL.md`
+> **Write to:** `skills/<name>/SKILL.md` (new skill directory in the repo)
 >
 > **Follow these conventions:**
 > - YAML frontmatter with `name`, `description` (starts with "Use when..."), `allowed-tools`
@@ -84,10 +84,10 @@ Source: https://github.com/org/repo — [specific file path]
 > Enhance an existing clauDNA skill based on the comparison report.
 >
 > **Read:** `/tmp/heist-<timestamp>/comparisons/<item-slug>.md` for the full comparison.
-> **Read:** The existing skill at `~/.claude/skills/<name>/SKILL.md`.
+> **Read:** The existing skill at `skills/<name>/SKILL.md`.
 > **Read:** The foreign source. If API mode, fetch via `gh api` or WebFetch. If local mode, read from `/tmp/heist-<timestamp>/repo/<path>`.
 >
-> **Edit:** `~/.claude/skills/<name>/SKILL.md` using the Edit tool.
+> **Edit:** `skills/<name>/SKILL.md` using the Edit tool.
 >
 > **Rules:**
 > - Add specific improvements identified in the comparison — do not rewrite the whole skill
