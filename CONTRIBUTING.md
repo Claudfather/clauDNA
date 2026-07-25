@@ -43,7 +43,7 @@ No build step. The repo is a Claude Code plugin — skills are markdown files, h
 
 2. **Edit the source files.** The repo structure:
    - `skills/<name>/SKILL.md` — skill definitions (see [SKILL_CONTRACT.md](./SKILL_CONTRACT.md))
-   - `agents/` — agent persona definitions
+   - `agents/` — agent persona definitions (see [AGENT_CONTRACT.md](./AGENT_CONTRACT.md))
    - `plugin-hooks/` — hook scripts + `hooks.json` wiring
    - `scripts/` — validation and release tooling
 

@@ -170,6 +170,8 @@ Specialized personas invoked by skills or directly:
 "Use railway-ops to diagnose the deployment failure"
 "Use vercel-ops to investigate the 500 errors"
 "Use modal-ops to check GPU utilization"
+"Use code-reviewer to assess this PR for correctness and test coverage"
+"Use spec-reviewer to verify the implementation matches the plan"
 ```
 
 ## Safety
@@ -202,6 +204,7 @@ Quick version: branch off `main`, make your change, run `python3 scripts/validat
 | [PROJECT_MISSION.md](./PROJECT_MISSION.md) | What clauDNA is, what it's becoming, and where it fits in the Claudfather ecosystem |
 | [CLAUDE.md](./CLAUDE.md) | Operating rules for agents extending clauDNA |
 | [SKILL_CONTRACT.md](./SKILL_CONTRACT.md) | The binding contract every skill must satisfy. Enforced in CI by `scripts/validate-skills.py` |
+| [AGENT_CONTRACT.md](./AGENT_CONTRACT.md) | The binding contract every agent must satisfy. Enforced in CI by `scripts/validate-agents.py` |
 | [SETUP_GUIDE.md](./SETUP_GUIDE.md) | Deep-dive setup — settings.json bootstrap, headless/CI provisioning, Snowflake key-pair auth, troubleshooting |
 | [SKILL_AUTHORING_GUIDE.md](./documentation/guides/SKILL_AUTHORING_GUIDE.md) | How to write, test, and submit a skill — patterns, examples, anti-patterns |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | Contribution workflow — bug reports, PRs, testing requirements |
