@@ -29,8 +29,8 @@ Make every clauDNA procedural skill invocable from headless orchestration with a
 
 | Phase | Repo | Working directory |
 |---|---|---|
-| 1, 2, 3 | clauDNA | `/Users/chris/Projects/claudna` |
-| 4 | claudlobby | `/Users/chris/Projects/claudlobby` |
+| 1, 2, 3 | clauDNA | `/path/to/clauDNA` |
+| 4 | claudlobby | `/path/to/claudlobby` |
 
 ## Phases and dependency order
 
