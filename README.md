@@ -208,5 +208,4 @@ Quick version: branch off `main`, make your change, run `python3 scripts/validat
 | [SETUP_GUIDE.md](./SETUP_GUIDE.md) | Deep-dive setup — settings.json bootstrap, headless/CI provisioning, Snowflake key-pair auth, troubleshooting |
 | [SKILL_AUTHORING_GUIDE.md](./documentation/guides/SKILL_AUTHORING_GUIDE.md) | How to write, test, and submit a skill — patterns, examples, anti-patterns |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | Contribution workflow — bug reports, PRs, testing requirements |
-| [CLAUDE_MD_TEMPLATE.md](./CLAUDE_MD_TEMPLATE.md) | Template for project-level `CLAUDE.md` files (used by `/claudna:init-project`) |
 | [CHANGELOG.md](./CHANGELOG.md) | All notable changes |
