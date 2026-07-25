@@ -70,7 +70,7 @@ No build step. The repo is a Claude Code plugin — skills are markdown files, h
 Every skill must satisfy [SKILL_CONTRACT.md](./SKILL_CONTRACT.md). The short version:
 
 - Lives in `skills/<name>/SKILL.md`
-- Starts with YAML frontmatter: `name` (must match directory), `description` (20-500 chars, starts with "Use when...")
+- Starts with YAML frontmatter: `name` (must match directory), `description` (20-500 chars, begins with `Use ` — when/at/before/after/to, per SKILL_CONTRACT §2.1 rule 1)
 - Body is at least 200 characters of markdown
 - No hardcoded paths to `~/.claude/skills/`, `~/.claude/commands/`, or `~/.claude/agents/`
 - `name` is globally unique across the repo

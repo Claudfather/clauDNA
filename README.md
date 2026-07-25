@@ -13,7 +13,7 @@ Inside Claude Code:
 /plugin install claudna@Claudfather
 ```
 
-That's it. Skills become available as `/claudna:<skill-name>` (namespaced under the plugin). Tab completion works — type `/claudna:` and press Tab to browse, or `/claudna:tech` and Tab to narrow. Hooks (auto-format, pretooluse permission expansion, notifications) activate automatically when the plugin is enabled.
+That's it. Skills become available as `/claudna:<skill-name>` (namespaced under the plugin). Tab completion works — type `/claudna:` and press Tab to browse, or `/claudna:au` and Tab to narrow. Hooks (auto-format, pretooluse permission expansion, notifications) activate automatically when the plugin is enabled.
 
 ### After install
 
@@ -180,7 +180,7 @@ The marketplace install is managed by Claude Code: plugins live under `~/.claude
 
 **Never touched by claudna:**
 - `~/.claude/settings.json` — user-managed. claudna never writes here. Recommended snippets are documented in SETUP_GUIDE for you to merge manually.
-- `~/.claude/notes/` — your personal files. claudna never reads or writes here.
+- `~/.claude/notes/` — your personal files. claudna never writes here; the session engine's resume mode reads legacy `notes/projects/<slug>/context-resume.md` handoffs as a one-shot migration fallback.
 
 ## Project Template
 

@@ -62,4 +62,4 @@ The content requirements, at minimum:
 8. **Verification Checklist** — tests to run, commands to execute, things to manually check
 9. **"What NOT To Do" Section** — common pitfalls, anti-patterns, things that look right but are wrong
 
-**Note:** Some skills have domain-specific sections that replace or augment items above (e.g., Visual Specification and Accessibility Checklist for design-review, or Root Cause Explanation and cascade diagrams for frontend-performance-audit). When a skill specifies custom sections, Plan agents should use those in place of or in addition to the defaults.
+**Note:** Some skills have domain-specific sections that replace or augment items above (e.g., Visual Specification and Accessibility Checklist for the `/audit` design lens, or Root Cause Explanation and cascade diagrams for the `/audit` frontend-perf lens). When a skill specifies custom sections, Plan agents should use those in place of or in addition to the defaults.
