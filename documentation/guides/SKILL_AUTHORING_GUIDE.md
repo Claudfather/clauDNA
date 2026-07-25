@@ -34,7 +34,7 @@ Skill names are `kebab-case`: lowercase letters, digits, hyphens. The name becom
 Conventions:
 - Action verbs for workflow skills: `quick-commit`, `review-work`, `implement-plan`
 - Bare tool name for infrastructure engines: `modal`, `railway`, `vercel`, `neon` — one engine with verb modes per `skills/_shared/infra-cli-contract.md`, never a `<tool>-<verb>` skill
-- Descriptive compound for audits: `tech-debt`, `security-audit`, `cache-audit`
+- Audit capabilities are lenses of `/audit`, not standalone skills — a new audit concern is a new lens directory (see SKILL_CONTRACT §4)
 
 ### 2. Create the Directory
 
@@ -62,7 +62,7 @@ That's the minimum. The full field reference:
 | `name` | Yes | string | Must match the directory name exactly. `kebab-case`. |
 | `description` | Yes | string | 20-500 characters. The routing surface the model reads when picking a skill — see "Writing the description" below. |
 | `allowed-tools` | No | string or list | Restricts which tools the skill can use. Omit to allow all tools. Use when the skill runs dangerous commands and you want to whitelist specific patterns. |
-| `argument-hint` | No | string | Shown when the user types `/claudna:<name>`. Convention: `[--flag] [positional-arg]`. Strongly recommended when the skill accepts arguments. |
+| `argument-hint` | No | string | Shown when the user types `/claudna:<name>`. Convention: `[--flag] [positional-arg]`. Required if the skill accepts arguments (SKILL_CONTRACT §2). |
 | `requires` | No | list | External runtime dependencies — each entry has exactly one of `cli` or `env`, plus an optional `reason`. See [SKILL_CONTRACT.md](../../SKILL_CONTRACT.md) for the schema. |
 | `user-invocable` | No | boolean | Defaults to `true`. Set to `false` for context-only skills loaded by reference, not invoked as a slash command. |
 
@@ -345,7 +345,7 @@ Never reference `~/.claude/skills/`, `~/.claude/commands/`, or `~/.claude/agents
 
 ### Duplicate Functionality
 
-Before writing a new skill, check the existing 53 skills. If an existing skill does 80% of what you want, consider improving it rather than creating a parallel one.
+Before writing a new skill, check the existing skills in `skills/`. If an existing skill does 80% of what you want, consider improving it rather than creating a parallel one.
 
 ## Worked Example 1: Simple Skill
 
@@ -497,10 +497,10 @@ Before opening your PR:
 - [ ] `python3 scripts/validate-manifest.py` passes
 - [ ] Skill tested locally with `claude --plugin-dir /path/to/clauDNA`
 - [ ] `name` in frontmatter matches directory name
-- [ ] `description` starts with "Use when..." and is 20-500 characters
+- [ ] `description` begins with `Use ` (when/at/before/after/to — SKILL_CONTRACT §2.1 rule 1) and is 20-500 characters
 - [ ] Body is at least 200 characters
 - [ ] No hardcoded paths to `~/.claude/skills/`, `~/.claude/commands/`, or `~/.claude/agents/`
-- [ ] No duplicate of an existing skill (checked the 53 skills in `skills/`)
+- [ ] No duplicate of an existing skill (checked the skills in `skills/`)
 - [ ] CHANGELOG.md entry added under `[Unreleased]`
 - [ ] Version bumped in `.claude-plugin/plugin.json`
 - [ ] PR template filled out

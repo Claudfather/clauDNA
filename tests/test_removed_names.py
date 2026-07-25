@@ -1,8 +1,9 @@
 """Tests for the removed-names reference gate (epic #165 P2 step 0).
 
-A PR that deletes a skill must not leave references to it anywhere in the
-repo — in any form: `claudna:<name>`, `/  <name>`, `skills/<name>/`,
-`Skill(<name>)`, or a bare mention. The gate is keyed on
+A PR that deletes a skill must not leave references to it anywhere in
+the repo, in any reference form (`claudna:<name>`, `/<name>`,
+`skills/<name>/`, `Skill(<name>)`); bare prose mentions are deliberately
+exempt (see `check_removed_name_mentions`). The gate is keyed on
 scripts/removed-skills.txt and exempts `Replaces …` breadcrumb lines
 (SKILL_CONTRACT §2.1 rule 6 requires those to name removed skills).
 """
