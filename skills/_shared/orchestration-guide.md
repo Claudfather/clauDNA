@@ -464,16 +464,15 @@ When multiple skills could apply to a task, invoke them in tier order. Process s
 
 | Tier | Category | Skills | Purpose |
 |------|----------|--------|---------|
-| 1 | **Process** | review-self, investigate-app, verify-completion | Establish approach, verify assumptions, gather evidence, debug |
+| 1 | **Process** | investigate-app, verify-completion | Establish approach, verify assumptions, gather evidence, debug |
 | 2 | **Planning** | product-enhance, product-vision, audit (lens engine — lenses per `audit-lens-contract.md`) | Analyze what to build, identify gaps, produce design docs |
 | 3 | **Implementation** | implement-plan, review-work (mode engine — changes/pr/multi-pr), quick-commit, commit-push-pr | Execute plans, review code, commit and ship PRs |
 | 4 | **Deployment & Ops** | modal, railway, vercel, neon, dbt (infra engines — verb modes per `infra-cli-contract.md`) | Deploy, monitor, query infrastructure |
 
-**Utility skills** (session-handoff, session-resume, lessons, notes, find-skills, cache-audit, worktree, clauDNA-migrate, notifications) are not tiered -- they are invoked on demand for session management, not as part of a build workflow. (The former docs-review and repo-health utilities are now `docs` and `repo-health` lenses of the tiered `audit` engine.)
+**Utility skills** (session, capture, recall, claudron, find-skills, worktree, using-claudna) are not tiered -- they are invoked on demand for session management, not as part of a build workflow. (The former docs-review and repo-health utilities are now `docs` and `repo-health` lenses of the tiered `audit` engine.)
 
 ### Rules
 
 - **Higher tiers first.** When a task could benefit from skills in multiple tiers, start with the lowest-numbered tier. Example: a bug report should invoke investigate-app (Tier 1) before implement-plan (Tier 3).
 - **Within a tier, order does not matter.** Tier 1 skills can run in any order relative to each other.
 - **Skipping tiers is allowed when inapplicable.** Not every task needs all four tiers. A simple deploy needs only Tier 4. A code review needs only Tier 3. The rule is: do not skip a tier that IS applicable.
-- **Review-self is always first.** When present in a workflow, review-self precedes all other skills regardless of tier.
