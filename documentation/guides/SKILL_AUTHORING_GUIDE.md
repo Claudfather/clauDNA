@@ -341,7 +341,7 @@ If SKILL.md exceeds ~500 lines, the agent's context fills up just loading the sk
 
 ### Hardcoded Paths
 
-Never reference `~/.claude/skills/`, `~/.claude/commands/`, or `~/.claude/agents/` — those are legacy install paths. The plugin system handles file discovery. The validator catches this.
+Never reference `~/.claude/skills/`, `~/.claude/commands/`, or `~/.claude/agents/` — those are legacy install paths. The plugin system handles file discovery. The validator catches this in SKILL.md bodies, agent files, and `_shared/` files; skill support files (templates and other non-SKILL.md files in a skill directory) are not yet scanned.
 
 ### Duplicate Functionality
 
