@@ -15,7 +15,7 @@ Markdown-first, output-last. Takes a doc with frontmatter and publishes it to th
 
 Parse `$ARGUMENTS` at invocation:
 - **First positional arg:** Path to the source markdown file — or, for the docs adapter's family mode, a directory holding one `00_*.md` master plus `NN_*.md` phase docs. Required.
-- `--to <dest>`: Destination adapter. One of: `vault` (default), `docs`, `github-issue`, `github-pr`, `session`, `notion`. `disk` is a deprecated alias for `vault` (one release): warn once per invocation, then treat as `vault`.
+- `--to <dest>`: Destination adapter. One of: `vault` (default), `docs`, `github-issue`, `github-pr`, `session`, `notion`.
 - `--dir <path>`: docs adapter only — the target directory under `documentation/` (the calling skill knows its category; registry in `skills/_shared/documentation-standard.md` §2). Required with `--to docs`.
 - `--update <issue#|url>`: Replace the named GitHub issue's body instead of creating anything. Implies `--to github-issue` — the only adapter with an update path — so `--to` may be omitted. See "In-place update" under the github-issue adapter.
 - `--repo <name>`: Target repository (for github adapters).
@@ -64,8 +64,6 @@ Two disk-backed adapters serve two different planes — the plane doctrine and w
 - **`docs`** → the current repo's `documentation/` tree (work-in-flight + repo-coupled records; git/PR-discovered)
 
 ### Adapter: vault (default)
-
-*(`--to disk` is the deprecated alias — warn once, continue as `vault`.)*
 
 This plane has two backends — a Claudron vault (engine) and a raw tree (fallback). Run the **detection ladder in `skills/_shared/claudron-engine.md` §1** first, then route:
 
