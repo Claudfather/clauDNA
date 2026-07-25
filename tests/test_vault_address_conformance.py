@@ -146,11 +146,10 @@ class TestGateRejectsTheRegressions:
 
     def test_empty_scan_is_an_error_not_a_pass(self, tmp_path: Path):
         """A gate that silently scans nothing is worse than no gate."""
-        (tmp_path / "scripts").mkdir(parents=True)
-        (tmp_path / "scripts" / "validate-skills.py").write_text(
-            "GATE_EXTENSIONS = set()\nGATE_PRUNE_DIRS = set()\n"
-            "GATE_EXCLUDE_FILES = set()\nGATE_EXCLUDE_PREFIXES = ()\n"
-        )
+        # _candidates sources its extension set from skill_checks, so a zero-file
+        # scan is produced by a repo whose only file is a non-gated extension.
+        # Exercises the `if not candidates` guard.
+        (tmp_path / "notes.rst").write_text("nothing the gate scans\n")
         errors, _w, _n = run_check(tmp_path)
         assert any("zero files" in e for e in errors), errors
 

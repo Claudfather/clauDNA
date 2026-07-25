@@ -17,6 +17,8 @@ from pathlib import Path
 from check_schema_drift import run_check as run_schema_drift_check
 from check_vault_address import run_check as run_vault_address_check
 from skill_checks import (
+    GATE_EXTENSIONS,
+    GATE_PRUNE_DIRS,
     STALE_PATH_RE,
     check_removed_name_mentions,
     collect_skill_reference_errors,
@@ -35,11 +37,11 @@ REMOVED_SKILLS_FILE = REPO_ROOT / "scripts" / "removed-skills.txt"
 SKIP_DIRS = {"_shared"}
 SKIP_SKILLS: set[str] = set()  # add skill names here to intentionally bypass validation
 
-# Removed-names gate scope: repo-wide over these text extensions, minus
-# historical records and generated/managed paths. CHANGELOG and the archive
-# legitimately narrate removed skills; the gate protects living surfaces.
-GATE_EXTENSIONS = {".md", ".sh", ".py", ".json", ".yaml", ".yml", ".toml", ".txt"}
-GATE_PRUNE_DIRS = {".git", "__pycache__", "worktrees", "node_modules"}
+# Removed-names gate scope: GATE_EXTENSIONS / GATE_PRUNE_DIRS (imported from
+# skill_checks, shared with the vault-address gate) pick the repo-wide text
+# surfaces; these exclusions carve out historical records and generated/managed
+# paths. CHANGELOG and the archive legitimately narrate removed skills; the gate
+# protects living surfaces.
 GATE_EXCLUDE_FILES = {"CHANGELOG.md", "scripts/removed-skills.txt"}  # exact paths
 # Point-in-time records legitimately narrate retired skills: the archive,
 # plan/spec/decision documents (rewriting history would falsify them), and
