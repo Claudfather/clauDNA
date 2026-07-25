@@ -11,12 +11,9 @@ For each phase in a plan or change in a PR, assess whether the cost justifies th
 
 ## Dispatch Rules
 
-- The dispatcher provides the source (plan document path or PR source file) and the result path.
-- **Do NOT call `EnterPlanMode`.** The dispatcher owns the lifecycle.
-- **Do NOT call `AskUserQuestion`.** No human is present.
-- **Do NOT prompt for clarification.** If the source lacks identifiable phases or changes to assess, emit `status: blocked` with a description of what is missing.
-- Execute the procedure below silently.
-- Emit the structured markdown result as the FINAL output and stop. No text after the result document.
+Follow the dispatch discipline in `skills/_shared/contracts/lens-result-contract.md` (§ Dispatch Rules): run non-interactively (no `EnterPlanMode`, no `AskUserQuestion`), execute silently, and emit the structured result as the FINAL output with no text after it.
+
+**Blocked condition:** If the source lacks identifiable phases or changes to assess, emit `status: blocked` with a description of what is missing.
 
 ## Procedure
 
@@ -176,8 +173,6 @@ Map findings to body sections:
 | **Observations** | Per-phase ROI summary; cut candidates; sequencing suggestions; overall portfolio health |
 
 ## Structured Result Emission
-
-After Step 6, emit a single markdown document with YAML frontmatter as the FINAL output. No text before or after this document.
 
 **Format:** Follow the canonical schema at `skills/_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all panel lens output.
 

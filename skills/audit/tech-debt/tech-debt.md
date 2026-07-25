@@ -9,7 +9,7 @@ Invoked by /claudna:audit in tech-debt mode — find, report, and plan remediati
 - For a portfolio view across many repos → use `/claudna:audit repo-health`
 - For product feature gaps → use `/claudna:product-enhance`
 
-**Enter Plan Mode.** Call `EnterPlanMode` to enter deliberation mode. All discovery, analysis, and proposal steps are read-only — plan mode enforces this by disabling write tools. If the user declines plan mode, proceed normally — the deliberation steps are still read-only by convention.
+**Enter Plan Mode.** Call `EnterPlanMode` per `skills/_shared/audit-lens-contract.md` §6 — the discovery, analysis, and proposal steps below are read-only.
 
 ## Constraints
 
@@ -147,7 +147,7 @@ After presenting the scan results, **ask the user to confirm** whether they want
 
 Ask: "Would you like me to generate detailed tech debt documentation and phased remediation plans?"
 
-**Exit Plan Mode.** Call `ExitPlanMode` to transition to execution mode. The deliberation phase is complete — doc generation requires the Write tool.
+**Exit Plan Mode.** Call `ExitPlanMode` per `skills/_shared/audit-lens-contract.md` §6 — doc generation past this point requires the Write tool.
 
 If yes, ask the user for a **short session name** (e.g., `api-cleanup`, `db-layer`) or derive one from the focus area. Output lands in:
 
@@ -226,7 +226,7 @@ When `--auto` is set (see the lens contract §4 and orchestration guide Section 
 3. Implies `--output github`
 4. Use the focus area from the dispatched arguments as scope. If none provided, scan full codebase but limit to top 10 findings.
 5. Create GitHub Issues per the output guide (`--output github`) for all findings above LOW severity
-6. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after (skill `audit`, lens inside `artifacts`, per the lens contract §4):
+6. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
 ```json
 {

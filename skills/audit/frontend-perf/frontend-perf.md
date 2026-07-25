@@ -121,7 +121,7 @@ When `--auto` is set (see orchestration guide Section 10):
 2. Page/flow **must** be provided in the arguments (bail if missing — this lens can't auto-detect what to audit)
 3. Skip the user confirmation gate between scan and remediation
 4. Create GitHub Issues for all findings, grouped by cascade chain
-5. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after, `skill: "audit"` with the lens inside `artifacts` (contract §4):
+5. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
 ```json
 {

@@ -9,15 +9,11 @@ Stand back from the proposed solution. Forget the plan exists. Ask: what is the 
 
 **Applies to:** `plan` and `mixed` targets.
 
-## Dispatch Discipline
+## Dispatch Rules
 
-This lens always runs dispatched, non-interactively:
+Follow the dispatch discipline in `skills/_shared/contracts/lens-result-contract.md` (§ Dispatch Rules): run non-interactively (no `EnterPlanMode`, no `AskUserQuestion`), execute silently, and emit the structured result as the FINAL output with no text after it.
 
-- **Do NOT call `EnterPlanMode`.** The dispatcher owns the lifecycle.
-- **Do NOT call `AskUserQuestion`.** No human is present.
-- **Do NOT prompt for clarification.** If the plan lacks a Goal section or is too ambiguous to review, emit `status: blocked` with a description of what is missing.
-- Execute the procedure below silently.
-- Emit the structured markdown result as the FINAL output and stop. No text after the result document.
+**Blocked condition:** If the plan lacks a Goal section or is too ambiguous to review, emit `status: blocked` with a description of what is missing.
 
 ---
 
@@ -109,8 +105,6 @@ Map findings to body sections:
 ---
 
 ## Structured Result Emission
-
-After Step 5, emit a single markdown document with YAML frontmatter as the FINAL output. No text before or after this document.
 
 **Format:** Follow the canonical schema at `skills/_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all panel lens output.
 
