@@ -26,6 +26,13 @@ BODY_MIN = 200
 STALE_PATH_RE = re.compile(r"~/\.claude/(skills|commands|agents)/")
 STALE_PATH_SKIP_SKILLS = {"cleanup-legacy-install"}
 
+# Repo-wide text surfaces the gates walk, minus VCS/build directories. Owned
+# here because two gates reason over the same living-surface file set:
+# validate-skills.py's removed-names scan and check_vault_address.py's
+# vault-address conformance gate.
+GATE_EXTENSIONS = {".md", ".sh", ".py", ".json", ".yaml", ".yml", ".toml", ".txt"}
+GATE_PRUNE_DIRS = {".git", "__pycache__", "worktrees", "node_modules"}
+
 # Skills must delegate GitHub output to /claudna:publish, never call `gh` directly.
 # These three are the gh-endpoint skills where direct `gh` use is the whole point.
 RAW_GH_ALLOWED_SKILLS = {"publish", "file-github-issue", "commit-push-pr"}

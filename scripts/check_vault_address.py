@@ -146,31 +146,25 @@ GATE_EXCLUDE_FILES = {"CHANGELOG.md", "scripts/removed-skills.txt"}
 def _candidates(repo_root: Path) -> list[Path]:
     """Living surfaces that could carry or execute the variable.
 
-    Borrows ``validate-skills.py``'s *file-type* scope — ``GATE_EXTENSIONS`` and
-    ``GATE_PRUNE_DIRS``. That matters beyond tidiness: it brings in ``.sh`` files
-    and the templates shipped into user projects, which are the only surfaces
-    that could *actually read* an env var, and which a ``skills/**/*.md`` walk
-    misses.
+    Shares the gates' *file-type* scope from ``skill_checks`` —
+    ``GATE_EXTENSIONS`` and ``GATE_PRUNE_DIRS``. That matters beyond tidiness: it
+    brings in ``.sh`` files and the templates shipped into user projects, which
+    are the only surfaces that could *actually read* an env var, and which a
+    ``skills/**/*.md`` walk misses.
 
-    It does **not** borrow that module's exclusions — see
+    It does **not** share the removed-names gate's exclusions — see
     ``GATE_EXCLUDE_PREFIXES`` above. Inheriting them silently exempted a live
     skill directory from an env-var gate on the strength of a rationale about
     retired skill names.
     """
-    from importlib.util import module_from_spec, spec_from_file_location
-
-    spec = spec_from_file_location(
-        "_validate_skills", repo_root / "scripts" / "validate-skills.py"
-    )
-    mod = module_from_spec(spec)
-    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    import skill_checks
 
     out: list[Path] = []
     for path in sorted(repo_root.rglob("*")):
-        if not path.is_file() or path.suffix not in mod.GATE_EXTENSIONS:
+        if not path.is_file() or path.suffix not in skill_checks.GATE_EXTENSIONS:
             continue
         rel = path.relative_to(repo_root).as_posix()
-        if any(part in mod.GATE_PRUNE_DIRS for part in path.relative_to(repo_root).parts):
+        if any(part in skill_checks.GATE_PRUNE_DIRS for part in path.relative_to(repo_root).parts):
             continue
         if rel in GATE_EXCLUDE_FILES or rel.startswith(GATE_EXCLUDE_PREFIXES):
             continue
