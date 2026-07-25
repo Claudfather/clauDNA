@@ -24,6 +24,7 @@ from skill_checks import (
     check_no_raw_gh_commands,
     check_output_github_reference,
     check_skill_references,
+    check_structured_result_emission,
     collect_skill_reference_errors,
     validate_skill_md,
     warn_skill_md,
@@ -93,6 +94,44 @@ class TestAutoNoAskUser:
     def test_argument_hint_not_string(self):
         fm = {"argument-hint": 42}
         assert check_auto_no_ask_user(fm, "AskUserQuestion") == []
+
+
+# --- check_structured_result_emission ---
+
+
+class TestStructuredResultEmission:
+    def test_auto_without_structured_result_fails(self):
+        fm = {"argument-hint": "[--auto] [scope]"}
+        body = "# Test\n\nSkip Plan Mode and do things.\n"
+        errors = check_structured_result_emission(fm, body)
+        assert len(errors) == 1
+        assert "structured-result" in errors[0]
+
+    def test_auto_with_structured_result_mention_passes(self):
+        fm = {"argument-hint": "[--auto]"}
+        body = "# Test\n\nEmit the structured result JSON block.\n"
+        assert check_structured_result_emission(fm, body) == []
+
+    def test_auto_with_hyphenated_structured_result_passes(self):
+        fm = {"argument-hint": "[--auto]"}
+        body = "# Test\n\nEmit the structured-result shape per §10.C.\n"
+        assert check_structured_result_emission(fm, body) == []
+
+    def test_auto_with_section_reference_passes(self):
+        fm = {"argument-hint": "[--auto]"}
+        body = "# Test\n\nSee `skills/_shared/orchestration-guide.md` §10.C for shape.\n"
+        assert check_structured_result_emission(fm, body) == []
+
+    def test_no_auto_skips_check(self):
+        """Skills that don't declare --auto are not required to emit structured result."""
+        fm = {"argument-hint": "[scope-path]"}
+        body = "# Test\n\nNo structured result mention here.\n"
+        assert check_structured_result_emission(fm, body) == []
+
+    def test_non_string_argument_hint_skips_check(self):
+        fm = {"argument-hint": None}
+        body = "# Test\n"
+        assert check_structured_result_emission(fm, body) == []
 
 
 # --- check_no_raw_gh_commands ---
