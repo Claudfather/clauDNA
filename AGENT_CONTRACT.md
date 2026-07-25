@@ -1,6 +1,6 @@
 # Agent Contract
 
-This is the binding contract for every agent in clauDNA. Adding or modifying an agent means satisfying these rules. Pull requests that violate the contract are rejected by CI ([`scripts/validate-agents.py`](./scripts/validate-agents.py), wired into `.github/workflows/validate-agents.yml`).
+This is the binding contract for every agent in clauDNA. Adding or modifying an agent means satisfying these rules. Pull requests that violate the contract are rejected by CI ([`scripts/validate-agents.py`](./scripts/validate-agents.py), wired into the `validate-agents` job of `.github/workflows/ci.yml`).
 
 If you want to understand *what* an agent is conceptually, read this file. If you want to know *whether* an agent is valid, run the validator.
 
@@ -88,7 +88,7 @@ Run locally:
 python scripts/validate-agents.py
 ```
 
-The validator returns non-zero on any violation and prints a structured report. Every push and pull request runs the same script in CI via `.github/workflows/validate-agents.yml`.
+The validator returns non-zero on any violation and prints a structured report. Every pull request runs the same script in CI via the `validate-agents` job in `.github/workflows/ci.yml`.
 
 ---
 
