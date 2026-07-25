@@ -68,3 +68,15 @@ learn
 # the sole write door (note / external content / session), scoped by what the note
 # is about; the PreCompact hook fires /capture in place of /reflect.
 reflect
+#
+# Pre-ledger hard removals (this file began at epic #165) — deleted in c7c7b03
+# ("remove deprecated skills — snowflake-cutover, cache-audit, notifications")
+# but never recorded here, so the removed-names gate stayed blind to them (#268).
+snowflake-cutover
+cache-audit
+notifications
+#
+# Never shipped as skills/<name>/SKILL.md, yet named as live skills in stale docs
+# (#268); gated so any future sigiled reference trips the check.
+review-self
+clauDNA-migrate
