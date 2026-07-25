@@ -1,12 +1,12 @@
 #!/bin/bash
 # PreCompact hook: prompt for /claudna:capture before context compaction —
-# UNLESS the engine now owns that prompt (F1 defer, below).
+# UNLESS the engine now owns that prompt (defer gate below).
 #
 # On the first compaction attempt per session, blocks compaction and instructs
 # Claude to run /claudna:capture first (a bare capture distills the session).
 # On the second attempt (after capture has run), allows compaction to proceed.
 #
-# F1 — capture-prompt defer (clauDNA #254; boundary program fork F1):
+# Capture-prompt defer:
 # Claudron's engine also ships a PreCompact prompt. Exactly one participant may
 # hold R-capture-prompt per session (Claudron docs/CLI_CONTRACT.md §Session-loop
 # protocol). When the engine's PreCompact hook is registered AND the engine is
@@ -29,7 +29,7 @@ if [ "${CLAUDNA_PRECOMPACT_REFLECT:-1}" = "0" ]; then
     exit 0
 fi
 
-# ─── F1 capture-prompt defer gate ─────────────────────────────────────────
+# ─── Capture-prompt defer gate ─────────────────────────────────────────
 #
 # SHIM_REMOVAL_RELEASE — the Claudron engine release that removed the
 # transitional PreCompact glob shim (Claudron #85 / PR #90). Its significance:
@@ -37,7 +37,7 @@ fi
 #   • BEFORE this release, the engine's PreCompact hook YIELDS to a detected
 #     clauDNA plugin (the glob shim in Claudron hooks.py). If this front-end
 #     ALSO defers there, BOTH sides yield and *nobody* prompts — durable
-#     capture stops, silently. That is the F1 ordering hazard, and the whole
+#     capture stops, silently. That is the ordering hazard, and the whole
 #     reason this defer is version-gated.
 #   • AT/AFTER this release, the engine ALWAYS prompts wherever its hook is
 #     installed, in text that names no front-end. Only then is deferring safe.

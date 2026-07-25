@@ -160,6 +160,8 @@ asyncio.run(check())
 
 Write results to `<scratch>/console-logs/<route-slug>.json`.
 
+Also flag **network request failures** — 4xx/5xx responses to `fetch`/XHR calls — as `console-error` findings (a `page.on('response')` handler surfaces them alongside the console listener above).
+
 ---
 
 ## Phase 3: Interaction Testing
@@ -181,7 +183,7 @@ For each route, use Playwright to:
      }))
    ```
 
-2. **Dead link check:** For all `<a href>` elements, verify targets return 2xx/3xx (not 404/500). Use `curl -sI` for each unique href.
+2. **Link integrity check:** For all `<a href>` elements, verify targets return 2xx/3xx (not 404/500) — `curl -sI` each unique href. Also flag, per link: external (new-tab) links missing `rel="noopener"` (security); `href="#"` paired with a click handler and `javascript:void(0)` hrefs (accessibility antipatterns); and links pointing at `localhost` or a staging host when crawling production.
 
 3. **Button click test:** Click each visible, non-disabled button. After click, check for:
    - New console errors (compare before/after)

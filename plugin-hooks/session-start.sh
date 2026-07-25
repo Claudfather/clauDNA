@@ -1,5 +1,5 @@
 #!/bin/bash
-# SessionStart briefing hook for clauDNA (epic #165 P7, fork F3: on by default).
+# SessionStart briefing hook for clauDNA (on by default).
 #
 # Renders a short warm-start briefing from purely local + gh state — current
 # branch/tree, the per-cwd handoff (<cwd>/.claude/session.md, written by
@@ -23,7 +23,7 @@
 
 set -u
 
-# Opt-out (default on, per fork F3)
+# Opt-out (default on)
 if [ "${CLAUDNA_SESSION_BRIEFING:-1}" = "0" ]; then
     exit 0
 fi

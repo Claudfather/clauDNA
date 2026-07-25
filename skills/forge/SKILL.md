@@ -85,7 +85,7 @@ For each risk, draft a mitigation. If no mitigation exists, flag it as an open r
 
 Forge authors in the **shared §4.1 publishable-doc contract** (`skills/_shared/output-guide.md` §3 frontmatter + §4.1 body) — the same contract the audit lenses (`/claudna:audit tech-debt`, `/claudna:audit security`, et al.) emit — so `/claudna:publish` can route it and `/implement-plan` can consume it. Forge's distinctive sections (Decision Forks, Architecture, Sequencing) ride **alongside** the §4.1 skeleton as added sections; publish validates the skeleton's presence, not its exclusivity.
 
-Per **F7**, a multi-phase plan is **one epic/overview doc + one §4.1 doc per phase** (§4.1 is "one phase per issue"; this mirrors the docs-plane `00_overview` + phase-docs pattern). A single-phase plan is one §4.1 doc.
+A multi-phase plan is **one epic/overview doc + one §4.1 doc per phase** (§4.1 is "one phase per issue"; this mirrors the docs-plane `00_overview` + phase-docs pattern). A single-phase plan is one §4.1 doc.
 
 **Per-phase doc** — one phase = one issue / one PR's worth of work:
 
@@ -200,11 +200,11 @@ Present the plan in chat with a summary:
 Forge is an *author*, not a publisher: it produces a §4.1 publishable doc and hands it to `/claudna:publish` — the same shared adapter every other planning skill uses (`skills/_shared/output-guide.md` §7). Forge never calls `gh` directly and never writes a bespoke planning PR.
 
 1. Write the plan as a publishable doc: house-style frontmatter (output-guide §3) + the §4.1 body skeleton (§4.1 — `## Summary`, `## Evidence`, `## Implementation Plan` with `### Dependencies`/`### Blocks`/`### Steps`, `## Test Plan`, `## Verification Checklist`, `## What NOT To Do`, `## Context`), plus a `## Decision Forks` section.
-2. **Multi-phase → epic + per-phase docs (F7).** §4.1 is "one phase per issue," so a multi-phase plan becomes an epic/overview doc plus one §4.1 doc per phase (mirrors the docs-plane `00_overview` + phase-docs pattern). A single-phase plan may be one doc.
+2. **Multi-phase → epic + per-phase docs.** §4.1 is "one phase per issue," so a multi-phase plan becomes an epic/overview doc plus one §4.1 doc per phase (mirrors the docs-plane `00_overview` + phase-docs pattern). A single-phase plan may be one doc.
 3. Route to the requested target:
    - `--output github` → `/claudna:publish <doc> --to github-issue --repo <repo>`
    - `--output docs` → write the doc(s) to a scratch directory — multi-phase named `00_OVERVIEW.md` + `NN_<slug>.md` (family mode's required shape) — then `/claudna:publish <scratch-file-or-dir> --to docs --dir documentation/planning/<topic-slug>/<session>_<date>/` (the PR-reviewable plan directory)
-4. **F7 issue generation** — with `--output github` and a multi-phase plan, forge publishes the *whole family*, epic first, then cross-links:
+4. **Issue generation** — with `--output github` and a multi-phase plan, forge publishes the *whole family*, epic first, then cross-links:
    1. Publish the epic doc → note its issue number `E`.
    2. Publish each per-phase doc in phase order. Every phase doc's `## Summary` opens with `Part of #E (<track>). Size: <S/M/L/XL>.` and its `### Dependencies` names the phase issues it waits on — the numbers exist because publication follows phase order.
    3. After all phases publish, append a `## Phase issues` table to the epic body (`| Phase | Issue | Track |`, one row per phase with the real issue numbers) and re-publish the epic body via `/claudna:publish <epic-doc> --to github-issue --repo <repo> --update #E` so the family is navigable from the top.
@@ -243,7 +243,7 @@ Emit structured-result JSON per `skills/_shared/orchestration-guide.md` §10 (St
 
 ## Re-forge Mode (`forge --reforge <issue-url>`)
 
-The hardening loop's **author** step. `/ironclad` posts lens findings as comments on the plan's Issue; `--reforge` folds them back into the body. Invoked per cycle by `/ironclad --loops` as a `--dispatch` subagent (F5), or by hand.
+The hardening loop's **author** step. `/ironclad` posts lens findings as comments on the plan's Issue; `--reforge` folds them back into the body. Invoked per cycle by `/ironclad --loops` as a `--dispatch` subagent, or by hand.
 
 1. **Read the live Issue** — the body (canonical plan) plus every comment since the last re-forge: lens findings + collaborator input. Treat the Issue head as truth; never overwrite from a stale local copy.
 2. **Fold each open finding** — make the smallest body edit that resolves it, or, if it's a genuine choice, add/update a `## Decision Forks` entry. **Preserve locked content**: do not reopen a `[FORK-LOCK]`'d fork or rewrite a settled phase without a `[FORK-REOPEN F<N>]`.
