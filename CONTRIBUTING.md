@@ -57,9 +57,11 @@ No build step. The repo is a Claude Code plugin — skills are markdown files, h
    ```bash
    pip install pyyaml  # one-time
    python3 scripts/validate-skills.py
+   python3 scripts/integration-test.py
+   python3 scripts/validate-agents.py
    python3 scripts/validate-manifest.py
    ```
-   CI runs these on every PR — they must pass before merge.
+   `integration-test.py` checks reference-file resolution, tool-name validity, body-structure conventions, and cross-skill uniqueness. CI runs all of these on every PR — they must pass before merge.
 
 5. **Update CHANGELOG.md** — add your change under the `[Unreleased]` section following the [Keep a Changelog](https://keepachangelog.com/) format.
 
@@ -92,11 +94,13 @@ The directory is named `plugin-hooks/` (not `hooks/`) to work around a Claude Co
 Before opening a PR, verify:
 
 - [ ] `python3 scripts/validate-skills.py` passes (skill contract)
+- [ ] `python3 scripts/integration-test.py` passes (cross-skill integration)
+- [ ] `python3 scripts/validate-agents.py` passes (agent contract)
 - [ ] `python3 scripts/validate-manifest.py` passes (plugin manifest)
 - [ ] You tested the affected skill/hook locally with `claude --plugin-dir`
 - [ ] CHANGELOG.md has an entry under `[Unreleased]`
 
-For changes that add or modify validation scripts, also run:
+The pytest suite runs on every PR, not only for validation-script changes — run it before opening any PR:
 ```bash
 python3 -m pytest tests/
 ```
@@ -107,7 +111,7 @@ python3 -m pytest tests/
 - **Descriptive title.** Use conventional commits: `feat:`, `fix:`, `docs:`, `chore:`.
 - **Fill out the PR template.** The checkboxes are there for a reason.
 - **Version bumps.** If your change affects what users get (new skill, changed behavior, hook change), bump `version` in `.claude-plugin/plugin.json`. Marketplace users only receive updates on version bumps. Bug fixes to docs or tests don't need a bump.
-- **CI must pass.** All four CI checks (skill validation, manifest validation, changelog check, lint) must pass before merge. The `main` branch has branch protection rules that enforce this.
+- **CI must pass.** All six CI checks (skill validation + integration tests, agent validation, manifest validation, changelog check, lint, and the pytest suite) must pass before merge. The `main` branch has branch protection rules that enforce this.
 
 ## Release Process
 

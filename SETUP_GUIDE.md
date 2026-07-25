@@ -175,8 +175,8 @@ Optional categories — add only the ones whose skills you actually use:
 |---|---|---|
 | **Python** | Python projects, formatters | `Bash(python *)`, `Bash(python3 *)`, `Bash(pip *)`, `Bash(pip3 *)`, `Bash(pytest *)`, `Bash(ruff *)` |
 | **Node** | JS/TS projects | `Bash(node *)`, `Bash(npm *)`, `Bash(npx *)`, `Bash(prettier *)` |
-| **Data & Analytics** | `/claudna:dbt`, `/claudna:neon-*`, `snowflake-analyst` agent | `Bash(snowsql *)`, `Bash(dbt *)`, `Bash(psql *)`, `Bash(pg_isready *)` |
-| **Infrastructure CLIs** | `/claudna:railway-*`, `/claudna:vercel-*`, `/claudna:modal-*` | `Bash(railway *)`, `Bash(vercel *)`, `Bash(modal *)` |
+| **Data & Analytics** | `/claudna:dbt`, `/claudna:neon`, `snowflake-analyst` agent | `Bash(snowsql *)`, `Bash(dbt *)`, `Bash(psql *)`, `Bash(pg_isready *)` |
+| **Infrastructure CLIs** | `/claudna:railway`, `/claudna:vercel`, `/claudna:modal` | `Bash(railway *)`, `Bash(vercel *)`, `Bash(modal *)` |
 | **Browser Automation** | `/claudna:audit design`, `/claudna:visual-crawl` | `Bash(/Applications/Google*)`, `Bash("/Applications/Google*)`, `Bash(google-chrome*)`, `Bash(chromium*)` |
 | **Auto-skill-approval** | Bots / cron / non-interactive runs | See "Auto-skill-approval" expansion below |
 
@@ -209,16 +209,18 @@ The plugin ships a `statusline.sh` that shows branch, lines changed, model, and 
 {
   "statusLine": {
     "type": "command",
-    "command": "bash ${HOME}/.claude/plugins/cache/Claudfather/claudna/0.2.0/plugin-hooks/statusline.sh"
+    "command": "bash ${HOME}/.claude/plugins/cache/Claudfather/claudna/<version>/plugin-hooks/statusline.sh"
   }
 }
 ```
 
+Resolve `<version>` with: `ls -d ~/.claude/plugins/cache/Claudfather/claudna/*/ 2>/dev/null | sort -V | tail -1`
+
 > **Known friction:** the version segment (`0.2.0`) is **hardcoded** because the plugin cache path includes the version. Every claudna release bump leaves this path pointing at a stale (or pruned) version directory, and the statusLine silently stops rendering. Workarounds, none of them great:
 >
 > 1. **Update the path on every `/plugin update`** — a `sed` / `jq` one-liner in your post-update routine. Simplest. The path you want is `~/.claude/plugins/cache/Claudfather/claudna/<latest-version>/plugin-hooks/statusline.sh`.
-> 2. **Symlink to a stable path** — `ln -sfn ~/.claude/plugins/cache/Claudfather/claudna/0.2.0/plugin-hooks/statusline.sh ~/.local/bin/claudna-statusline.sh` and point the statusLine command at the symlink. You still re-run the symlink command on every plugin bump, but the statusLine entry in settings.json stays stable.
-> 3. **Copy `statusline.sh` to a path you control** — `cp ~/.claude/plugins/cache/Claudfather/claudna/0.2.0/plugin-hooks/statusline.sh ~/.claude/hooks/claudna-statusline.sh` and point statusLine there. Frozen version (won't pick up improvements) but zero maintenance.
+> 2. **Symlink to a stable path** — `ln -sfn ~/.claude/plugins/cache/Claudfather/claudna/<version>/plugin-hooks/statusline.sh ~/.local/bin/claudna-statusline.sh` and point the statusLine command at the symlink. You still re-run the symlink command on every plugin bump, but the statusLine entry in settings.json stays stable.
+> 3. **Copy `statusline.sh` to a path you control** — `cp ~/.claude/plugins/cache/Claudfather/claudna/<version>/plugin-hooks/statusline.sh ~/.claude/hooks/claudna-statusline.sh` and point statusLine there. Frozen version (won't pick up improvements) but zero maintenance.
 >
 > Anthropic hasn't shipped a plugin-shipped statusLine surface yet (`statusLine` in `plugin.json` is not honored), so until they do, one of the three options is unavoidable.
 
@@ -688,8 +690,10 @@ Hooks ship in `plugin-hooks/hooks.json` inside the plugin and auto-wire on enabl
 Claude Code does not support statusLine declarations inside plugin manifests. The plugin ships a `statusline.sh` but you have to wire it in your own `settings.json` — see §3.2. If you added the snippet and it still doesn't show:
 
 ```bash
-bash ~/.claude/plugins/cache/Claudfather/claudna/0.2.0/plugin-hooks/statusline.sh
+bash ~/.claude/plugins/cache/Claudfather/claudna/<version>/plugin-hooks/statusline.sh
 ```
+
+Resolve `<version>` with: `ls -d ~/.claude/plugins/cache/Claudfather/claudna/*/ 2>/dev/null | sort -V | tail -1`
 
 Run that directly to see if the script itself errors. If it does, your shell environment is missing something (likely `gh` for branch info).
 
