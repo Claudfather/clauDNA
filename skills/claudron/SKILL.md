@@ -29,7 +29,7 @@ For the selected verb, read ONLY its depth file in this skill directory and foll
 
 Each verb resolves its state through the **detection ladder in `skills/_shared/claudron-engine.md` §1** — it replaces the generic CLI-installed / auth / target-discovery pre-flight and yields one of three verdicts (present-with-vault / present-no-vault / absent). `lookup` runs it at pre-flight and requires present-with-vault; `status` runs it as its own Step 1 and reports the verdict in all three states. Each verb gates on the verdict in its depth file's Step 0. Every `--json` call is envelope-validated per §2; failures follow the exit-code posture in §3.
 
-**Door note (F1).** clauDNA ships no MCP servers — this engine *is* the CLI. If Claudron's own MCP tools are configured in the session, they are the same engine with equivalent semantics; the CLI is the contract floor this skill targets.
+**Door note.** clauDNA ships no MCP servers — this engine *is* the CLI. If Claudron's own MCP tools are configured in the session, they are the same engine with equivalent semantics; the CLI is the contract floor this skill targets.
 
 ## Structured result (`--auto`)
 
