@@ -79,7 +79,7 @@ When modifying components inside the plugin tree (`skills/`, `agents/`, `plugin-
 1. Edit the file in place (this repo is the source of truth).
 2. Test by loading the plugin locally: `claude --plugin-dir <path-to-this-repo>` and invoking the affected skill.
 3. Update `CHANGELOG.md` with the change.
-4. Before opening a PR, run `python3 scripts/validate-skills.py` — CI runs the same check and will block merge on violations.
+4. Before opening a PR, run `make check` — CI runs the same target (the check-set is defined once, in the `Makefile`) and will block merge on violations.
 5. When bumping for release, update `version` in `.claude-plugin/plugin.json`. Without a bump, marketplace users do not receive the update.
 
 When adding or modifying a skill, the binding rules live in [SKILL_CONTRACT.md](./SKILL_CONTRACT.md). The contract is enforced by `scripts/validate-skills.py` and the `validate-skills` GitHub Actions workflow. If you need to relax a rule, update both the contract and the validator together — never one without the other.

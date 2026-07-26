@@ -1,0 +1,7 @@
+# Toolchain for `make check` — CI installs exactly this file (via
+# `make deps`), so local and CI run identical tool versions. Bump
+# deliberately, in a PR; an unpinned toolchain is its own CI-surprise
+# vector (a new ruff release turning CI red overnight).
+pyyaml==6.0.3
+pytest==9.0.3
+ruff==0.15.10

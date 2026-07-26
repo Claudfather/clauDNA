@@ -31,7 +31,11 @@ git clone https://github.com/Claudfather/clauDNA.git
 cd clauDNA
 ```
 
-No build step. The repo is a Claude Code plugin — skills are markdown files, hooks are shell scripts, and validation is plain Python (requires `pyyaml`).
+No build step. The repo is a Claude Code plugin — skills are markdown files, hooks are shell scripts, and validation is plain Python. One-time setup for the check toolchain (in your Python environment of choice):
+
+```bash
+make deps   # pip install -r requirements-dev.txt
+```
 
 ### Making Changes
 
@@ -53,15 +57,11 @@ No build step. The repo is a Claude Code plugin — skills are markdown files, h
    ```
    Then invoke the skill you changed (e.g. `/claudna:audit tech-debt`) and verify it works.
 
-4. **Run the validators:**
+4. **Run the full check-set:**
    ```bash
-   pip install pyyaml  # one-time
-   python3 scripts/validate-skills.py
-   python3 scripts/integration-test.py
-   python3 scripts/validate-agents.py
-   python3 scripts/validate-manifest.py
+   make check
    ```
-   `integration-test.py` checks reference-file resolution, tool-name validity, body-structure conventions, and cross-skill uniqueness. CI runs all of these on every PR — they must pass before merge.
+   This is the exact set CI runs — `.github/workflows/ci.yml` executes this same target, so a green `make check` is a green CI run. The check-set is defined once, in the `Makefile`: the skill/agent/manifest validators, the cross-skill integration checks (`integration-test.py` — reference-file resolution, tool-name validity, body-structure conventions, cross-skill uniqueness), the changelog gate, `ruff`, and the pytest suite. Individual sub-targets (`make lint`, `make test`, `make check-skills`, ...) are available while iterating. CI additionally forwards PR labels; to reproduce a label-gated run: `PR_LABELS=full-validate make check`.
 
 5. **Update CHANGELOG.md** — add your change under the `[Unreleased]` section following the [Keep a Changelog](https://keepachangelog.com/) format.
 
@@ -77,7 +77,7 @@ Every skill must satisfy [SKILL_CONTRACT.md](./SKILL_CONTRACT.md). The short ver
 - No hardcoded paths to `~/.claude/skills/`, `~/.claude/commands/`, or `~/.claude/agents/`
 - `name` is globally unique across the repo
 
-Run `python3 scripts/validate-skills.py` to catch violations before pushing.
+Run `make check-skills` to catch contract violations while iterating, and `make check` before pushing.
 
 ### Modifying Hooks
 
@@ -93,17 +93,10 @@ The directory is named `plugin-hooks/` (not `hooks/`) to work around a Claude Co
 
 Before opening a PR, verify:
 
-- [ ] `python3 scripts/validate-skills.py` passes (skill contract)
-- [ ] `python3 scripts/integration-test.py` passes (cross-skill integration)
-- [ ] `python3 scripts/validate-agents.py` passes (agent contract)
-- [ ] `python3 scripts/validate-manifest.py` passes (plugin manifest)
+- [ ] `make check` passes — the exact check-set CI runs, defined once in the `Makefile` (validators, integration checks, changelog gate, lint, pytest suite)
 - [ ] You tested the affected skill/hook locally with `claude --plugin-dir`
-- [ ] CHANGELOG.md has an entry under `[Unreleased]`
 
-The pytest suite runs on every PR, not only for validation-script changes — run it before opening any PR:
-```bash
-python3 -m pytest tests/
-```
+CI runs the same `make check` target, so local green means CI green. If CI fails where local passed, your checkout is either behind `origin/main` or missing the pinned toolchain (`make deps`); CI runs Python 3.12.
 
 ## PR Expectations
 
@@ -111,7 +104,7 @@ python3 -m pytest tests/
 - **Descriptive title.** Use conventional commits: `feat:`, `fix:`, `docs:`, `chore:`.
 - **Fill out the PR template.** The checkboxes are there for a reason.
 - **Version bumps.** If your change affects what users get (new skill, changed behavior, hook change), bump `version` in `.claude-plugin/plugin.json`. Marketplace users only receive updates on version bumps. Bug fixes to docs or tests don't need a bump.
-- **CI must pass.** All six CI checks (skill validation + integration tests, agent validation, manifest validation, changelog check, lint, and the pytest suite) must pass before merge. The `main` branch has branch protection rules that enforce this.
+- **CI must pass.** CI runs `make check` — the same command you run locally, so there are no CI-only surprises. Run it before pushing.
 
 ## Release Process
 

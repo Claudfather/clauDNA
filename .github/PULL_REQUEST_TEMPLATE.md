@@ -11,9 +11,7 @@
 <!-- How did you verify this works? -->
 
 - [ ] Tested locally with `claude --plugin-dir /path/to/clauDNA`
-- [ ] `python3 scripts/validate-skills.py` passes
-- [ ] `python3 scripts/validate-manifest.py` passes
-- [ ] `python3 -m pytest tests/` passes (if test files changed)
+- [ ] `make check` passes (the exact check-set CI runs)
 
 ## Checklist
 
