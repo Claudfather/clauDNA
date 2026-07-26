@@ -54,7 +54,7 @@ The first argument selects scope. All three scopes run the *same* method (`extra
 
 `<HARD-GATE>` — do this before loading the method or launching any subagent.
 
-1. Parse args: scope (default `full-system`), `--budget <tokens>`, `--depth` (default `standard`), `--out <path>` (default `FULL_SYSTEM_SPEC.md`; `WING-<name>-SPEC.md` / `TARGETED-SPEC.md` for narrower scopes).
+1. Parse args: scope (default `full-system`), `--budget <tokens>`, `--depth` (default `standard`), `--out <path>`. The default output name is scope-derived, written at the project root: FULL_SYSTEM_SPEC.md for full-system, WING-<name>-SPEC.md for a wing, TARGETED-SPEC.md for a targeted slice.
 2. Cheap, read-only size estimate — this is NOT the Phase 1 inventory yet:
    - `git ls-files | wc -l` (fallback: `find . -type f` minus vendor/build dirs).
    - Approximate LOC over source globs; count deployable units; get rough entry-point and persisted-entity counts; note languages/frameworks.
