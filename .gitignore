@@ -13,3 +13,8 @@
 *.key
 __pycache__/
 *.pyc
+
+# Bot/fleet runtime state (event ledgers, telemetry) written into a working
+# checkout — never part of the plugin. Root-anchored so it can't touch the
+# tracked skills/audit/data-model/ skill.
+/data/
