@@ -3,7 +3,7 @@
 
 Run: python scripts/validate-agents.py
 Exits non-zero on any violation; prints a structured report.
-Runs in CI as the `validate-agents` job in `.github/workflows/ci.yml`.
+Runs in CI via `make check` (target `check-agents`; see the repo Makefile).
 """
 
 from __future__ import annotations
