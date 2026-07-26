@@ -61,7 +61,7 @@ make deps   # pip install -r requirements-dev.txt
    ```bash
    make check
    ```
-   This is the exact set CI runs — `.github/workflows/ci.yml` executes this same target, so a green `make check` is a green CI run. The check-set is defined once, in the `Makefile`: the skill/agent/manifest validators, the cross-skill integration checks (`integration-test.py` — reference-file resolution, tool-name validity, body-structure conventions, cross-skill uniqueness), the changelog gate, `ruff`, and the pytest suite. Individual sub-targets (`make lint`, `make test`, `make check-skills`, ...) are available while iterating. CI additionally forwards PR labels; to reproduce a label-gated run: `PR_LABELS=full-validate make check`.
+   This is the exact set CI runs — `.github/workflows/ci.yml` executes this same target, so a green `make check` is a green CI run. The check-set is defined once, in the [`Makefile`](./Makefile) (`make -n check` lists it); individual sub-targets (`make lint`, `make test`, `make check-skills`, ...) are available while iterating. Among the checks, `integration-test.py` covers reference-file resolution, tool-name validity, body-structure conventions, and cross-skill uniqueness. CI additionally forwards PR labels; to reproduce a label-gated run: `PR_LABELS=full-validate make check`.
 
 5. **Update CHANGELOG.md** — add your change under the `[Unreleased]` section following the [Keep a Changelog](https://keepachangelog.com/) format.
 
@@ -93,7 +93,7 @@ The directory is named `plugin-hooks/` (not `hooks/`) to work around a Claude Co
 
 Before opening a PR, verify:
 
-- [ ] `make check` passes — the exact check-set CI runs, defined once in the `Makefile` (validators, integration checks, changelog gate, lint, pytest suite)
+- [ ] `make check` passes — the exact check-set CI runs, defined once in the `Makefile`
 - [ ] You tested the affected skill/hook locally with `claude --plugin-dir`
 
 CI runs the same `make check` target, so local green means CI green. If CI fails where local passed, your checkout is either behind `origin/main` or missing the pinned toolchain (`make deps`); CI runs Python 3.12.

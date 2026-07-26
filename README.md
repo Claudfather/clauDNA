@@ -195,7 +195,7 @@ The marketplace install is managed by Claude Code: plugins live under `~/.claude
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full guide. Writing a new skill? Start with the [Skill Authoring Guide](./documentation/guides/SKILL_AUTHORING_GUIDE.md).
 
-Quick version: branch off `main`, make your change, run `python3 scripts/validate-skills.py`, update CHANGELOG.md, open a PR.
+Quick version: branch off `main`, make your change, update CHANGELOG.md, run `make check` (the exact check-set CI runs), open a PR.
 
 ## Documentation
 
