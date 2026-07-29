@@ -18,3 +18,10 @@ __pycache__/
 # checkout — never part of the plugin. Root-anchored so it can't touch the
 # tracked skills/audit/data-model/ skill.
 /data/
+
+# Claude fleet bot telemetry — supervision hooks may write these relative to
+# the session cwd instead of the bot directory (Claudfather/Claudlobby#874);
+# they can land at any depth and are never product data.
+**/data/events/fleet-*.jsonl
+**/data/.last-tool-call
+**/data/.idle
