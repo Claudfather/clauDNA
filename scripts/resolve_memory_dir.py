@@ -40,8 +40,10 @@ from pathlib import Path
 
 SETTING_KEY = "autoMemoryDirectory"
 
-# Within one directory, `.local` overrides the shared file.
-PROJECT_SETTINGS = (".claude/settings.json", ".claude/settings.local.json")
+# Consulted in this order — the first file that sets the key wins. Within a
+# directory `.local` overrides the shared file; a nearer directory overrides a
+# further one; the user tier is the floor.
+PROJECT_SETTINGS = (".claude/settings.local.json", ".claude/settings.json")
 
 
 def project_slug(cwd: Path) -> str:
@@ -54,15 +56,14 @@ def default_memory_dir(cwd: Path, home: Path) -> Path:
     return home / ".claude" / "projects" / project_slug(cwd) / "memory"
 
 
-def _settings_files(cwd: Path, home: Path, project_dir: Path | None) -> list[Path]:
-    """The settings files to consult, in ascending precedence order."""
-    files = [home / ".claude" / "settings.json"]
-    # Furthest ancestor first so the nearest directory's setting lands last.
-    bases = [project_dir] if project_dir else [cwd, *cwd.parents]
-    for base in reversed(bases):
-        files.extend(base / rel for rel in PROJECT_SETTINGS)
-    # Preserve order while dropping the duplicate when home is itself an ancestor.
-    return list(dict.fromkeys(files))
+def _candidate_dirs(cwd: Path, project_dir: Path | None) -> list[Path]:
+    """Directories whose `.claude/` may set the key, nearest first.
+
+    `CLAUDE_PROJECT_DIR` is the harness's own answer, so it stands alone when
+    exported; otherwise walk up, because a bot's settings sit above the repo
+    checkout its skills run in.
+    """
+    return [project_dir] if project_dir else [cwd, *cwd.parents]
 
 
 def _read_setting(path: Path) -> str | None:
@@ -76,6 +77,16 @@ def _read_setting(path: Path) -> str | None:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
+def _first_configured(cwd: Path, home: Path, project_dir: Path | None) -> str | None:
+    """The winning `autoMemoryDirectory`, or None if nothing sets one."""
+    for base in _candidate_dirs(cwd, project_dir):
+        for rel in PROJECT_SETTINGS:
+            value = _read_setting(base / rel)
+            if value:
+                return value
+    return _read_setting(home / ".claude" / "settings.json")
+
+
 def resolve_memory_dir(cwd: Path, home: Path, project_dir: Path | None = None) -> Path:
     """The harness auto-memory dir for `cwd`, honouring any redirect.
 
@@ -83,9 +94,7 @@ def resolve_memory_dir(cwd: Path, home: Path, project_dir: Path | None = None) -
     chain sets one. A relative setting resolves against `cwd`, and `~` against
     `home`, so the answer is always absolute.
     """
-    configured: str | None = None
-    for path in _settings_files(cwd, home, project_dir):
-        configured = _read_setting(path) or configured
+    configured = _first_configured(cwd, home, project_dir)
     if configured is None:
         return default_memory_dir(cwd, home)
     expanded = Path(configured).expanduser() if configured.startswith("~") else Path(configured)
