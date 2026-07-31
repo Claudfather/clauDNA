@@ -76,7 +76,13 @@ With `--full`, additionally read and summarize the top note in each tier from it
 
 Runs regardless of which retrieval path ran — the harness's per-project auto-memory is a **separate substrate** from the vault. The harness injects this project's `MEMORY.md` **once** at session start, a frozen snapshot: it can miss a topic that only turns relevant later, and it never re-fires if memory changes mid-session (a sibling session, or `/claudna:capture`'s fallback, can write to it while yours is open). So re-read it live on every recall.
 
-1. **Locate it:** `~/.claude/projects/<cwd-slug>/memory/MEMORY.md`, where `<cwd-slug>` is the cwd path with every `/` replaced by `-`. No `memory/` dir or no `MEMORY.md` → skip silently (not every project has harness memory).
+1. **Locate it** — resolve, never reconstruct. The directory is the `autoMemoryDirectory` setting, which redirects freely (Claudlobby points every fleet bot at its own `memory/` dir, outside `~/.claude/` entirely); the cwd-derived `~/.claude/projects/<cwd-slug>/memory` is only the default when nothing sets it. Run a bare command, no pipe:
+
+   ```
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/resolve_memory_dir.py"
+   ```
+
+   (falls back to the highest-versioned `~/.claude/plugins/cache/Claudfather/claudna/*/scripts/resolve_memory_dir.py` when `${CLAUDE_PLUGIN_ROOT}` is unset). It prints the resolved directory; **exit 1 means no readable `MEMORY.md`** → skip silently (not every project has harness memory). Read `MEMORY.md` and any linked topic files from the directory it printed — do not rebuild that path yourself.
 2. **Read the index:** `MEMORY.md` is a flat list of `- [Title](file.md) — hook` lines. Score each against the query terms (title + hook); on a bare recall, take the most-recently-updated few. Cap by `--limit`, like a tier.
 3. **With `--full`,** read the linked `memory/<file.md>` body for the top match and summarize it.
 4. **Render** under its own header — additive to the vault tiers, never a duplicate:
