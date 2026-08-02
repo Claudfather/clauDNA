@@ -214,6 +214,17 @@ rows:
     expect: promotion-intake
     phase: post-epic
 
+  - utterance: "can this app safely serve multiple tenants across several replicas?"
+    keywords: [multi-tenant, isolation]
+    expect: audit
+    mode: multi-tenancy
+    phase: post-epic
+  - utterance: "audit our workspace isolation before we scale out the queue workers"
+    keywords: [multi-tenant isolation, scale]
+    expect: audit
+    mode: multi-tenancy
+    phase: post-epic
+
   # --- Cross-family disambiguation ---
   - utterance: "the page loads slow and the scrolling is janky"
     keywords: [janky]

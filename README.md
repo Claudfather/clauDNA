@@ -63,7 +63,7 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:audit t
 
 | Skill | Description |
 |-------|-------------|
-| `/audit` | Codebase-audit engine — `security` / `tech-debt` / `docs` / `design` / `access-path` / `data-model` / `frontend-perf` / `repo-health` lenses (replaces the eight standalone audit skills) |
+| `/audit` | Codebase-audit engine — `security` / `tech-debt` / `docs` / `design` / `access-path` / `data-model` / `frontend-perf` / `repo-health` / `system` / `cache` / `multi-tenancy` lenses (replaces the eight standalone audit skills) |
 | `/review-work` | Review engine — `changes` (uncommitted work) / `pr` (one PR) / `multi-pr` (parallel subagent reviews + synthesis) modes (replaces the two review skills) |
 | `/verify-completion` | Verify work is actually complete before claiming success |
 | `/visual-crawl` | Autonomous visual crawl — discover routes, screenshot at 3 viewports, file issues for findings |

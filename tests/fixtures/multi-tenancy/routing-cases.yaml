@@ -1,0 +1,57 @@
+# Routing cases for the /audit multi-tenancy lens.
+#
+# Two verification layers, mirroring tests/fixtures/routing-matrix.yaml:
+#
+#   1. CI (deterministic): tests/test_multi_tenancy_lens.py asserts
+#      - every positive row's `anchors` appear (case-insensitive substrings)
+#        in the lens's routing surface (the engine's multi-tenancy table row
+#        plus the lens file's Routing section) — the engine dispatches on
+#        that surface, so anchor presence is the mechanical proxy;
+#      - every negative row's `route_to` target is named in the lens's
+#        negative triggers (and, where given, its `non_trigger` token is
+#        explicitly declared insufficient by both engine row and lens);
+#      - every ambiguous row's utterance contains NO positive anchor, and the
+#        engine retains its stop-on-ambiguity dispatch contract — ambiguous
+#        requests fall to the engine's print-the-table-and-stop rule, never
+#        silently into this lens.
+#   2. Manual (richer, run when the lens table changes): in a fresh session,
+#      type the utterance and record which lens the engine dispatches.
+#      Pass rule: 2 of 3 attempts route positive rows to multi-tenancy,
+#      negative rows to their route_to, and ambiguous rows to the table
+#      printout.
+
+positive:
+  - utterance: "can this app safely serve multiple tenants across several replicas?"
+    anchors: [multiple tenants, replicas]
+  - utterance: "audit our workspace isolation — organizations share one database"
+    anchors: [workspace, isolation]
+  - utterance: "check the queue workers and job leases for cross-tenant bugs"
+    anchors: [queue, lease]
+  - utterance: "review our row-level security policies before we onboard more customers"
+    anchors: [RLS]
+  - utterance: "are per-tenant rate limits and fairness actually enforced across processes?"
+    anchors: [rate limit, fairness, processes]
+  - utterance: "is the tenant backfill migration safe to run while replicas are live?"
+    anchors: [migration, backfill]
+  - utterance: "we post to third parties with customer credentials — can tenants collide?"
+    anchors: [credentials]
+  - utterance: "outbox rows are marked published but workers never pick them up for one account"
+    anchors: [outbox, worker]
+
+negative:
+  - utterance: "find the technical debt in this codebase (our models have a tenant_id column)"
+    route_to: audit tech-debt
+    non_trigger: tenant_id
+  - utterance: "scan the API for SQL injection and leaked secrets"
+    route_to: audit security
+  - utterance: "do the API, CLI, and worker interfaces enforce validation consistently?"
+    route_to: audit access-path
+  - utterance: "does our schema actually fit what the application needs?"
+    route_to: audit data-model
+  - utterance: "production is down and tenants are reporting errors right now"
+    route_to: investigate-app
+
+ambiguous:
+  - utterance: "audit the backend"
+  - utterance: "review how we handle accounts and data"
+  - utterance: "is this codebase in good shape?"
