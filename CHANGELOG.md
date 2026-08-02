@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **`AGENTS.md` with a `## Cursor Cloud specific instructions` section for cloud dev agents.** Documents that clauDNA is a plugin (no server to run — the runtime pieces are the `plugin-hooks/` shell hooks), that `make check` is the single source-of-truth check-set CI mirrors, and captures non-obvious setup caveats (pinned `requirements-dev.txt` toolchain landing in `~/.local/bin`, running `make check` from a login shell, the `check-changelog.sh` branch gate, and driving hooks directly via a JSON event on stdin). Docs only — no skill, agent, script, or hook behavior changed.
+
 ### Security
 - **Any-depth gitignore rules for Claude fleet bot telemetry ([Claudlobby#874](https://github.com/Claudfather/Claudlobby/issues/874)).** The existing root-anchored `/data/` rule shields only checkout-root landings; observed telemetry landings include nested paths (the hook writes relative to the session cwd, wherever that is). Adds narrow any-depth rules for the exact filenames the supervision hooks write — `data/events/fleet-*.jsonl`, `data/.last-tool-call`, `data/.idle` — so a broad `git add` in an agent checkout cannot stage fleet telemetry at any depth. Defence-in-depth behind the #874 writer fix; no product paths match these patterns.
 ### Added
