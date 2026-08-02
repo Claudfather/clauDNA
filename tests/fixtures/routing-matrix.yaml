@@ -214,6 +214,12 @@ rows:
     expect: promotion-intake
     phase: post-epic
 
+  - utterance: "should we rebuild our data model? compare the options and plan the migration"
+    keywords: [data model, redesign]
+    expect: audit
+    mode: data-model-redesign
+    phase: post-epic
+
   # --- Cross-family disambiguation ---
   - utterance: "the page loads slow and the scrolling is janky"
     keywords: [janky]
