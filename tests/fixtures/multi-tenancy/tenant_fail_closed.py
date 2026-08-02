@@ -7,6 +7,7 @@ this file. The safe shapes it demonstrates:
 - tenant context is mandatory — a missing tenant raises instead of widening scope;
 - non-nullable ownership column; uniqueness and cache keys are tenant-composite;
 - idempotency keys embed the tenant and an operation namespace;
+- prefix lookups run over a tenant-namespaced keyspace, never the global one;
 - maintenance/global access is a separate, named, audited interface — never a
   missing-tenant special case on the tenant-scoped one.
 
@@ -67,6 +68,15 @@ class DocumentRepository:
         if row is not None:
             self._cache[cache_key] = row
         return row
+
+    def find_by_key_prefix(self, tenant_id: int, prefix: str) -> list[dict]:
+        self._require_tenant(tenant_id)
+        # The keyspace is tenant-namespaced, so the scan cannot cross tenants.
+        return [
+            doc
+            for key, doc in self._cache.items()
+            if key.startswith(f"{tenant_id}:documents:{prefix}")
+        ]
 
     def create_document(self, tenant_id: int, slug: str, body: str, fingerprint: str) -> str:
         self._require_tenant(tenant_id)

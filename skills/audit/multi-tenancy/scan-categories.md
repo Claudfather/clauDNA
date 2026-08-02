@@ -56,20 +56,23 @@ Everything that stops being true when a second process exists.
 
 ### Machine-checked distributed queue/worker patterns
 
-Exercised by CI against the queue/worker fixture (must trip every pattern; the fail-closed fixture must trip none).
+Exercised by CI against the golden fixtures: the hazard fixture (`queue_worker.py`) must trip every pattern; the correctly **fenced** worker (`queue_worker_fenced.py`) and the fail-closed repository must trip none — each heuristic has to tell the bug from its fix, not just find queue-shaped code.
 
 <!-- test-anchor: queue-worker-patterns -->
 ```regex
-# idempotency key not scoped by tenant (no tenant component on the line)
+# inline idempotency key with no tenant component on the line — a lead, not a verdict:
+# a bare helper call (build_idempotency_key(job)) also needs its body traced for tenant + namespace scope
 idempotency_key\s*=\s*(?!.*tenant)[^\n]+
 # claim query that re-admits rows already claimed as processing (no lease fencing)
 status\s+IN\s*\(\s*'ready'\s*,\s*'processing'\s*\)
-# finalization keyed on id alone — a stale worker that lost its lease can still finalize
-SET\s+status\s*=\s*'done'\s+WHERE\s+id\s*=\s*%s
-# blind retry of an externally visible call after an ambiguous outcome
-except\s+(?:TimeoutError|ConnectionError)\b[^\n]*:\n[^\n]*(?:publish|send|retry)
-# process-local rate limiter guarding a shared budget — multiplies with replicas
-InMemoryRateLimiter|memory://
+# finalization keyed on id alone (no fencing token in the predicate) — a stale worker that lost its lease can still finalize
+SET\s+status\s*=\s*'done'\s+WHERE\s+(?![^"']*(?:token|lease|generation|fence|epoch))id\s*=\s*%s
+# blind retry call of an externally visible effect after an ambiguous outcome
+except\s+(?:TimeoutError|ConnectionError)\b[^\n]*:\n[^\n]*(?:publish|send|retry)\(
+# process-local rate limiter guarding a shared budget — multiplies with replicas.
+# Name/URI-based lead for the common shapes; limiters hand-rolled from module-level
+# counters + locks need the category-E manual trace.
+In[Mm]emory\w*Limiter|memory://
 # fixed, unjittered poll/backoff interval — replicas herd on the same tick after a shared outage
 time\.sleep\(\s*[A-Z][A-Z_0-9]*\s*\)
 ```

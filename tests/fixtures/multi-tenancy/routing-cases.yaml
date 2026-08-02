@@ -53,5 +53,5 @@ negative:
 
 ambiguous:
   - utterance: "audit the backend"
-  - utterance: "review how we handle accounts and data"
+  - utterance: "give the data handling a general review"
   - utterance: "is this codebase in good shape?"

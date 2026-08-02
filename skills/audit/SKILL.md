@@ -1,7 +1,7 @@
 ---
 name: audit
 user-invocable: true
-description: "Use for codebase audits across eleven concerns — security vulnerabilities, technical debt, stale documentation, visual/UX design, frontend performance (janky scroll), cross-cutting consistency of interfaces, data model fit, multi-tenant isolation at scale, birds-eye view across repositories, whole-system comprehension, and prompt-cache efficiency. Replaces /security-audit, /tech-debt, /docs-review, /design-review, /access-path-audit, /data-model-audit, /frontend-performance-audit, /repo-health."
+description: "Use for codebase audits across eleven concerns — security vulnerabilities, technical debt, stale documentation, visual and UX design, frontend performance (janky scroll, slow loads), cross-cutting consistency of interfaces, data model fit, multi-tenant isolation at scale (replicas, queues, RLS), a birds-eye view across repositories, whole-system comprehension reviews, and prompt-cache efficiency."
 argument-hint: "[security|tech-debt|docs|design|access-path|data-model|frontend-perf|repo-health|system|cache|multi-tenancy] [--auto] [--output github|session] [focus]"
 requires:
   - cli: gh

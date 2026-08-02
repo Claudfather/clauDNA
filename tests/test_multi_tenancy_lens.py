@@ -16,8 +16,10 @@ Five concerns, each deterministic in CI:
    of the scorecard, and failure-window coverage of the required traces.
 5. Detection patterns — the machine-checked regexes in scan-categories.md
    against the golden fixtures: the fail-open fixture trips every fail-open
-   pattern, the queue/worker fixture trips every queue pattern, and the
-   fail-closed fixture trips none of either set.
+   pattern, the queue/worker hazard fixture trips every queue pattern, and
+   the two correct implementations (the fail-closed repository and the
+   fenced queue/worker) trip none of either set — every heuristic must tell
+   the bug from its fix, not merely find code of the same shape.
 """
 
 from __future__ import annotations
@@ -46,6 +48,35 @@ ROUTING_CASES = FIXTURE_DIR / "routing-cases.yaml"
 FAIL_OPEN_FIXTURE = FIXTURE_DIR / "tenant_fail_open.py"
 FAIL_CLOSED_FIXTURE = FIXTURE_DIR / "tenant_fail_closed.py"
 QUEUE_FIXTURE = FIXTURE_DIR / "queue_worker.py"
+FENCED_QUEUE_FIXTURE = FIXTURE_DIR / "queue_worker_fenced.py"
+
+# The lens's declared positive triggers (multi-tenancy.md § Positive triggers),
+# flattened to matchable terms. Ambiguous fixture rows are screened against
+# this full vocabulary — not just the curated per-row anchors — so an
+# "ambiguous" utterance cannot smuggle in a declared trigger word.
+POSITIVE_TRIGGER_TERMS = [
+    "multi-tenan",
+    "tenant",
+    "organization",
+    "workspace",
+    "account",
+    "isolation",
+    "replica",
+    "scaling",
+    "queue",
+    "worker",
+    "job",
+    "lease",
+    "outbox",
+    "scheduler",
+    "rate limit",
+    "fairness",
+    "rls",
+    "row-level security",
+    "migration",
+    "backfill",
+    "credential",
+]
 
 
 def engine_frontmatter_and_body() -> tuple[dict, str]:
@@ -203,15 +234,18 @@ def test_tenant_id_alone_is_declared_a_non_trigger():
     )
 
 
-def test_ambiguous_utterances_carry_no_positive_anchor():
-    # Fixture hygiene: an "ambiguous" utterance containing a positive anchor
-    # would not be ambiguous — it would legitimately route to this lens.
+def test_ambiguous_utterances_carry_no_positive_trigger():
+    # Fixture hygiene: an "ambiguous" utterance containing a declared positive
+    # trigger would not be ambiguous — it would legitimately route to this
+    # lens. Screen against the full trigger vocabulary, not just the curated
+    # per-row anchors (which are a subset and can miss a smuggled trigger).
     cases = load_routing_cases()
     anchors = {str(a).lower() for row in cases["positive"] for a in row["anchors"]}
+    screen = anchors | set(POSITIVE_TRIGGER_TERMS)
     for row in cases["ambiguous"]:
         utterance = row["utterance"].lower()
-        hits = [a for a in anchors if a in utterance]
-        assert not hits, f"ambiguous utterance {row['utterance']!r} contains positive anchor(s) {hits}"
+        hits = [term for term in sorted(screen) if term in utterance]
+        assert not hits, f"ambiguous utterance {row['utterance']!r} contains positive trigger(s) {hits}"
 
 
 def test_engine_retains_stop_on_ambiguity_contract():
@@ -437,18 +471,24 @@ def test_queue_fixture_trips_every_queue_pattern():
     )
 
 
-def test_fail_closed_fixture_trips_no_pattern():
-    # The discriminating half of the golden pair: a correctly fail-closed
-    # implementation (mandatory tenant context, tenant-scoped keys, audited
-    # maintenance path) must not match any heuristic — otherwise the lens
-    # flags healthy code.
-    text = FAIL_CLOSED_FIXTURE.read_text()
-    false_positives = [
-        p
-        for anchor in ("fail-open-patterns", "queue-worker-patterns")
-        for p in extract_patterns(anchor)
-        if re.search(p, text)
-    ]
-    assert not false_positives, (
-        f"patterns match the fail-closed fixture (false positives): {false_positives}"
-    )
+def test_correct_implementations_trip_no_pattern():
+    # The discriminating half of the golden set: the correct implementations
+    # must not match any heuristic — otherwise the lens flags healthy code.
+    # tenant_fail_closed.py mirrors the fail-open hazards (mandatory tenant
+    # context, tenant-scoped keys and prefix lookups, audited maintenance
+    # path); queue_worker_fenced.py mirrors the queue/worker hazards (fenced
+    # finalization, tenant-scoped idempotency key, reconcile-not-retry,
+    # injected shared limiter, jittered polls) — so every pattern is proven
+    # to tell its bug from that bug's fix.
+    for fixture in (FAIL_CLOSED_FIXTURE, FENCED_QUEUE_FIXTURE):
+        text = fixture.read_text()
+        false_positives = [
+            p
+            for anchor in ("fail-open-patterns", "queue-worker-patterns")
+            for p in extract_patterns(anchor)
+            if re.search(p, text)
+        ]
+        assert not false_positives, (
+            f"patterns match the correct implementation {fixture.name} "
+            f"(false positives): {false_positives}"
+        )

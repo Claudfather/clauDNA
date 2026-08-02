@@ -188,7 +188,7 @@ When `--auto` is set (implies `--output github`; lens contract §4, orchestratio
 1. Skip Plan Mode — run Phases 0–3 directly.
 2. Skip the user confirmation gate; do not generate Phase 4 remediation plans.
 3. Use the engine's `[focus]` argument as scope; if none, audit the full system.
-4. Create GitHub Issues for all P0 and P1 findings (immediately), P2 batched; skip P3 unless particularly noteworthy.
+4. Create GitHub Issues for all P0 and P1 findings (immediately), P2 batched; skip P3 unless particularly noteworthy. **Confidence floor:** a `low`-confidence (pattern-only) lead never files as P0/P1 — batch it with the P2s, naming the evidence that would confirm or dismiss it.
 5. Scrub every published doc through the redactor (orchestration-guide §7) — no raw credential values in issue bodies or artifacts.
 6. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
