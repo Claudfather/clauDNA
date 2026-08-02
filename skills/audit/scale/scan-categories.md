@@ -1,6 +1,6 @@
-# Multi-Tenancy Scan Categories
+# Scale Scan Categories
 
-Reference material for the `/claudna:audit multi-tenancy` lens. Eight categories (A–H), one per scorecard dimension in `report-template.md`. Subagents run the categories assigned to them (see `subagent-prompts.md`), adapting the grep heuristics to the detected stack. A pattern hit is a *lead to trace*, never an automatic finding; a clean grep is never proof of absence.
+Reference material for the `/claudna:audit scale` lens. Eight categories (A–H), one per scorecard dimension in `report-template.md`. Subagents run the categories assigned to them (see `subagent-prompts.md`), adapting the grep heuristics to the detected stack. A pattern hit is a *lead to trace*, never an automatic finding; a clean grep is never proof of absence.
 
 Do NOT read CLAUDE.md or MEMORY.md — already in the system prompt.
 
@@ -26,7 +26,7 @@ Every read/write interface, key, and cache the tenant boundary must pass through
 
 ### Machine-checked fail-open patterns
 
-These heuristics are exercised by this repo's CI against the golden fixtures in `tests/fixtures/multi-tenancy/` (fail-open fixture must trip every pattern; the fail-closed fixture must trip none). One pattern per line; `#` starts a comment.
+These heuristics are exercised by this repo's CI against the golden fixtures in `tests/fixtures/scale/` (fail-open fixture must trip every pattern; the fail-closed fixture must trip none). One pattern per line; `#` starts a comment.
 
 <!-- test-anchor: fail-open-patterns -->
 ```regex

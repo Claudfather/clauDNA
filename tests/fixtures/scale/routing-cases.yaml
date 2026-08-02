@@ -1,10 +1,10 @@
-# Routing cases for the /audit multi-tenancy lens.
+# Routing cases for the /audit scale lens.
 #
 # Two verification layers, mirroring tests/fixtures/routing-matrix.yaml:
 #
-#   1. CI (deterministic): tests/test_multi_tenancy_lens.py asserts
+#   1. CI (deterministic): tests/test_scale_lens.py asserts
 #      - every positive row's `anchors` appear (case-insensitive substrings)
-#        in the lens's routing surface (the engine's multi-tenancy table row
+#        in the lens's routing surface (the engine's scale table row
 #        plus the lens file's Routing section) — the engine dispatches on
 #        that surface, so anchor presence is the mechanical proxy;
 #      - every negative row's `route_to` target is named in the lens's
@@ -16,11 +16,15 @@
 #        silently into this lens.
 #   2. Manual (richer, run when the lens table changes): in a fresh session,
 #      type the utterance and record which lens the engine dispatches.
-#      Pass rule: 2 of 3 attempts route positive rows to multi-tenancy,
+#      Pass rule: 2 of 3 attempts route positive rows to scale,
 #      negative rows to their route_to, and ambiguous rows to the table
 #      printout.
 
 positive:
+  - utterance: "will this system survive 10x growth in users and traffic?"
+    anchors: [growth]
+  - utterance: "is the pipeline built for high throughput, or do the workers fall over under load?"
+    anchors: [high throughput, worker]
   - utterance: "can this app safely serve multiple tenants across several replicas?"
     anchors: [multiple tenants, replicas]
   - utterance: "audit our workspace isolation — organizations share one database"
@@ -50,6 +54,8 @@ negative:
     route_to: audit data-model
   - utterance: "production is down and tenants are reporting errors right now"
     route_to: investigate-app
+  - utterance: "profile this one slow endpoint and make it faster"
+    route_to: audit system
 
 ambiguous:
   - utterance: "audit the backend"

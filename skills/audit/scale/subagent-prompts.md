@@ -1,8 +1,8 @@
 # Subagent Prompt Templates
 
-Reference material for the `/claudna:audit multi-tenancy` lens. Detailed instructions for the subagents launched during Phases 1–2. All subagents follow the disk-write pattern (`skills/_shared/orchestration-guide.md` Sections 2 & 6): write findings to the scratch dir, return a 2-4 line summary, never stream research through the orchestrator. Every research file that captured command output or configuration is scrubbed in place with the redactor (`python3 scripts/redact.py <file>`; path per orchestration-guide §7) before handoff.
+Reference material for the `/claudna:audit scale` lens. Detailed instructions for the subagents launched during Phases 1–2. All subagents follow the disk-write pattern (`skills/_shared/orchestration-guide.md` Sections 2 & 6): write findings to the scratch dir, return a 2-4 line summary, never stream research through the orchestrator. Every research file that captured command output or configuration is scrubbed in place with the redactor (`python3 scripts/redact.py <file>`; path per orchestration-guide §7) before handoff.
 
-Every prompt receives: the Phase 0 tenant-boundary map, the focus area (if any), and the scratch path `/tmp/multi-tenancy-audit-<YYYY-MM-DD_HHMMSS>/research/`.
+Every prompt receives: the Phase 0 boundary and capacity map, the focus area (if any), and the scratch path `/tmp/scale-audit-<YYYY-MM-DD_HHMMSS>/research/`.
 
 Common rules for all subagents:
 
@@ -15,7 +15,7 @@ Common rules for all subagents:
 
 ## Subagent A: Identity & data isolation
 
-**Prompt:** "Audit tenant identity and data isolation per categories A and B of `<skill-dir>/scan-categories.md`. The tenant-boundary map is: <paste>. Write findings to `<scratch>/research/identity-data.md` using the Write tool. Return a 2-4 line summary."
+**Prompt:** "Audit tenant identity and data isolation per categories A and B of `<skill-dir>/scan-categories.md`. The boundary and capacity map is: <paste>. Write findings to `<scratch>/research/identity-data.md` using the Write tool. Return a 2-4 line summary."
 
 The subagent should:
 
@@ -41,7 +41,7 @@ The subagent should:
 
 ## Subagent B: Coordination & providers
 
-**Prompt:** "Audit distributed coordination and provider-effect safety per categories C and D of `<skill-dir>/scan-categories.md`. The tenant-boundary map is: <paste>. Write findings to `<scratch>/research/coordination-providers.md` using the Write tool. Return a 2-4 line summary."
+**Prompt:** "Audit distributed coordination and provider-effect safety per categories C and D of `<skill-dir>/scan-categories.md`. The boundary and capacity map is: <paste>. Write findings to `<scratch>/research/coordination-providers.md` using the Write tool. Return a 2-4 line summary."
 
 The subagent should:
 
@@ -67,7 +67,7 @@ The subagent should:
 
 ## Subagent C: Fairness & observability
 
-**Prompt:** "Audit fairness/capacity and observability per categories E and F of `<skill-dir>/scan-categories.md`. The tenant-boundary map is: <paste>. Write findings to `<scratch>/research/fairness-observability.md` using the Write tool. Return a 2-4 line summary."
+**Prompt:** "Audit fairness/capacity and observability per categories E and F of `<skill-dir>/scan-categories.md`. The boundary and capacity map is: <paste>. Write findings to `<scratch>/research/fairness-observability.md` using the Write tool. Return a 2-4 line summary."
 
 The subagent should:
 
@@ -96,7 +96,7 @@ The subagent should:
 
 ## Subagent D: Migrations & tests
 
-**Prompt:** "Audit migration safety and isolation-test coverage per categories G and H of `<skill-dir>/scan-categories.md`. The tenant-boundary map is: <paste>. Write findings to `<scratch>/research/migrations-tests.md` using the Write tool. Return a 2-4 line summary."
+**Prompt:** "Audit migration safety and isolation-test coverage per categories G and H of `<skill-dir>/scan-categories.md`. The boundary and capacity map is: <paste>. Write findings to `<scratch>/research/migrations-tests.md` using the Write tool. Return a 2-4 line summary."
 
 The subagent should:
 

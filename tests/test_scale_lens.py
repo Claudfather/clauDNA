@@ -1,4 +1,4 @@
-"""Checks for the /audit multi-tenancy lens (routing, contract, detection patterns).
+"""Checks for the /audit scale lens (routing, contract, detection patterns).
 
 Five concerns, each deterministic in CI:
 
@@ -7,7 +7,7 @@ Five concerns, each deterministic in CI:
    live only in the lens directory).
 2. Routing — positive anchors resolve against the routing surface, negative
    rows name their alternative lens, ambiguous rows fall to the engine's
-   stop-on-ambiguity rule (fixtures/multi-tenancy/routing-cases.yaml; the
+   stop-on-ambiguity rule (fixtures/scale/routing-cases.yaml; the
    richer manual protocol is documented in that file's header).
 3. Report contract — report-template.md carries the stable section order,
    verdict values, scorecard dimensions, per-finding fields, and the severity
@@ -36,21 +36,21 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from skill_checks import parse_frontmatter
 
 ENGINE_MD = REPO_ROOT / "skills" / "audit" / "SKILL.md"
-LENS_DIR = REPO_ROOT / "skills" / "audit" / "multi-tenancy"
-LENS_MD = LENS_DIR / "multi-tenancy.md"
+LENS_DIR = REPO_ROOT / "skills" / "audit" / "scale"
+LENS_MD = LENS_DIR / "scale.md"
 SCAN_MD = LENS_DIR / "scan-categories.md"
 WINDOWS_MD = LENS_DIR / "failure-windows.md"
 TEMPLATE_MD = LENS_DIR / "report-template.md"
 PROMPTS_MD = LENS_DIR / "subagent-prompts.md"
 
-FIXTURE_DIR = Path(__file__).parent / "fixtures" / "multi-tenancy"
+FIXTURE_DIR = Path(__file__).parent / "fixtures" / "scale"
 ROUTING_CASES = FIXTURE_DIR / "routing-cases.yaml"
 FAIL_OPEN_FIXTURE = FIXTURE_DIR / "tenant_fail_open.py"
 FAIL_CLOSED_FIXTURE = FIXTURE_DIR / "tenant_fail_closed.py"
 QUEUE_FIXTURE = FIXTURE_DIR / "queue_worker.py"
 FENCED_QUEUE_FIXTURE = FIXTURE_DIR / "queue_worker_fenced.py"
 
-# The lens's declared positive triggers (multi-tenancy.md § Positive triggers),
+# The lens's declared positive triggers (scale.md § Positive triggers),
 # flattened to matchable terms. Ambiguous fixture rows are screened against
 # this full vocabulary — not just the curated per-row anchors — so an
 # "ambiguous" utterance cannot smuggle in a declared trigger word.
@@ -71,6 +71,10 @@ POSITIVE_TRIGGER_TERMS = [
     "scheduler",
     "rate limit",
     "fairness",
+    "throughput",
+    "growth",
+    "scale",
+    "capacity",
     "rls",
     "row-level security",
     "migration",
@@ -86,10 +90,10 @@ def engine_frontmatter_and_body() -> tuple[dict, str]:
 
 
 def engine_lens_row() -> str:
-    """The multi-tenancy row of the engine's lens table."""
+    """The scale row of the engine's lens table."""
     _, body = engine_frontmatter_and_body()
-    rows = [ln for ln in body.splitlines() if ln.startswith("| `multi-tenancy`")]
-    assert len(rows) == 1, f"expected exactly one multi-tenancy table row, found {len(rows)}"
+    rows = [ln for ln in body.splitlines() if ln.startswith("| `scale`")]
+    assert len(rows) == 1, f"expected exactly one scale table row, found {len(rows)}"
     return rows[0]
 
 
@@ -139,15 +143,15 @@ def test_lens_files_exist():
 
 def test_engine_table_row_registers_the_lens():
     row = engine_lens_row()
-    assert "`multi-tenancy/multi-tenancy.md`" in row, "row must point at the lens depth file"
+    assert "`scale/scale.md`" in row, "row must point at the lens depth file"
     cells = [c.strip() for c in row.strip("|").split("|")]
-    assert cells[2] == "yes", f"multi-tenancy is a read-only scan lens — Auto column should be 'yes', got {cells[2]!r}"
+    assert cells[2] == "yes", f"scale is a read-only scan lens — Auto column should be 'yes', got {cells[2]!r}"
 
 
 def test_argument_hint_carries_the_lens_token():
     fm, _ = engine_frontmatter_and_body()
-    assert "multi-tenancy" in str(fm.get("argument-hint", "")), (
-        "engine argument-hint must list the multi-tenancy lens token"
+    assert "scale" in str(fm.get("argument-hint", "")), (
+        "engine argument-hint must list the scale lens token"
     )
 
 
@@ -156,7 +160,7 @@ def test_description_carries_routing_vocabulary():
     # these anchors are what the matrix rows for this lens key on.
     fm, _ = engine_frontmatter_and_body()
     desc = str(fm.get("description", "")).lower()
-    for anchor in ("multi-tenant", "isolation"):
+    for anchor in ("scale", "throughput", "multi-tenant", "isolation"):
         assert anchor in desc, f"engine description lost routing anchor {anchor!r}"
 
 
@@ -268,7 +272,7 @@ def test_lens_defers_the_ambiguous_case_to_the_engine():
 REPORT_SECTIONS = [
     "## 1. Executive verdict",
     "## 2. Scorecard",
-    "## 3. Tenant-boundary map",
+    "## 3. Boundary and capacity map",
     "## 4. Evidence audit",
     "## 5. Failure sequences",
     "## 6. Findings (P0–P3)",
@@ -416,7 +420,7 @@ def test_capacity_envelope_is_demanded():
     assert "No declared envelope is itself a finding" in lens, (
         "an unstated capacity target must be a finding, not a blank"
     )
-    boundary = markdown_section(TEMPLATE_MD.read_text(), "3. Tenant-boundary map")
+    boundary = markdown_section(TEMPLATE_MD.read_text(), "3. Boundary and capacity map")
     assert "capacity envelope" in boundary.lower(), (
         "the report's boundary map must carry the envelope the audit graded against"
     )

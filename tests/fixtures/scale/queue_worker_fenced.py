@@ -1,7 +1,7 @@
 """Golden fixture: a correctly FENCED distributed queue/worker.
 
 The negative control for the machine-checked queue/worker patterns in
-skills/audit/multi-tenancy/scan-categories.md: this file implements the *fix*
+skills/audit/scale/scan-categories.md: this file implements the *fix*
 for every hazard in queue_worker.py, so no pattern may match it — a heuristic
 that fires here cannot tell the bug from its fix and would make the lens flag
 healthy code. The safe shapes:

@@ -1,7 +1,7 @@
 """Golden fixture: a correctly FAIL-CLOSED tenant boundary.
 
-Exercised by tests/test_multi_tenancy_lens.py: no machine-checked fail-open or
-queue/worker pattern in skills/audit/multi-tenancy/scan-categories.md may match
+Exercised by tests/test_scale_lens.py: no machine-checked fail-open or
+queue/worker pattern in skills/audit/scale/scan-categories.md may match
 this file. The safe shapes it demonstrates:
 
 - tenant context is mandatory — a missing tenant raises instead of widening scope;

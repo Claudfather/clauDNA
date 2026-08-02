@@ -1,7 +1,7 @@
 """Golden fixture: a FAIL-OPEN tenant boundary (every isolation seam is optional).
 
-Exercised by tests/test_multi_tenancy_lens.py: every machine-checked fail-open
-pattern in skills/audit/multi-tenancy/scan-categories.md must match this file.
+Exercised by tests/test_scale_lens.py: every machine-checked fail-open
+pattern in skills/audit/scale/scan-categories.md must match this file.
 The hazards are deliberate:
 
 - optional tenant argument with a ``None`` default (scoping by convention);

@@ -1,6 +1,6 @@
 # Cross-Process Failure Windows
 
-Reference material for the `/claudna:audit multi-tenancy` lens, consumed by the Phase 2 convergence subagent. Each window is a *shape* of distributed failure; the subagent instantiates it against the actual code paths found in Phase 1, producing a concrete ordered sequence (who does what, in what order, what breaks) — or records the repository evidence that closes the window. A generic warning is not an acceptable trace.
+Reference material for the `/claudna:audit scale` lens, consumed by the Phase 2 convergence subagent. Each window is a *shape* of distributed failure; the subagent instantiates it against the actual code paths found in Phase 1, producing a concrete ordered sequence (who does what, in what order, what breaks) — or records the repository evidence that closes the window. A generic warning is not an acceptable trace.
 
 Format per window: **Sequence** (the generic shape) · **Required invariant** (what closes it) · **Where to look** (evidence leads).
 

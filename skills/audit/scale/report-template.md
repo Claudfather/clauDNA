@@ -1,6 +1,6 @@
-# Multi-Tenancy Audit Report Template
+# Scale Audit Report Template
 
-The output contract for the `/claudna:audit multi-tenancy` lens. The report is **stable**: sections appear in exactly this order with these headings, so downstream consumers (issue filing per `skills/_shared/output-guide.md`, re-audits, diffs between audits) can rely on the structure. Sections with nothing to report state that explicitly ("No open decisions.") — never omit a section.
+The output contract for the `/claudna:audit scale` lens. The report is **stable**: sections appear in exactly this order with these headings, so downstream consumers (issue filing per `skills/_shared/output-guide.md`, re-audits, diffs between audits) can rely on the structure. Sections with nothing to report state that explicitly ("No open decisions.") — never omit a section.
 
 Severity and confidence vocabulary are defined at the bottom; findings carry the canonical concern areas from `skills/_shared/contracts/lens-result-contract.md`.
 
@@ -10,9 +10,9 @@ Severity and confidence vocabulary are defined at the bottom; findings carry the
 
 Exactly one of:
 
-- **approve** — the tenant boundary holds across the audited surfaces; remaining findings are P2/P3.
-- **approve with required changes** — the direction is sound, but named P0/P1 findings must land before (further) multi-tenant or multi-replica operation.
-- **reject** — the boundary does not hold and no bounded set of changes identified by this audit closes it; a design change is required.
+- **approve** — the system survives its declared envelope: the isolation boundary holds and capacity behavior is bounded across the audited surfaces; remaining findings are P2/P3.
+- **approve with required changes** — the direction is sound, but named P0/P1 findings must land before (further) growth: more replicas, more tenants, or higher admitted throughput.
+- **reject** — the boundary or the capacity model does not hold and no bounded set of changes identified by this audit closes it; a design change is required.
 
 Follow the verdict with the minimum rationale (2–5 sentences) and the boxed summary (lens, scope, verdict, finding counts by severity).
 
@@ -31,11 +31,11 @@ Score each dimension 0–5 against **repository-proven** evidence only (document
 | Migration safety | /5 | |
 | Testability | /5 | |
 
-Anchors: 0 = boundary absent; 2 = present but fail-open or single-process-only; 4 = enforced with independent layers and tested; 5 = enforced, tested hostile + cross-process, and operator-observable.
+Anchors: 0 = boundary absent; 2 = present but fail-open or single-process-only; 4 = enforced with independent layers and tested; 5 = enforced, tested hostile + cross-process, and operator-observable. When Phase 0 records no isolation unit, the isolation-specific dimensions grade `N/A` with that reason — an absent boundary is never scored as a safe one, and `N/A` rows are excluded from any aggregate.
 
-## 3. Tenant-boundary map
+## 3. Boundary and capacity map
 
-The Phase 0 output, finalized: what a tenant is (anchor model/table/type), where tenant identity is derived server-side (and every place it is instead client-supplied), and the enumerated surfaces the boundary must span — processes, replicas, queues, databases, caches, provider credentials, operational workflows. Include a short table of tenant-owned data stores/tables with their ownership column and nullability.
+The Phase 0 output, finalized: the isolation unit ("tenant" — org/workspace/account, or the individual user account in a consumer product; or its recorded absence), where tenant identity is derived server-side (and every place it is instead client-supplied), and the enumerated surfaces the boundary must span — processes, replicas, queues, databases, caches, provider credentials, operational workflows. Include a short table of tenant-owned data stores/tables with their ownership column and nullability.
 
 Close the map with the **capacity envelope** the audit graded against: provisioned vs. concurrently active tenants, peak admission rate, replica plan, shared budgets (DB pool, provider concurrency, limiter scope), and each latency/availability SLO with its unambiguous measurement point. State whether the envelope was declared by the repository or derived by the audit — an underived, undeclared envelope is a finding, not a blank.
 

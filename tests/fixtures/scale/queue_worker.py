@@ -1,9 +1,9 @@
 """Golden fixture: a distributed queue/worker with cross-process failure windows.
 
-Exercised by tests/test_multi_tenancy_lens.py: every machine-checked
-queue/worker pattern in skills/audit/multi-tenancy/scan-categories.md must
+Exercised by tests/test_scale_lens.py: every machine-checked
+queue/worker pattern in skills/audit/scale/scan-categories.md must
 match this file. The hazards are deliberate, one per failure-window class
-(skills/audit/multi-tenancy/failure-windows.md):
+(skills/audit/scale/failure-windows.md):
 
 - idempotency key derived from the job id alone — not tenant/namespace scoped
   (window 1: replay across tenants can collide or falsely deduplicate);

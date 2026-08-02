@@ -1,4 +1,4 @@
-Invoked by /claudna:audit in multi-tenancy mode — evaluates whether an application safely supports multiple tenants across processes, replicas, queues, databases, caches, external providers, and operational workflows. Answers one question: where does the tenant boundary actually hold, where does it fail open, and what breaks first under scale-out?
+Invoked by /claudna:audit in scale mode — evaluates whether the system will survive growth: high throughput, high user counts, and multiple tenants across processes, replicas, queues, databases, caches, external providers, and operational workflows. Answers one question: what breaks first under growth — and does the isolation boundary hold while it breaks? Multi-tenancy is one dimension of scale survival, not a separate concern: the seams that leak between tenants and the seams that collapse under load are audited together because they fail together.
 
 **Persona:** Principal distributed-systems reviewer with a hostile-caller mindset. Evidence-driven — every finding cites file/symbol. Treats process memory, brokers, and network responses as fallible. Does not validate a design merely because it is detailed; prefers a smaller enforceable contract over broad aspirational language. If the evidence does not support a claim, says so.
 
@@ -6,14 +6,16 @@ Invoked by /claudna:audit in multi-tenancy mode — evaluates whether an applica
 
 ## Routing
 
-Direct invocation: `/claudna:audit multi-tenancy [focus]`. Automatic routing is the engine's job — the engine (`skills/audit/SKILL.md`) selects this lens from its table when the request wording unambiguously matches the triggers below; otherwise it prints the lens table and stops (engine dispatch rules). This lens never claims the ambiguous case.
+Direct invocation: `/claudna:audit scale [focus]`. Automatic routing is the engine's job — the engine (`skills/audit/SKILL.md`) selects this lens from its table when the request wording unambiguously matches the triggers below; otherwise it prints the lens table and stops (engine dispatch rules). This lens never claims the ambiguous case.
 
 ### Positive triggers
 
 Evidence in the request or repository that warrants this lens:
 
-- multi-tenancy, organizations, workspaces, accounts, or customer isolation;
+- growth questions — "will this survive 10x users or traffic?", launch-spike readiness, capacity planning;
+- sustained or bursty high throughput — ingestion, fan-out, worker fleets under load;
 - horizontal scaling or multiple replicas of any process;
+- multi-tenancy — multiple tenants, organizations, workspaces, accounts, or customer isolation;
 - tenant-owned database rows;
 - queues, workers, jobs, leases, outboxes, or schedulers;
 - tenant or provider rate limits and fairness between tenants;
@@ -29,16 +31,18 @@ Evidence in the request or repository that warrants this lens:
 - Injection, secrets exposure, OWASP patterns → `/claudna:audit security` (cross-tenant *authorization* stays here; generic vulnerability scanning does not).
 - Whether interfaces enforce cross-cutting concerns consistently → `/claudna:audit access-path`.
 - Schema-to-intent fit and awkward code-to-DB paths → `/claudna:audit data-model`.
+- Making one endpoint or page faster (profiling, query tuning, micro-optimization) is performance engineering, not scale survival → `/claudna:audit frontend-perf` for UI symptoms, `/claudna:audit system` for whole-system triage that includes backend performance.
 - A live production outage → `/claudna:investigate-app` (this lens examines systems at rest).
 
 ## The Key Insight
 
-A codebase that is safe single-process and single-tenant usually fails multi-tenancy through two seam classes, and neither is visible from the presence of tenant columns:
+A codebase that works single-process at today's load usually fails growth through three seam classes, and none is visible from healthy-path reading:
 
 1. **Fail-open interfaces** — the tenant scope is *optional* somewhere: a `tenant=None` default, a nullable ownership column, an unscoped query helper, a global prefix lookup, or a maintenance path that smuggles global access through a missing tenant. Every optional scope is an isolation bug waiting for one forgotten argument.
 2. **Cross-process windows** — invariants enforced by process memory (locks, in-flight sets, local rate limiters) silently stop holding when a second replica, worker, or scheduler exists. The failure is a *sequence*, not a line of code: replay, lease expiry, stale workers, cancellation racing an external effect, broker loss.
+3. **Capacity cliffs** — budgets enforced per process silently multiply with replica count; admission has no backpressure, so overload becomes cascading failure instead of bounded rejection; unjittered retries herd after every recovery; fairness is assumed from queue topology. The system does not degrade under growth — it falls off a cliff, and nobody stated the envelope it was supposed to hold.
 
-The audit therefore hunts for optionality and for sequences — never for the mere presence of tenant vocabulary.
+The audit therefore hunts for optionality, for sequences, and for unstated envelopes — never for the mere presence of tenant vocabulary or a big queue.
 
 ## Evidence discipline
 
@@ -80,19 +84,19 @@ Do NOT read CLAUDE.md or MEMORY.md — already in system prompt.
 
 ### Phase 0: Boundary definition
 
-Before scanning anything, answer in writing (this becomes the report's tenant-boundary map):
+Before scanning anything, answer in writing (this becomes the report's boundary and capacity map):
 
-1. **What is a tenant here?** The organization/workspace/account/customer unit the system claims to isolate — in a consumer product, the individual user account (a tenant of size one). Name the model/table/type that anchors it.
+1. **What is the isolation unit ("tenant") here?** The organization/workspace/account/customer unit the system claims to isolate — in a consumer product, the individual user account (a tenant of size one). Name the model/table/type that anchors it. If the system genuinely has none (a single-customer internal tool with no user accounts), record that: the isolation-specific checks grade `N/A` with that reason, and the audit proceeds on the throughput and coordination dimensions.
 2. **What is the authoritative tenant identity?** Where is the tenant derived *server-side* from the authenticated principal — and where is it instead accepted from client input (a header, a body field, a URL segment)? Client-supplied tenant identity is a finding, not a boundary.
 3. **Which surfaces are inside the boundary?** Processes, replicas, queues, databases, caches, provider credentials, scheduled/operational workflows — enumerate what the boundary must span.
 4. **What does the system claim?** Collect isolation/fairness/scaling claims from docs and comments and pre-classify each per the evidence discipline.
 5. **What is the declared capacity envelope?** Provisioned vs. concurrently active tenants, peak admission rate, replica plan per process, shared budgets (DB pool, provider concurrency), and every latency/availability SLO the system claims — each SLO with its measurement point. All pressure claims in Phases 1–2 are challenged against these declared numbers. **No declared envelope is itself a finding** — a system cannot be pressure-tested against an unstated target; derive a conservative envelope from observed configuration, say so, and grade against that.
 
-If the repository has no plausible tenant concept at all, report that and stop — this lens has nothing to audit (under `--auto`, emit the structured result with `"outcome": "blocked"`).
+If the system has neither an isolation unit nor any scale-out surface (no replicas, no workers or queues, no shared budgets), report that and stop — this lens has nothing to audit (under `--auto`, emit the structured result with `"outcome": "blocked"`).
 
 ### Phase 1: Parallel discovery
 
-**Scratch directory:** `/tmp/multi-tenancy-audit-<YYYY-MM-DD_HHMMSS>/research/`
+**Scratch directory:** `/tmp/scale-audit-<YYYY-MM-DD_HHMMSS>/research/`
 
 Launch four `general-purpose` subagents in parallel (disk-write pattern per `skills/_shared/orchestration-guide.md` — subagents write findings to the scratch dir and return 2-4 line summaries; the orchestrator never reads full research files):
 
@@ -117,7 +121,7 @@ Assemble the report **exactly** per `report-template.md` in this lens directory 
 
 Present the report and ask:
 
-**"Here is the multi-tenancy audit. Would you like me to generate remediation plans? I'll group related fixes into PRs."**
+**"Here is the scale audit. Would you like me to generate remediation plans? I'll group related fixes into PRs."**
 
 Do NOT proceed to Phase 4 without explicit confirmation.
 
@@ -129,19 +133,19 @@ Do NOT proceed to Phase 4 without explicit confirmation.
 
 **Output lands in:**
 ```
-documentation/planning/multi-tenancy/<session_name>_<YYYY-MM-DD>/
-├── 00_MULTI_TENANCY_AUDIT.md
+documentation/planning/scale/<session_name>_<YYYY-MM-DD>/
+├── 00_SCALE_AUDIT.md
 ├── 01_<remediation-slug>.md
 └── ...
 ```
 
-Plan agents write the family to the session's scratch docs directory (`/tmp/multi-tenancy-audit-<YYYY-MM-DD_HHMMSS>/docs/`); the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/multi-tenancy/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide, Section 3).
+Plan agents write the family to the session's scratch docs directory (`/tmp/scale-audit-<YYYY-MM-DD_HHMMSS>/docs/`); the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/scale/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide, Section 3).
 
-`00_MULTI_TENANCY_AUDIT.md` is the full Phase 3 report. Each numbered doc is exactly one PR, grouping related findings (e.g., all mandatory-tenant-context changes → one PR; all lease-fencing changes → one PR), ordered P0 first, and must include the required invariants it discharges plus the acceptance-test rows that prove it. Plan agents follow Section 9 of the orchestration guide and `skills/_shared/planning-standard.md`.
+`00_SCALE_AUDIT.md` is the full Phase 3 report. Each numbered doc is exactly one PR, grouping related findings (e.g., all mandatory-tenant-context changes → one PR; all lease-fencing changes → one PR), ordered P0 first, and must include the required invariants it discharges plus the acceptance-test rows that prove it. Plan agents follow Section 9 of the orchestration guide and `skills/_shared/planning-standard.md`.
 
 **Adversarial review pass:** follow `skills/_shared/pre-handoff-checklist.md` on every doc before publishing. Prioritize `concern_area` values `security`, `data-integrity`, `error-handling`. If a critic finds that a proposed remediation *itself* opens a cross-tenant window (e.g., a backfill that guesses ownership), elevate to CRITICAL.
 
-Then hand off: **"Plans are ready. Run `/claudna:implement-plan documentation/planning/multi-tenancy/<session>/` to start building."** This lens produces plans, not code — see `skills/_shared/orchestration-guide.md` §11.
+Then hand off: **"Plans are ready. Run `/claudna:implement-plan documentation/planning/scale/<session>/` to start building."** This lens produces plans, not code — see `skills/_shared/orchestration-guide.md` §11.
 
 ---
 
@@ -199,13 +203,13 @@ When `--auto` is set (implies `--output github`; lens contract §4, orchestratio
   "skill": "audit",
   "outcome": "completed",
   "artifacts": {
-    "lens": "multi-tenancy",
+    "lens": "scale",
     "verdict": "approve with required changes",
     "issues_created": ["..."],
     "findings_by_severity": {"P0": 1, "P1": 2, "P2": 4, "P3": 3},
     "scorecard": {"identity-authorization": 3, "data-isolation": 2, "distributed-coordination": 2, "provider-isolation": 3, "fairness-capacity": 1, "observability": 2, "migration-safety": 3, "testability": 2},
     "unverified_claims": 2,
-    "session_dir": "documentation/planning/multi-tenancy/<session>/"
+    "session_dir": "documentation/planning/scale/<session>/"
   },
   "summary": "<2-3 line digest>",
   "next": null,
@@ -214,4 +218,4 @@ When `--auto` is set (implies `--output github`; lens contract §4, orchestratio
 }
 ```
 
-- `outcome` is `completed` on success, `partial` if some issue creates failed, `blocked` if the repository has no plausible tenant concept (per Phase 0).
+- `outcome` is `completed` on success, `partial` if some issue creates failed, `blocked` if the system has neither an isolation unit nor a scale-out surface (per Phase 0).
