@@ -1,8 +1,8 @@
 ---
 name: audit
 user-invocable: true
-description: "Use for codebase audits across ten concerns — security vulnerabilities, technical debt, stale documentation, visual and UX design, frontend performance (janky scroll, slow loads), cross-cutting consistency of interfaces, data model fit, a birds-eye view across repositories, whole-system comprehension reviews, and prompt-cache efficiency. Replaces /security-audit, /tech-debt, /docs-review, /design-review, /access-path-audit, /data-model-audit, /frontend-performance-audit, /repo-health."
-argument-hint: "[security|tech-debt|docs|design|access-path|data-model|frontend-perf|repo-health|system|cache] [--auto] [--output github|session] [focus]"
+description: "Use for codebase audits across ten concerns — security vulnerabilities, technical debt, stale documentation, visual and UX design, frontend performance (janky scroll, slow loads), cross-cutting consistency of interfaces, data model fit and redesign, a birds-eye view across repositories, whole-system comprehension, and prompt-cache efficiency. Replaces /security-audit, /tech-debt, /docs-review, /design-review, /access-path-audit, /data-model-audit, /frontend-performance-audit, /repo-health."
+argument-hint: "[security|tech-debt|docs|design|access-path|data-model|data-model-redesign|frontend-perf|repo-health|system|cache] [--auto] [--output github|session] [focus]"
 requires:
   - cli: gh
     reason: "GitHub CLI for --output github issue filing (via publish) and the repo-health lens's PR/CI listing"
@@ -10,7 +10,7 @@ requires:
 
 # Audit
 
-One engine for codebase audits — ten concern lenses as verb modes. Shared behavior (arguments, output routing, autonomous mode, orchestration) lives in `skills/_shared/audit-lens-contract.md`; this file supplies only the lens table and dispatch rules.
+One engine for codebase audits — eleven lenses as verb modes. Shared behavior (arguments, output routing, autonomous mode, orchestration) lives in `skills/_shared/audit-lens-contract.md`; this file supplies only the lens table and dispatch rules.
 
 ## Lens dispatch (contract §2, §4)
 
@@ -25,7 +25,8 @@ No lens token → infer only when the request wording is unambiguous (e.g. "chec
 | `docs` | Project documentation stale, inaccurate, or incomplete vs the codebase | yes | `docs/docs.md` |
 | `design` | Visual and UX audit of a deployed app — spacing, typography, flows, accessibility | no | `design/design.md` |
 | `access-path` | Interfaces (API, CLI, Slack, MCP, SDK, workers) enforcing cross-cutting concerns consistently, at the right layer | yes | `access-path/access-path.md` |
-| `data-model` | How well the data model serves the application — schema-to-intent mismatches, awkward code-to-DB paths | no | `data-model/data-model.md` |
+| `data-model` | How well the data model serves the application — schema-to-intent mismatches, awkward code-to-DB paths. For whether the model should be rebuilt, `data-model-redesign` | no | `data-model/data-model.md` |
+| `data-model-redesign` | Whether the data model should be rebuilt — reconstruct the system, compare candidate target models (incremental repair included), plan a staged migration. For a fast fit-audit of the model as it stands, `data-model` | no | `data-model-redesign/data-model-redesign.md` |
 | `frontend-perf` | Frontend performance symptoms — flickering, slow loads, janky scroll, re-renders, layout shifts | yes | `frontend-perf/frontend-perf.md` |
 | `repo-health` | Birds-eye view across multiple repositories — activity, staleness, CI health, open work | no | `repo-health/repo-health.md` |
 | `system` | An unfamiliar whole system (or subsystem) to understand and triage at rest — comprehension maps plus cross-concern correctness/reliability/performance/data-quality risk, filed as junior-executable, tracker-deduplicated issues | no | `system/system.md` |

@@ -42,6 +42,7 @@ Planning output (the default `--output docs` target) routes through `/claudna:pu
 | `/claudna:audit design` | `documentation/planning/phases/` |
 | `/claudna:audit repo-health` | `documentation/planning/repo_health/` |
 | `/claudna:audit data-model` | `documentation/planning/data-model/` |
+| `/claudna:audit data-model-redesign` | `documentation/planning/data-model/` |
 | `/claudna:product-enhance` | `documentation/planning/phases/` |
 | `/claudna:product-vision` | `documentation/planning/product-vision/` |
 | `/claudna:investigate-app` | `documentation/planning/investigations/` |
