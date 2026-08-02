@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Cursor team marketplace manifests (`.cursor-plugin/`).** Adds `plugin.json` and `marketplace.json` so clauDNA can be imported as a Cursor team marketplace the same way as other internal skill packs (Customize → team marketplace, or Dashboard → Plugins → Import from Repo). Ships skills and agents; shell hooks remain Claude Code–only (different hook runtime and `${CLAUDE_PLUGIN_ROOT}` paths). `validate-manifest.py` now checks both `.claude-plugin/` and `.cursor-plugin/` and enforces version sync between them.
 - **`AGENTS.md` with a `## Cursor Cloud specific instructions` section for cloud dev agents.** Documents that clauDNA is a plugin (no server to run — the runtime pieces are the `plugin-hooks/` shell hooks), that `make check` is the single source-of-truth check-set CI mirrors, and captures non-obvious setup caveats (pinned `requirements-dev.txt` toolchain landing in `~/.local/bin`, running `make check` from a login shell, the `check-changelog.sh` branch gate, and driving hooks directly via a JSON event on stdin). Docs only — no skill, agent, script, or hook behavior changed.
 
 ### Security
