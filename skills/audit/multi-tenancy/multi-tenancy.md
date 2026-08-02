@@ -21,6 +21,8 @@ Evidence in the request or repository that warrants this lens:
 - tenant-aware migrations or backfills;
 - externally visible effects performed with tenant-owned credentials.
 
+"Tenant" names the isolation unit, not the billing shape: in a consumer product the unit is the individual user account — a tenant of size one — and every trigger and check in this lens applies unchanged to per-user isolation at high user counts.
+
 ### Negative triggers (when NOT to use)
 
 - A `tenant_id` column existing somewhere is NOT a trigger by itself — an ordinary code-quality request against a codebase that happens to have tenants routes to `/claudna:audit tech-debt`.
@@ -80,7 +82,7 @@ Do NOT read CLAUDE.md or MEMORY.md — already in system prompt.
 
 Before scanning anything, answer in writing (this becomes the report's tenant-boundary map):
 
-1. **What is a tenant here?** The organization/workspace/account/customer unit the system claims to isolate. Name the model/table/type that anchors it.
+1. **What is a tenant here?** The organization/workspace/account/customer unit the system claims to isolate — in a consumer product, the individual user account (a tenant of size one). Name the model/table/type that anchors it.
 2. **What is the authoritative tenant identity?** Where is the tenant derived *server-side* from the authenticated principal — and where is it instead accepted from client input (a header, a body field, a URL segment)? Client-supplied tenant identity is a finding, not a boundary.
 3. **Which surfaces are inside the boundary?** Processes, replicas, queues, databases, caches, provider credentials, scheduled/operational workflows — enumerate what the boundary must span.
 4. **What does the system claim?** Collect isolation/fairness/scaling claims from docs and comments and pre-classify each per the evidence discipline.
