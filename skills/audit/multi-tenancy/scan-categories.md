@@ -70,6 +70,8 @@ SET\s+status\s*=\s*'done'\s+WHERE\s+id\s*=\s*%s
 except\s+(?:TimeoutError|ConnectionError)\b[^\n]*:\n[^\n]*(?:publish|send|retry)
 # process-local rate limiter guarding a shared budget — multiplies with replicas
 InMemoryRateLimiter|memory://
+# fixed, unjittered poll/backoff interval — replicas herd on the same tick after a shared outage
+time\.sleep\(\s*[A-Z][A-Z_0-9]*\s*\)
 ```
 
 ## D. Provider isolation
@@ -88,8 +90,13 @@ Challenge every rate-limit and fairness claim **at its actual shared scope**.
 
 - For each limiter: what is the enforced scope (process, replica, deployment, tenant, provider account) versus the *claimed* scope? A process-local limiter multiplies with replica count; a global limiter keyed by tenant does not protect a genuinely shared provider budget, and tenant-keying a shared budget does not create per-tenant capacity.
 - Can one tenant's burst delay every other tenant (FIFO queue, sequential scheduler loop, unbounded prefetch)? Consumer groups distribute work — they do not by themselves implement weighted fairness, priority, or a starvation bound. Demand the dispatch-time mechanism and its observable maximum peer lag.
-- Capacity math: process concurrency × replicas vs. database pool budget, provider concurrency, thread offload, temporary storage. "Scale the workers" must not silently multiply provider or DB pressure.
-- Grep leads: rate-limiter construction (storage backend = the enforced scope), semaphores, pool sizes, prefetch counts, `for tenant in tenants:` loops in schedulers.
+- Capacity math: process concurrency × replicas vs. database pool budget, provider concurrency, thread offload, temporary storage. "Scale the workers" must not silently multiply provider or DB pressure. Challenge every claimed number against the Phase 0 declared capacity envelope; where the envelope is derived (not declared), say so in the finding.
+- **Admission control and backpressure at saturation:** when a shared budget (DB pool, provider concurrency, queue depth, memory) is exhausted, does admission fail fast — reject/defer with bounded latency — or do requests hang for the full timeout while unbounded in-memory queues grow? Missing backpressure converts overload into cascading failure exactly when the system is already unhealthy.
+- **Retry storms and herds:** are retries bounded *and jittered*? After a shared outage ends (provider recovery, broker restart, limiter-store restart), do all replicas and all queued jobs retry on the same tick? Fixed, unjittered poll/backoff intervals herd by construction; respect provider reset/retry-after signals with per-key spreading.
+- **Atomic multi-bucket admission:** hierarchical budgets (global → tenant → provider key) must be checked and consumed all-or-none; a partial consume across buckets under a mid-check failure leaks capacity or permanently under-admits.
+- **Degraded-mode policy:** when the shared limiter/coordination store is unavailable, what is the *declared* admission behavior — fail-closed (refuse admission, an availability cost) or bounded fail-open (a conservative local budget)? Silent fail-open at full local capacity multiplies admission exactly during the outage; an undeclared policy is a finding.
+- **Autoscaling signal:** scaling should key on queue age, saturation, and budget exhaustion — not CPU. Provider slots, DB connections, and ambiguity backlogs exhaust while CPU stays low, so CPU-keyed autoscaling never fires for the failures this lens audits.
+- Grep leads: rate-limiter construction (storage backend = the enforced scope), semaphores, pool sizes and pool-wait timeouts, prefetch counts, retry/backoff decorators and their jitter arguments, fixed `sleep` intervals in worker loops, `for tenant in tenants:` loops in schedulers, autoscaler configuration.
 
 ## F. Observability
 
@@ -99,6 +106,7 @@ Whether an operator can see the boundary holding — without the telemetry itsel
 - Traces and logs carry tenant context on every tenant-scoped operation, so a cross-tenant incident is diagnosable.
 - No cross-tenant leakage *through* telemetry: tenant A's identifiers, payload contents, or credentials must not appear in tenant B's error messages, shared dashboards, or support tooling.
 - Operator visibility for the coordination machinery: queue age per tenant, lease recoveries, ambiguous provider operations awaiting review, poison/dead-letter counts, fairness lag. An invariant nobody can observe will be violated silently.
+- **SLO measurement points:** every latency/availability SLO the system claims (from the Phase 0 envelope) must have an unambiguous measurement point in shipped telemetry — which timestamps, measured at which component, aggregated at which percentile. An SLO that cannot be measured from production signals is `documentation-only` by construction — flag it and name the missing instrumentation.
 
 ## G. Migration safety
 

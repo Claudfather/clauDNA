@@ -63,3 +63,15 @@ Format per window: **Sequence** (the generic shape) · **Required invariant** (w
 **Sequence:** tenant A enqueues a large burst ahead of tenant B; FIFO ordering, a sequential per-tenant scheduler loop, or a large prefetch keeps serving A; B's first job waits behind A's ten-thousandth; per-tenant concurrency caps bound A's *active* work but not B's queue-position wait.
 **Required invariant:** fairness is enforced at or before dispatch (weighted quantum, per-tenant interleaving, age promotion) with bounded prefetch, and produces an observable maximum peer lag — queue topology alone is not a fairness proof.
 **Where to look:** dispatch/relay selection queries, scheduler iteration order, prefetch/batch sizes, any fairness metric or its absence (ties to scan category F).
+
+## 11. Shared limiter/coordination-store outage (degraded admission)
+
+**Sequence:** the store backing shared rate limits or admission coordination becomes unavailable; each replica silently falls back to admitting at its full local capacity (or to no limit at all); aggregate admission multiplies by replica count precisely while a dependency is already down; downstream budgets (DB pool, provider limits) are breached and the outage cascades. The inverse failure is equally real: an undeclared fail-closed fallback turns a coordination blip into a total admission outage nobody planned for.
+**Required invariant:** the degraded-mode admission policy is *declared* and bounded — fail-closed, or fail-open within a conservative per-replica budget sized so that replicas × local budget stays inside every shared downstream budget — and the degradation is loud (metric + alert), not silent.
+**Where to look:** limiter-client exception handling (what happens on connection error?), fallback branches around the coordination store, whether any test exercises admission during a store outage.
+
+## 12. Post-recovery retry herd (thundering herd)
+
+**Sequence:** a shared dependency (provider, broker, database) recovers after an outage; every replica's fixed, unjittered poll/backoff interval fires on the same tick; all queued and retry-eligible work re-attempts simultaneously; the synchronized burst re-trips the provider's rate limit or re-saturates the pool; the dependency "fails" again — a self-inflicted oscillation.
+**Required invariant:** retries and recovery polls are bounded and jittered; provider reset/retry-after signals are respected with per-key spreading; concurrency ramps back gradually (e.g. additive increase) instead of releasing the full backlog at once.
+**Where to look:** retry/backoff decorators and their jitter parameters, fixed `sleep(CONSTANT)` worker loops, backlog release behavior after health checks flip green (ties to scan category E).

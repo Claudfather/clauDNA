@@ -71,19 +71,25 @@ The subagent should:
 
 The subagent should:
 
-1. For every rate limiter and concurrency bound: the *enforced* scope (storage backend, key) vs. the *claimed* scope; what multiplies with replica count; what shared budgets (provider, DB pool) lack deployment-wide enforcement.
+1. For every rate limiter and concurrency bound: the *enforced* scope (storage backend, key) vs. the *claimed* scope; what multiplies with replica count; what shared budgets (provider, DB pool) lack deployment-wide enforcement; whether multi-bucket admission is atomic (all-or-none) and what the declared degraded-mode policy is when the limiter store is unavailable.
 2. Trace the one-tenant-flood path: dispatch order, prefetch, scheduler iteration — can one tenant delay peers, and is there an observable fairness bound?
-3. Assess telemetry: metric cardinality strategy for tenant labels, tenant context in traces/logs, cross-tenant leakage through error messages or shared dashboards, operator visibility of queue age / lease recoveries / ambiguous operations / poison counts.
+3. Trace saturation behavior: at each shared-budget bound, does admission fail fast (reject/defer, bounded latency) or hang/grow unbounded queues? Are retries and recovery polls bounded and jittered, or do replicas herd after a shared outage? Is autoscaling keyed on queue age/saturation rather than CPU? Challenge every number against the Phase 0 capacity envelope.
+4. Assess telemetry: metric cardinality strategy for tenant labels, tenant context in traces/logs, cross-tenant leakage through error messages or shared dashboards, operator visibility of queue age / lease recoveries / ambiguous operations / poison counts.
+5. For each SLO in the Phase 0 envelope: name its unambiguous measurement point in shipped telemetry, or record that none exists.
 
 **Research file format:**
 ```markdown
 # Fairness & Observability
 ## Limiter inventory
-| Limiter (file:symbol) | Enforced scope | Claimed scope | Multiplies with replicas? |
+| Limiter (file:symbol) | Enforced scope | Claimed scope | Multiplies with replicas? | Degraded-mode policy |
 ## Flood path
 [dispatch order, prefetch, the concrete delay mechanism — evidence class per claim]
+## Saturation & recovery behavior
+[per shared budget: fail-fast vs. hang, retry jitter, herd risk, autoscaling signal — evidence class per claim]
 ## Telemetry
 [cardinality, tenant context, leakage risks, operator visibility — each with evidence class]
+## SLO measurement points
+| SLO (claimed) | Measurement point (or MISSING) |
 ```
 
 ---

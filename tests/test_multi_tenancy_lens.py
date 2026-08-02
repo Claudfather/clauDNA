@@ -368,8 +368,46 @@ def test_failure_windows_cover_required_traces():
         "pooled connection",
         "poison",
         "flood",
+        "degraded admission",
+        "herd",
     ):
         assert keyword in text, f"failure-windows.md missing required window keyword {keyword!r}"
+
+
+def test_capacity_envelope_is_demanded():
+    # The pressure-tester bar: claims are graded against a stated numeric
+    # target, and the absence of one is itself a finding.
+    lens = LENS_MD.read_text()
+    assert "capacity envelope" in lens.lower(), "Phase 0 must demand the capacity envelope"
+    assert "No declared envelope is itself a finding" in lens, (
+        "an unstated capacity target must be a finding, not a blank"
+    )
+    boundary = markdown_section(TEMPLATE_MD.read_text(), "3. Tenant-boundary map")
+    assert "capacity envelope" in boundary.lower(), (
+        "the report's boundary map must carry the envelope the audit graded against"
+    )
+
+
+def test_slo_measurement_point_rule():
+    # Every claimed SLO needs an unambiguous measurement point in shipped
+    # telemetry; an unmeasurable SLO is documentation-only by construction.
+    scan = SCAN_MD.read_text().lower()
+    assert "measurement point" in scan, "scan category F must carry the SLO measurement-point rule"
+
+
+def test_saturation_and_recovery_behavior_is_audited():
+    scan = SCAN_MD.read_text().lower()
+    for token in ("backpressure", "jitter", "degraded-mode", "autoscaling", "all-or-none"):
+        assert token in scan, f"scan categories missing pressure-behavior token {token!r}"
+
+
+def test_acceptance_matrix_requires_pressure_rows():
+    matrix = markdown_section(TEMPLATE_MD.read_text(), "8. Acceptance-test matrix").lower()
+    for token in ("saturation", "storm", "herd", "fast reject"):
+        assert token in matrix, f"acceptance-test matrix missing pressure scenario token {token!r}"
+    assert "one saturation row per shared budget" in matrix, (
+        "the matrix must require a saturation row for every shared budget"
+    )
 
 
 # --- 5. Detection patterns vs. golden fixtures -----------------------------

@@ -15,7 +15,9 @@ match this file. The hazards are deliberate, one per failure-window class
 - blind retry of an externally visible publish after an ambiguous timeout
   (window 6: the effect may have happened twice);
 - process-local rate limiter guarding a shared provider budget — the budget
-  multiplies with every added replica (window 10 / scan category E).
+  multiplies with every added replica (window 10 / scan category E);
+- fixed, unjittered poll interval — after a shared outage every replica wakes
+  and retries on the same tick (window 12: post-recovery retry herd).
 
 This file is static audit material — it is never imported by the test suite.
 """
@@ -25,6 +27,7 @@ from __future__ import annotations
 import time
 
 LEASE_SECONDS = 30
+POLL_INTERVAL_SECONDS = 5
 
 # HAZARD: 'processing' rows become claimable again on staleness alone; the new
 # claim carries no fencing token the original holder would fail to present.
@@ -85,3 +88,10 @@ class PublishWorker:
 
         self._db.execute(FINALIZE_SQL, [job_id])
         return True
+
+    def run_forever(self) -> None:
+        while True:
+            if not self.run_once():
+                # HAZARD: every replica sleeps the same fixed interval, so after a
+                # shared outage they all wake — and retry — on the same tick.
+                time.sleep(POLL_INTERVAL_SECONDS)

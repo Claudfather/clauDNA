@@ -37,6 +37,8 @@ Anchors: 0 = boundary absent; 2 = present but fail-open or single-process-only; 
 
 The Phase 0 output, finalized: what a tenant is (anchor model/table/type), where tenant identity is derived server-side (and every place it is instead client-supplied), and the enumerated surfaces the boundary must span — processes, replicas, queues, databases, caches, provider credentials, operational workflows. Include a short table of tenant-owned data stores/tables with their ownership column and nullability.
 
+Close the map with the **capacity envelope** the audit graded against: provisioned vs. concurrently active tenants, peak admission rate, replica plan, shared budgets (DB pool, provider concurrency, limiter scope), and each latency/availability SLO with its unambiguous measurement point. State whether the envelope was declared by the repository or derived by the audit — an underived, undeclared envelope is a finding, not a blank.
+
 ## 4. Evidence audit
 
 One row per significant claim examined, with its evidence class from the lens's evidence discipline:
@@ -79,9 +81,14 @@ Concrete tests that would prove the invariants — positive, hostile, missing-co
 | hostile cross-tenant read | tenant A requests tenant B's id | denial, no existence leak | denial audit + unchanged B rows |
 | missing tenant context | call scoped interface without context, as the runtime DB role | fail closed (raise/deny) | integration assertion under runtime role |
 | concurrent claim | two processes claim the same job | one live lease token | conditional-update row count |
+| flood fairness | tenant A contributes 90% of enqueued work | peers start within the declared lag bound | per-tenant lag quantiles |
+| provider rate-limit storm | fake limit responses with reset headers | bounded jittered retry, reduced concurrency, no herd | active/retry timeline |
+| DB pool saturation | hold DB-active tasks at the pool bound | fast reject/defer with bounded admission latency — no full-timeout hangs | pool-wait metric + admission status |
+| coordination-store outage | stop the limiter/wake-up store under load | the declared degraded policy holds (fail-closed, or bounded fail-open) and degrades loudly | admission decisions + degradation alert during outage |
+| post-recovery herd | restore a failed shared dependency with a retry backlog | gradual ramp, no synchronized burst re-tripping the dependency | dependency call-rate timeline after recovery |
 | … | | | |
 
-Include at minimum: one positive-isolation row, one hostile cross-tenant row, one missing-context row, and one row per open failure window from §5.
+Include at minimum: one positive-isolation row, one hostile cross-tenant row, one missing-context row, one row per open failure window from §5, and **one saturation row per shared budget** (DB pool, provider budget, coordination/limiter store). Saturation rows must prove fast reject/defer at the admission edge — bounded latency, never unbounded queue growth or full-timeout hangs — under load at the Phase 0 envelope's declared peak.
 
 ## 9. Open decisions
 
