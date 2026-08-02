@@ -1,8 +1,8 @@
 ---
 name: audit
 user-invocable: true
-description: "Use for codebase audits across eleven concerns — security vulnerabilities, technical debt, stale documentation, visual and UX design, frontend performance (janky scroll, slow loads), cross-cutting consistency of interfaces, data model fit, multi-tenant isolation at scale (replicas, queues, RLS), a birds-eye view across repositories, whole-system comprehension reviews, and prompt-cache efficiency."
-argument-hint: "[security|tech-debt|docs|design|access-path|data-model|frontend-perf|repo-health|system|cache|multi-tenancy] [--auto] [--output github|session] [focus]"
+description: "Use for codebase audits — security vulnerabilities, technical debt, stale documentation, visual and UX design, frontend performance (janky scroll, slow loads), cross-cutting consistency of interfaces, data model fit and redesign, multi-tenant isolation at scale (replicas, queues, RLS), a birds-eye view across repositories, whole-system comprehension, and prompt-cache efficiency."
+argument-hint: "[security|tech-debt|docs|design|access-path|data-model|data-model-redesign|frontend-perf|repo-health|system|cache|multi-tenancy] [--auto] [--output github|session] [focus]"
 requires:
   - cli: gh
     reason: "GitHub CLI for --output github issue filing (via publish) and the repo-health lens's PR/CI listing"
@@ -10,7 +10,7 @@ requires:
 
 # Audit
 
-One engine for codebase audits — eleven concern lenses as verb modes. Shared behavior (arguments, output routing, autonomous mode, orchestration) lives in `skills/_shared/audit-lens-contract.md`; this file supplies only the lens table and dispatch rules.
+One engine for codebase audits — concern lenses as verb modes. Shared behavior (arguments, output routing, autonomous mode, orchestration) lives in `skills/_shared/audit-lens-contract.md`; this file supplies only the lens table and dispatch rules.
 
 ## Lens dispatch (contract §2, §4)
 
@@ -25,12 +25,13 @@ No lens token → infer only when the request wording is unambiguous (e.g. "chec
 | `docs` | Project documentation stale, inaccurate, or incomplete vs the codebase | yes | `docs/docs.md` |
 | `design` | Visual and UX audit of a deployed app — spacing, typography, flows, accessibility | no | `design/design.md` |
 | `access-path` | Interfaces (API, CLI, Slack, MCP, SDK, workers) enforcing cross-cutting concerns consistently, at the right layer | yes | `access-path/access-path.md` |
-| `data-model` | How well the data model serves the application — schema-to-intent mismatches, awkward code-to-DB paths | no | `data-model/data-model.md` |
+| `data-model` | How well the data model serves the application — schema-to-intent mismatches, awkward code-to-DB paths. For whether the model should be rebuilt, `data-model-redesign` | no | `data-model/data-model.md` |
+| `data-model-redesign` | Whether the data model should be rebuilt — reconstruct the system, compare candidate target models (incremental repair included), plan a staged migration. For a fast fit-audit of the model as it stands, `data-model` | no | `data-model-redesign/data-model-redesign.md` |
 | `frontend-perf` | Frontend performance symptoms — flickering, slow loads, janky scroll, re-renders, layout shifts | yes | `frontend-perf/frontend-perf.md` |
 | `repo-health` | Birds-eye view across multiple repositories — activity, staleness, CI health, open work | no | `repo-health/repo-health.md` |
 | `system` | An unfamiliar whole system (or subsystem) to understand and triage at rest — comprehension maps plus cross-concern correctness/reliability/performance/data-quality risk, filed as junior-executable, tracker-deduplicated issues | no | `system/system.md` |
 | `cache` | Prompt-cache efficiency of project config (`CLAUDE.md`, `.claude/`) — section ordering, file size, auto-loaded files, tool/model stability, mid-session edits, rules-file scoping | yes | `cache/cache.md` |
-| `multi-tenancy` | Whether the app safely supports multiple tenants across processes and replicas — tenant/org/workspace/account isolation, queues/workers/leases/outboxes, RLS, tenant-aware rate limits and fairness, tenant migrations/backfills, effects via tenant-owned credentials. A `tenant_id` column alone is NOT a trigger | yes | `multi-tenancy/multi-tenancy.md` |
+| `multi-tenancy` | Whether the app safely supports multiple tenants across processes and replicas — tenant/org/workspace/account isolation, queues/workers/leases/outboxes, RLS, tenant-aware rate limits and fairness, tenant-aware migrations, effects via tenant-owned credentials. A `tenant_id` column alone is NOT a trigger | yes | `multi-tenancy/multi-tenancy.md` |
 
 For the selected lens, read ONLY its depth file in this skill directory and follow it exactly — never load another lens's depth (contract §1).
 

@@ -1,6 +1,6 @@
 Invoked by /claudna:audit in data-model mode — a grounded audit of how well an application's data model serves the code that uses it: schema-to-intent mismatches, awkward code-to-database paths, redundant or missing structures.
 
-Audits a Python/Postgres application's data model against its codebase — traces code paths to DB interactions, maps intent to schema, finds where the model fights the application. Interactive-only lens: there is no `--auto` variant; the engine owns the `--auto` blocked-result path (contract §4).
+Audits a Python/Postgres application's data model against its codebase — traces code paths to DB interactions, maps intent to schema, finds where the model fights the application. This is the **fast fit-audit** of the model as it stands; for a ground-up redesign evaluation — candidate target architectures compared and a staged migration planned — use the sibling lens `/claudna:audit data-model-redesign`. Interactive-only lens: there is no `--auto` variant; the engine owns the `--auto` blocked-result path (contract §4).
 
 **Persona:** Senior data architect who reads code. Evidence-driven — every finding cites specific code paths and schema elements.
 

@@ -1,0 +1,26 @@
+{
+  "name": "claudna",
+  "displayName": "claudna",
+  "version": "0.18.0",
+  "description": "Curated skills, agents, and hooks — the canonical capability set of the Claudfather ecosystem.",
+  "author": {
+    "name": "Chris Rogers",
+    "url": "https://github.com/Claudfather"
+  },
+  "homepage": "https://github.com/Claudfather/clauDNA",
+  "repository": "https://github.com/Claudfather/clauDNA",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "agents",
+    "devops",
+    "vercel",
+    "modal",
+    "railway",
+    "snowflake",
+    "neon",
+    "dbt"
+  ],
+  "skills": "./skills/",
+  "agents": "./agents/"
+}
