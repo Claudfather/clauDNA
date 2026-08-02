@@ -1,7 +1,7 @@
 ---
 name: audit
 user-invocable: true
-description: "Use for codebase audits across ten concerns — security vulnerabilities, technical debt, stale documentation, visual and UX design, frontend performance (janky scroll, slow loads), cross-cutting consistency of interfaces, data model fit and redesign, a birds-eye view across repositories, whole-system comprehension, and prompt-cache efficiency. Replaces /security-audit, /tech-debt, /docs-review, /design-review, /access-path-audit, /data-model-audit, /frontend-performance-audit, /repo-health."
+description: "Use for codebase audits — security vulnerabilities, technical debt, stale documentation, visual and UX design, frontend performance (janky scroll, slow loads), cross-cutting consistency of interfaces, data model fit and redesign, a birds-eye view across repositories, whole-system comprehension, and prompt-cache efficiency. Replaces /security-audit, /tech-debt, /docs-review, /design-review, /access-path-audit, /data-model-audit, /frontend-performance-audit, /repo-health."
 argument-hint: "[security|tech-debt|docs|design|access-path|data-model|data-model-redesign|frontend-perf|repo-health|system|cache] [--auto] [--output github|session] [focus]"
 requires:
   - cli: gh
@@ -10,7 +10,7 @@ requires:
 
 # Audit
 
-One engine for codebase audits — eleven lenses as verb modes. Shared behavior (arguments, output routing, autonomous mode, orchestration) lives in `skills/_shared/audit-lens-contract.md`; this file supplies only the lens table and dispatch rules.
+One engine for codebase audits — concern lenses as verb modes. Shared behavior (arguments, output routing, autonomous mode, orchestration) lives in `skills/_shared/audit-lens-contract.md`; this file supplies only the lens table and dispatch rules.
 
 ## Lens dispatch (contract §2, §4)
 

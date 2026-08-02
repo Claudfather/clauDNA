@@ -31,7 +31,7 @@ The full per-part requirements live in `evaluation-prompt-template.md` (same dir
 
 ## Procedure
 
-Follow the steps in order. Call `EnterPlanMode` first per the lens contract §6 — every step through the direction gate (1–6) is read-only for the orchestrator. After the gate, follow the **mode-specific** plan-mode transition in Step 7. All pre-gate scratch files are written by subagents (Task = separate sessions, not bound by the orchestrator's plan mode), per the house pattern (orchestration guide §2–§3, §6).
+Follow the steps in order. Call `EnterPlanMode` first per the lens contract (`skills/_shared/audit-lens-contract.md`) §6 — every step through the direction gate (1–6) is read-only for the orchestrator. After the gate, follow the **mode-specific** plan-mode transition in Step 7. All pre-gate scratch files are written by subagents (Task = separate sessions, not bound by the orchestrator's plan mode), per the house pattern (`skills/_shared/orchestration-guide.md` §2–§3, §6).
 
 **Scratch root** for this run: `/tmp/audit-<YYYY-MM-DD_HHMMSS>/data-model-redesign/` — reconstruction files under `research/`, authored deliverables under `docs/`. The Write tool creates directories on first write; do not `mkdir`.
 
