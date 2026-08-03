@@ -1,8 +1,8 @@
 ---
 name: audit
 user-invocable: true
-description: "Use for codebase audits — security vulnerabilities, technical debt, stale documentation, visual and UX design, frontend performance (janky scroll, slow loads), cross-cutting consistency of interfaces, data model fit and redesign, a birds-eye view across repositories, whole-system comprehension, and prompt-cache efficiency. Replaces /security-audit, /tech-debt, /docs-review, /design-review, /access-path-audit, /data-model-audit, /frontend-performance-audit, /repo-health."
-argument-hint: "[security|tech-debt|docs|design|access-path|data-model|data-model-redesign|frontend-perf|repo-health|system|cache] [--auto] [--output github|session] [focus]"
+description: "Use for codebase audits — security vulnerabilities, technical debt, stale documentation, visual and UX design, frontend performance (janky scroll, slow loads), cross-cutting consistency of interfaces, data model fit and redesign, scale survival (high throughput, high user counts, multi-tenant isolation), a birds-eye view across repositories, whole-system comprehension, and prompt-cache efficiency."
+argument-hint: "[security|tech-debt|docs|design|access-path|data-model|data-model-redesign|frontend-perf|repo-health|system|cache|scale] [--auto] [--output github|session] [focus]"
 requires:
   - cli: gh
     reason: "GitHub CLI for --output github issue filing (via publish) and the repo-health lens's PR/CI listing"
@@ -31,6 +31,7 @@ No lens token → infer only when the request wording is unambiguous (e.g. "chec
 | `repo-health` | Birds-eye view across multiple repositories — activity, staleness, CI health, open work | no | `repo-health/repo-health.md` |
 | `system` | An unfamiliar whole system (or subsystem) to understand and triage at rest — comprehension maps plus cross-concern correctness/reliability/performance/data-quality risk, filed as junior-executable, tracker-deduplicated issues | no | `system/system.md` |
 | `cache` | Prompt-cache efficiency of project config (`CLAUDE.md`, `.claude/`) — section ordering, file size, auto-loaded files, tool/model stability, mid-session edits, rules-file scoping | yes | `cache/cache.md` |
+| `scale` | Whether the system survives growth — high throughput, high user counts, and multi-tenancy across processes and replicas: capacity and saturation behavior, queues/workers/leases/outboxes, tenant/org/workspace/account isolation, RLS, tenant-aware rate limits and fairness, tenant-aware migrations, effects via tenant-owned credentials. A `tenant_id` column alone is NOT a trigger | yes | `scale/scale.md` |
 
 For the selected lens, read ONLY its depth file in this skill directory and follow it exactly — never load another lens's depth (contract §1).
 
