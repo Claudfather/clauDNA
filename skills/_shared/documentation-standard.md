@@ -49,6 +49,7 @@ Planning output (the default `--output docs` target) routes through `/claudna:pu
 | `/claudna:investigate-app` | `documentation/planning/investigations/` |
 | `/claudna:development-retro` | `documentation/planning/retros/` |
 | `/claudna:weigh-development-paths` | `documentation/planning/decisions/` |
+| `/claudna:kindle` | `documentation/planning/decisions/` |
 | `/claudna:forge` (docs output) | `documentation/planning/<topic-slug>/` |
 
 If the target directory doesn't exist, publish creates it before writing (Write tool creates parents). Don't fail on missing directories. Categories beyond §1's scaffolded tree (`performance/`, `repo_health/`, `data-model/`, `retros/`, `decisions/`) are created on demand the same way.
@@ -74,7 +75,7 @@ Phase files use: `NN_<phase-slug>.md` (e.g., `01_input-validation.md`).
 
 ## 5. Status Markers
 
-Embed these in plan documents. They are machine-read by `/claudna:session` (resume and handoff modes) and `/claudna:implement-plan`:
+Embed these in plan documents. They are machine-read by `/claudna:session` (resume and handoff modes) and `/claudna:build`:
 
 | Marker | Meaning |
 |--------|---------|
@@ -90,7 +91,7 @@ When all phases are `✅ COMPLETE` and the final PR is merged:
 git mv documentation/planning/<category>/<session>/ documentation/archive/<session>/
 ```
 
-`/claudna:implement-plan` does this in Step 8. `/claudna:session` handoff mode flags completed-but-unarchived sessions.
+`/claudna:build` does this in Step 8. `/claudna:session` handoff mode flags completed-but-unarchived sessions.
 
 ## 7. Non-Planning Directories
 

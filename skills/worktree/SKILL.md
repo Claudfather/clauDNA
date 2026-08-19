@@ -1,7 +1,7 @@
 ---
 name: worktree
 user-invocable: true
-description: "Use when starting feature work that needs isolation from the current workspace, or when running multiple Claude sessions in parallel on different branches — creates and manages git worktrees."
+description: "Use when starting feature work that needs isolation from the current workspace, or when running multiple Claude sessions in parallel on different branches — creates and manages git worktrees. For fetching latest main into every existing worktree and branch across your sibling repos, use /claudna:sync-branches instead."
 ---
 
 # Git Worktree Manager

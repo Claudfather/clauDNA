@@ -24,7 +24,7 @@ Not every difference across access paths is a bug. A CLI having no auth is corre
 | **1: Scan** | Steps 1–5 | Detect paths, parallel discovery, convergence analysis, classify findings, present summary | No |
 | **Gate** | — | User confirms whether to generate remediation plans | **Yes** |
 | **2: Remediation** | — | Generate per-PR planning docs grouped by related findings | No |
-| **3: Summary** | — | Present final summary, hand off to `/claudna:implement-plan` | No |
+| **3: Summary** | — | Present final summary, hand off to `/claudna:build` | No |
 
 ## Procedure
 
@@ -249,9 +249,9 @@ Access Path Audit Summary
 
 Then tell the user:
 
-**"Plans are ready. Run `/claudna:implement-plan documentation/planning/access-paths/<session>/` to start building — it will handle challenge review, branching, implementation, and PRs for each phase doc."**
+**"Plans are ready. Run `/claudna:build documentation/planning/access-paths/<session>/` to start building — it will handle challenge review, branching, implementation, and PRs for each phase doc."**
 
-**This lens produces plans, not code** — see the shared reminder in `skills/_shared/orchestration-guide.md` §11: build, branch, and PR steps are always `/claudna:implement-plan`'s job.
+**This lens produces plans, not code** — see the shared reminder in `skills/_shared/orchestration-guide.md` §11: build, branch, and PR steps are always `/claudna:build`'s job.
 
 ---
 

@@ -6,7 +6,7 @@ Shared reference for skills that support `--source <target>`. Skills reference t
 
 ## 1. Overview
 
-Implementation skills (primarily `/claudna:implement-plan`) support multiple input sources. The source controls **where** the plan is read from, not **how** it is processed — all sources feed into the same implementation workflow.
+Implementation skills (primarily `/claudna:build`) support multiple input sources. The source controls **where** the plan is read from, not **how** it is processed — all sources feed into the same implementation workflow.
 
 | Target | Flag | Behavior |
 |---|---|---|
@@ -57,16 +57,16 @@ Fetch a GitHub Issue by number and use its structured body as the plan input.
 
 **Direct mode** (specific issue):
 ```
-/claudna:implement-plan --source github <issue-number>
+/claudna:build --source github <issue-number>
 ```
 
 Examples:
-- `/claudna:implement-plan --source github 190`
-- `/claudna:implement-plan --source github #190` (with or without `#`)
+- `/claudna:build --source github 190`
+- `/claudna:build --source github #190` (with or without `#`)
 
 **Browse mode** (no number):
 ```
-/claudna:implement-plan --source github
+/claudna:build --source github
 ```
 
 When no issue number is provided, the skill enters browse mode:
@@ -76,7 +76,7 @@ When no issue number is provided, the skill enters browse mode:
 4. Present a paginated multi-select AskUserQuestion picker (3 issues per page + "More..." on 4th slot)
 5. Accumulate selections across pages until user is done
 6. Confirm selections, then fetch full body for each via `gh issue view <number>`
-7. Queue selected issues for sequential implementation (see `/claudna:implement-plan` execution queue)
+7. Queue selected issues for sequential implementation (see `/claudna:build` execution queue)
 
 Browse mode produces the same result as direct mode — a fetched issue body fed into the implementation pipeline — but lets the user discover and select from available work.
 

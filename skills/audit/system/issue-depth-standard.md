@@ -1,6 +1,6 @@
 # Junior-executable issue-depth standard
 
-The system lens files issues for a **more junior implementer who did not do this review**. The house body contract is output-guide §4.1 — `/claudna:publish` validates it and `/claudna:implement-plan --source github` parses it. This file is the *depth* each §4.1 section must reach for a system-review issue. It does not replace §4.1; it raises the bar inside it.
+The system lens files issues for a **more junior implementer who did not do this review**. The house body contract is output-guide §4.1 — `/claudna:publish` validates it and `/claudna:build --source github` parses it. This file is the *depth* each §4.1 section must reach for a system-review issue. It does not replace §4.1; it raises the bar inside it.
 
 The depth this standard requires — ordered implementation steps, acceptance criteria, exact test commands — is depth a thorough review can already reach on its own; that is the part to preserve. What such a review typically lacks is the tracker reconciliation (system.md Phase 5) and the §4.1 frontmatter/skeleton — this standard bolts the depth onto the house contract so both survive.
 

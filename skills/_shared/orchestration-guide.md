@@ -236,7 +236,7 @@ Run it over any research or findings file that captured command output before th
 
 ## 8. Archive Convention
 
-Output directories follow this pattern per skill (reached via `publish --to docs --dir` — the registry in `skills/_shared/documentation-standard.md` §2; skills never *place finished docs* here directly. Documented exceptions: `/claudna:implement-plan`'s status-marker write-backs and its `git mv` archive move):
+Output directories follow this pattern per skill (reached via `publish --to docs --dir` — the registry in `skills/_shared/documentation-standard.md` §2; skills never *place finished docs* here directly. Documented exceptions: `/claudna:build`'s status-marker write-backs and its `git mv` archive move):
 
 ```
 documentation/planning/<subdirectory>/<session_name>_<YYYY-MM-DD>/
@@ -254,7 +254,7 @@ When all phases are complete, the session directory moves to:
 documentation/archive/<session_name>_<YYYY-MM-DD>/
 ```
 
-via `git mv`. This is handled by `/claudna:implement-plan` — planning skills only generate plans, never archive them.
+via `git mv`. This is handled by `/claudna:build` — planning skills only generate plans, never archive them.
 
 ---
 
@@ -329,7 +329,7 @@ When `--auto` is set (see orchestration guide Section 10):
 
 ### For implementation skills (Tier 3)
 
-The rules above describe planning skills that produce GitHub Issues. Implementation skills (Tier 3 per §13: `/claudna:implement-plan`, and any future skill that produces PRs from existing plans) follow a parallel `--auto` contract with these differences:
+The rules above describe planning skills that produce GitHub Issues. Implementation skills (Tier 3 per §13: `/claudna:build`, and any future skill that produces PRs from existing plans) follow a parallel `--auto` contract with these differences:
 
 - **Implies producing a PR, not an issue.** Does NOT imply `--output github`. The terminal artifact is an open PR on the work item's source branch.
 - **Never merges.** The merge gate is unconditionally skipped in `--auto`. A human ratifies the PR.
@@ -352,7 +352,7 @@ Every `--auto` run emits a single fenced JSON block as its final output (the las
 
 ```json
 {
-  "skill": "<skill name, e.g. 'implement-plan'>",
+  "skill": "<skill name, e.g. 'build'>",
   "outcome": "completed | bypassed | needs-input | blocked | partial",
   "artifacts": {
     "issues_created": ["https://github.com/org/repo/issues/123"],
@@ -409,8 +409,8 @@ Every `--auto` run emits a single fenced JSON block as its final output (the las
 | `/claudna:product-vision` | ⚠️ Limited | Vision without user input produces generic ideas. Use only with tight scope. |
 | `/claudna:audit design` | ❌ No | Requires screenshots, deployed URL, visual judgment |
 | `/claudna:session` (handoff/resume/checkpoint modes) | ✅ Yes | Already implemented |
-| `/claudna:implement-plan` | ✅ Yes | **Tier 3.** Phase 3 of the autonomous-mode rollout. Consumes plans/issues, produces PRs, never merges. |
-| `/claudna:weigh-development-paths` | ✅ Yes | **Composable.** Phase 1 adds `--auto` for chained use from `/implement-plan --auto`. Returns refined plan. |
+| `/claudna:build` | ✅ Yes | **Tier 3.** Phase 3 of the autonomous-mode rollout. Consumes plans/issues, produces PRs, never merges. |
+| `/claudna:weigh-development-paths` | ✅ Yes | **Composable.** Phase 1 adds `--auto` for chained use from `/build --auto`. Returns refined plan. |
 | `/claudna:adversarial-review` | ✅ Yes | **Composable.** `--dispatch` mode is non-interactive when invoked from another skill. Returns structured critique findings. |
 
 ---
@@ -419,8 +419,8 @@ Every `--auto` run emits a single fenced JSON block as its final output (the las
 
 The following rules apply to ALL orchestration skills. Skills should reference this section rather than restating these individually:
 
-- **One PR per doc.** Each phase/remediation/fix doc maps to exactly one PR when implemented via `/claudna:implement-plan`.
-- **This skill produces plans, not code.** Implementation is always handled by `/claudna:implement-plan`, which provides its own challenge round, verification, and PR workflow. Do NOT build, branch, or create PRs from planning skills.
+- **One PR per doc.** Each phase/remediation/fix doc maps to exactly one PR when implemented via `/claudna:build`.
+- **This skill produces plans, not code.** Implementation is always handled by `/claudna:build`, which provides its own challenge round, verification, and PR workflow. Do NOT build, branch, or create PRs from planning skills.
 - **Testing is non-negotiable.** Every phase doc must include a test plan. Implementations without tests are incomplete.
 - **Documentation is non-negotiable.** Every phase doc must specify documentation updates. Code without docs is incomplete.
 - **Respect existing architecture.** Enhancements and fixes should work *with* the system's existing patterns, not introduce alien abstractions.
@@ -465,14 +465,14 @@ When multiple skills could apply to a task, invoke them in tier order. Process s
 | Tier | Category | Skills | Purpose |
 |------|----------|--------|---------|
 | 1 | **Process** | investigate-app, verify-completion | Establish approach, verify assumptions, gather evidence, debug |
-| 2 | **Planning** | product-enhance, product-vision, audit (lens engine — lenses per `audit-lens-contract.md`) | Analyze what to build, identify gaps, produce design docs |
-| 3 | **Implementation** | implement-plan, review-work (mode engine — changes/pr/multi-pr), quick-commit, commit-push-pr | Execute plans, review code, commit and ship PRs |
+| 2 | **Planning** | kindle, product-enhance, product-vision, audit (lens engine — lenses per `audit-lens-contract.md`) | Analyze what to build, identify gaps, produce design docs |
+| 3 | **Implementation** | build, review-work (mode engine — changes/pr/multi-pr), ship (mode engine — commit/pr) | Execute plans, review code, commit and ship PRs |
 | 4 | **Deployment & Ops** | modal, railway, vercel, neon, dbt (infra engines — verb modes per `infra-cli-contract.md`) | Deploy, monitor, query infrastructure |
 
 **Utility skills** (session, capture, recall, claudron, find-skills, worktree, using-claudna) are not tiered -- they are invoked on demand for session management, not as part of a build workflow. (The former docs-review and repo-health utilities are now `docs` and `repo-health` lenses of the tiered `audit` engine.)
 
 ### Rules
 
-- **Higher tiers first.** When a task could benefit from skills in multiple tiers, start with the lowest-numbered tier. Example: a bug report should invoke investigate-app (Tier 1) before implement-plan (Tier 3).
+- **Higher tiers first.** When a task could benefit from skills in multiple tiers, start with the lowest-numbered tier. Example: a bug report should invoke investigate-app (Tier 1) before build (Tier 3).
 - **Within a tier, order does not matter.** Tier 1 skills can run in any order relative to each other.
 - **Skipping tiers is allowed when inapplicable.** Not every task needs all four tiers. A simple deploy needs only Tier 4. A code review needs only Tier 3. The rule is: do not skip a tier that IS applicable.

@@ -145,7 +145,7 @@ Plan agents write the family to the session's scratch docs directory (`/tmp/scal
 
 **Adversarial review pass:** follow `skills/_shared/pre-handoff-checklist.md` on every doc before publishing. Prioritize `concern_area` values `security`, `data-integrity`, `error-handling`. If a critic finds that a proposed remediation *itself* opens a cross-tenant window (e.g., a backfill that guesses ownership), elevate to CRITICAL.
 
-Then hand off: **"Plans are ready. Run `/claudna:implement-plan documentation/planning/scale/<session>/` to start building."** This lens produces plans, not code — see `skills/_shared/orchestration-guide.md` §11.
+Then hand off: **"Plans are ready. Run `/claudna:build documentation/planning/scale/<session>/` to start building."** This lens produces plans, not code — see `skills/_shared/orchestration-guide.md` §11.
 
 ---
 

@@ -14,7 +14,7 @@ Structured multi-dimensional evaluation for development junctions.
 ## Arguments
 
 Parse `$ARGUMENTS` at invocation:
-- `--auto`: Non-interactive synthesis mode. Suppresses Plan Mode and all interactive user-question gates. Requires a context bundle path or inline bundle in `$ARGUMENTS`. Emits the structured-result shape from `skills/_shared/orchestration-guide.md` §10.C with a refined plan in `artifacts.refined_plan`. See "Autonomous Mode" section below.
+- `--auto`: Non-interactive synthesis mode. Suppresses Plan Mode and all interactive user-question gates. Requires a context bundle path in `$ARGUMENTS`. Emits the structured-result shape from `skills/_shared/orchestration-guide.md` §10.C with a refined plan in `artifacts.refined_plan`. See "Autonomous Mode" section below.
 - `--output github`: Write findings and plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
 - Remaining text: the junction description (interactive mode) or path to a context bundle file (--auto mode).
@@ -122,27 +122,13 @@ Follow the output guide at `skills/_shared/output-guide.md`:
 
 ## Autonomous Mode (`--auto`)
 
-When `--auto` is set, this skill operates as a non-interactive synthesis engine called from another skill (typically `/claudna:implement-plan --auto` per design §5.5.2) or directly from an orchestrator.
+`weigh-development-paths --auto <bundle-path>` runs the synthesis non-interactively — it's the **synthesis pass** that `build --auto` delegates to when a plan has open decisions. No human, no plan mode, no prompts. Contract: `skills/_shared/contracts/synthesis-contract.md`.
 
 ### Input contract
 
-`$ARGUMENTS` after the `--auto` flag MUST contain a path to a context bundle file OR the bundle content inline. The bundle is a markdown document with these sections:
+`$ARGUMENTS` after the `--auto` flag MUST contain a path to a context bundle file — the only argument. The bundle carries `## Open decisions` (one block per junction needing resolution, each with its options, source, and context), `## Codebase-comparison artifacts` (so the Existing-Patterns / Extension / DRY dimensions are grounded — do **not** re-explore the codebase; the consumer already did Step 2 and handed you its findings), and the full `## Plan`. Exact shape: `skills/_shared/contracts/synthesis-contract.md`.
 
-```markdown
-## Plan
-<the plan body being refined>
-
-## Open Adversarial Findings
-- [<concern_area>][<severity>] <finding summary> — <recommendation>
-- ...
-
-## Open Matrix Decisions
-- [<category>] <question> — Options: A) ..., B) ..., C) ...
-- ...
-
-## Codebase Comparison Artifacts (optional)
-<file paths, function names, dependency notes from Step 2 of implement-plan>
-```
+If the bundle is missing/unreadable or has zero open decisions, emit the §10.C block with `outcome: "blocked"` and stop — an empty synthesis is the consumer's bug, not a resolution.
 
 ### Procedure
 
@@ -151,48 +137,24 @@ When `--auto` is active:
 1. **Do NOT call `EnterPlanMode`.** The caller manages mode.
 2. **Do NOT issue interactive user-question prompts.** Synthesize machine recommendations directly. Any tool that would halt for user input is forbidden in this mode.
 3. Parse the bundle.
-4. For each open finding AND each open matrix decision, treat it as a junction:
-   - Generate candidate options (from the bundle when provided; synthesize otherwise).
-   - Run the 7-dimensional analysis from the interactive procedure (do not skip dimensions).
-   - Synthesize a recommendation. Capture a "Synthesis Rationale" stating which dimensions drove the choice.
+4. For **each** open junction, run Steps 1–5 exactly as above (frame → 7-dimension evaluation → matrix → holistic → recommend) — but grounded in the bundle, not live exploration. Then resolve:
+   - **Technical comparison** (one option wins on the dimensions, even narrowly, or it's a genuine tie) → **resolve it.** A tie is still a pick; Step 5 names what's lost. Goes to `decisions_resolved`.
+   - **Not the matrix's call** (the junction hinges on a human value / policy / security / cost decision the dimensions can't settle — e.g. "bot identity vs personal key") → do **not** force a pick. Goes to `decisions_unresolved`.
 5. Assemble a refined plan: take the original plan body and replace/augment each ambiguous section with the synthesis result. Mark each formerly-open item as RESOLVED with the rationale inline.
-6. If any decision genuinely cannot be resolved without human input (insufficient evidence in any dimension), do NOT guess. List it as unresolved and exit `outcome: blocked` with that list in `blocker_description`.
 
 ### Output (structured result)
 
-The canonical schema for this output is `skills/_shared/contracts/synthesis-contract.md`. When this skill is invoked as the synthesis producer (typically by `/claudna:implement-plan --auto`), the consumer parses against that contract. If you change the shape here, update `skills/_shared/contracts/synthesis-contract.md` in the same commit.
+The canonical schema for this output is `skills/_shared/contracts/synthesis-contract.md`. When this skill is invoked as the synthesis producer (typically by `/claudna:build --auto`), the consumer parses against that contract. If you change the shape here, update `skills/_shared/contracts/synthesis-contract.md` in the same commit.
 
-Emit a single fenced JSON block as the FINAL output. Format:
+Emit exactly one fenced ```json §10.C block (the FINAL output, nothing after it), shaped per the synthesis-contract: `skill: "weigh-development-paths"`, `artifacts.refined_plan` (the plan body with every resolved choice woven in), `artifacts.decisions_resolved` / `decisions_unresolved` (junction-keyed arrays, not counts — see the contract), and `artifacts.synthesis_rationales` (the per-dimension reasoning behind each pick, keyed by junction id, as the audit trail).
 
-```json
-{
-  "skill": "weigh-development-paths",
-  "outcome": "completed",
-  "artifacts": {
-    "refined_plan_path": "<path written to disk, or null if inline only>",
-    "refined_plan": "<full markdown body of the refined plan>",
-    "decisions_resolved": 5,
-    "decisions_unresolved": 0,
-    "synthesis_rationales": [
-      {
-        "decision": "<original open question or finding>",
-        "chosen_option": "<the synthesized choice>",
-        "dimensions": ["<dim that drove it>", "..."]
-      }
-    ]
-  },
-  "summary": "<2-3 line digest>",
-  "next": null,
-  "errors": [],
-  "blocker_description": null
-}
-```
-
-If outcome is `blocked`, `decisions_unresolved` > 0 and `blocker_description` lists the unresolvable decisions.
+**Outcome:** `completed` when every junction resolved (`decisions_unresolved` empty); `needs-input` when one or more need a human call (set `blocker_description` to the unresolved junctions); `blocked` for a malformed/empty bundle — a contract error, not a decision gap.
 
 ### Restrictions in `--auto` mode
 
 - Do NOT write to the original plan file unless explicitly given a write path in the bundle.
 - Do NOT open Plan Mode.
 - Do NOT ask questions.
+- Do NOT route through `/claudna:publish` or persist a decision doc — that's the interactive mode's Output Targets step; `--auto` returns the refined plan to its caller only.
+- Do NOT re-explore the codebase — use the bundle's `## Codebase-comparison artifacts`.
 - Do NOT print anything after the JSON block.

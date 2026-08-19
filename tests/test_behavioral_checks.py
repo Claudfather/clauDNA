@@ -172,12 +172,12 @@ class TestNoRawGhCommands:
         assert check_no_raw_gh_commands({}, body) == []
 
     def test_issue_consumption_not_flagged(self):
-        # Reading/editing issues (implement-plan) is not output publishing.
+        # Reading/editing issues (build) is not output publishing.
         body = "Fetch via gh issue view 5; gh issue list --state open; gh label create foo"
         assert check_no_raw_gh_commands({}, body) == []
 
     def test_allowlisted_skill_passes_via_validate(self):
-        # publish/file-github-issue/commit-push-pr may use gh directly.
+        # publish/file-github-issue/ship may use gh directly.
         body = "# Publish\n\nCreate it with gh issue create --repo o/r --title t.\n" + "x" * 200
         with tempfile.TemporaryDirectory() as d:
             skill = Path(d) / "SKILL.md"
@@ -377,10 +377,10 @@ class TestDescriptionTriggerConvention:
 
 
 class TestSkillReferences:
-    VALID = {"publish", "implement-plan", "review-work"}
+    VALID = {"publish", "build", "review-work"}
 
     def test_known_reference_passes(self):
-        text = "Route the doc via /claudna:publish, then /claudna:implement-plan builds it."
+        text = "Route the doc via /claudna:publish, then /claudna:build builds it."
         assert check_skill_references(text, self.VALID) == []
 
     def test_unknown_reference_fails(self):

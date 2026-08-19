@@ -104,7 +104,7 @@ The body is markdown. There is no rigid template, but the following conventions 
 2. **`## Procedure`** is the standard heading for the executable steps. Skills that don't fit a linear procedure — verb-dispatch engines like `/claudna:session`, phase-based workflows — use other headings.
 3. **Numbered steps** when ordering matters. Subagent-driven skills often have an explicit `EnterPlanMode` step early.
 4. **Reference long supporting material via filename** rather than inlining (`See subagent-prompts.md in this skill directory`). This keeps `SKILL.md` scannable; the orchestrator reads the file, subagents read the deep references at runtime.
-5. **Hard gates** — when a step blocks proceeding without evidence, mark it with `<HARD-GATE>` tags or "Iron Law" language. See `/implement-plan` and `/review-work` for examples.
+5. **Hard gates** — when a step blocks proceeding without evidence, mark it with `<HARD-GATE>` tags or "Iron Law" language. See `/build` and `/review-work` for examples.
 6. **Red Flags / Common Rationalizations tables** — for skills that get rationalized away ("this case is special"), include a short table mapping common excuses to counter-arguments.
 
 Minimum body length: 200 characters of non-frontmatter content. Skills shorter than that are stubs and fail validation.
@@ -113,9 +113,9 @@ Minimum body length: 200 characters of non-frontmatter content. Skills shorter t
 
 ## 4. Naming conventions
 
-- Skill names use `kebab-case`: `product-vision`, `review-work`, `implement-plan`.
+- Skill names use `kebab-case`: `product-vision`, `review-work`, `build`.
 - Slash commands are the skill name with a `/` prefix: `/product-vision`.
-- Codebase audits are **lenses of the one `/audit` engine** (`skills/audit/<lens>/`, per `skills/_shared/audit-lens-contract.md`) — a new audit concern is a new lens directory + table row, never a new `-audit` skill. Review skills for plans/PRs use `-review` or a plain action verb (`heist`, `commit-push-pr`).
+- Codebase audits are **lenses of the one `/audit` engine** (`skills/audit/<lens>/`, per `skills/_shared/audit-lens-contract.md`) — a new audit concern is a new lens directory + table row, never a new `-audit` skill. Review skills for plans/PRs use `-review` or a plain action verb (`heist`, `ship`).
 - Skills that wrap a third-party tool are **one engine named for the tool, with verb modes** — `dbt`, `modal`, `railway`, `vercel`, `neon` — never one skill per tool×verb (`<tool>-deploy` / `<tool>-logs` / …). Engines follow `skills/_shared/infra-cli-contract.md`: thin body, first-token verb dispatch, per-verb depth in support files. A new capability for a tool is a new verb row + depth file, not a new skill.
 
 Naming is not validator-enforced today — it's a guideline. Conflicts and confusion (e.g. duplicate names) are validator-enforced.

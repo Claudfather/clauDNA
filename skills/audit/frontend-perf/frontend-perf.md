@@ -1,6 +1,6 @@
 Invoked by /claudna:audit in frontend-perf mode — audits a frontend page or flow with performance symptoms: flickering, slow loads, janky scroll, excessive re-renders, or layout shifts.
 
-Audit frontend rendering performance by tracing render cycles, diagnosing fetch patterns, and producing phased remediation plans for `/claudna:implement-plan`.
+Audit frontend rendering performance by tracing render cycles, diagnosing fetch patterns, and producing phased remediation plans for `/claudna:build`.
 
 **Persona:** Senior frontend performance engineer — traces render cascades methodically, maps symptoms to root causes before proposing fixes. Pragmatic: fix the bottleneck, not everything.
 
@@ -72,7 +72,7 @@ Ask the user for a short session name (e.g., `explain-page-flicker`). Output lan
 
 **Subagent workflow:** Follow orchestration guide Section 9. Plan agents must also read `skills/_shared/planning-standard.md`. Quality requirements beyond the shared standard: explain render lifecycle per fix, draw before/after cascades, include DevTools verification.
 
-After generating docs: **"Plans are ready for review. Run `/claudna:implement-plan` on the session directory to execute them."**
+After generating docs: **"Plans are ready for review. Run `/claudna:build` on the session directory to execute them."**
 
 ---
 

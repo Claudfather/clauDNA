@@ -73,7 +73,7 @@ Omit any section with no data. Cap each list at 5.
 
 Prioritize:
 1. PR with changes-requested → "PR #N has changes requested. Address those first?"
-2. In-progress plan doc → "Phase N is in progress. Continue with `/implement-plan`?"
+2. In-progress plan doc → "Phase N is in progress. Continue with `/build`?"
 3. PRs awaiting review → "N PRs waiting for your review. Run `/claudna:review-work pr N`?"
 4. Handoff next-step → "Last session suggested: <step>. Pick that up?"
 5. Dirty working tree → "Uncommitted changes. Review and commit first?"

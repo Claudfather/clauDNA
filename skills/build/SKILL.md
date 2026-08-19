@@ -1,7 +1,7 @@
 ---
-name: implement-plan
+name: build
 user-invocable: true
-description: "Use when you have a design or development plan document ready to implement against the codebase."
+description: "Use when you have a design or development plan document ready to implement against the codebase. Executes ONE plan doc end to end: challenge round, deliverable audit, PR workflow. Replaces /implement-plan. NOT for a failing compile or CI build (that's systematic-debugging) and NOT for `dbt build` (that's the /claudna:dbt skill); for several ordered phase docs as one run, use /claudna:build-all."
 argument-hint: "[--source github [number]] [--auto] [file-path-or-directory]"
 allowed-tools:
   - "Bash(git *)"
@@ -39,7 +39,7 @@ allowed-tools:
   - "Task(*)"
 ---
 
-# Implement Plan
+# Build
 
 Execute a design or development plan against the codebase. Challenge first, refine through dialogue, then build — updating the plan as the single source of truth throughout. Works with any structured development document (downstream of `/claudna:audit tech-debt`, `/claudna:product-enhance`, or standalone) or a GitHub Issue created by `--output github`.
 
@@ -59,8 +59,8 @@ When `$ARGUMENTS` contains `--auto` (or its alias `--autonomous`), the skill run
 
 ### Required invocation shape
 
-- `/claudna:implement-plan --source github <number> --auto`
-- `/claudna:implement-plan <path-to-plan-file> --auto`
+- `/claudna:build --source github <number> --auto`
+- `/claudna:build <path-to-plan-file> --auto`
 
 NOT supported in `--auto`:
 - `--source github` without a number (the browse picker)
@@ -98,7 +98,7 @@ After Step 9, emit a single fenced JSON block as the FINAL output (full schema i
 
 ```json
 {
-  "skill": "implement-plan",
+  "skill": "build",
   "outcome": "completed",
   "artifacts": {
     "pr_url": "https://github.com/org/repo/pull/456",
@@ -121,8 +121,8 @@ After Step 9, emit a single fenced JSON block as the FINAL output (full schema i
 `outcome` mapping for `--auto`:
 - `completed` — PR opened with all verification passing
 - `bypassed` — Step 2.5 scope-expansion tripwire fired
-- `blocked` — Step 1.5 sparse issue, Step 5 "feels wrong", synthesis pass blocked
-- `needs-input` — synthesis pass returned unresolvable decisions
+- `blocked` — Step 1.5 sparse issue, Step 5 "feels wrong"
+- `needs-input` — synthesis pass returned unresolved decisions, or could not run (a synthesis failure remaps here rather than to `blocked` — never silently fall back to implementing unresolved decisions)
 - `partial` — verification ultimately failed after multiple fix attempts; PR opened with failing checks noted in body
 
 When `outcome != "completed"`, populate `blocker_description` with 1-2 sentences explaining what blocked the work and what would unblock it.
@@ -147,12 +147,12 @@ Shell operators (`&&`, `||`, `;`, `|`) break `allowed-tools` matching. Never cha
 > **This flowchart is the authoritative process definition. Prose below provides detail for each step.**
 
 ```dot
-digraph implement_plan {
+digraph build {
     rankdir=TB;
     node [fontname="Helvetica" fontsize=10];
     edge [fontname="Helvetica" fontsize=9];
 
-    start [label="User invokes\n/implement-plan" shape=doublecircle];
+    start [label="User invokes\n/build" shape=doublecircle];
 
     parse [label="Parse arguments" shape=box];
     auto_mode [label="--auto\nset?" shape=diamond];
@@ -190,10 +190,8 @@ digraph implement_plan {
     step3_auto [label="Step 3-AUTO:\nSynthesis pass via\nweigh-development-paths --auto" shape=box];
     synthesis_result [label="Synthesis\noutcome?" shape=diamond];
     auto_needs_input [label="EXIT outcome:\nneeds-input" shape=doublecircle style=filled fillcolor=lightcoral];
-    auto_blocked [label="EXIT outcome:\nblocked" shape=doublecircle style=filled fillcolor=lightcoral];
 
-    step3a [label="Step 3A: Seed with\nadversarial findings" shape=box];
-    step3b [label="Step 3B: Matrix\nchallenge round" shape=box];
+    step3 [label="Step 3: Challenge Round\nAdaptive flow" shape=box];
     update_plan [label="Update plan" shape=box];
     more_challenges [label="More\nchallenges?" shape=diamond];
     ready [label="Ready to\nbuild?" shape=diamond];
@@ -275,20 +273,19 @@ digraph implement_plan {
     scope_check -> step3_mode [label="no"];
 
     step3_mode -> step3_auto [label="yes (--auto)"];
-    step3_mode -> step3a [label="no (interactive)"];
+    step3_mode -> step3 [label="no (interactive)"];
 
     step3_auto -> synthesis_result;
     synthesis_result -> step4 [label="completed"];
-    synthesis_result -> auto_needs_input [label="blocked"];
-    synthesis_result -> auto_blocked [label="error"];
+    synthesis_result -> auto_needs_input [label="needs-input"];
+    synthesis_result -> auto_needs_input [label="blocked/error (remapped)"];
 
-    step3a -> step3b;
-    step3b -> update_plan;
+    step3 -> update_plan;
     update_plan -> more_challenges;
-    more_challenges -> step3b [label="yes"];
+    more_challenges -> step3 [label="yes"];
     more_challenges -> ready [label="no"];
     ready -> step4 [label="ready"];
-    ready -> step3b [label="revise"];
+    ready -> step3 [label="revise"];
 
     step4 -> step5_branch;
     step5_branch -> implement;
@@ -424,7 +421,7 @@ Each item goes through the full implementation flow (Steps 2-8) sequentially. Af
 - "Skip to a different item" (if 3+ items remain)
 - "Stop here"
 
-**Do NOT auto-start the next item.** The user should run `/compact` between items to manage context. Present the exact command: `/compact` then `/claudna:implement-plan <path-or-source>` for the next queued item.
+**Do NOT auto-start the next item.** The user should run `/compact` between items to manage context. Present the exact command: `/compact` then `/claudna:build <path-or-source>` for the next queued item.
 
 For direct paths (A and B): the queue contains a single item. Steps 2-9 execute once with no queue logic.
 
@@ -446,13 +443,13 @@ After the work item is loaded into the queue (Step 1), validate that the plan bo
 
 ```json
 {
-  "skill": "implement-plan",
+  "skill": "build",
   "outcome": "blocked",
   "artifacts": {
     "issue_url": "<source URL or path>"
   },
   "summary": "Plan lacks ## Implementation Plan section; cannot implement in --auto mode.",
-  "next": "Run /claudna:audit tech-debt --auto, /claudna:audit security --auto, or similar planning skill against this issue to expand it into an implementable plan, then re-invoke /implement-plan --auto.",
+  "next": "Run /claudna:audit tech-debt --auto, /claudna:audit security --auto, or similar planning skill against this issue to expand it into an implementable plan, then re-invoke /build --auto.",
   "errors": [],
   "blocker_description": "Source issue body has findings but no implementation plan. Expansion requires planning judgment that --auto mode does not provide. Run a planning skill first."
 }
@@ -489,7 +486,7 @@ Exit with the structured-result block:
 
 ```json
 {
-  "skill": "implement-plan",
+  "skill": "build",
   "outcome": "bypassed",
   "artifacts": {
     "issue_url": "<source URL or path>",
@@ -508,7 +505,7 @@ Exit with the structured-result block:
 After emitting the block, also post a comment on the source issue (if GitHub) explaining why the work was bypassed. Comment body:
 
 ```markdown
-## /implement-plan --auto bypassed: scope expansion detected
+## /build --auto bypassed: scope expansion detected
 
 The plan anticipates touching N files, but a codebase comparison reveals M files are actually affected:
 
@@ -521,7 +518,7 @@ Headless implementation of this scope risks producing surprises (missed call-sit
 - Re-plan with the full surface listed
 - Or split into multiple smaller phase docs covering subsets
 
-This was an automatic decision by `/claudna:implement-plan --auto`.
+This was an automatic decision by `/claudna:build --auto`.
 ```
 
 Add a `needs-input` label to the issue via `gh issue edit <number> --add-label "needs-input"` (create the label first via `gh label create` if it doesn't exist — skip silently if label creation fails for permission reasons).
@@ -533,56 +530,49 @@ Add a `needs-input` label to the issue via `gh issue edit <number> --add-label "
 Read `challenge-round-questions.md` for the question matrix and `red-flags-and-rationalizations.md` to guard against rubber-stamping.
 
 **Mode branch:**
-- **Interactive mode:** runs sub-steps 3A and 3B below.
-- **`--auto` mode:** runs sub-step 3-AUTO below, replacing both 3A and 3B with a machine synthesis pass.
+- **Interactive mode:** runs the adaptive challenge flow below.
+- **`--auto` mode:** runs Step 3-AUTO below instead, replacing the interactive flow with a machine synthesis pass.
 
 #### Step 3-AUTO: Synthesis pass (`--auto` only)
 
 Per design §5.5.2 and the canonical Autonomous Mode reference earlier in this skill, replace the interactive challenge round with a machine synthesis pass that delegates to `/claudna:weigh-development-paths --auto`. The producer/consumer schema between the two skills is canonical at `skills/_shared/contracts/synthesis-contract.md`.
 
-1. **Create scratch directory.** Use the Write tool to create a file at `/tmp/implement-plan-<YYYY-MM-DD_HHMMSS>/synthesis-bundle.md`. The Write tool creates parent directories automatically.
+1. **Create scratch directory.** Use the Write tool to create a file at `/tmp/build-<YYYY-MM-DD_HHMMSS>/synthesis-bundle.md`. The Write tool creates parent directories automatically.
 
-2. **Extract OPEN adversarial findings.** Read the plan body. Search for `## Adversarial Review Findings`. Collect each finding where the checkbox is `- [ ]` (unchecked). Each finding has `severity`, `concern_area`, `summary`, `recommendation`.
+2. **Extract open junctions.** Read the plan body and identify every decision that is genuinely open, from three possible sources:
+   - **Adversarial findings** — search for `## Adversarial Review Findings`; collect each finding where the checkbox is `- [ ]` (unchecked). Each has `severity`, `concern_area`, `summary`, `recommendation`.
+   - **Decision forks** — search for `## Decision Forks`; collect each `### Fork F<N>: <Title>` entry whose `**Status:**` is `open` (per `forge/SKILL.md`'s Decision Fork format — options, a lean, a ratifier, a status). A `locked` fork is already decided; skip it.
+   - **Matrix decision points** — for each category in `challenge-round-questions.md` relevant to this plan (architecture, testing, dependencies, error handling, etc.) that neither of the above sources already covers, generate a `{category, question, options[]}` triple by drawing options from the Step 2 codebase comparison output.
 
-3. **Generate machine-form matrix decision points.** For each matrix category in `challenge-round-questions.md` relevant to this plan:
-   - Architecture: where does new code live? Reuse existing pattern or new one?
-   - Testing: what tests cover the change? Existing patterns?
-   - Dependencies: does the plan introduce new packages?
-   - Error handling: what failure modes are explicitly handled?
-   - (etc. — match the matrix in the file)
-   For each, produce one or more `{category, question, options[]}` triples by drawing options from the Step 2 codebase comparison output.
+   Assign each an id `D1`, `D2`, ... in the order found.
 
-4. **Write the bundle.** Compose the synthesis bundle at the scratch path:
+3. **Write the bundle.** Compose the synthesis bundle at the scratch path, per `skills/_shared/contracts/synthesis-contract.md`'s input-bundle shape:
 
 ```markdown
-## Plan
-<full original plan body>
+# Synthesis bundle — <plan title>
 
-## Open Adversarial Findings
-- [<severity>][<concern_area>] <summary>
-  Recommendation: <recommendation>
-- ...
+## Open decisions
+### D1: <junction title>
+- Options: A) <option-A> · B) <option-B> · C) <option-C> (if applicable)
+- Source: adversarial finding | matrix decision point | plan fork F<N>
+- Context: <the plan text this junction came from, and why it's open>
+### D2: ...
 
-## Open Matrix Decisions
-- [<category>] <question>
-  Options:
-  A) <option-A>
-  B) <option-B>
-  C) <option-C> (if applicable)
-- ...
-
-## Codebase Comparison Artifacts
+## Codebase-comparison artifacts
 <the Plan vs Codebase table from Step 2 — copy verbatim>
 <list of relevant files Step 2 identified beyond what the plan named>
+
+## Plan
+<full original plan body>
 ```
 
-5. **Dispatch the synthesis subagent.** Launch a `general-purpose` subagent with this prompt:
+4. **Dispatch the synthesis subagent.** Launch a `general-purpose` subagent with this prompt:
 
 ```
 Read the skill body at skills/weigh-development-paths/SKILL.md.
 
 Apply the skill with --auto mode against the context bundle at:
-  /tmp/implement-plan-<timestamp>/synthesis-bundle.md
+  /tmp/build-<timestamp>/synthesis-bundle.md
 
 Return ONLY the structured-result JSON block per the skill's emission contract
 (canonical schema: skills/_shared/contracts/synthesis-contract.md).
@@ -590,87 +580,59 @@ Do NOT enter Plan Mode. Do NOT issue interactive user-input prompts.
 Do NOT write to any plan file — the orchestrator handles that.
 ```
 
-6. **Parse the subagent's structured result** per `skills/_shared/contracts/synthesis-contract.md`.
+5. **Parse the subagent's structured result** per `skills/_shared/contracts/synthesis-contract.md`, and remap its outcome to `build`'s own:
 
    Use the Read tool to read the subagent's final output (it should be a single fenced JSON block). Parse it.
 
    **If `outcome: "completed"`:**
-   - Read `artifacts.refined_plan` (full markdown body) and `artifacts.synthesis_rationales` (per-decision array).
+   - Read `artifacts.refined_plan` (full markdown body), `artifacts.decisions_resolved` (junction-keyed array — `{junction, choice, rationale}`), and `artifacts.synthesis_rationales` (per-junction dimension reasoning, keyed by junction id).
    - Use the Edit tool to update the plan body:
      - Replace the existing plan content with `refined_plan`.
-     - For each previously-OPEN adversarial finding, change `- [ ]` to `- [x]` and append a sub-bullet:
+     - For each `decisions_resolved` entry whose `junction` traces back to a previously-OPEN adversarial finding, change that finding's `- [ ]` to `- [x]` and append a sub-bullet:
        ```
        - [x] **[<severity>] <concern_area>**: <summary>
          - **Recommendation:** <recommendation>
-         - **--auto synthesis decision:** <chosen_option> (rationale: <dimensions>)
+         - **--auto synthesis decision:** <choice> (rationale: <rationale>)
        ```
-   - For GitHub-source issues, post the refined plan as a comment on the issue with the header `## [implement-plan-auto] Refined plan via synthesis pass`.
+   - For GitHub-source issues, post the refined plan as a comment on the issue with the header `## [build-auto] Refined plan via synthesis pass`.
    - Proceed to Step 4.
 
-   **If `outcome: "blocked"`:** the synthesizer found unresolvable decisions. Exit `/implement-plan --auto` with:
+   **If `outcome: "needs-input"`:** the synthesizer found one or more junctions that hinge on a human value/policy/security/cost call, not a technical comparison. Exit `/build --auto` with:
 
    ```json
    {
-     "skill": "implement-plan",
+     "skill": "build",
      "outcome": "needs-input",
      "artifacts": {
        "issue_url": "<source URL or path>",
-       "unresolvable_decisions": ["..."]
+       "decisions_unresolved": [{"junction": "D3: ...", "why": "..."}]
      },
      "summary": "Synthesis pass returned unresolvable decisions; human input needed.",
-     "next": "Surface decisions to a human; once resolved, re-invoke /implement-plan --auto.",
+     "next": "Surface decisions to a human; once resolved, re-invoke /build --auto.",
      "errors": [],
      "blocker_description": "<copy from subagent's blocker_description>"
    }
    ```
 
-   Post a comment on the source issue (if GitHub) with the unresolvable decisions formatted as a checklist for a human to fill in.
+   Post a comment on the source issue (if GitHub) with `artifacts.decisions_unresolved` formatted as a checklist for a human to fill in.
 
-   **If `outcome` is anything else (timeout, error, malformed JSON):** Exit with:
+   **If `outcome: "blocked"` or anything else (timeout, error, malformed JSON):** a synthesis it cannot run is a decision it cannot make headlessly — remap to `needs-input` rather than silently falling back to implementing unresolved decisions. Exit with:
 
    ```json
    {
-     "skill": "implement-plan",
-     "outcome": "blocked",
+     "skill": "build",
+     "outcome": "needs-input",
      "artifacts": {"issue_url": "..."},
-     "summary": "Synthesis pass failed: <reason>",
-     "next": null,
-     "errors": ["synthesis pass returned outcome: <X>"],
+     "summary": "Synthesis pass did not return a usable result: <reason>",
+     "next": "Surface to a human; once resolved, re-invoke /build --auto.",
+     "errors": ["synthesis pass returned outcome: <X or 'malformed'>"],
      "blocker_description": "Synthesis pass did not return a usable result. Re-invoke with a more complete plan or escalate."
    }
    ```
 
-#### Step 3A: Seed with open adversarial-review findings (interactive only)
+#### Interactive Challenge Round
 
-Open the plan body (the plan document or GitHub issue body). Search for a section titled `## Adversarial Review Findings`.
-
-**If the section exists and has OPEN items** (markdown checkboxes `- [ ]` rather than `- [x]`):
-
-1. Use an interactive question prompt. First question: **"Adversarial review flagged these unresolved concerns. Which to dig into?"**
-
-   Options: up to 3 most-severe findings (use the severity label from the bullet) + "All of them" + "None — ready to build".
-
-   If more than 3 findings are open, paginate: after the user picks from the first 3, present the next 3 in another turn until all are addressed or the user picks "None — ready to build."
-
-2. For each picked finding:
-   - Identify the finding's `concern_area` from the bullet text (e.g., `[high] architecture`).
-   - Drive matrix questions from `challenge-round-questions.md` scoped to that concern area. Generate options drawn from the codebase, just as in 3B.
-   - Process the user's answer. Update the plan body immediately — both the finding's resolution AND any plan-level changes the user's answer implies.
-   - Mark the finding's checkbox as resolved: `- [ ]` → `- [x]`. Add the user's decision as a sub-bullet below the finding.
-
-3. After all picked findings are addressed (or user chose "None — ready to build"), proceed to Step 3B for a full matrix pass.
-
-**If the section exists but has NO open items** (all resolved):
-
-Skip Step 3A. Note in chat: "Plan was reviewed adversarially at creation time; all findings already resolved. Proceeding to matrix challenge." Go to Step 3B.
-
-**If the section does NOT exist** (ad-hoc plan):
-
-Skip Step 3A. Note in chat: "No upstream adversarial review present (ad-hoc plan). Running full matrix challenge from scratch." Go to Step 3B.
-
-#### Step 3B: Matrix-driven challenge round
-
-This is the existing challenge-round flow, run AFTER Step 3A regardless of whether findings were resolved. The matrix may surface concerns adversarial-review didn't think to raise; an extra pass is cheap and catches real issues.
+Read `challenge-round-questions.md` for the question matrix and `red-flags-and-rationalizations.md` to guard against rubber-stamping. If the plan carries an open `## Adversarial Review Findings` section, its unresolved items are part of what Step 1 of the flow below analyzes — there is no separate seeding step.
 
 **Adaptive one-at-a-time flow using interactive question prompts:**
 
@@ -685,14 +647,10 @@ This is the existing challenge-round flow, run AFTER Step 3A regardless of wheth
    - User selects "Skip remaining challenges" (always include as an option)
 7. Final gate — interactive question: **"Ready to build?"** with options:
    - "Ready to build" (proceed to Step 4)
-   - "I have more concerns" (loop back to Step 3B)
+   - "I have more concerns" (loop back to this step)
    - "Abort — not implementing this"
 
 **The question matrix still guides what to challenge** (architecture, testing, dependencies, error handling, etc.). The delivery mechanism is one focused interactive question per topic.
-
-#### Note for `--auto` mode
-
-In `--auto` mode, Step 3 is replaced by the Step 3-AUTO synthesis pass above. 3A and 3B describe interactive behavior only.
 
 ---
 
@@ -722,7 +680,7 @@ If a step feels wrong (you encounter a situation the plan didn't anticipate, you
 
 ```json
 {
-  "skill": "implement-plan",
+  "skill": "build",
   "outcome": "blocked",
   "artifacts": {
     "issue_url": "<source URL or path>",
@@ -731,7 +689,7 @@ If a step feels wrong (you encounter a situation the plan didn't anticipate, you
     "commits_made": "<M>"
   },
   "summary": "Implementation blocked at step <X>: <one-line description of conflict>.",
-  "next": "Surface to human for scope clarification; once resolved, re-invoke /implement-plan --auto or implement interactively.",
+  "next": "Surface to human for scope clarification; once resolved, re-invoke /build --auto or implement interactively.",
   "errors": [],
   "blocker_description": "<2 sentences explaining what felt wrong and what would unblock it>"
 }
@@ -808,7 +766,7 @@ git reset --hard HEAD~1
 
      ```json
      {
-       "skill": "implement-plan",
+       "skill": "build",
        "outcome": "partial",
        "artifacts": {
          "issue_url": "<source URL or path>",
@@ -848,7 +806,7 @@ Create PR (title from plan header/issue title, body with summary + verification 
 ```markdown
 ---
 
-Opened by `/claudna:implement-plan --auto`.
+Opened by `/claudna:build --auto`.
 
 This PR was generated without interactive human review. Before merging:
 - Confirm the implementation matches your understanding of the issue
@@ -877,7 +835,7 @@ On `merge`: merge PR, switch to main and pull (separate Bash calls).
 
 **For `--source github`:** The issue auto-closes when the PR merges (via `Closes #<number>`). No archival needed.
 
-**If more items remain in the queue:** Present the queue status and use an interactive question prompt to offer continuing to the next item, skipping, or stopping. Provide the exact commands: `/compact` then `/claudna:implement-plan <path-or-source>` for the next item.
+**If more items remain in the queue:** Present the queue status and use an interactive question prompt to offer continuing to the next item, skipping, or stopping. Provide the exact commands: `/compact` then `/claudna:build <path-or-source>` for the next item.
 
 Suggest worktree parallelism for independent phases. **Do NOT auto-start** — the user must run `/compact` between items.
 
@@ -895,7 +853,7 @@ The structured-result for a successful `--auto` run:
 
 ```json
 {
-  "skill": "implement-plan",
+  "skill": "build",
   "outcome": "completed",
   "artifacts": {
     "pr_url": "<PR URL from Step 7>",

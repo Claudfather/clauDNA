@@ -96,7 +96,7 @@ Each issue maps to one phase (one PR's worth of work), matching the "one PR per 
 
 ### 4.1. Issue Body Format
 
-The body uses a **structured format** that maps 1:1 to the phase doc structure (orchestration guide Section 5). This structure is a contract — it must be parseable by `--source github` in `/claudna:implement-plan`, and `/claudna:publish` validates its presence for `type: audit|review|plan` before publishing.
+The body uses a **structured format** that maps 1:1 to the phase doc structure (orchestration guide Section 5). This structure is a contract — it must be parseable by `--source github` in `/claudna:build`, and `/claudna:publish` validates its presence for `type: audit|review|plan` before publishing.
 
 ```markdown
 ## Summary
@@ -150,7 +150,7 @@ The body uses a **structured format** that maps 1:1 to the phase doc structure (
 - Related issues: #NNN, #NNN (if any)
 ```
 
-**Important:** The `## Implementation Plan` section with its `### Steps` subsection is what distinguishes a full-detail issue from a findings-only issue. `/claudna:publish` rejects an `audit`/`review`/`plan` doc that lacks it, and `/claudna:implement-plan --source github` checks for it to decide whether an issue is implementation-ready.
+**Important:** The `## Implementation Plan` section with its `### Steps` subsection is what distinguishes a full-detail issue from a findings-only issue. `/claudna:publish` rejects an `audit`/`review`/`plan` doc that lacks it, and `/claudna:build --source github` checks for it to decide whether an issue is implementation-ready.
 
 ### 4.2. Issue Title (the `title:` frontmatter field)
 

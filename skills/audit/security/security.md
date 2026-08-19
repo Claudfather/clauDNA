@@ -137,9 +137,9 @@ Security Audit Summary
 
 Then tell the user:
 
-**"Plans are ready. Run `/claudna:implement-plan documentation/planning/security/<session>/` to start building — it will handle challenge review, branching, implementation, and PRs for each phase doc."**
+**"Plans are ready. Run `/claudna:build documentation/planning/security/<session>/` to start building — it will handle challenge review, branching, implementation, and PRs for each phase doc."**
 
-**This lens produces plans, not code** — see the shared reminder in `skills/_shared/orchestration-guide.md` §11: build, branch, and PR steps are always `/claudna:implement-plan`'s job.
+**This lens produces plans, not code** — see the shared reminder in `skills/_shared/orchestration-guide.md` §11: build, branch, and PR steps are always `/claudna:build`'s job.
 
 ---
 

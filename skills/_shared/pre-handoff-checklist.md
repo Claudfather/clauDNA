@@ -6,7 +6,7 @@ Run `/adversarial-review` on your output before emitting. This is the shared gat
 
 ## When to Run
 
-Run `/adversarial-review` on plan output in **all modes** — interactive, `--output github`, `--output session`, and `--auto`. The gate applies whenever a skill produces a plan document or structured audit finding that will be consumed downstream (by `/claudna:implement-plan`, by a human reader, or as a GitHub Issue body).
+Run `/adversarial-review` on plan output in **all modes** — interactive, `--output github`, `--output session`, and `--auto`. The gate applies whenever a skill produces a plan document or structured audit finding that will be consumed downstream (by `/claudna:build`, by a human reader, or as a GitHub Issue body).
 
 Skip only if the skill's plan-generation phase produced zero documents (nothing to review).
 
@@ -67,7 +67,7 @@ When plan output is GitHub Issues (not phase docs on disk), run `/adversarial-re
 
 ## What Passes
 
-`/adversarial-review` is informational, not blocking. Findings are folded into the plan document as open checklist items. Downstream consumers (`/claudna:implement-plan` challenge round, `--auto` synthesis pass) resolve them during implementation.
+`/adversarial-review` is informational, not blocking. Findings are folded into the plan document as open checklist items. Downstream consumers (`/claudna:build` challenge round, `--auto` synthesis pass) resolve them during implementation.
 
 The gate "passes" when:
 - All generated documents have had `/adversarial-review` run (or the attempt was logged on failure).

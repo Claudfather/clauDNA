@@ -21,7 +21,7 @@ A skill is a markdown file that teaches Claude how to do something specific, on 
 | User invokes via `/claudna:<name>` | Invoked by name in conversation ("use code-reviewer to...") |
 | Procedural: numbered steps, gates, output | Persona: tone, expertise, evaluation lens |
 | Runs once, produces output, done | Persistent identity across a conversation |
-| Examples: `audit`, `review-work`, `quick-commit` | Examples: `snowflake-analyst`, `code-reviewer`, `dbt-engineer` |
+| Examples: `audit`, `review-work`, `ship` | Examples: `snowflake-analyst`, `code-reviewer`, `dbt-engineer` |
 
 If your contribution defines _who_ the agent is (expertise, judgment criteria, personality), it's an agent. If it defines _what_ to do (steps, gates, output format), it's a skill.
 
@@ -32,7 +32,7 @@ If your contribution defines _who_ the agent is (expertise, judgment criteria, p
 Skill names are `kebab-case`: lowercase letters, digits, hyphens. The name becomes both the directory name and the slash command (`/claudna:<name>`).
 
 Conventions:
-- Action verbs for workflow skills: `quick-commit`, `review-work`, `implement-plan`
+- Action verbs for workflow skills: `ship`, `review-work`, `build`
 - Bare tool name for infrastructure engines: `modal`, `railway`, `vercel`, `neon` — one engine with verb modes per `skills/_shared/infra-cli-contract.md`, never a `<tool>-<verb>` skill
 - Audit capabilities are lenses of `/audit`, not standalone skills — a new audit concern is a new lens directory (see SKILL_CONTRACT §4)
 
@@ -75,7 +75,7 @@ The `description` is the highest-leverage line in the skill: it is what the mode
 - **Lead with the trigger, not the topic.** "Use when a frontend page has performance symptoms — flickering, slow loads, janky scroll" beats "Frontend performance analysis." Temporal anchors ("Use when a PR has been merged…", "Use before starting substantive work…") tell the model *at which moment* to reach for the skill.
 - **Describe the situation, never the procedure.** A description that summarizes the workflow ("dispatches lenses, folds findings, checks convergence") becomes a shortcut: the model follows the one-line summary instead of reading the body it abbreviates. State when; let the body say how.
 - **Keep flags out.** `Supports --output github and --auto` is argument documentation, not a trigger — it lives in `argument-hint`. The validator hard-errors on any `--flag` token in a description.
-- **Route away from confusable siblings.** If a user intent could plausibly land on two skills, partition it inside the descriptions: `/quick-commit` ends with "For the full commit-push-PR flow, use /claudna:commit-push-pr" and `/commit-push-pr` points back. The picker then cannot land wrong. Every `/claudna:<name>` reference is CI-checked to resolve.
+- **Route away from confusable siblings.** If a user intent could plausibly land on two skills, partition it inside the descriptions: `/claudna:build` ends with "for several ordered phase docs as one run, use /claudna:build-all" and `/claudna:build-all` points back with "For a single plan doc, use /claudna:build instead." The picker then cannot land wrong. Every `/claudna:<name>` reference is CI-checked to resolve.
 - **Use words the model would match on.** Symptoms ("flaky", "stale", "janky scroll"), quoted trigger phrases ("Option A vs B"), and concrete nouns outrank abstractions.
 - **Leave a breadcrumb on renames.** If the skill replaces older ones, end with `Replaces /old-name.` so old muscle memory still resolves.
 
@@ -226,7 +226,7 @@ with the questions, re-present the top 3 concerns before proceeding.
 </HARD-GATE>
 ```
 
-HARD-GATEs appear in skills where the cost of skipping a step is high: `implement-plan` gates code writing behind a challenge round, `review-work` gates approval behind checklist verification. Use them sparingly — one or two per skill at most.
+HARD-GATEs appear in skills where the cost of skipping a step is high: `build` gates code writing behind a challenge round, `review-work` gates approval behind checklist verification. Use them sparingly — one or two per skill at most.
 
 ### User Confirmation Gates
 

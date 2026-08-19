@@ -51,8 +51,10 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:audit t
 | Skill | Description |
 |-------|-------------|
 | `/session` | Session-continuity engine — `resume` / `handoff` / `checkpoint` / `name` modes (replaces the three `session-*`/`name-session` skills) |
-| `/implement-plan` | Execute a design doc or GitHub Issue — browse, pick, challenge, build, test, PR |
+| `/build` | Execute a design doc or GitHub Issue — browse, pick, challenge, build, test, PR |
+| `/build-all` | Drive an epic's worth of ordered phase docs as one governed multi-PR run |
 | `/worktree` | Manage git worktrees for parallel Claude sessions |
+| `/sync-branches` | Fetch and merge origin/main into every branch and worktree across sibling repos |
 | `/development-retro` | Post-merge retrospective — systemic patterns, friction, breadcrumb trails |
 | `/weigh-development-paths` | Compare multiple viable approaches at a development junction |
 | `/adversarial-review` | Structured plan challenge with evidence and anti-groupthink guards |
@@ -66,12 +68,13 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:audit t
 | `/audit` | Codebase-audit engine — `security` / `tech-debt` / `docs` / `design` / `access-path` / `data-model` / `data-model-redesign` / `frontend-perf` / `repo-health` / `system` / `cache` / `scale` lenses (replaces the eight standalone audit skills) |
 | `/review-work` | Review engine — `changes` (uncommitted work) / `pr` (one PR) / `multi-pr` (parallel subagent reviews + synthesis) modes (replaces the two review skills) |
 | `/verify-completion` | Verify work is actually complete before claiming success |
-| `/visual-crawl` | Autonomous visual crawl — discover routes, screenshot at 3 viewports, file issues for findings |
+| `/qa` | Headless-browser QA — test-and-fix, report-only, canary, benchmark, browse, cookie-setup, or autonomous visual crawl |
 
 ### Product
 
 | Skill | Description |
 |-------|-------------|
+| `/kindle` | Ideation gate before any creative work — discover intent into an approved spec, hand off to `/forge` |
 | `/product-enhance` | Discover enhancements via intent interviews and gap analysis |
 | `/product-vision` | Architecture-aware product vision — explore what the codebase could become |
 
@@ -89,8 +92,7 @@ Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:audit t
 
 | Skill | Description |
 |-------|-------------|
-| `/quick-commit` | Stage all + commit with conventional commits format |
-| `/commit-push-pr` | Commit, push, and open a PR |
+| `/ship` | Commit, push, and open a PR (`ship commit` for a local-only checkpoint) |
 
 ### Data & Infrastructure
 
@@ -140,7 +142,7 @@ Planning (when starting new work)
 
 Building (the core loop)
 ───────────────────────────────────────────────────
-  /claudna:implement-plan        → Point at a phase doc
+  /claudna:build                 → Point at a phase doc
                                    ├── Challenge round (first principles review)
                                    ├── Build & test
                                    ├── PR with deliverable audit
