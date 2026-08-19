@@ -348,4 +348,4 @@ After Phase 3 aggregation, emit a single markdown document with YAML frontmatter
 
 For this skill, set `lens: adversarial-review` in frontmatter. All other fields, severity vocabulary, body sections (Blockers/Risks/Gaps/Questions/Observations), concern area values, and blocked/failed output are defined in the contract.
 
-**`concern_area` values** should align with the matrix categories in `skills/implement-plan/challenge-round-questions.md` where possible (architecture, testing, dependencies, error-handling, performance, security, data-integrity, compatibility, observability, scope) so downstream skills can fold findings into the challenge round.
+**`concern_area` values** should align with the matrix categories in `skills/build/challenge-round-questions.md` where possible (architecture, testing, dependencies, error-handling, performance, security, data-integrity, compatibility, observability, scope) so downstream skills can fold findings into the challenge round.

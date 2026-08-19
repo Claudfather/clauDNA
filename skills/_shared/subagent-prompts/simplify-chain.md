@@ -1,10 +1,10 @@
 # /simplify Chain — Subagent Dispatch Prompt
 
-Used by `/claudna:implement-plan` (Step 6.5) to run `/simplify` against changed files after verification passes. /simplify operates non-interactively on the working tree by design — this file documents the chain pattern so other skills can adopt it later if needed.
+Used by `/claudna:build` (Step 6.5) to run `/simplify` against changed files after verification passes. /simplify operates non-interactively on the working tree by design — this file documents the chain pattern so other skills can adopt it later if needed.
 
 ## When this chain runs
 
-In `/claudna:implement-plan` Step 6.5, AFTER Step 6 verification passes. Triggered when the diff exceeds a size threshold (>50 LOC OR >2 files changed).
+In `/claudna:build` Step 6.5, AFTER Step 6 verification passes. Triggered when the diff exceeds a size threshold (>50 LOC OR >2 files changed).
 
 ## Procedure
 

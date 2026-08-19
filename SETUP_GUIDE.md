@@ -177,7 +177,7 @@ Optional categories — add only the ones whose skills you actually use:
 | **Node** | JS/TS projects | `Bash(node *)`, `Bash(npm *)`, `Bash(npx *)`, `Bash(prettier *)` |
 | **Data & Analytics** | `/claudna:dbt`, `/claudna:neon`, `snowflake-analyst` agent | `Bash(snowsql *)`, `Bash(dbt *)`, `Bash(psql *)`, `Bash(pg_isready *)` |
 | **Infrastructure CLIs** | `/claudna:railway`, `/claudna:vercel`, `/claudna:modal` | `Bash(railway *)`, `Bash(vercel *)`, `Bash(modal *)` |
-| **Browser Automation** | `/claudna:audit design`, `/claudna:visual-crawl` | `Bash(/Applications/Google*)`, `Bash("/Applications/Google*)`, `Bash(google-chrome*)`, `Bash(chromium*)` |
+| **Browser Automation** | `/claudna:audit design`, `/claudna:qa` | `Bash(/Applications/Google*)`, `Bash("/Applications/Google*)`, `Bash(google-chrome*)`, `Bash(chromium*)` |
 | **Auto-skill-approval** | Bots / cron / non-interactive runs | See "Auto-skill-approval" expansion below |
 
 #### Auto-skill-approval expansion

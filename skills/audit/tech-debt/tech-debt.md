@@ -246,4 +246,4 @@ When `--auto` is set (see the lens contract §4 and orchestration guide Section 
 ```
 
 - `outcome` should be `completed` on a successful run, `partial` if some issues failed to create (gh CLI errors), `blocked` if the scan couldn't run (e.g., no git repo).
-- `next` may suggest follow-up like `"Apply /claudna:implement-plan --source github <#> --auto to highest-severity issue"`.
+- `next` may suggest follow-up like `"Apply /claudna:build --source github <#> --auto to highest-severity issue"`.

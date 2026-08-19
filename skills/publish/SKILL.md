@@ -49,10 +49,10 @@ The body must match the house-style skeleton for its `type:`. This is keyed off 
 
 - **`audit`, `review`, `plan`** — must contain the implementation-ready skeleton (see `skills/_shared/output-guide.md` Section 4.1):
   `## Summary`, `## Evidence`, `## Implementation Plan` (with `### Dependencies`, `### Blocks`, `### Steps`), `## Test Plan`, `## Verification Checklist`, `## What NOT To Do`, `## Context`.
-  **Hard gate:** the `## Implementation Plan` heading and its `### Steps` subsection MUST be present. This is the contract `/claudna:implement-plan --source github` depends on to tell an implementable issue from a findings-only one — without it, `--auto` implementation blocks. Reject the publish if missing.
+  **Hard gate:** the `## Implementation Plan` heading and its `### Steps` subsection MUST be present. This is the contract `/claudna:build --source github` depends on to tell an implementable issue from a findings-only one — without it, `--auto` implementation blocks. Reject the publish if missing.
 - **`decision`, `knowledge`, `runbook`** — require a non-trivial body (not just frontmatter) and a leading `#`/`##` heading. No fixed section gate (see `skills/_shared/documentation-standard.md`); validate presence, not structure.
 
-**Master-doc exception (docs adapter):** a `00_*.md` doc validates like the knowledge tier — frontmatter + non-trivial body + leading heading, no §4.1 skeleton gate — even when its `type:` is `audit`/`review`/`plan`, whether it arrives as a family member (directory source) or alone (single-doc source: retros, dashboards, findings reports). Masters and standalone reports are inventories, not implementation plans; the skeleton hard gate exists for implement-plan readiness, which is a property of the `NN_*` phase docs (which validate in full). This exemption is the design, not a workaround.
+**Master-doc exception (docs adapter):** a `00_*.md` doc validates like the knowledge tier — frontmatter + non-trivial body + leading heading, no §4.1 skeleton gate — even when its `type:` is `audit`/`review`/`plan`, whether it arrives as a family member (directory source) or alone (single-doc source: retros, dashboards, findings reports). Masters and standalone reports are inventories, not implementation plans; the skeleton hard gate exists for build readiness, which is a property of the `NN_*` phase docs (which validate in full). This exemption is the design, not a workaround.
 
 ---
 
@@ -94,7 +94,7 @@ If the file already exists, compare and warn before overwriting (the raw adapter
 
 ### Adapter: docs
 
-Write the doc — or doc family — into the current repo's `documentation/` tree, the per-project plane. The author produces its output in a scratch directory and hands it here; publish is the single **placement path for finished docs** on this plane (status-marker write-backs and archiving by `/claudna:implement-plan` are the documented exceptions).
+Write the doc — or doc family — into the current repo's `documentation/` tree, the per-project plane. The author produces its output in a scratch directory and hands it here; publish is the single **placement path for finished docs** on this plane (status-marker write-backs and archiving by `/claudna:build` are the documented exceptions).
 
 - `--dir <path>` is **required** and must resolve under `documentation/`. Reject anything outside it. Create the directory if it doesn't exist (the Write tool creates parents automatically) — don't fail on missing directories.
 - **Single-doc mode** (source is a file): validate per Step 1, write into `--dir`, report the path.

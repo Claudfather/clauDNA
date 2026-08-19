@@ -1,84 +1,92 @@
-# Synthesis Contract
+# Synthesis contract — `weigh-development-paths --auto` → `build --auto`
 
-Canonical schema for the structured result emitted by `/claudna:weigh-development-paths --auto` and consumed by `/claudna:implement-plan --auto` (Step 3-AUTO). Both skills MUST reference this file rather than restating the shape inline.
+The machine handoff for the **synthesis pass**: when `build --auto` hits a plan with *open* decisions (unresolved adversarial findings or undecided matrix junctions), it delegates the resolution to `weigh-development-paths --auto` instead of skipping the challenge round. This file is the contract between the two — the producer (`weigh`) and the consumer (`build`) both adhere to it, and both point here rather than restating the shape inline.
 
-## Producer
+Producer: `weigh-development-paths --auto <bundle-path>`. Consumer: `build --auto` Step 3-AUTO.
 
-`/claudna:weigh-development-paths` running in `--auto` mode.
+## The input bundle (consumer → producer)
 
-## Consumer
+`build` writes a scratch bundle (a markdown file under the run's scratch dir, per `orchestration-guide.md` §1) and passes its path to `weigh --auto`. The bundle carries everything `weigh` needs to resolve the junctions **without a human or codebase round-trip of its own**:
 
-`/claudna:implement-plan` running in `--auto` mode, specifically Step 3-AUTO (synthesis pass).
+```
+# Synthesis bundle — <plan title>
 
-## Emission rules (producer side)
+## Open decisions
+<one block per junction needing resolution>
+### D<n>: <junction title>
+- Options: <A / B / C, with the plan's framing>
+- Source: <"adversarial finding" | "matrix decision point" | "plan fork F<n>">
+- Context: <the plan text + why it's open>
 
-- The producer emits exactly one fenced ```json block as the FINAL output of the run.
-- No prose, comments, or extra text after the block.
-- The block MUST be valid JSON (no trailing commas, all strings quoted).
+## Codebase-comparison artifacts
+<the Step-2 findings: what exists, relevant patterns, constraints — so weigh's
+"Existing Patterns" / "Extension" dimensions are grounded, not guessed>
 
-## Schema
+## Plan
+<the full upstream plan body, so weigh resolves in-context>
+```
+
+A junction enters the bundle only if it is genuinely **open** — an adversarial finding still flagged, or a fork/matrix cell the plan left undecided. A fully-decided plan produces an **empty** `## Open decisions` section, and the consumer skips synthesis entirely (trust-the-plan still applies when there's nothing to resolve).
+
+## The output (producer → consumer)
+
+`weigh --auto` emits **one** `orchestration-guide.md` §10.C structured-result block, with `skill: "weigh-development-paths"` and the synthesis payload under `artifacts`:
 
 ```json
 {
   "skill": "weigh-development-paths",
-  "outcome": "completed",
+  "outcome": "completed | needs-input | blocked",
   "artifacts": {
-    "refined_plan_path": "<absolute path written to disk, or null if inline-only>",
-    "refined_plan": "<full markdown body of the refined plan>",
-    "decisions_resolved": <integer count>,
-    "decisions_unresolved": <integer count>,
-    "synthesis_rationales": [
+    "refined_plan": "<the plan body with every resolved decision substituted in-line>",
+    "decisions_resolved": [
       {
-        "decision": "<original open question or finding summary>",
-        "chosen_option": "<the synthesized choice>",
-        "dimensions": ["<dimension that drove it>", "..."]
+        "junction": "D1: where the dedup helper lives",
+        "choice": "extend skills/neon/branch.md",
+        "rationale": "<1-2 lines — the holistic synthesis across the 7 dimensions>"
       }
-    ]
+    ],
+    "decisions_unresolved": [
+      {
+        "junction": "D3: two-key bot vs personal key",
+        "why": "requires a human policy call (identity/security) the matrix can't settle"
+      }
+    ],
+    "synthesis_rationales": {
+      "D1": "<the per-dimension reasoning, Elegance…Plan Alignment, behind the choice>"
+    }
   },
-  "summary": "<2-3 line digest>",
+  "summary": "<2-4 lines: how many junctions resolved / left open>",
   "next": null,
   "errors": [],
-  "blocker_description": null
+  "blocker_description": "<required when outcome != completed; names the unresolved junctions>"
 }
 ```
 
-### Field requirements
+- **`refined_plan`** — the upstream plan with every `decisions_resolved` choice woven in (the decision is now stated, not a fork). This is what the consumer implements.
+- **`decisions_resolved`** — one entry per junction the synthesis settled; `rationale` is the holistic call, `synthesis_rationales[junction-id]` holds the full 7-dimension reasoning (audit trail).
+- **`decisions_unresolved`** — junctions the matrix *cannot* settle headlessly (they hinge on a human value/policy/security call, not a technical comparison). Non-empty ⇒ producer `outcome: "needs-input"`.
 
-| Field | Required | Type | Notes |
-|---|---|---|---|
-| `skill` | yes | string | Exactly `"weigh-development-paths"` |
-| `outcome` | yes | enum | One of `completed`, `blocked`. See "Outcome semantics" below. |
-| `artifacts.refined_plan` | yes (when `completed`) | string | Full markdown body — directly substitutable for the original plan body |
-| `artifacts.refined_plan_path` | optional | string \| null | Disk path if the producer chose to persist; null otherwise |
-| `artifacts.decisions_resolved` | yes | integer | Count of input decisions/findings the producer resolved |
-| `artifacts.decisions_unresolved` | yes | integer | Count the producer could NOT resolve without human input |
-| `artifacts.synthesis_rationales` | yes | array | One entry per resolved decision; see element schema above |
-| `summary` | yes | string | 2-3 line digest for human/orchestrator scanning |
-| `next` | optional | string \| null | Orchestrator hint; usually null for synthesis |
-| `errors` | yes | array | Empty on success |
-| `blocker_description` | required when `outcome != completed` | string \| null | 1-2 sentences explaining what blocked and what would unblock |
+## Producer outcomes
 
-### Outcome semantics
+| `weigh --auto` outcome | When | `decisions_unresolved` |
+|---|---|---|
+| `completed` | every open junction resolved by the 7-dimension synthesis | empty |
+| `needs-input` | one or more junctions need a human call (not a technical tie — a value/policy/security decision) | non-empty |
+| `blocked` | the bundle was malformed/unreadable, or no junctions were supplied | n/a (a contract error, not a decision gap) |
 
-- **`completed`** — All input decisions and adversarial findings resolved. `refined_plan` is substitutable for the original plan body. `decisions_unresolved` is 0.
-- **`blocked`** — One or more decisions cannot be resolved without human input (insufficient evidence in any of the 7 dimensions). `decisions_unresolved` > 0. `blocker_description` lists the unresolvable decisions as a checklist a human can complete.
+A genuine technical tie is **not** `needs-input` — `weigh` must still pick (its Step 5 names what's lost). `needs-input` is reserved for decisions that aren't the matrix's to make.
 
-The producer MUST NOT emit any other outcome value. Consumers MAY treat unrecognized outcomes as a synthesis failure (mapping to consumer-side `blocked` with `errors: ["synthesis pass returned outcome: <X>"]`).
+## The remap (consumer)
 
-## Consumer expectations
+`build` Step 3-AUTO maps the producer's outcome to its own:
 
-Consumers (currently only `/implement-plan --auto` Step 3-AUTO) MUST:
+| producer (`weigh`) | consumer (`build`) | consumer action |
+|---|---|---|
+| `completed` | continues to Step 4 | substitute `refined_plan`, flip the resolved adversarial findings to closed, proceed |
+| `needs-input` | **`needs-input`** | stop; emit the §10.C block with `blocker_description` listing the `decisions_unresolved` junctions; leave a note on the source issue |
+| `blocked` | **`needs-input`** | a synthesis it cannot run is a decision it cannot make headlessly — surface for a human, don't silently fall back to trust-the-plan (that would implement *unresolved* decisions) |
 
-1. Read the producer's final output and parse the JSON block.
-2. On `outcome: completed`:
-   - Use `artifacts.refined_plan` as the new plan body. Replace the original.
-   - For each previously-OPEN adversarial finding present in the original plan, mark its checkbox as resolved (`- [ ]` → `- [x]`) and append a sub-bullet pulling the matching `synthesis_rationales` entry by `decision` text.
-   - Record `decisions_resolved` in the consumer's own structured result as `artifacts.synthesis_decisions_resolved`.
-3. On `outcome: blocked`:
-   - Exit with the consumer's own `outcome: "needs-input"` (mapping: producer-blocked ≠ consumer-blocked; the producer asks for human help, the consumer surfaces that request).
-   - Copy the producer's `blocker_description` into the consumer's structured result.
-4. On any other outcome (malformed JSON, timeout, missing required fields):
-   - Exit with consumer's `outcome: "blocked"`, `errors: ["synthesis pass returned outcome: <value or 'malformed'>"]`.
+The `blocked → needs-input` remap is deliberate: the consumer never silently proceeds past an open decision it failed to resolve. Either synthesis settled it, or a human is asked — never "implement it anyway".
 
 ## Stability
 
@@ -88,10 +96,10 @@ This contract is the integration surface between two skills. Changes are breakin
 - Removing or renaming any field is a breaking change for both.
 - Adding an OPTIONAL field is non-breaking — consumers MUST ignore unknown fields.
 
-When changing this file, update both `skills/weigh-development-paths/SKILL.md` and `skills/implement-plan/SKILL.md` in the same commit.
+When changing this file, update both `skills/weigh-development-paths/SKILL.md` and `skills/build/SKILL.md` in the same commit.
 
 ## Related
 
-- General structured-result shape: `skills/_shared/orchestration-guide.md` §10.C
-- Producer skill: `skills/weigh-development-paths/SKILL.md` "Autonomous Mode (`--auto`)" section
-- Consumer skill: `skills/implement-plan/SKILL.md` Step 3-AUTO (Synthesis pass)
+- `skills/_shared/orchestration-guide.md` §10.C — the structured-result envelope this nests in.
+- `skills/weigh-development-paths/SKILL.md` — the producer (7-dimension synthesis).
+- `skills/build/SKILL.md` — the consumer (Step 3-AUTO).

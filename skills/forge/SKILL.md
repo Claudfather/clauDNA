@@ -18,7 +18,7 @@ Forge is the *general-purpose* planning lens — reach for it when the lens is "
 Parse `$ARGUMENTS` at invocation:
 - **First positional arg:** Topic description, issue URL, or path to an existing rough plan. If omitted, prompt for it.
 - `--auto`: Non-interactive mode. Suppresses Plan Mode and all interactive gates. Requires topic in `$ARGUMENTS`. Emits structured-result JSON and stops.
-- `--output github`: Publish the plan as a §4.1 GitHub Issue via `/claudna:publish --to github-issue` — the shared, implement-plan-ready contract. The Issue body is the canonical, iterable plan.
+- `--output github`: Publish the plan as a §4.1 GitHub Issue via `/claudna:publish --to github-issue` — the shared, build-ready contract. The Issue body is the canonical, iterable plan.
 - `--output docs`: Publish to the repo's `documentation/` tree via `/claudna:publish --to docs` — a PR-reviewable plan directory; choose this when git diffs matter (large or contentious plans).
 - `--output session`: Present the plan in chat only (default).
 
@@ -32,11 +32,11 @@ You are about to start a workstream that is:
 - Decision-heavy (has forks where reasonable people disagree)
 - High-stakes (wrong direction creates weeks of rework)
 
-This is for **workstream-level planning** — initiatives that span multiple PRs and weeks. Not for single-PR task scoping (use `/weigh-development-paths` for that) or implementation details (use `/implement-plan` after the plan is ratified).
+This is for **workstream-level planning** — initiatives that span multiple PRs and weeks. Not for single-PR task scoping (use `/weigh-development-paths` for that) or implementation details (use `/build` after the plan is ratified).
 
 ### Why forge over plain plan mode
 
-Plan mode is the *mechanism* — read-only research, then propose. Forge adds the *methodology and artifact* on top: the §4.1 contract that forces completeness, ratifiable **decision forks**, a durable Issue the team iterates, and a direct path into the `/ironclad` hardening loop and `/implement-plan`. If none of that gets used — single session, single implementer, no real forks — plain plan mode is the better, lighter choice. Forge earns its overhead only when the plan must survive review, coordinate people, and persist.
+Plan mode is the *mechanism* — read-only research, then propose. Forge adds the *methodology and artifact* on top: the §4.1 contract that forces completeness, ratifiable **decision forks**, a durable Issue the team iterates, and a direct path into the `/ironclad` hardening loop and `/build`. If none of that gets used — single session, single implementer, no real forks — plain plan mode is the better, lighter choice. Forge earns its overhead only when the plan must survive review, coordinate people, and persist.
 
 ## Phase 0: Right-Size Gate
 
@@ -83,7 +83,7 @@ For each risk, draft a mitigation. If no mitigation exists, flag it as an open r
 
 ### Plan Document Structure
 
-Forge authors in the **shared §4.1 publishable-doc contract** (`skills/_shared/output-guide.md` §3 frontmatter + §4.1 body) — the same contract the audit lenses (`/claudna:audit tech-debt`, `/claudna:audit security`, et al.) emit — so `/claudna:publish` can route it and `/implement-plan` can consume it. Forge's distinctive sections (Decision Forks, Architecture, Sequencing) ride **alongside** the §4.1 skeleton as added sections; publish validates the skeleton's presence, not its exclusivity.
+Forge authors in the **shared §4.1 publishable-doc contract** (`skills/_shared/output-guide.md` §3 frontmatter + §4.1 body) — the same contract the audit lenses (`/claudna:audit tech-debt`, `/claudna:audit security`, et al.) emit — so `/claudna:publish` can route it and `/build` can consume it. Forge's distinctive sections (Decision Forks, Architecture, Sequencing) ride **alongside** the §4.1 skeleton as added sections; publish validates the skeleton's presence, not its exclusivity.
 
 A multi-phase plan is **one epic/overview doc + one §4.1 doc per phase** (§4.1 is "one phase per issue"; this mirrors the docs-plane `00_overview` + phase-docs pattern). A single-phase plan is one §4.1 doc.
 

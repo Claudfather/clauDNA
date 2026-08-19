@@ -1,7 +1,7 @@
 ---
 name: product-vision
 user-invocable: true
-description: "Use when you want to explore what a codebase could become — candidate features one or two hops from existing infrastructure, compound plays, and a trajectory aligned to the project mission. For triaging known issues in an existing product, use /claudna:product-enhance. Replaces /product-brainstorm."
+description: "Use when you want to explore what a codebase could become — candidate features one or two hops from existing infrastructure, compound plays, and a trajectory aligned to the project mission. For triaging known issues in an existing product, use /claudna:product-enhance. For discovery gated on an active piece of creative work, needing user approval before implementation, use /claudna:kindle instead. Replaces /product-brainstorm."
 argument-hint: "[--auto] [--output github|session] [focus-area]"
 ---
 

@@ -55,7 +55,7 @@ Substitute `<DOC_PATH>` with the actual filesystem path or issue URL.
 
 ## Concern area vocabulary
 
-When critics label findings, use these `concern_area` values where possible (aligns with `skills/implement-plan/challenge-round-questions.md` matrix categories so downstream consumers can route findings to the right matrix questions):
+When critics label findings, use these `concern_area` values where possible (aligns with `skills/build/challenge-round-questions.md` matrix categories so downstream consumers can route findings to the right matrix questions):
 
 - `architecture` — module boundaries, layering, placement decisions
 - `testing` — test coverage, test design, missing scenarios
@@ -92,7 +92,7 @@ These concerns were raised by /claudna:adversarial-review at plan-creation time.
 
 Findings sorted by severity (critical → major → minor → info).
 
-4. The section becomes part of the plan body. Downstream consumers (interactive `/implement-plan` Step 3A, or `--auto` synthesis pass) read it and resolve items.
+4. The section becomes part of the plan body. Downstream consumers (interactive `/build` challenge round, or `--auto` synthesis pass) read it and resolve items.
 
 ## When this chain runs
 

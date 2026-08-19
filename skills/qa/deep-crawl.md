@@ -1,108 +1,25 @@
----
-name: visual-crawl
-user-invocable: true
-description: "Use when you want a frontend app crawled and visually inspected without supervision — every route screenshotted at desktop, tablet, and mobile viewports, interactions exercised, findings filed as issues. For a judgment-based audit of specific screens, use /claudna:audit design."
-argument-hint: "[--auto] [--deep] [--output github|session] [--url <base-url>] [--local] [focus-area]"
-allowed-tools:
-  - "Bash(which *)"
-  - "Bash(test *)"
-  - "Bash(curl *)"
-  - "Bash(lsof *)"
-  - "Bash(npm run *)"
-  - "Bash(pnpm *)"
-  - "Bash(yarn *)"
-  - "Bash(python3 *)"
-  - "Bash(npx *)"
-  - "Bash(node *)"
-  - "Bash(ls *)"
-  - "Bash(mkdir *)"
-  - "Bash(cat *)"
-  - "Bash(gh *)"
-  - "Read(*)"
-  - "Write(*)"
-  - "Glob(*)"
-  - "Grep(*)"
-  - "Task(*)"
-  - "Agent(*)"
-  - "EnterPlanMode"
-  - "ExitPlanMode"
----
+# Deep Crawl — the crawl-mode automation engine
 
-# Visual Crawl — Autonomous Frontend Audit
+This is the backing engine for the `qa` skill's **Crawl mode** (`qa/SKILL.md`). It supplies real, runnable Playwright recipes for screenshotting routes at three viewports, collecting console errors, exercising every interactive element (`--deep`), and simulating a chat UI. All scripts are inline Python via `python3 -c "..."` — no external script files required.
 
-Systematic visual crawl of a frontend application. Discovers routes, screenshots every page at three viewports, tests interactions for errors, compares observed styles against design tokens, and files GitHub issues with screenshot evidence for every finding.
+Pair this with:
+- `crawl-checklist.md` — the 7 per-route check groups and their thresholds.
+- `design-token-rules.md` — design-token extraction JS + comparison thresholds (ΔE2000).
 
-## Arguments
+## Conventions
 
-Parse `$ARGUMENTS` at invocation:
-- `--auto`: Fully non-interactive. Implies `--output github`. Crawl, screenshot, test, file issues, return summary.
-- `--deep`: Full interactive testing. Extends Phase 3 with: click every button/link and verify result, fill and submit forms, simulate chat conversations with sample queries, screenshot before/after each interaction, report broken flows. Uses Playwright for interaction testing (inline Python scripts; see Phase 3 below).
-- `--output github`: Write findings as GitHub Issues (default). See output guide (`skills/_shared/output-guide.md`).
-- `--output session`: Present findings in chat only, no persistence.
-- `--url <base-url>`: Crawl a deployed URL (e.g., `--url https://app.example.com`).
-- `--local`: Spin up a local dev server from the project directory and crawl it.
-- Remaining text is a focus area or constraint (e.g., "only the dashboard pages").
-
-If neither `--url` nor `--local` is specified, ask the user.
-
-## When NOT to use
-
-- For design critique and enhancement proposals → use `/claudna:audit design`
-- For frontend performance (flickering, re-renders, layout shifts) → use `/claudna:audit frontend-perf`
-- For code quality/tech debt → use `/claudna:audit tech-debt`
-- For security vulnerabilities → use `/claudna:audit security`
-
-**Enter Plan Mode.** Call `EnterPlanMode`. All discovery and crawl steps are read-only. If declined, proceed by convention.
+- **Scratch dir:** `/tmp/qa-crawl-<YYYY-MM-DD_HHMMSS>/` with subdirectories `screenshots/`, `console-logs/`, `deep-crawl/`.
+- **One screenshot per Bash call.** No shell operators (`&&`, `||`, `;`, `|`). Playwright commands are single-shot.
+- **Sequential routes, parallel viewports.** Capture the three viewports of one route in parallel (3 Bash calls), but process routes one at a time — keeps browser memory pressure low and avoids resource exhaustion on constrained hardware.
+- **Screenshots are evidence.** Every finding must reference at least one screenshot file.
+- After each route, read the screenshots to visually inspect them.
+- Detect Chrome/Chromium first: `which chromium`, `which google-chrome`, `which chromium-browser` in parallel. If you have a project-specific screenshot helper configured, prefer it over the inline path.
 
 ---
 
-## Phase 1: Setup & Route Discovery
+## Screenshot crawl
 
-### Step 1: Environment Setup
-
-Scratch dir: `/tmp/visual-crawl-<YYYY-MM-DD_HHMMSS>/`. Create subdirectories: `screenshots/`, `research/`, `console-logs/`.
-
-Use Playwright via inline Python scripts (see Step 4) for screenshots. If you have a project-specific screenshot helper configured, prefer that over the inline path.
-
-Detect Chrome/Chromium: `which chromium`, `which google-chrome`, `which chromium-browser` in parallel.
-
-### Step 2: Determine Base URL
-
-**If `--url <base-url>`:** Use directly. Verify reachable with `curl -sI <base-url>`.
-
-**If `--local`:**
-1. Read `package.json` for start/dev scripts and port
-2. Check if dev server is already running: `lsof -i :<port>` and `curl -s http://localhost:<port>`
-3. If not running, start it: `npm run dev` (or `pnpm dev`, `yarn dev`) in background
-4. Wait for server to be ready (poll with curl, max 30s)
-5. Base URL = `http://localhost:<port>`
-
-**If neither:** Ask the user (skip in `--auto` — error out).
-
-### Step 3: Route Discovery
-
-Launch **Explore subagents** in parallel:
-
-**Subagent A — File-based route discovery:**
-- Scan for Next.js App Router: `app/**/page.tsx`, `app/**/page.jsx`
-- Scan for Next.js Pages Router: `pages/**/*.tsx`, `pages/**/*.jsx`
-- Scan for React Router: grep for `<Route`, `createBrowserRouter`, `path:` patterns
-- Scan for other frameworks: `routes/`, `views/`, URL patterns in config
-- Write discovered routes to `<scratch>/research/routes.md`
-
-**Subagent B — Sitemap and link discovery:**
-- Check `<base-url>/sitemap.xml`
-- Check `<base-url>/robots.txt` for sitemap references
-- Fetch the homepage HTML, extract all `<a href>` links
-- Write discovered URLs to `<scratch>/research/sitemap-links.md`
-
-Merge results into a deduplicated route list. Present to user for confirmation (skip in `--auto`).
-
----
-
-## Phase 2: Screenshot Crawl
-
-### Step 4: Viewport Screenshots
+### Viewport matrix
 
 For each discovered route, capture screenshots at three viewports:
 
@@ -112,7 +29,9 @@ For each discovered route, capture screenshots at three viewports:
 | Tablet | 768 × 1024 | `<route-slug>_tablet.png` |
 | Mobile | 375 × 812 | `<route-slug>_mobile.png` |
 
-**Screenshot command** (one per Bash call, no shell operators) — inline Playwright:
+### Screenshot recipe (inline Playwright)
+
+One per Bash call, no shell operators. Substitute `<W>`, `<H>`, `<url>`, `<output>`:
 
 ```bash
 python3 -c "
@@ -133,11 +52,9 @@ asyncio.run(shot())
 
 **Parallelism:** Capture all three viewports of a single route in parallel (3 Bash calls). Process routes sequentially to avoid overloading the browser.
 
-After each route, read the screenshots to visually inspect them.
+### Console error collection
 
-### Step 5: Console Error Collection
-
-For each route, capture JavaScript console errors:
+For each route, capture JavaScript console errors and page exceptions. Write results to `<scratch>/console-logs/<route-slug>.json`:
 
 ```bash
 python3 -c "
@@ -158,15 +75,9 @@ asyncio.run(check())
 "
 ```
 
-Write results to `<scratch>/console-logs/<route-slug>.json`.
-
-Also flag **network request failures** — 4xx/5xx responses to `fetch`/XHR calls — as `console-error` findings (a `page.on('response')` handler surfaces them alongside the console listener above).
-
 ---
 
-## Phase 3: Interaction Testing
-
-### Step 6: Interactive Element Audit (standard)
+## Interaction testing (standard)
 
 For each route, use Playwright to:
 
@@ -183,7 +94,7 @@ For each route, use Playwright to:
      }))
    ```
 
-2. **Link integrity check:** For all `<a href>` elements, verify targets return 2xx/3xx (not 404/500) — `curl -sI` each unique href. Also flag, per link: external (new-tab) links missing `rel="noopener"` (security); `href="#"` paired with a click handler and `javascript:void(0)` hrefs (accessibility antipatterns); and links pointing at `localhost` or a staging host when crawling production.
+2. **Dead link check:** For all `<a href>` elements, verify targets return 2xx/3xx (not 404/500). Use `curl -sI` for each unique href.
 
 3. **Button click test:** Click each visible, non-disabled button. After click, check for:
    - New console errors (compare before/after)
@@ -194,15 +105,17 @@ For each route, use Playwright to:
 
 Write interaction findings to `<scratch>/research/interactions.md`.
 
-### Step 6b: Deep Interactive Testing (`--deep` only)
+---
 
-When `--deep` is set, extend Phase 3 with comprehensive interaction testing. For each discovered route, run the deep crawl and (if the app has a chat/console interface) the chat simulation below. All testing uses inline Playwright — no external scripts required.
+## Deep interactive testing (`--deep`)
+
+When `--deep` is set, extend interaction testing with a comprehensive harness. For each discovered route, run the deep crawl and (if the app has a chat/console interface) the chat simulation below. All testing uses inline Playwright — no external scripts required.
 
 **Setup:** Create `<scratch>/deep-crawl/` for results. Use dark mode if the app supports it.
 
-#### Deep Crawl — click every button, fill every form
+### Deep crawl — click every button, fill every form
 
-For each route, run this Playwright script via Bash:
+Enumerates interactive elements, clicks up to 30 buttons/links with a before/after console+URL diff, fills up to 10 form inputs, and screenshots each interaction. For each route, run this Playwright script via Bash. Replace `ROUTE_URL`, `PAGE_NAME` with each discovered route. Run for every route:
 
 ```bash
 python3 -c "
@@ -298,11 +211,9 @@ asyncio.run(deep_test('ROUTE_URL', 'PAGE_NAME', '<scratch>/deep-crawl/PAGE_NAME'
 "
 ```
 
-Replace `ROUTE_URL`, `PAGE_NAME` with each discovered route. Run for every route.
+### Chat simulation — test the conversational experience
 
-#### Chat Simulation — test the conversational experience
-
-If the app has a chat or console interface, run this to simulate a conversation:
+If the app has a chat or console interface, run this to simulate a conversation. It drives the chat UI through sample queries, polling for loading spinners between turns (up to 30s) and screenshotting each turn. Replace `BASE_URL` with the app's base URL. If the app's chat page is not at `/console`, adjust the path. Use domain-specific test queries from `CLAUDE.md` or `PROJECT_MISSION.md` if available instead of the defaults:
 
 ```bash
 python3 -c "
@@ -378,13 +289,11 @@ asyncio.run(chat_test('BASE_URL', '<scratch>/deep-crawl/chat'))
 "
 ```
 
-Replace `BASE_URL` with the app's base URL. If the app's chat page is not at `/console`, adjust the path. Use domain-specific test queries from CLAUDE.md or PROJECT_MISSION.md if available instead of the defaults.
-
-#### After deep testing
+### After deep testing
 
 Read all screenshots from `<scratch>/deep-crawl/` to visually inspect results. Read `*_results.json` files for structured findings.
 
-Merge deep findings into the Phase 5 findings list with appropriate severity:
+Merge deep findings into the findings list with appropriate severity:
 - `page-load-error` → Critical
 - `interaction-error` (click caused console errors) → High
 - `form-error` (form submission caused errors) → High
@@ -394,54 +303,9 @@ Merge deep findings into the Phase 5 findings list with appropriate severity:
 
 ---
 
-## Phase 4: Design Token Comparison
+## Findings & output
 
-### Step 7: Extract Observed Tokens
-
-For each route at desktop viewport, extract via Playwright JavaScript evaluation:
-
-**Fonts:**
-```javascript
-[...new Set([...document.querySelectorAll('*')].slice(0,500).map(e => getComputedStyle(e).fontFamily))]
-```
-
-**Colors:**
-```javascript
-[...new Set([...document.querySelectorAll('*')].slice(0,500).flatMap(e => [getComputedStyle(e).color, getComputedStyle(e).backgroundColor]).filter(c => c !== 'rgba(0, 0, 0, 0)'))]
-```
-
-**Font sizes:**
-```javascript
-[...new Set([...document.querySelectorAll('*')].slice(0,500).map(e => getComputedStyle(e).fontSize))]
-```
-
-**Spacing (padding/margin):**
-```javascript
-[...new Set([...document.querySelectorAll('*')].slice(0,200).flatMap(e => {const s=getComputedStyle(e); return [s.padding, s.margin].filter(v => v !== '0px')}))]
-```
-
-### Step 8: Compare Against Reference Tokens
-
-Load design token reference from (in priority order):
-1. `--tokens <path>` argument if provided
-2. Project's `tokens.json`, `tailwind.config.js/ts`, CSS custom properties (`:root` vars)
-3. `design-token-rules.md` in this skill's directory (fallback defaults)
-
-Compare observed vs reference:
-- **Font families** not in the design system
-- **Colors** not in the palette (allow close matches within ΔE < 5)
-- **Font sizes** not on the type scale
-- **Spacing values** not on the spacing scale
-
-Write token comparison to `<scratch>/research/token-comparison.md`.
-
----
-
-## Phase 5: Analysis & Output
-
-### Step 9: Findings Compilation
-
-Classify each finding:
+Classify each finding by category and priority (see `crawl-checklist.md` for the full criteria):
 
 | Category | Examples |
 |----------|----------|
@@ -460,87 +324,6 @@ Priority mapping:
 - **Medium:** Design token violations, responsive issues
 - **Low:** Minor visual inconsistencies, warnings
 
-### Step 10: Output
+**Filing findings.** Every finding must reference at least one screenshot. To persist findings as GitHub issues, file them via the `/claudna:publish` skill (`--to github-issue --repo <repo>`) or `/claudna:file-github-issue`. Group related findings: multiple findings on the same page/component → one issue; the same finding across multiple pages → one umbrella issue listing affected pages; console errors with the same stack trace → one issue regardless of which pages trigger it. For chat-only analysis, present findings inline with screenshot references instead of filing.
 
-**Exit Plan Mode.** Call `ExitPlanMode`.
-
-**If `--output github` or `--auto`:**
-
-Write each finding as a doc (frontmatter + the Section 4 body skeleton; one per finding, or group related findings) with `tags:` `auto-audit`, `visual-crawl`, a category label and a priority label, plus any screenshot paths. Then delegate each to `/claudna:publish <file> --to github-issue --repo <repo>` — publish dedups and applies labels. Finish with a batch summary doc linking all findings (Section 4.6 of the output guide).
-
-**If `--output session`:**
-
-Present findings in chat with inline screenshot references. Stay in Plan Mode.
-
-Return structured summary:
-```
-Visual Crawl Summary
-════════════════════════════════════════════════════
-Routes crawled: N
-Screenshots taken: N (N routes × 3 viewports)
-Console errors found: N
-Dead links found: N
-Interaction failures: N
-Design token violations: N
-GitHub issues created: N
-════════════════════════════════════════════════════
-```
-
----
-
-## Autonomous Mode (`--auto`)
-
-When `--auto` is set:
-1. Skip Plan Mode — go straight to crawl
-2. Skip user confirmation gates
-3. Implies `--output github`
-4. Must have `--url` or `--local` (cannot prompt for URL)
-5. Create GitHub Issues for all findings at Medium priority or above
-6. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
-
-```json
-{
-  "skill": "visual-crawl",
-  "outcome": "completed",
-  "artifacts": {
-    "issues_created": ["..."],
-    "routes_crawled": 12,
-    "screenshots_taken": 36,
-    "console_errors": 3,
-    "dead_links": 1,
-    "interaction_failures": 0,
-    "design_token_violations": 5,
-    "scratch_dir": "/tmp/visual-crawl-<timestamp>/"
-  },
-  "summary": "<2-3 line digest>",
-  "next": null,
-  "errors": [],
-  "blocker_description": null
-}
-```
-
-- `outcome` is `completed` on success, `blocked` if base URL is unreachable or no routes were discovered.
-- `--deep` mode produces additional artifacts; if --deep was used, add `deep_findings: N` to artifacts.
-
-`--auto` and `--deep` can be combined: `--auto --deep --url https://app.example.com` runs a full interactive crawl with issue filing, no human in the loop.
-
----
-
-## Notes
-
-- **One screenshot per Bash call.** No shell operators (`&&`, `||`, `;`, `|`). Playwright commands are single-shot.
-- **Sequential routes, parallel viewports.** Don't open multiple browser instances for different routes simultaneously — sequential keeps memory pressure low and avoids resource exhaustion on constrained hardware.
-- **Screenshots are evidence.** Every finding must reference at least one screenshot file.
-- **Don't fix code.** This skill identifies problems. Use `/claudna:implement-plan` or manual fixes afterward.
-- **Respect robots.txt.** If a deployed URL has `Disallow` rules, honor them unless the user explicitly overrides.
-- **Timeout handling.** If a page doesn't load within 30 seconds, log a finding (possible server issue) and continue to next route.
-- **Subagents for research.** Use Explore subagents for route discovery and codebase analysis. Use general-purpose subagents for disk writes. Keep orchestrator context lean.
-- Orchestration guide Section 10 for shared reminders.
-
----
-
-## Output Targets
-
-Follow the output guide at `skills/_shared/output-guide.md`:
-- For `github` (default): write each finding as a doc (frontmatter + Section 4 body skeleton) with `tags:` including `visual-crawl` + a category label, then delegate to `/claudna:publish <file> --to github-issue --repo <repo>` (publish dedups + labels).
-- For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
+**Don't fix code here.** This engine identifies problems. Apply fixes separately afterward.

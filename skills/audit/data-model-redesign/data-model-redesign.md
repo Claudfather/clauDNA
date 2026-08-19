@@ -121,5 +121,5 @@ Before anything is presented or published, run `verification-checklist.md` (this
 - **Neutrality is enforced, not assumed.** The leakage scan (Step 2, template rule) runs on every filled prompt; a prompt that names the destination produces an evaluation worth nothing.
 - **Incremental repair is not a courtesy entry.** It is the baseline the comparison exists to test against — if repair wins the matrix, that *is* the recommendation, and Part 7 plans the repair.
 - **Secrets.** Never print a raw secret or connection string — `file:line` plus the variable name only; the redactor (orchestration guide §7) is the deterministic backstop at every file handoff.
-- **This lens produces an evaluation and a plan, not code.** Implementation is `/claudna:implement-plan`'s job — do not build, branch, or open PRs from here.
+- **This lens produces an evaluation and a plan, not code.** Implementation is `/claudna:build`'s job — do not build, branch, or open PRs from here.
 - **Terminal at the gate for a sound model.** If Part 4 finds the current model fundamentally sound, say so and stop after Step 6 with a short repair list — "no redesign warranted" is a successful outcome of this lens, not a failed run.

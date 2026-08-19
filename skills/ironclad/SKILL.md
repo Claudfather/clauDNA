@@ -155,7 +155,7 @@ For a **plan Issue** with `--loops N` (default `N=1`):
 
 3. Increment the cycle and repeat from **Phase 3** (re-select and re-dispatch lenses against the updated body).
 
-`/ironclad` never edits the plan body itself — `forge --reforge` (in the dispatched subagent) is the only writer of the body; ironclad writes only comments and orchestrates. **Implementation and mixed PRs do not loop** (`--loops` is ignored): code is iterated by humans / `/implement-plan`, not by re-forge.
+`/ironclad` never edits the plan body itself — `forge --reforge` (in the dispatched subagent) is the only writer of the body; ironclad writes only comments and orchestrates. **Implementation and mixed PRs do not loop** (`--loops` is ignored): code is iterated by humans / `/build`, not by re-forge.
 
 ## `--lens <name>` mode — single-lens report
 

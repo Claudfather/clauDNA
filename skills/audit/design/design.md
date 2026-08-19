@@ -84,7 +84,7 @@ Output lands in `documentation/planning/phases/<session_name>_<YYYY-MM-DD>/` —
 
 Phase docs include: header, context + screenshots, visual spec (exact before/after), dependencies, implementation plan, responsive behavior, accessibility checklist, test plan, verification, "What NOT To Do."
 
-Tell user: **"Run `/claudna:implement-plan` on the phase directory to start building."** This lens produces plans, not code.
+Tell user: **"Run `/claudna:build` on the phase directory to start building."** This lens produces plans, not code.
 
 ---
 

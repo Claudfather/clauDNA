@@ -5,7 +5,7 @@ description: "Use when a Claudosseum promotion package (manifest + battle histor
 argument-hint: "<package-path-or-url> [--dry-run] [--auto]"
 requires:
   - cli: gh
-    reason: "Fetching remote packages and the PR step (via /claudna:commit-push-pr)"
+    reason: "Fetching remote packages and the PR step (via /claudna:ship)"
 ---
 
 # Promotion Intake
@@ -51,7 +51,7 @@ On a new branch `promote/<skill-name>`:
 
 ### 4. Open the PR
 
-Invoke `/claudna:commit-push-pr` with:
+Invoke `/claudna:ship` with:
 - Title: `feat: promote /claudna:<name> from Claudosseum arena`
 - Body: the validator's check table, the manifest's provenance block (win rate, battles, judge confidence, telemetry period), and the staged-file list.
 
@@ -69,7 +69,7 @@ Emit the §10.C structured result per `skills/_shared/orchestration-guide.md` as
     "package": "<path-or-url>",
     "skill_name": "<name>",
     "validation": "pass",
-    "pr_url": "<URL from commit-push-pr, or null for --dry-run>",
+    "pr_url": "<URL from ship, or null for --dry-run>",
     "dry_run": false
   },
   "summary": "Promotion staged: /claudna:<name> — PR <url>.",

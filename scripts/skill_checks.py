@@ -35,11 +35,11 @@ GATE_PRUNE_DIRS = {".git", "__pycache__", "worktrees", "node_modules"}
 
 # Skills must delegate GitHub output to /claudna:publish, never call `gh` directly.
 # These three are the gh-endpoint skills where direct `gh` use is the whole point.
-RAW_GH_ALLOWED_SKILLS = {"publish", "file-github-issue", "commit-push-pr"}
+RAW_GH_ALLOWED_SKILLS = {"publish", "file-github-issue", "ship"}
 # Scope: issue/PR *creation* and *comment* verbs (output written to GitHub). We
 # intentionally do NOT gate edit/view/list verbs (e.g. `gh issue edit --add-label`,
 # `gh issue view`) — those are issue *consumption* / label management, used legitimately
-# by consumer skills like implement-plan.
+# by consumer skills like build.
 _RAW_GH_PATTERNS = [
     re.compile(r"\bgh\s+issue\s+create\b"),
     re.compile(r"\bgh\s+pr\s+create\b"),
