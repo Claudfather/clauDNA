@@ -1,6 +1,7 @@
 ---
 name: build-all
 user-invocable: true
+argument-hint: "[phase-docs-directory-or-forge-epic]"
 description: Use when executing multiple phase or plan docs as one ordered workstream — an epic spanning several PRs, possibly several repos, with phases that must land in a declared order. Also when a forge epic's phases are ready for execution. For a single plan doc, use /claudna:build instead.
 ---
 
@@ -120,7 +121,7 @@ digraph convergence {
     "Fix every in-scope instance" [shape=box];
     "Re-request review" [shape=box];
     "New findings?" [shape=diamond];
-    "Round closed zero findings, or reopened one?" [shape=diamond];
+    "Fix-sweep resolved none of the prior round's findings, or reopened a closed one?" [shape=diamond];
     "Converged - record clean verdict" [shape=box style=filled fillcolor=lightgreen];
     "Escalate to owner with named blocker" [shape=box];
 

@@ -142,7 +142,7 @@ Planning (when starting new work)
 
 Building (the core loop)
 ───────────────────────────────────────────────────
-  /claudna:build        → Point at a phase doc
+  /claudna:build                 → Point at a phase doc
                                    ├── Challenge round (first principles review)
                                    ├── Build & test
                                    ├── PR with deliverable audit

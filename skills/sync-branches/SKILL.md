@@ -47,17 +47,24 @@ If on main:
 git -C <repo-path> pull origin main
 ```
 
-If on a feature branch:
+If on a feature branch, check for uncommitted changes first — never stash (a pre-existing unrelated stash entry on the stack would get silently popped into this branch):
 ```bash
-git -C <repo-path> stash
+git -C <repo-path> status --porcelain
+```
+
+If clean, merge:
+```bash
 git -C <repo-path> merge origin/main
-git -C <repo-path> stash pop
+```
+
+If dirty, skip and report — same as Step 5 does for worktrees:
+```
+Skipped (uncommitted changes)
 ```
 
 If merge fails, abort and report — do NOT force anything:
 ```bash
 git -C <repo-path> merge --abort
-git -C <repo-path> stash pop
 ```
 
 ### Step 5: Sync each worktree

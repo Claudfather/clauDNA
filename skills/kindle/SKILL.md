@@ -1,6 +1,7 @@
 ---
 name: kindle
 user-invocable: true
+argument-hint: "[topic-or-idea]"
 description: "Use before any creative work — creating features, building components, adding functionality, or modifying behavior. The ideation phase: discovers intent and requirements into an approved spec before /claudna:forge plans and /claudna:ironclad hardens. Requires a presented design and user approval before any implementation. For an on-demand, codebase-driven opportunity scan not gated on active creative work, use /claudna:product-vision instead."
 ---
 

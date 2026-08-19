@@ -45,15 +45,21 @@ allowed-tools:
 
 Browser-automation framework with modes for different QA tasks. Uses a fast headless browser (~100ms per command) for navigating, interacting, screenshotting, and verifying state.
 
-Pick the mode based on the task:
+## Mode dispatch
 
-- **Test-and-fix mode** — systematically QA the app, find bugs, fix them, re-verify (iterative loop)
-- **Report-only mode** — find bugs and produce a structured report; never modify code
-- **Canary mode** — post-deploy monitoring; baseline + diff to catch regressions
-- **Benchmark mode** — performance regression detection (Core Web Vitals, bundle size, load time)
-- **Browse mode** — general-purpose browser interactions (navigate, click, screenshot, verify)
-- **Cookie-setup mode** — import cookies from real browser for authenticated testing
-- **Crawl mode** — autonomous route discovery + screenshot + per-route checks + findings filed via `publish`
+Arguments to dispatch (first token = mode, the rest belong to the mode): $ARGUMENTS
+
+| Token | Mode | When |
+|-------|------|------|
+| `test` | Test-and-fix | Systematically QA the app, find bugs, fix them, re-verify (iterative loop) |
+| `report` | Report-only | Find bugs and produce a structured report; never modify code |
+| `canary` | Canary | Post-deploy monitoring; baseline + diff to catch regressions |
+| `benchmark` | Benchmark | Performance regression detection (Core Web Vitals, bundle size, load time) |
+| `browse` | Browse | General-purpose browser interactions (navigate, click, screenshot, verify) |
+| `cookies` | Cookie-setup | Import cookies from real browser for authenticated testing |
+| `crawl` | Crawl | Autonomous route discovery + screenshot + per-route checks + findings filed via `publish` |
+
+**No mode token → infer from the natural-language triggers in each mode's own section below** ("qa"/"test this site" → `test`; "canary"/"monitor deploy" → `canary`; etc. — see each mode's **When:** line). **Headless / non-interactive contexts: the mode token is required** — never inferred.
 
 Only **Crawl mode** supports `--auto` (see "Autonomous Mode" below) — the other six modes are interactive-only.
 
