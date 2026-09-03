@@ -105,11 +105,62 @@ Write the doc — or doc family — into the current repo's `documentation/` tre
 
 ### Adapter: github-issue
 
-**Dedup first (mandatory).** Before creating, search for an existing issue and apply the decision rules in `skills/_shared/output-guide.md` Section 4.5:
+**Dedup first (mandatory).** A dedup that silently misses is exactly the failure it exists to
+prevent, so this step is bounded on purpose and **states its bound in the output**. Run it
+before creating, then apply the decision rules in `skills/_shared/output-guide.md` Section 4.5.
+
+**1. Pick 2–3 deliberately different terms** from the doc's title, tags and cited files. GitHub
+issue search is *lexical, not semantic* — it cannot match a duplicate whose filer chose different
+words than you did. Rephrasing toward the symptom does not fix that, so vary the vocabulary
+instead:
+
+| Term | Draw it from | Why |
+|---|---|---|
+| **Component** | a file, function, script or module name in the doc | strongest — file and symbol names are the one vocabulary two filers reliably share |
+| **Symptom** | what the reader observes going wrong | matches a duplicate filed from the outside in |
+| **Synonym** | the same defect said another way | the coverage the other two miss |
+
+**2. Run one query per term — separate commands, one term each.**
 
 ```bash
-gh issue list --repo <owner>/<repo> --search "<key terms from title/tags/files>" --state open --limit 20
+gh issue list --repo <owner>/<repo> --search "<component>" --state open --limit 20 --json number,title,url
+gh issue list --repo <owner>/<repo> --search "<symptom>"   --state open --limit 20 --json number,title,url
+gh issue list --repo <owner>/<repo> --search "<synonym>"   --state open --limit 20 --json number,title,url
 ```
+
+**One term per query is the whole point of running three.** GitHub ANDs the words inside a
+`--search` string, so `--search "dedup limit truncation"` is a *single* search for issues
+containing all three words — it is not three searches, and it is **narrower than any one of
+them alone**. Three terms in one query is the opposite of the coverage this step is asking for.
+
+Run each command unpiped and read its output. A `gh` call piped into anything reports the
+*pipe's* exit status, so a failed search becomes an empty result that passes every check below.
+
+**3. Check each count against the limit** before drawing any conclusion from it. The count must
+be **strictly below the `--limit` you passed**.
+
+- **Count < limit** → complete for that term. Its hits are the whole open match set, and a zero
+  is a real zero.
+- **Count == limit** → **truncated.** What it returned is still real — a duplicate you can see is
+  a duplicate, so act on it. What a truncated query cannot support is the **negative**: you
+  cannot tell "no issue in this repo matches" from "none of the first 20 match". Reporting *no
+  duplicate found* on the strength of a query that came back at the limit is a false negative,
+  not a clean result. Narrow the term (a filename or a symbol rather than a common word) or
+  raise `--limit`, re-run, and report both what you changed and the new count.
+
+**4. State the bound with the result** — every query verbatim, its count, the limit it ran under,
+and what was outside the search. "No duplicate found" is never the whole claim; "no *open* match
+for *these terms*" is.
+
+```
+Dedup: 3 queries against OPEN issues in <owner>/<repo>, --limit 20 each.
+  "<component>" → 2 hits (under limit)
+  "<symptom>"   → 0 hits (under limit)
+  "<synonym>"   → 7 hits (under limit)
+  Verdict: no open issue matched. Closed issues were not searched.
+```
+
+Then apply §4.5 to whatever the searches returned:
 
 - Exact match → prefer offering `--update` of the existing issue (§4.5); skip and report its URL only if the caller declines.
 - Related but different → create and add `Related: #NNN` to the body.
@@ -190,7 +241,9 @@ Would create GitHub issue:
   Repo: chrisrogers37/shuffify
   Title: Spotify API Rate Limits & Quirks
   Labels: api, spotify, rate-limits
-  Dedup: no open match for "spotify rate limit"
+  Dedup: 3 queries vs OPEN issues, --limit 20 each — "rate-limits" 2 hits,
+         "429 backoff" 0 hits, "throttling" 5 hits; all under limit.
+         No open match. Closed issues not searched.
   Body: [243 chars, first line: "Spotify enforces 30 req/sec per app..."]
 
 No changes made.
