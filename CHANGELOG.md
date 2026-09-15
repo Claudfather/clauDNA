@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`auto-format.sh` no longer depends on the host's JSON whitespace ([#324](https://github.com/Claudfather/clauDNA/issues/324)).** The hook resolved its target with `grep -o '"file_path":"[^"]*"'`, a pattern that requires **compact** JSON. Given a pretty-printed payload the match fails, `FILE_PATH` is empty, and the hook exits 0 having formatted nothing — no error, no log, no exit code.
+
+  **Measured before fixing, because the two possible findings had different severities.** Literal hook stdin was captured from a real `claude 2.1.240` run (a capture hook registered via `--settings` on `PostToolUse`, one `Write` payload and one `Edit` payload): both are valid JSON on a single line with **zero** occurrences of `": "` anywhere. So the parse was succeeding, and this was latent rather than a hook that had been silently formatting nothing. Confirmed end-to-end in the other direction too — a real interactive `Write` of `x   =   1` came back `x = 1`, attributed by elimination (`auto-format.sh` is the only hook on that host invoking `ruff`/`prettier`).
+
+  That measurement is the reason for the fix rather than an argument against it: the payload's whitespace is a property of an **external producer** and is not part of any published contract, so it can change with a binary upgrade and switch this hook off with nothing to notice. **A verdict inherits the expiry of the evidence under it** — "compact" is true of `2.1.240` and says nothing about the next download.
+
+  Resolution is now two chained rungs: `jq` parses the payload as JSON so the whitespace question stops existing, and a fallback pattern tolerating whitespace on **both** sides of the colon (`'"file_path"[[:space:]]*:[[:space:]]*"[^"]*"'`) covers a host without `jq`. They chain rather than branch on `jq` presence — a fallback reachable only where `jq` is absent is never exercised anywhere it is installed, which is everywhere we test.
+
+- **`auto-format.sh` reports a payload it cannot parse instead of exiting 0 ([#324](https://github.com/Claudfather/clauDNA/issues/324)).** Silence was the defect's whole character: a formatter that stops formatting looks exactly like a formatter with nothing to do. The hook is wired to `Write|Edit` only and both always carry the file they acted on, so a non-empty payload that yields no path is a parse failure, not an event without a target — it now writes one line to stderr and exits 1, which surfaces the message without blocking the tool call. Empty stdin stays silent at 0; that is genuinely nothing to do.
+
+- **`auto-format.sh` has tests ([#324](https://github.com/Claudfather/clauDNA/issues/324)).** It was the only wired hook with none. `tests/test_auto_format_hook.py` drives the real hook across (compact | pretty) x (with-`jq` | without-`jq`), pins that the target comes from `tool_input.file_path` and never from the file content being written, and pins the loud-on-unparseable behaviour. The hook also gains a `set -uo pipefail` prologue — deliberately without `-e`, since the formatters below it exit nonzero for legitimate reasons and aborting there would turn a partial format into none.
+
 ## [0.19.0] - 2026-09-04
 
 **This release does not update anything by itself.** Claude Code loads plugins from a pinned local cache, so cutting a tag moves no installation: every existing install stays on the version it already resolved until something pulls this one — `claude plugin update` by hand, or an automated puller. If you run a fleet and have no puller enrolled, nothing has moved. Reading this release is not evidence that any bot is running the changes below.
