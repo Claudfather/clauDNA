@@ -1,16 +1,57 @@
 #!/bin/bash
 # Auto-format hook for Claude Code
-# Runs after Write/Edit operations to format code
+# Runs after Write/Edit operations to format code.
+#
+# Deliberately not `set -e`. The formatters below exit nonzero for legitimate
+# reasons — `ruff check --fix` does it whenever a violation remains unfixable —
+# so under `-e` the ordinary "file still has lint" case would exit 1 and collide
+# with the meaning this hook assigns to exit 1 below. Dropping `-e` is what keeps
+# that exit code single-meaninged; it also stops one failing formatter from
+# skipping the rest.
+#
+# `pipefail` is omitted rather than forgotten: every pipeline here sits inside a
+# command substitution whose status nothing reads, so it is measurably inert, and
+# `set -u` alone matches session-start.sh, the other degrade-don't-abort hook.
+set -u
 
 # Read the hook event from stdin
 EVENT=$(cat)
 
-# Extract the file path from the event
-FILE_PATH=$(echo "$EVENT" | grep -o '"file_path":"[^"]*"' | cut -d'"' -f4)
-
-# Exit if no file path found
-if [ -z "$FILE_PATH" ]; then
+# Nothing on stdin is not a failure — there is simply no event to act on.
+if [ -z "$EVENT" ]; then
     exit 0
+fi
+
+# Extract the target path from the event.
+#
+# The payload's whitespace is not part of any published contract, so parse it as
+# JSON where possible. The two rungs chain rather than branch on `jq` presence: a
+# fallback reachable only on a host without `jq` is never exercised on a host
+# that has it.
+FILE_PATH=""
+if command -v jq &>/dev/null; then
+    FILE_PATH=$(printf '%s' "$EVENT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
+fi
+if [ -z "$FILE_PATH" ]; then
+    FILE_PATH=$(printf '%s' "$EVENT" \
+        | grep -o '"file_path"[[:space:]]*:[[:space:]]*"[^"]*"' \
+        | head -1 \
+        | cut -d'"' -f4)
+fi
+
+# A non-empty payload that yields no path is a PARSE failure, not an event
+# without a target: this hook matches Write|Edit only, and both always carry the
+# file they acted on. The matcher does not reach NotebookEdit, whose payload
+# carries `notebook_path` instead and would otherwise be a legitimate no-path
+# event — measured, with a Write through the same matcher as a positive control.
+#
+# Exiting 0 here is precisely what let a whitespace-fragile parse switch the hook
+# off with no error, no log and no exit code. Exit 1 surfaces the message without
+# blocking the tool call; exit 2 would feed the model, which is not wanted for a
+# formatter that has already missed its chance to run.
+if [ -z "$FILE_PATH" ]; then
+    printf 'auto-format: could not resolve tool_input.file_path from the hook payload; nothing formatted\n' >&2
+    exit 1
 fi
 
 # Format based on file extension
