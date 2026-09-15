@@ -232,10 +232,11 @@ class TestAnUnparseablePayloadIsLoud:
         assert "file_path" in err
         assert calls == [], "nothing should have been formatted"
 
-    @JQ_ARMS
-    def test_empty_stdin_is_silent_and_successful(self, tmp_path, with_jq):
+    def test_empty_stdin_is_silent_and_successful(self, tmp_path):
         # No event is not a parse failure — the hook has nothing to act on.
-        rc, err, calls = run_hook(tmp_path, "", with_jq=with_jq)
+        # Not run across the jq arms: the hook exits before jq is consulted, so
+        # both arms are byte-identical executions (bash, cat — nothing else).
+        rc, err, calls = run_hook(tmp_path, "")
         assert rc == 0
         assert err == ""
         assert calls == []
@@ -247,3 +248,35 @@ class TestExtensionDispatch:
         rc, err, calls = run_hook(tmp_path, serialize(_payload(str(tmp_path / "notes.txt"))))
         assert rc == 0, f"hook failed: {err}"
         assert calls == []
+
+
+class TestJqResolvesToolInputRegardlessOfKeyOrder:
+    """Why `jq` is rung 1 and not a fallback, despite being the expensive rung.
+
+    A text pattern takes the *first* `file_path` in the payload, so it is correct
+    only while `tool_input` happens to precede `tool_response`. That is one more
+    uncontracted property of the same external producer this fix exists to stop
+    depending on — trading whitespace-order for key-order is not a fix. Measured:
+    with the keys swapped, the text rung returns the echoed path and `jq` returns
+    the real one.
+
+    The text rung keeps that limitation; it is the degraded path for a host with
+    no `jq`, and its bound is stated rather than papered over. This test pins the
+    `jq` rung's freedom from it, so a later change that reorders the rungs for
+    speed fails here rather than silently re-acquiring the dependency.
+    """
+
+    def test_a_reordered_payload_still_resolves_tool_input(self, tmp_path):
+        real = str(tmp_path / "real.py")
+        echoed = str(tmp_path / "echoed.py")
+        # tool_response BEFORE tool_input — a key order no contract forbids.
+        payload = {
+            "tool_name": "Write",
+            "tool_response": {"file_path": echoed},
+            "tool_input": {"file_path": real, "content": "x = 1\n"},
+        }
+        rc, err, calls = run_hook(tmp_path, compact(payload), with_jq=True)
+        assert rc == 0, f"hook failed: {err}"
+        assert targets(calls) == [real, real], (
+            f"jq must resolve tool_input.file_path, not the first match; got {calls}"
+        )

@@ -28,6 +28,14 @@ fi
 # JSON where possible. The two rungs chain rather than branch on `jq` presence: a
 # fallback reachable only on a host without `jq` is never exercised on a host
 # that has it.
+#
+# `jq` is the FIRST rung even though it is the expensive one — ~47ms of startup
+# on this host against ~0.1ms for a bash regex, on every Write and Edit. It is
+# first because a text pattern takes the first `file_path` in the payload, which
+# is the right one only while `tool_input` happens to precede `tool_response`.
+# That is one more uncontracted property of the same producer, and trading
+# whitespace-order for key-order is not a fix. The text rung keeps that
+# limitation knowingly: it is the degraded path for a host with no `jq`.
 FILE_PATH=""
 if command -v jq &>/dev/null; then
     FILE_PATH=$(printf '%s' "$EVENT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
