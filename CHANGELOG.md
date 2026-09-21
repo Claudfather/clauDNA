@@ -20,6 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`auto-format.sh` has tests ([#324](https://github.com/Claudfather/clauDNA/issues/324)).** It was the only wired hook with none. `tests/test_auto_format_hook.py` drives the real hook across (compact | pretty) x (with-`jq` | without-`jq`), pins that the target comes from `tool_input.file_path` and never from the file content being written, and pins the loud-on-unparseable behaviour. The hook also gains a `set -uo pipefail` prologue — deliberately without `-e`, since the formatters below it exit nonzero for legitimate reasons and aborting there would turn a partial format into none.
 
+- **`repo-health`'s two GitHub-review rows carried two different defects, both fixed.** Two separate mechanisms — stated separately here for the same reason:
+
+  **"Open PRs (mine)" fetched `reviewDecision`** (the second known instance of this dead field — see `Claudfather/Claudlobby#1551` for the first, upstream one). That GitHub field reflects a formal Approve/Request-Changes review state only, and reads as permanently `REVIEW_REQUIRED` for any team — or any shared-identity bot fleet, which structurally cannot produce a formal state at all — that reviews by PR comment instead. Measured on one such fleet: four merged, peer-reviewed PRs, all still `REVIEW_REQUIRED`, zero formal reviews. **The command ran; the value was silently wrong.** The check now fetches only `number,title,updatedAt`, with a note pointing at `gh pr view <n> --comments` (or a fleet's own review-attribution tool, where one exists) as the actual source of review activity.
+
+  **"PRs to review" used `--review-requested @me`, which is not a real `gh pr list` flag** (verified on `gh 2.92.0`) — the command itself errors, `unknown flag: --review-requested`, exit 1. **This row has never run as written**, on any repo, regardless of review convention. Replaced with the working `--search` form, `review-requested:@me`.
+
+  Silent-wrong-value and loud-error are not ranked against each other here — that depends on whether the caller checks the exit code, which was not measured, so the writeup states each mechanism and stops there rather than construct a severity ordering the evidence does not support.
+
+  Neither fix closes the underlying class. The person who built a correct review-attribution tool for exactly the `reviewDecision` problem reached for that same dead field again the next day — the wrong field is one step and always answers, the right tool is several steps and each one is independently forgettable. A doc fix cannot repair that gap by itself.
+
 ## [0.19.0] - 2026-09-04
 
 **This release does not update anything by itself.** Claude Code loads plugins from a pinned local cache, so cutting a tag moves no installation: every existing install stays on the version it already resolved until something pulls this one — `claude plugin update` by hand, or an automated puller. If you run a fleet and have no puller enrolled, nothing has moved. Reading this release is not evidence that any bot is running the changes below.

@@ -10,14 +10,34 @@ Detailed definitions for each check performed by the repo-health skill.
 |------|-----|
 | **Current branch** | `git -C <repo> branch --show-current` |
 | **Working tree** | `git -C <repo> status --porcelain` (count modified/untracked/staged) |
-| **Open PRs (mine)** | `gh pr list -R <remote> --author @me --json number,title,reviewDecision,updatedAt` |
-| **PRs to review** | `gh pr list -R <remote> --review-requested @me --json number,title,author` |
+| **Open PRs (mine)** | `gh pr list -R <remote> --author @me --json number,title,updatedAt` |
+| **PRs to review** | `gh pr list -R <remote> --search "review-requested:@me" --json number,title,author` |
 | **CI status** | `gh pr checks <number>` for open PRs, or `gh run list -R <remote> --limit 1` |
 | **Stale branches** | Local branches with no commits in 14+ days |
 | **In-progress plans** | Search `documentation/planning/` for `🔧 IN PROGRESS` markers |
 | **Pending plans** | Search `documentation/planning/` for `📋 PENDING` markers |
 | **Last commit** | `git -C <repo> log -1 --format="%ar — %s"` |
 | **Stashes** | `git -C <repo> stash list` count |
+
+> Two prior defects in the two rows above, different in kind — stated separately
+> because they are not ranked against each other below.
+>
+> **"Open PRs (mine)"** used to also fetch `reviewDecision`. That field reflects
+> GitHub's formal Approve/Request-Changes state only, and reads as permanently
+> `REVIEW_REQUIRED` for any team (or any shared-identity bot fleet, which can
+> never produce a formal state at all) that reviews by PR comment instead.
+> Measured on one such fleet: four merged, peer-reviewed PRs, all still reading
+> `REVIEW_REQUIRED` with zero formal reviews. The command still ran; the column
+> was silently wrong. To see whether an open PR has actually been reviewed,
+> check its comments (`gh pr view <n> --comments`) rather than this field — or,
+> if your setup has its own review-attribution tool for a shared-identity
+> convention, that is a stronger source than either.
+>
+> **"PRs to review"** used to read `--review-requested @me`. That flag does not
+> exist on `gh` (verified on `2.92.0`): the command itself errors —
+> `unknown flag: --review-requested`, exit 1 — so this row has never run as
+> written. The working form is a `--search` query, `review-requested:@me`, now
+> reflected above.
 
 ---
 
