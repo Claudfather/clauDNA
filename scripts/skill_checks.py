@@ -6,6 +6,7 @@ can share the same rules without duplication.
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -31,7 +32,60 @@ STALE_PATH_SKIP_SKILLS = {"cleanup-legacy-install"}
 # validate-skills.py's removed-names scan and check_vault_address.py's
 # vault-address conformance gate.
 GATE_EXTENSIONS = {".md", ".sh", ".py", ".json", ".yaml", ".yml", ".toml", ".txt"}
-GATE_PRUNE_DIRS = {".git", "__pycache__", "worktrees", "node_modules"}
+# Names with no structural marker to key on: git, CPython and npm each mandate
+# their own directory name, so the name IS the invariant here. A virtualenv is
+# the opposite case and is handled by is_virtualenv() below -- .venv and venv
+# are listed only as a name-level backstop for a venv whose marker is missing
+# or unreadable. "env" is deliberately NOT listed: it is a plausible name for a
+# tracked config directory, and a literal entry would silently drop real files
+# from a gate whose whole job is to find them. A venv named env is caught by
+# the marker instead, which keys on contents rather than on the name.
+GATE_PRUNE_DIRS = {".git", "__pycache__", "worktrees", "node_modules", ".venv", "venv"}
+
+
+def is_virtualenv(path: Path) -> bool:
+    """True when *path* is the root of a Python virtual environment.
+
+    PEP 405 defines ``pyvenv.cfg`` at the environment root as the marker, and
+    ``python -m venv`` writes it (verified). Keying on the marker rather than on
+    the directory name is what stops this recurring the moment a contributor
+    picks ``.venv313``, ``env`` or ``build-venv``: the set of names a person
+    might choose is unbounded, the marker is not.
+
+    Why it matters that the gates skip one: an environment holds thousands of
+    gate-matching files whose lines are long, and the gates run a per-line regex
+    over every file they walk. One in the repo root measured a 33x slowdown --
+    slow enough to read as a hang, which is how it cost hours (#330).
+
+    Layouts that do not write the marker (conda prefix environments, older
+    virtualenv) were not measured; the name-level entries in GATE_PRUNE_DIRS are
+    the backstop for those.
+    """
+    return (path / "pyvenv.cfg").is_file()
+
+
+def walk_gate_files(root: Path) -> list[Path]:
+    """Every gate-relevant file under *root*, vendored directories pruned.
+
+    The single walk behind both gates. os.walk rather than rglob because the
+    prune has to stop the DESCENT: a filter applied to an already-enumerated
+    list still pays to enumerate the environment, and a bare venv is ~1,500
+    files before a single package is installed.
+
+    Callers layer their own path exclusions on top -- the two gates deliberately
+    differ there (see each one's GATE_EXCLUDE_* constants).
+    """
+    out: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        here = Path(dirpath)
+        dirnames[:] = [
+            d for d in dirnames if d not in GATE_PRUNE_DIRS and not is_virtualenv(here / d)
+        ]
+        for fname in filenames:
+            if Path(fname).suffix in GATE_EXTENSIONS:
+                out.append(here / fname)
+    return sorted(out)
+
 
 # Skills must delegate GitHub output to /claudna:publish, never call `gh` directly.
 # These three are the gh-endpoint skills where direct `gh` use is the whole point.
