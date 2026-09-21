@@ -14,6 +14,14 @@
 __pycache__/
 *.pyc
 
+# Python virtual environments. CONTRIBUTING.md's `make deps` is a bare
+# `pip install`, which PEP 668 hosts (Debian, Homebrew) refuse outright, so the
+# standard remedy is a venv in the repo root. Ignored here; the repo-walking
+# gates prune it separately (scripts/skill_checks.py::is_virtualenv), since a
+# gitignore entry is invisible to them.
+.venv/
+venv/
+
 # Bot/fleet runtime state (event ledgers, telemetry) written into a working
 # checkout — never part of the plugin. Root-anchored so it can't touch the
 # tracked skills/audit/data-model/ skill.

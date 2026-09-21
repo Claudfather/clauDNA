@@ -146,10 +146,10 @@ GATE_EXCLUDE_FILES = {"CHANGELOG.md", "scripts/removed-skills.txt"}
 def _candidates(repo_root: Path) -> list[Path]:
     """Living surfaces that could carry or execute the variable.
 
-    Shares the gates' *file-type* scope from ``skill_checks`` —
-    ``GATE_EXTENSIONS`` and ``GATE_PRUNE_DIRS``. That matters beyond tidiness: it
-    brings in ``.sh`` files and the templates shipped into user projects, which
-    are the only surfaces that could *actually read* an env var, and which a
+    Shares the gates' walk with ``skill_checks.walk_gate_files`` — same
+    extensions, same pruning. That matters beyond tidiness: it brings in ``.sh``
+    files and the templates shipped into user projects, which are the only
+    surfaces that could *actually read* an env var, and which a
     ``skills/**/*.md`` walk misses.
 
     It does **not** share the removed-names gate's exclusions — see
@@ -160,12 +160,8 @@ def _candidates(repo_root: Path) -> list[Path]:
     import skill_checks
 
     out: list[Path] = []
-    for path in sorted(repo_root.rglob("*")):
-        if not path.is_file() or path.suffix not in skill_checks.GATE_EXTENSIONS:
-            continue
+    for path in skill_checks.walk_gate_files(repo_root):
         rel = path.relative_to(repo_root).as_posix()
-        if any(part in skill_checks.GATE_PRUNE_DIRS for part in path.relative_to(repo_root).parts):
-            continue
         if rel in GATE_EXCLUDE_FILES or rel.startswith(GATE_EXCLUDE_PREFIXES):
             continue
         if rel in SELF:

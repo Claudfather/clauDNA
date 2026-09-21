@@ -10,15 +10,12 @@ Untouched skill errors are reported as warnings for visibility.
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
 from check_schema_drift import run_check as run_schema_drift_check
 from check_vault_address import run_check as run_vault_address_check
 from skill_checks import (
-    GATE_EXTENSIONS,
-    GATE_PRUNE_DIRS,
     STALE_PATH_RE,
     check_removed_name_mentions,
     collect_skill_reference_errors,
@@ -27,6 +24,7 @@ from skill_checks import (
     load_removed_skills,
     parse_frontmatter,
     validate_skill_md,
+    walk_gate_files,
     warn_skill_md,
 )
 
@@ -37,11 +35,10 @@ REMOVED_SKILLS_FILE = REPO_ROOT / "scripts" / "removed-skills.txt"
 SKIP_DIRS = {"_shared"}
 SKIP_SKILLS: set[str] = set()  # add skill names here to intentionally bypass validation
 
-# Removed-names gate scope: GATE_EXTENSIONS / GATE_PRUNE_DIRS (imported from
-# skill_checks, shared with the vault-address gate) pick the repo-wide text
-# surfaces; these exclusions carve out historical records and generated/managed
-# paths. CHANGELOG and the archive legitimately narrate removed skills; the gate
-# protects living surfaces.
+# Removed-names gate scope: skill_checks.walk_gate_files (shared with the
+# vault-address gate) picks the repo-wide text surfaces; these exclusions carve
+# out historical records and generated/managed paths. CHANGELOG and the archive
+# legitimately narrate removed skills; the gate protects living surfaces.
 GATE_EXCLUDE_FILES = {"CHANGELOG.md", "scripts/removed-skills.txt"}  # exact paths
 # Point-in-time records legitimately narrate retired skills: the archive,
 # plan/spec/decision documents (rewriting history would falsify them), and
@@ -77,14 +74,7 @@ def scan_removed_names(removed_names: list[str]) -> list[tuple[str, str]]:
     if not removed_names:
         return hits
 
-    candidates: list[Path] = []
-    for dirpath, dirnames, filenames in os.walk(REPO_ROOT):
-        dirnames[:] = [d for d in dirnames if d not in GATE_PRUNE_DIRS]
-        for fname in filenames:
-            if Path(fname).suffix in GATE_EXTENSIONS:
-                candidates.append(Path(dirpath) / fname)
-
-    for path in sorted(candidates):
+    for path in walk_gate_files(REPO_ROOT):
         rel = path.relative_to(REPO_ROOT).as_posix()
         if rel in GATE_EXCLUDE_FILES or rel.startswith(GATE_EXCLUDE_PREFIXES):
             continue
