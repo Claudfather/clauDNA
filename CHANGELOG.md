@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Silent-wrong-value and loud-error are not ranked against each other here — that depends on whether the caller checks the exit code, which was not measured, so the writeup states each mechanism and stops there rather than construct a severity ordering the evidence does not support.
 
-  Neither fix closes the underlying class. The person who built a correct review-attribution tool for exactly the `reviewDecision` problem reached for that same dead field again the next day — the wrong field is one step and always answers, the right tool is several steps and each one is independently forgettable. A doc fix cannot repair that gap by itself.
+  Neither fix closes the underlying class. A correct review-attribution tool for exactly the `reviewDecision` problem already exists, and the dead field still gets reached for, because the wrong field is one step and always answers while the right tool is several steps — each one independently forgettable. A doc fix cannot repair that gap by itself.
 
 ## [0.19.0] - 2026-09-04
 
