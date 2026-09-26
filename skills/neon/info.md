@@ -41,12 +41,12 @@ Requires `<PROJECT_ID>` and `<ORG_ID>` from discovery. If either is missing, ski
 
 **With API key:**
 ```bash
-timeout 10 npx neon branches list --project-id "<PROJECT_ID>" --org-id "<ORG_ID>" --api-key "<API_KEY>"
+timeout 10 npx neon@6.2.3 branches list --project-id "<PROJECT_ID>" --org-id "<ORG_ID>" --api-key "<API_KEY>"
 ```
 
 **Without API key:**
 ```bash
-timeout 10 npx neon branches list --project-id "<PROJECT_ID>" --org-id "<ORG_ID>"
+timeout 10 npx neon@6.2.3 branches list --project-id "<PROJECT_ID>" --org-id "<ORG_ID>"
 ```
 
 If the output contains "Awaiting authentication", skip and note "Branch listing: neon auth required".
@@ -73,5 +73,5 @@ Format the output as a summary:
 | Name | State | Created |
 |------|-------|---------|
 | ...  | ...   | ...     |
-(or "neon auth required — run `npx neon auth` to enable branch listing")
+(or "neon auth required — run `npx neon@6.2.3 auth` to enable branch listing")
 ```

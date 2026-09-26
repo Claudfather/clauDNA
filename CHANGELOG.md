@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **The find-skills and neon skills pin every `npx` package they tell an agent to run ([Claudlobby#1890](https://github.com/Claudfather/Claudlobby/issues/1890)).** 31 lines ran `npx skills …` or `npx neon …` with no version, so a future bad publish of either package would run on the agent's next call. Each now names the version npm serves today, checked with `npm view <pkg>@<version> version` and never by running it: `skills@1.7.0` (vercel-labs/skills, 14 lines in `find-skills`) and `neon@6.2.3` (Neon's own CLI from neondatabase/neon-pkgs, 17 lines across the neon skill's `SKILL.md`, `branch.md` and `info.md`). The same package at its current version changes nothing; an upgrade is now an explicit edit. The two sentences that told an agent to add or drop an `npx` prefix now name the pinned command and the bare `neon` in its place. `find-skills`' frontmatter `cli: npx` is a requirement, not a launch, and is unchanged.
+
 ### Fixed
 - **A virtualenv in the repo root no longer makes every gate walk ~33x slower ([#330](https://github.com/Claudfather/clauDNA/issues/330)).** Two gates walk every text surface in the repo and run a per-line regex over each file: `validate-skills.py`'s removed-names scan and `check_vault_address.py`'s conformance gate. A virtualenv was in neither `GATE_PRUNE_DIRS` nor `.gitignore`, and every extension one is full of is gated — so a venv in the repo root added ~1,200 files of vendored content to both walks. `make check`'s first leg went from ~9s to ~98s and the two affected pytest legs read as a hang, which is what actually cost the time: a 25s bound turns a 33x slowdown into a SIGTERM indistinguishable from a deadlock, and that misreading held a merge for hours while the diagnosis pointed at the pinned dependency set rather than at a directory.
 
