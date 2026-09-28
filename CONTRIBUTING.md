@@ -31,11 +31,19 @@ git clone https://github.com/Claudfather/clauDNA.git
 cd clauDNA
 ```
 
-No build step. The repo is a Claude Code plugin — skills are markdown files, hooks are shell scripts, and validation is plain Python. One-time setup for the check toolchain (in your Python environment of choice):
+No build step. The repo is a plugin — skills are markdown files, hooks are shell scripts, and validation is plain Python. One-time setup for the check toolchain (in your Python environment of choice):
 
 ```bash
-make deps   # pip install -r requirements-dev.txt
+make deps   # python3 -m pip install -r requirements-dev.txt
 ```
+
+Every check-set target invokes its tool as `python3 -m <tool>` rather than by bare name. That is deliberate: `make deps` usually has no writeable system site-packages, so pip does a user install and the `ruff`/`pytest` console scripts land in `~/.local/bin`, which is not always on PATH. Going through the interpreter means `make check` works regardless, and resolves the tools in the same interpreter they were installed for. Keep new targets in that style.
+
+### Cloud Agents
+
+[`.cursor/environment.json`](./.cursor/environment.json) makes the repo ready to work in from the first prompt in a [Cursor Cloud Agent](https://cursor.com/docs/cloud-agent/setup). It declares one `install` step — [`.cursor/install.sh`](./.cursor/install.sh), which runs `make deps` — so an agent boots with the same pinned toolchain CI uses. The requirements list is not duplicated there; the toolchain stays defined once, in `requirements-dev.txt`.
+
+There is no `start` command and no `terminals`, because the repo has no server or service to run. The install script also creates `~/.local/bin` before pip installs into it, so login shells add it to PATH and a bare `ruff` works interactively. Nothing in it needs secrets.
 
 ### Making Changes
 
@@ -103,7 +111,7 @@ CI runs the same `make check` target, so local green means CI green. If CI fails
 - **One concern per PR.** A skill fix and an unrelated hook change should be separate PRs.
 - **Descriptive title.** Use conventional commits: `feat:`, `fix:`, `docs:`, `chore:`.
 - **Fill out the PR template.** The checkboxes are there for a reason.
-- **Version bumps.** If your change affects what users get (new skill, changed behavior, hook change), bump `version` in `.claude-plugin/plugin.json`. Marketplace users only receive updates on version bumps. Bug fixes to docs or tests don't need a bump.
+- **Version bumps.** If your change affects what users get (new skill, changed behavior, hook change), bump `version` in **both** `.claude-plugin/plugin.json` and `.cursor-plugin/plugin.json`. Marketplace users only receive updates on version bumps, and `make check-manifest` fails if the two manifests disagree — bumping only one is worse than bumping neither. Bug fixes to docs or tests don't need a bump.
 - **CI must pass.** CI runs `make check` — the same command you run locally, so there are no CI-only surprises. Run it before pushing.
 
 ## Release Process
@@ -116,7 +124,32 @@ Maintainers use `scripts/release.sh` to cut releases:
 ./scripts/release.sh major   # 0.3.0 → 1.0.0
 ```
 
+The script bumps both `plugin.json` manifests together, rewrites the CHANGELOG's `[Unreleased]` section under the new version, commits, and tags. It refuses to start if the two manifests already disagree on the version, so reconcile them first.
+
 Contributors don't need to run this — just add your CHANGELOG entry and bump the version if applicable.
+
+## Distribution
+
+clauDNA ships to two hosts from one tree, and the manifests are not interchangeable:
+
+| | Claude Code | Cursor |
+|---|---|---|
+| Manifest | `.claude-plugin/plugin.json` | `.cursor-plugin/plugin.json` |
+| Marketplace manifest | `.claude-plugin/marketplace.json` (name `Claudfather`) | `.cursor-plugin/marketplace.json` (name `claudfather`) |
+| Components | `skills/`, `agents/`, `plugin-hooks/` | `skills/`, `agents/` — no hooks |
+
+Two asymmetries are deliberate and gated by `scripts/validate-manifest.py`:
+
+- **The marketplace names differ in case.** Claude Code's stays `Claudfather` because the documented install command is `/plugin install claudna@Claudfather`. Cursor's must be `claudfather` because Cursor's marketplace identifier grammar allows only lowercase alphanumerics and hyphens.
+- **The Cursor manifest declares no hooks**, so the Claude Code shell hooks never fire in a Cursor-based environment. This is enforced two ways: the validator rejects a `hooks` field in the Cursor manifest, and it rejects a `hooks/hooks.json` at the repo root, which is where Cursor's folder discovery would find hooks with no manifest change to notice.
+
+### Submitting to the Cursor marketplace
+
+The repo is kept submission-ready; `make check-manifest` covers the mechanical half of [Cursor's submission checklist](https://cursor.com/docs/reference/plugins). To submit or re-submit:
+
+1. Run `make check` and confirm it is green.
+2. Confirm the plugin loads in Cursor from a local copy at `~/.cursor/plugins/local/claudna` (**Developer: Reload Window**, then check **Customize** for the expected skills and agents, and for the absence of hooks).
+3. Submit the repository URL at [cursor.com/marketplace/publish](https://cursor.com/marketplace/publish). Cursor reviews every plugin manually.
 
 ## Code of Conduct
 

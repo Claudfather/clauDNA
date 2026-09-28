@@ -5,12 +5,16 @@ on:
     branches: [main]
     paths:
       - ".claude-plugin/**"
+      - ".cursor-plugin/**"
+      - "assets/**"
       - "plugin-hooks/hooks.json"
       - "scripts/validate-manifest.py"
   pull_request:
     branches: [main]
     paths:
       - ".claude-plugin/**"
+      - ".cursor-plugin/**"
+      - "assets/**"
       - "plugin-hooks/hooks.json"
       - "scripts/validate-manifest.py"
 

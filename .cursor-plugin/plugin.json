@@ -1,8 +1,8 @@
 {
   "name": "claudna",
-  "displayName": "claudna",
+  "displayName": "clauDNA",
   "version": "0.19.0",
-  "description": "Curated skills, agents, and hooks — the canonical capability set of the Claudfather ecosystem.",
+  "description": "Curated skills and agents for shipping software — audits, plan review, build workflows, and infra operations for Vercel, Railway, Modal, Neon, Snowflake, and dbt.",
   "author": {
     "name": "Chris Rogers",
     "url": "https://github.com/Claudfather"
@@ -10,6 +10,7 @@
   "homepage": "https://github.com/Claudfather/clauDNA",
   "repository": "https://github.com/Claudfather/clauDNA",
   "license": "MIT",
+  "logo": "assets/logo.svg",
   "keywords": [
     "skills",
     "agents",

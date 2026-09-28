@@ -12,8 +12,14 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PLUGIN_JSON="$REPO_ROOT/.claude-plugin/plugin.json"
 CHANGELOG="$REPO_ROOT/CHANGELOG.md"
+
+# Both manifests carry the version and validate-manifest.py enforces that they
+# match, so a release has to move them together. The Claude manifest is the
+# one the version is read from.
+PLUGIN_JSON="$REPO_ROOT/.claude-plugin/plugin.json"
+CURSOR_PLUGIN_JSON="$REPO_ROOT/.cursor-plugin/plugin.json"
+VERSIONED_MANIFESTS=("$PLUGIN_JSON" "$CURSOR_PLUGIN_JSON")
 
 # --- Arg parsing ---
 
@@ -49,10 +55,12 @@ if ! command -v jq &>/dev/null; then
     exit 1
 fi
 
-if [[ ! -f "$PLUGIN_JSON" ]]; then
-    echo "error: $PLUGIN_JSON not found" >&2
-    exit 1
-fi
+for manifest in "${VERSIONED_MANIFESTS[@]}"; do
+    if [[ ! -f "$manifest" ]]; then
+        echo "error: $manifest not found" >&2
+        exit 1
+    fi
+done
 
 if [[ ! -f "$CHANGELOG" ]]; then
     echo "error: $CHANGELOG not found" >&2
@@ -71,6 +79,17 @@ fi
 CURRENT_VERSION="$(jq -r '.version' "$PLUGIN_JSON")"
 if [[ -z "$CURRENT_VERSION" || "$CURRENT_VERSION" == "null" ]]; then
     echo "error: could not read version from $PLUGIN_JSON" >&2
+    exit 1
+fi
+
+# Refuse to release from a state the gate already rejects — otherwise the
+# release commit inherits a mismatch it did not cause.
+CURSOR_VERSION="$(jq -r '.version' "$CURSOR_PLUGIN_JSON")"
+if [[ "$CURSOR_VERSION" != "$CURRENT_VERSION" ]]; then
+    echo "error: manifest versions disagree before the bump" >&2
+    echo "  $PLUGIN_JSON: $CURRENT_VERSION" >&2
+    echo "  $CURSOR_PLUGIN_JSON: $CURSOR_VERSION" >&2
+    echo "hint: reconcile them, then re-run — run 'make check-manifest' to verify" >&2
     exit 1
 fi
 
@@ -128,17 +147,19 @@ fi
 echo ""
 
 if [[ "$DRY_RUN" == "true" ]]; then
-    echo "[dry-run] would update plugin.json, CHANGELOG.md, commit, and tag $TAG"
+    echo "[dry-run] would update both plugin.json manifests (.claude-plugin/," \
+         ".cursor-plugin/), CHANGELOG.md, commit, and tag $TAG"
     exit 0
 fi
 
-# --- Update plugin.json ---
+# --- Update both plugin.json manifests ---
 
-TMP_PLUGIN="$(mktemp)"
-jq --arg ver "$NEW_VERSION" '.version = $ver' "$PLUGIN_JSON" > "$TMP_PLUGIN"
-mv "$TMP_PLUGIN" "$PLUGIN_JSON"
-
-echo "updated $PLUGIN_JSON → $NEW_VERSION"
+for manifest in "${VERSIONED_MANIFESTS[@]}"; do
+    TMP_PLUGIN="$(mktemp)"
+    jq --arg ver "$NEW_VERSION" '.version = $ver' "$manifest" > "$TMP_PLUGIN"
+    mv "$TMP_PLUGIN" "$manifest"
+    echo "updated $manifest → $NEW_VERSION"
+done
 
 # --- Update CHANGELOG.md ---
 
@@ -165,7 +186,7 @@ echo "updated $CHANGELOG — moved unreleased entries under [$NEW_VERSION]"
 
 # --- Git commit + tag ---
 
-git -C "$REPO_ROOT" add "$PLUGIN_JSON" "$CHANGELOG"
+git -C "$REPO_ROOT" add "${VERSIONED_MANIFESTS[@]}" "$CHANGELOG"
 git -C "$REPO_ROOT" commit -m "release: v$NEW_VERSION"
 git -C "$REPO_ROOT" tag -a "$TAG" -m "Release $TAG"
 

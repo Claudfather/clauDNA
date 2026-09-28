@@ -16,5 +16,5 @@
 ## Checklist
 
 - [ ] CHANGELOG.md updated under `[Unreleased]`
-- [ ] Version bump in `.claude-plugin/plugin.json` (if this changes user-facing behavior)
+- [ ] Version bump in **both** `.claude-plugin/plugin.json` and `.cursor-plugin/plugin.json` (if this changes user-facing behavior — the two must match)
 - [ ] No hardcoded paths, tokens, or credentials
