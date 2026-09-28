@@ -31,11 +31,19 @@ git clone https://github.com/Claudfather/clauDNA.git
 cd clauDNA
 ```
 
-No build step. The repo is a Claude Code plugin — skills are markdown files, hooks are shell scripts, and validation is plain Python. One-time setup for the check toolchain (in your Python environment of choice):
+No build step. The repo is a plugin — skills are markdown files, hooks are shell scripts, and validation is plain Python. One-time setup for the check toolchain (in your Python environment of choice):
 
 ```bash
-make deps   # pip install -r requirements-dev.txt
+make deps   # python3 -m pip install -r requirements-dev.txt
 ```
+
+Every check-set target invokes its tool as `python3 -m <tool>` rather than by bare name. That is deliberate: `make deps` usually has no writeable system site-packages, so pip does a user install and the `ruff`/`pytest` console scripts land in `~/.local/bin`, which is not always on PATH. Going through the interpreter means `make check` works regardless, and resolves the tools in the same interpreter they were installed for. Keep new targets in that style.
+
+### Cloud Agents
+
+[`.cursor/environment.json`](./.cursor/environment.json) makes the repo ready to work in from the first prompt in a [Cursor Cloud Agent](https://cursor.com/docs/cloud-agent/setup). It declares one `install` step — [`.cursor/install.sh`](./.cursor/install.sh), which runs `make deps` — so an agent boots with the same pinned toolchain CI uses. The requirements list is not duplicated there; the toolchain stays defined once, in `requirements-dev.txt`.
+
+There is no `start` command and no `terminals`, because the repo has no server or service to run. The install script also creates `~/.local/bin` before pip installs into it, so login shells add it to PATH and a bare `ruff` works interactively. Nothing in it needs secrets.
 
 ### Making Changes
 

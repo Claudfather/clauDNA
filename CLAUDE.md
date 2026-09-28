@@ -25,6 +25,9 @@ snowflake/                      → Aux: Snowflake connection config template (n
 scripts/
   validate-skills.py            → CI-enforced SKILL_CONTRACT validator (walks skills/)
 .claude/                        → Repo-local settings (permission allowlists for working in this repo)
+.cursor/                        → Cursor Cloud Agent environment (not part of the shipped plugin)
+  environment.json              → Declares the `install` step; no start/services (nothing to serve)
+  install.sh                    → Runs `make deps` for the pinned toolchain; see CONTRIBUTING § Cloud Agents
 ```
 
 ## Install Paths

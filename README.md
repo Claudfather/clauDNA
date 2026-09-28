@@ -213,6 +213,8 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full guide. Writing a new skill
 
 Quick version: branch off `main`, make your change, update CHANGELOG.md, run `make check` (the exact check-set CI runs), open a PR.
 
+Working in a Cursor Cloud Agent? `.cursor/environment.json` installs the pinned check toolchain on boot, so `make check` runs without setup — see [CONTRIBUTING § Cloud Agents](./CONTRIBUTING.md#cloud-agents).
+
 ## Documentation
 
 | File | Description |

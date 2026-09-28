@@ -5,6 +5,13 @@
 # same pinned toolchain (requirements-dev.txt). Add or change checks
 # HERE, never in the workflow.
 #
+# Every tool is invoked as `python3 -m <tool>`, never by bare name. `make deps`
+# has no writeable system site-packages on most hosts, so pip does a user
+# install and the console scripts land in ~/.local/bin — which the stock
+# ~/.profile adds to PATH only if it already exists at shell start. Going
+# through the interpreter makes the check-set independent of that, and
+# guarantees the tools resolve in the same interpreter they were installed for.
+#
 # One-time setup:    make deps
 # Pre-push gate:     make check
 # Label-gated runs:  PR_LABELS=full-validate make check
@@ -16,7 +23,7 @@
 check: check-skills check-integration check-agents check-manifest check-changelog lint test
 
 deps:
-	pip install -r requirements-dev.txt
+	python3 -m pip install -r requirements-dev.txt
 
 check-skills:
 	python3 scripts/validate-skills.py
@@ -34,7 +41,7 @@ check-changelog:
 	bash scripts/check-changelog.sh
 
 lint:
-	ruff check scripts/ tests/
+	python3 -m ruff check scripts/ tests/
 
 test:
 	python3 -m pytest tests/
