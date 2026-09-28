@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   **Verified against a genuinely torn-down VM**, not a reasoned argument: with `~/.local/bin` and the user site-packages deleted, a pristine login shell reports `~/.local/bin is NOT on PATH` and `make lint` fails — the exact boot state that prompted this. After `./.cursor/install.sh`, a new pristine login shell has the directory on PATH, bare `ruff` and `pytest` resolve, and `make check` passes (443 tests). Install is idempotent across three consecutive runs. And with `~/.local/bin` deliberately excluded from PATH in a **non-login** shell, where bare `ruff` and `pytest` do not resolve at all, `make check` still passes — which is the half that only the `python3 -m` change buys.
 
+  **Also validated in a real pod.** A draft environment build off this branch (`bld-20260928-78f79d36`) shows the builder reading `.cursor/environment.json` from the branch revision and running the script — `python3 -m pip install -r requirements-dev.txt`, the three pins installed, then the script's own `ruff 0.15.10` / `pytest 9.0.3` verification, `[INSTALL] Exit code: 0`, snapshot ready. That also confirms the precedence rule in practice: the repository file won over the DB-managed personal environment this run booted from, which had no install step at all.
+
   `AGENTS.md`'s gotcha said the opposite of what is true and is rewritten.
 
 ### Fixed

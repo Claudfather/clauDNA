@@ -21,4 +21,4 @@ clauDNA is a plugin pack (markdown skills/agents + shell hooks) shipped to Claud
 - Hooks are plain executables that read a JSON event on stdin. To exercise one directly (no Claude Code needed), pipe an event in, e.g.:
   `echo '{"tool_name":"Bash","tool_input":{"command":"git status && ls -la"}}' | bash plugin-hooks/pretooluse-permissions.sh`
 - `pretooluse-permissions.sh` requires `jq` and silently no-ops (exit 0) if it is absent; it only ever emits an `allow` decision or falls through — it never denies.
-- This repo is the source of truth for the plugin. Do not edit the installed plugin cache under `~/.claude/plugins/cache/...`; make changes here and (for releases) bump `version` in `.claude-plugin/plugin.json`.
+- This repo is the source of truth for the plugin. Do not edit the installed plugin cache under `~/.claude/plugins/cache/...`; make changes here and (for releases) bump `version` in **both** `.claude-plugin/plugin.json` and `.cursor-plugin/plugin.json` — `scripts/release.sh` does both, and `make check-manifest` fails if they disagree.
