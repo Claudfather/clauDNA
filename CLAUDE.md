@@ -1,13 +1,18 @@
 # clauDNA
 
-Claude Code plugin pack distributed via the `Claudfather` marketplace. Ships skills, agents, and hooks as a single plugin (`claudna`). Marketplace install is the only supported channel — for headless / CI use, see [SETUP_GUIDE §4](./SETUP_GUIDE.md#4-headless--ci--docker-provisioning) for the declarative-settings + env-var pattern.
+Plugin pack shipping skills, agents, and hooks as a single plugin (`claudna`) to two hosts: Claude Code via the `Claudfather` marketplace, and Cursor via `.cursor-plugin/`. Marketplace install is the only supported channel — for headless / CI use, see [SETUP_GUIDE §4](./SETUP_GUIDE.md#4-headless--ci--docker-provisioning) for the declarative-settings + env-var pattern.
 
 ## Repo Structure
 
 ```
-.claude-plugin/
-  plugin.json                   → Plugin manifest (name: claudna, version)
+.claude-plugin/                 → Claude Code manifests
+  plugin.json                   → Plugin manifest (name: claudna, version, hooks)
   marketplace.json              → Marketplace manifest (name: Claudfather, lists claudna)
+.cursor-plugin/                 → Cursor manifests — skills + agents only, NO hooks (see Rules)
+  plugin.json                   → Plugin manifest (name: claudna, version, logo)
+  marketplace.json              → Marketplace manifest (name: claudfather, lists claudna at source ".")
+assets/
+  logo.svg                      → Marketplace logo, referenced by relative path from .cursor-plugin/plugin.json
 skills/                         → Skill directories (one per skill, plugin auto-discovers)
   _shared/                      → Shared orchestration material referenced by skills (no SKILL.md)
 agents/                         → Agent definition files
@@ -54,6 +59,7 @@ clauDNA is the stack's **behavior system**: procedural content — skills, agent
 - **Never write to `~/.claude/settings.json`** — that's user-managed. Recommended settings tweaks are documented in SETUP_GUIDE for the user to apply manually; the plugin never modifies user settings.
 - **Never touch `~/.claude/notes/`** — personal data (decisions, patterns).
 - **Never touch `~/.claude/plugins/cache/Claudfather/claudna/<ver>/`** directly — Claude Code manages that directory. Make changes in this repo and bump `version` in `plugin.json` to ship them.
+- **Never give the Cursor manifest hooks.** `.cursor-plugin/plugin.json` ships `skills/` and `agents/` only, so the Claude Code shell hooks never fire in a Cursor-based environment. Two things are load-bearing: no `hooks` field in that manifest, and no `hooks/hooks.json` at the repo root, which is where Cursor's folder discovery looks. `make check-manifest` rejects both.
 - **Use Read/Write tools for file operations** — Not shell `cp`. This gives visibility into what changes and avoids permission issues.
 
 ### You may, without asking
@@ -80,6 +86,6 @@ When modifying components inside the plugin tree (`skills/`, `agents/`, `plugin-
 2. Test by loading the plugin locally: `claude --plugin-dir <path-to-this-repo>` and invoking the affected skill.
 3. Update `CHANGELOG.md` with the change.
 4. Before opening a PR, run `make check` — CI runs the same target (the check-set is defined once, in the `Makefile`) and will block merge on violations.
-5. When bumping for release, update `version` in `.claude-plugin/plugin.json`. Without a bump, marketplace users do not receive the update.
+5. When bumping for release, update `version` in **both** `.claude-plugin/plugin.json` and `.cursor-plugin/plugin.json` — `scripts/release.sh` does both, and `make check-manifest` fails if they disagree. Without a bump, marketplace users do not receive the update.
 
 When adding or modifying a skill, the binding rules live in [SKILL_CONTRACT.md](./SKILL_CONTRACT.md). The contract is enforced by `scripts/validate-skills.py` and the `validate-skills` GitHub Actions workflow. If you need to relax a rule, update both the contract and the validator together — never one without the other.

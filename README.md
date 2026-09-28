@@ -1,8 +1,10 @@
 # clauDNA
 
-Claude Code plugin pack: curated skills, agents, and hooks distributed via the `Claudfather` marketplace.
+Curated skills, agents, and hooks for shipping software — codebase audits, plan review, build workflows, and infrastructure operations. Packaged for **Claude Code** (via the `Claudfather` marketplace) and for **Cursor** (as a Cursor plugin).
 
 ## Quick Start
+
+### Claude Code
 
 Requires [Claude Code](https://claude.ai/download) (`npm install -g @anthropic-ai/claude-code`).
 
@@ -14,6 +16,16 @@ Inside Claude Code:
 ```
 
 That's it. Skills become available as `/claudna:<skill-name>` (namespaced under the plugin). Tab completion works — type `/claudna:` and press Tab to browse, or `/claudna:au` and Tab to narrow. Hooks (auto-format, pretooluse permission expansion, notifications) activate automatically when the plugin is enabled.
+
+### Cursor
+
+The Cursor manifest is [`.cursor-plugin/plugin.json`](./.cursor-plugin/plugin.json). It ships `skills/` and `agents/` and **deliberately no hooks** — the shell hooks in `plugin-hooks/` are wired only from `.claude-plugin/plugin.json`, so nothing from this pack fires in a Cursor-based environment. Skills appear under *Agent Decides* and are invocable as `/<skill-name>` in chat.
+
+Three install paths, depending on what you have:
+
+1. **From the Cursor marketplace** — open **Customize** in the sidebar, search for `clauDNA`, and choose **Install**, picking a project or user scope. (Pending Cursor's review — see [CONTRIBUTING § Submitting to the Cursor marketplace](./CONTRIBUTING.md#submitting-to-the-cursor-marketplace).)
+2. **As a team marketplace** (Teams and Enterprise) — **Dashboard → Plugins & MCPs → Add Marketplace → Import from Repo**, with `https://github.com/Claudfather/clauDNA`. Enable **Auto Refresh** so pushes to `main` re-index the plugin. This path works today and does not wait on review.
+3. **From a local checkout** — copy or symlink the repo into `~/.cursor/plugins/local/claudna`, then run **Developer: Reload Window**. Cursor only follows symlinks whose target resolves inside that folder, so copy the tree if a symlink to your checkout is ignored.
 
 ### After install
 
@@ -32,9 +44,11 @@ For bots, CI runners, and Docker images, drop a `settings.json` with `enabledPlu
 
 | Directory | Count | Contents |
 |-----------|-------|----------|
-| `skills/` | 36 | User-invocable slash commands |
+| `skills/` | 39 | User-invocable slash commands |
 | `agents/` | 8 | `snowflake-analyst`, `dbt-engineer`, `neon-analyst`, `modal-ops`, `railway-ops`, `vercel-ops`, `code-reviewer`, `spec-reviewer` |
 | `plugin-hooks/` | 6 wired + 1 opt-in | SessionStart briefing (opt-out `CLAUDNA_SESSION_BRIEFING=0`), auto-format on Write/Edit, PreToolUse permission expansion, PreCompact capture gate, opt-in skill telemetry, macOS notifications. (`statusline.sh` is opt-in — see [SETUP_GUIDE §3.2](./SETUP_GUIDE.md#32-statusline-optional).) Named `plugin-hooks/` to avoid a Claude Code bug that deletes any project-root `hooks/` directory between tool calls. |
+
+Claude Code gets all three. Cursor gets `skills/` and `agents/` only — see [Cursor](#cursor) above. The `plugin-hooks/` name does double duty: besides dodging the Claude Code bug, it keeps the hooks out of `hooks/`, which is where Cursor's folder discovery would otherwise find and wire them.
 
 ## Design Philosophy
 
