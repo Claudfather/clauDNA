@@ -1,16 +1,16 @@
 {
-  "name": "Claudfather",
+  "name": "claudfather",
   "owner": {
     "name": "Chris Rogers"
   },
   "metadata": {
-    "description": "Claude Code and Cursor plugins from the Claudfather ecosystem."
+    "description": "Cursor plugins from the Claudfather ecosystem."
   },
   "plugins": [
     {
       "name": "claudna",
       "source": ".",
-      "description": "Curated skills, agents, and hooks — the canonical capability set of the Claudfather ecosystem.",
+      "description": "Curated skills and agents for shipping software — audits, plan review, build workflows, and infra operations for Vercel, Railway, Modal, Neon, Snowflake, and dbt.",
       "category": "developer-tools"
     }
   ]
