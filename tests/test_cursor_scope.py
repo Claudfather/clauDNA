@@ -1,7 +1,7 @@
 """Tests for the Cursor manifest scope gate (clauDNA #340).
 
 .cursor-plugin/plugin.json's `skills` field is the set Cursor ships. This
-gate cross-checks it against each skill's own hosts/context frontmatter:
+gate cross-checks it against each skill's own hosts/requires-context frontmatter:
 a restricted skill must not be declared, and -- once the manifest is an
 explicit list -- a portable skill must not be silently dropped either.
 """
@@ -18,7 +18,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import check_cursor_scope as ccs
 
 
-def _make_skill(skills_dir: Path, name: str, *, hosts=None, context=None) -> None:
+def _make_skill(skills_dir: Path, name: str, *, hosts=None, requires_context=None) -> None:
     skill_dir = skills_dir / name
     skill_dir.mkdir(parents=True)
     fm_lines = [
@@ -28,8 +28,8 @@ def _make_skill(skills_dir: Path, name: str, *, hosts=None, context=None) -> Non
     ]
     if hosts is not None:
         fm_lines.append(f"hosts: {hosts}")
-    if context is not None:
-        fm_lines.append(f"context: {context}")
+    if requires_context is not None:
+        fm_lines.append(f"requires-context: {requires_context}")
     frontmatter = "\n".join(fm_lines)
     body = "x" * 250
     (skill_dir / "SKILL.md").write_text(f"---\n{frontmatter}\n---\n{body}\n")
@@ -99,6 +99,64 @@ class TestDeclaredCursorSkills:
         assert names is None
         assert "neither a string nor a list" in how
 
+    def test_list_entry_leading_dot_directory_not_mangled(self, tmp_path):
+        # A real (if unusual) directory name starting with a literal dot.
+        # .lstrip("./") strips characters, not a prefix -- ".agents" would
+        # lose its leading dot and resolve to the wrong path.
+        root = _make_skills_fixture(tmp_path)
+        (root / "skills" / ".agents-skill").mkdir()
+        (root / "skills" / ".agents-skill" / "SKILL.md").write_text(
+            "---\nname: .agents-skill\ndescription: x\n---\n" + "x" * 250
+        )
+        _write_cursor_manifest(root, ["./skills/.agents-skill/"])
+        names, is_explicit, how = ccs._declared_cursor_skills(root / ".cursor-plugin")
+        assert names == {".agents-skill"}
+
+    def test_list_entry_folder_of_skills_is_expanded(self, tmp_path):
+        # ravi's #343 repro: a bare folder entry inside the array (Cursor's
+        # own docs show this shape -- "skills": "./my-skills/" -- and real
+        # published plugins nest it inside an array).
+        root = _make_skills_fixture(tmp_path)
+        _write_cursor_manifest(root, ["./skills/"])
+        names, is_explicit, how = ccs._declared_cursor_skills(root / ".cursor-plugin")
+        assert names == {"restricted-skill", "portable-skill-a", "portable-skill-b"}
+        assert is_explicit is True
+
+    def test_list_entry_nested_folder_of_skills_is_expanded(self, tmp_path):
+        # The shape ArisGuimera/MobiAI-Core actually ships: a folder-of-skills
+        # nested inside skills/, not skills/ itself.
+        root = _make_skills_fixture(tmp_path)
+        nested = root / "skills" / "core" / "skills"
+        nested.mkdir(parents=True)
+        _make_skill(nested, "nested-skill")
+        _write_cursor_manifest(root, ["./skills/core/skills/"])
+        names, is_explicit, how = ccs._declared_cursor_skills(root / ".cursor-plugin")
+        assert names == {"nested-skill"}
+
+    def test_list_entry_file_path_is_an_error(self, tmp_path):
+        # ravi's #343 repro: a file entry (a skill's SKILL.md itself) must
+        # not silently resolve to that skill's basename via Path(...).name.
+        root = _make_skills_fixture(tmp_path)
+        _write_cursor_manifest(root, ["./skills/portable-skill-a/SKILL.md"])
+        names, _, how = ccs._declared_cursor_skills(root / ".cursor-plugin")
+        assert names is None
+        assert "does not resolve to a directory" in how
+
+    def test_list_entry_outside_skills_dir_is_an_error(self, tmp_path):
+        root = _make_skills_fixture(tmp_path)
+        (root / "agents").mkdir()
+        _write_cursor_manifest(root, ["./agents/"])
+        names, _, how = ccs._declared_cursor_skills(root / ".cursor-plugin")
+        assert names is None
+        assert "outside" in how
+
+    def test_list_entry_nonexistent_path_is_an_error(self, tmp_path):
+        root = _make_skills_fixture(tmp_path)
+        _write_cursor_manifest(root, ["./skills/does-not-exist/"])
+        names, _, how = ccs._declared_cursor_skills(root / ".cursor-plugin")
+        assert names is None
+        assert "does not resolve to a directory" in how
+
 
 class TestRunCheck:
     def test_clean_explicit_list(self, tmp_path):
@@ -147,6 +205,30 @@ class TestRunCheck:
         assert len(errors) == 1
         assert "could not determine" in errors[0]
         assert notes == []  # a refusal, not a clean pass with nothing to say
+
+    def test_folder_entry_reopens_the_exclusion_check(self, tmp_path):
+        # ravi's exact #343 repro: adding a bare folder entry alongside real
+        # entries must not let a restricted skill back in silently. Before
+        # the fix this passed at rc 0 with the gate seeing a skill named
+        # "skills"; after the fix "./skills/" expands to every skill,
+        # including the restricted one, and the exclusion check fires.
+        root = _make_skills_fixture(tmp_path)
+        _write_cursor_manifest(root, ["./skills/portable-skill-a/", "./skills/"])
+        errors, _, _ = ccs.run_check(root)
+        assert any("restricted-skill" in e for e in errors)
+
+    def test_file_entry_reopens_the_exclusion_check(self, tmp_path):
+        # ravi's other #343 repro: a SKILL.md file entry for a RESTRICTED
+        # skill must not silently resolve to that skill's own basename and
+        # pass. It must error instead of ever reaching a verdict.
+        root = _make_skills_fixture(tmp_path)
+        _write_cursor_manifest(
+            root,
+            ["./skills/portable-skill-a/", "./skills/restricted-skill/SKILL.md"],
+        )
+        errors, _, _ = ccs.run_check(root)
+        assert len(errors) == 1
+        assert "could not determine" in errors[0]
 
     def test_both_directions_reported_together(self, tmp_path):
         # Declaring ONLY the restricted skill hits every rule at once: it

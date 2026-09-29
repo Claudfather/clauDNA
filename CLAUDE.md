@@ -62,7 +62,7 @@ clauDNA is the stack's **behavior system**: procedural content — skills, agent
 - **Never write to `~/.claude/settings.json`** — that's user-managed. Recommended settings tweaks are documented in SETUP_GUIDE for the user to apply manually; the plugin never modifies user settings.
 - **Never touch `~/.claude/notes/`** — personal data (decisions, patterns).
 - **Never touch `~/.claude/plugins/cache/Claudfather/claudna/<ver>/`** directly — Claude Code manages that directory. Make changes in this repo and bump `version` in `plugin.json` to ship them.
-- **Never give the Cursor manifest hooks.** `.cursor-plugin/plugin.json` ships `skills/` and `agents/` only, so the Claude Code shell hooks never fire in a Cursor-based environment. Two things are load-bearing: no `hooks` field in that manifest, and no `hooks/hooks.json` at the repo root, which is where Cursor's folder discovery looks. `make check-manifest` rejects both.
+- **Never give the Cursor manifest hooks.** `.cursor-plugin/plugin.json` ships `skills/` (minus a few host-/context-restricted skills, #340) and `agents/` only, so the Claude Code shell hooks never fire in a Cursor-based environment. Two things are load-bearing: no `hooks` field in that manifest, and no `hooks/hooks.json` at the repo root, which is where Cursor's folder discovery looks. `make check-manifest` rejects both.
 - **Use Read/Write tools for file operations** — Not shell `cp`. This gives visibility into what changes and avoids permission issues.
 
 ### You may, without asking

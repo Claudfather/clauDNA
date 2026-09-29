@@ -43,7 +43,7 @@ Hard rules:
 | `requires` | list | External dependencies the skill needs at runtime. Each entry is a mapping with exactly one of `cli` (tool name, optionally with `>=X.Y` version constraint) or `env` (environment variable name), plus an optional `reason` string. Skills with no external dependencies omit the field. See schema below. |
 | `user-invocable` | boolean | Defaults to `true`. Set to `false` for context-only skills (loaded by name reference, not invoked as `/skill`). |
 | `hosts` | list | Hosts the skill is known to function on. Values: `claude-code`, `cursor`. Omit for "no restriction" — most skills need no marker. See §2.2. |
-| `context` | string | A special execution context the skill needs beyond "any project directory". Values: `repo-clone` (must run from inside a clone of this repo). Omit for "no restriction". See §2.2. |
+| `requires-context` | string | A special execution context the skill needs beyond "any project directory". Values: `repo-clone` (must run from inside a clone of this repo). Omit for "no restriction". Not `context` — that key is Claude Code's own (`context: fork`, §2.2). See §2.2. |
 
 ### 2.1. Description grammar
 
@@ -98,16 +98,18 @@ Skills that only use built-in Claude Code tools (Read, Write, Bash, Grep, etc.) 
 
 ### 2.2. Host and context scoping
 
-`hosts` and `context` (#340) describe facts about a skill, not a distribution decision — whether it needs Claude Code's own plugin/hook internals, or a clone of this repo, versus running the same way anywhere. Both are optional and additive; omitting both means "no restriction," which is why most skills carry neither.
+`hosts` and `requires-context` (#340) describe facts about a skill, not a distribution decision — whether it needs Claude Code's own plugin/hook internals, or a clone of this repo, versus running the same way anywhere. Both are optional and additive; omitting both means "no restriction," which is why most skills carry neither.
+
+**Not named `context`.** Claude Code's own skills reference already defines `context` (set to `fork` to run in a forked subagent context, paired with `agent:` naming the subagent type). A same-named field here would collide: this repo's validator would reject Claude Code's own `fork` value as an unknown context, and the exclusion predicate below would treat any skill that later adopts `context: fork` for its native meaning as needing a repo clone (#343). `requires-context` is a key Claude Code does not define.
 
 The one consumer of these fields today is `scripts/check_cursor_scope.py` (`make check-manifest`), which excludes a skill from `.cursor-plugin/plugin.json`'s declared skill set when either applies:
 
 - `hosts` is set and does not include `cursor` (the skill is Claude-Code-only by definition — it inspects the plugin cache, hooks, or similar).
-- `context` is set at all (the skill needs to run from inside a clone of this repo; Cursor's marketplace install gives no such guarantee).
+- `requires-context` is set at all (the skill needs to run from inside a clone of this repo; Cursor's marketplace install gives no such guarantee).
 
-**Claude Code's own manifest is unaffected by either field** — it ships every skill regardless, as it always has. That is a deliberate, conservative scoping choice for #340 (limit the fix to the surface the issue is actually about), not a claim that Claude Code is somehow exempt from what the fields describe: a `context: repo-clone` skill installed via marketplace onto a random project is just as non-functional there as it would be on Cursor. If a second distribution channel ever needs the same curation Claude Code currently skips, extend `check_cursor_scope.py`'s caller rather than overloading `cursor_should_exclude()`'s scope.
+**Claude Code's own manifest is unaffected by either field** — it ships every skill regardless, as it always has. That is a deliberate, conservative scoping choice for #340 (limit the fix to the surface the issue is actually about), not a claim that Claude Code is somehow exempt from what the fields describe: a `requires-context: repo-clone` skill installed via marketplace onto a random project is just as non-functional there as it would be on Cursor. If a second distribution channel ever needs the same curation Claude Code currently skips, extend `check_cursor_scope.py`'s caller rather than overloading `cursor_should_exclude()`'s scope.
 
-`scripts/skill_checks.py` validates the field *shapes* (`validate_hosts`, `validate_context`) as part of `make check-skills` — unknown values are rejected there, independent of what any one consumer does with them.
+`scripts/skill_checks.py` validates the field *shapes* (`validate_hosts`, `validate_requires_context`) as part of `make check-skills` — unknown values are rejected there, independent of what any one consumer does with them.
 
 ---
 

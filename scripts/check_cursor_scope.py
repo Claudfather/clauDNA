@@ -3,12 +3,13 @@
 
 `.cursor-plugin/plugin.json`'s `skills` field is the set of skills Cursor
 ships. This gate keeps that set honest against each skill's own `hosts` /
-`context` frontmatter (`skill_checks.cursor_should_exclude`):
+`requires-context` frontmatter (`skill_checks.cursor_should_exclude`):
 
   - A skill marked host- or context-restricted must NOT appear in the
     declared set -- it would ship to Cursor despite being unusable there
-    (the bug #340 files: `hosts`/`context` didn't exist, so nothing could
-    be marked, and the directory-discovery manifest shipped everything).
+    (the bug #340 files: `hosts`/`requires-context` didn't exist, so nothing
+    could be marked, and the directory-discovery manifest shipped
+    everything).
   - A skill NOT so marked MUST appear in the declared set. This direction
     exists because the fix for the first bug creates a new failure mode:
     an explicit list, unlike directory discovery, can silently omit a
@@ -18,7 +19,7 @@ ships. This gate keeps that set honest against each skill's own `hosts` /
 Run via validate-manifest.py (`make check-manifest`), not validate-skills.py:
 this is a property of the MANIFEST's declared list, not of any one skill's
 own frontmatter shape (that half is skill_checks.validate_hosts /
-validate_context, enforced by `make check-skills`).
+validate_requires_context, enforced by `make check-skills`).
 """
 
 from __future__ import annotations
@@ -52,8 +53,14 @@ def _declared_cursor_skills(cursor_plugin_dir: Path) -> tuple[set[str] | None, b
     if raw is None:
         return None, False, "plugin.json has no 'skills' field"
 
+    plugin_root = cursor_plugin_dir.parent
+    skills_dir = plugin_root / "skills"
+
     if isinstance(raw, str):
-        resolved = (cursor_plugin_dir.parent / raw.lstrip("./")).resolve()
+        # Path(...) already normalizes a "./" prefix on join; lstrip("./")
+        # strips *characters*, not a prefix, so a real dot-leading name
+        # (".agents") would lose its dot too (#343).
+        resolved = (plugin_root / raw).resolve()
         if not resolved.is_dir():
             return None, False, f"plugin.json's skills path {raw!r} is not a directory"
         names = {p.name for p in resolved.iterdir() if p.is_dir() and p.name not in SKIP_DIRS}
@@ -64,7 +71,37 @@ def _declared_cursor_skills(cursor_plugin_dir: Path) -> tuple[set[str] | None, b
         for entry in raw:
             if not isinstance(entry, str):
                 return None, False, f"plugin.json's skills[] has a non-string entry: {entry!r}"
-            names.add(Path(entry.rstrip("/")).name)
+            # #343: a naive basename of the raw string passes ANY entry --
+            # a folder ("./skills/") basenames to "skills", a file
+            # (".../SKILL.md") basenames to "SKILL.md" -- neither matches a
+            # real skill name, so the exclusion check silently finds nothing
+            # wrong while Cursor itself would ship every restricted skill.
+            # Resolve against the plugin root and classify what is actually
+            # there instead of trusting the entry's own text.
+            resolved = (plugin_root / entry).resolve()
+            if not resolved.is_dir():
+                return (
+                    None,
+                    False,
+                    f"plugin.json's skills[] entry {entry!r} does not resolve to a "
+                    f"directory ({resolved}) -- each entry must be a skill "
+                    f"directory (one SKILL.md) or a directory of skills",
+                )
+            if resolved != skills_dir and skills_dir not in resolved.parents:
+                return (
+                    None,
+                    False,
+                    f"plugin.json's skills[] entry {entry!r} resolves to {resolved}, "
+                    f"which is outside {skills_dir} -- refusing rather than guessing "
+                    f"what it means",
+                )
+            if (resolved / "SKILL.md").is_file():
+                names.add(resolved.name)  # one skill directory
+            else:
+                # A folder of skills (Cursor's own directory-discovery shape,
+                # nested inside the array) -- expand it the same way the
+                # string branch above expands a bare directory-discovery path.
+                names.update(p.name for p in resolved.iterdir() if p.is_dir() and p.name not in SKIP_DIRS)
         return names, True, "explicit list"
 
     return (

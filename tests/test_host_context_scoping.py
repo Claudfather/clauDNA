@@ -1,10 +1,14 @@
-"""Unit tests for the hosts/context frontmatter fields (clauDNA #340).
+"""Unit tests for the hosts/requires-context frontmatter fields (clauDNA #340).
 
-Tests validate_hosts(), validate_context(), and cursor_should_exclude() --
-the field-shape validation enforced by `make check-skills`, and the
+Tests validate_hosts(), validate_requires_context(), and cursor_should_exclude()
+-- the field-shape validation enforced by `make check-skills`, and the
 Cursor-exclusion predicate `make check-manifest` reads (the manifest-level
 cross-check itself is tested separately, against a synthetic repo, in
 test_cursor_scope.py).
+
+The field is `requires-context`, not `context` -- Claude Code's own skills
+reference already defines `context` (set to `fork` to run in a forked
+subagent context). See SKILL_CONTRACT.md §2.2 and #343.
 """
 
 from __future__ import annotations
@@ -19,8 +23,8 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from skill_checks import (
     cursor_should_exclude,
     parse_frontmatter,
-    validate_context,
     validate_hosts,
+    validate_requires_context,
     validate_skill_md,
 )
 
@@ -65,25 +69,25 @@ class TestValidateHostsInvalid:
         assert len(errors) == 2
 
 
-# --- validate_context: valid inputs ---
+# --- validate_requires_context: valid inputs ---
 
 
-class TestValidateContextValid:
+class TestValidateRequiresContextValid:
     def test_known_context(self):
-        assert validate_context("repo-clone") == []
+        assert validate_requires_context("repo-clone") == []
 
 
-# --- validate_context: invalid inputs ---
+# --- validate_requires_context: invalid inputs ---
 
 
-class TestValidateContextInvalid:
+class TestValidateRequiresContextInvalid:
     def test_not_a_string(self):
-        errors = validate_context(["repo-clone"])
+        errors = validate_requires_context(["repo-clone"])
         assert len(errors) == 1
         assert "must be a string" in errors[0]
 
     def test_unknown_context(self):
-        errors = validate_context("docker-container")
+        errors = validate_requires_context("docker-container")
         assert len(errors) == 1
         assert "not a known context" in errors[0]
 
@@ -101,13 +105,18 @@ class TestCursorShouldExclude:
     def test_hosts_excluding_cursor_is_excluded(self):
         assert cursor_should_exclude({"hosts": ["claude-code"]}) is True
 
-    def test_context_alone_is_excluded(self):
-        assert cursor_should_exclude({"context": "repo-clone"}) is True
+    def test_requires_context_alone_is_excluded(self):
+        assert cursor_should_exclude({"requires-context": "repo-clone"}) is True
 
-    def test_hosts_with_cursor_but_context_set_is_still_excluded(self):
+    def test_claude_codes_own_context_field_does_not_trigger_it(self):
+        # #343: `context` (Claude Code's native fork-execution field) must
+        # NOT be read by this predicate -- only `requires-context` does.
+        assert cursor_should_exclude({"context": "fork"}) is False
+
+    def test_hosts_with_cursor_but_requires_context_set_is_still_excluded(self):
         # Either reason is independently sufficient -- a skill can be
         # host-portable and still need a repo clone.
-        fm = {"hosts": ["claude-code", "cursor"], "context": "repo-clone"}
+        fm = {"hosts": ["claude-code", "cursor"], "requires-context": "repo-clone"}
         assert cursor_should_exclude(fm) is True
 
     def test_unrelated_fields_dont_trigger_it(self):
@@ -153,10 +162,10 @@ class TestValidateSkillMdHostsContext:
         finally:
             path.unlink()
 
-    def test_valid_context_passes(self):
+    def test_valid_requires_context_passes(self):
         fm = (
             'name: test-skill\ndescription: "Use when you need to test the '
-            'context field validation logic."\ncontext: repo-clone\n'
+            'requires-context field validation logic."\nrequires-context: repo-clone\n'
         )
         body = "x" * 250
         path = self._write_skill(fm, body)
@@ -167,10 +176,10 @@ class TestValidateSkillMdHostsContext:
         finally:
             path.unlink()
 
-    def test_invalid_context_caught(self):
+    def test_invalid_requires_context_caught(self):
         fm = (
             'name: test-skill\ndescription: "Use when you need to test the '
-            'context field with an invalid value."\ncontext: docker\n'
+            'requires-context field with an invalid value."\nrequires-context: docker\n'
         )
         body = "x" * 250
         path = self._write_skill(fm, body)
@@ -182,11 +191,12 @@ class TestValidateSkillMdHostsContext:
         finally:
             path.unlink()
 
-    def test_hosts_and_context_are_known_fields(self):
-        """hosts/context should not trigger 'unknown field' errors."""
+    def test_hosts_and_requires_context_are_known_fields(self):
+        """hosts/requires-context should not trigger 'unknown field' errors."""
         fm = (
             'name: test-skill\ndescription: "Use when you need to verify hosts '
-            'and context are recognized fields."\nhosts: [claude-code]\ncontext: repo-clone\n'
+            'and requires-context are recognized fields."\n'
+            "hosts: [claude-code]\nrequires-context: repo-clone\n"
         )
         body = "x" * 250
         path = self._write_skill(fm, body)
@@ -194,6 +204,25 @@ class TestValidateSkillMdHostsContext:
             errors = validate_skill_md(path, dir_name="test-skill")
             unknown_errors = [e for e in errors if "unknown field" in e]
             assert unknown_errors == []
+        finally:
+            path.unlink()
+
+    def test_claude_codes_own_context_field_is_not_a_known_field(self):
+        # #343: `context` collides with Claude Code's native field and is
+        # deliberately NOT in KNOWN_FIELDS -- a skill using it (for its real,
+        # native meaning) gets flagged rather than silently misread as
+        # requires-context.
+        fm = (
+            'name: test-skill\ndescription: "Use when you need to verify the '
+            'native Claude Code context field is rejected here."\n'
+            "context: fork\nagent: general-purpose\n"
+        )
+        body = "x" * 250
+        path = self._write_skill(fm, body)
+        try:
+            errors = validate_skill_md(path, dir_name="test-skill")
+            unknown_errors = [e for e in errors if "unknown field" in e and "'context'" in e]
+            assert len(unknown_errors) == 1
         finally:
             path.unlink()
 
@@ -222,17 +251,17 @@ class TestRealMarkedSkills:
 
     def test_promotion_intake_needs_repo_clone(self):
         fm = self._fm("promotion-intake")
-        assert fm.get("context") == "repo-clone"
+        assert fm.get("requires-context") == "repo-clone"
         assert cursor_should_exclude(fm) is True
 
     def test_skill_scaffold_needs_repo_clone(self):
         fm = self._fm("skill-scaffold")
-        assert fm.get("context") == "repo-clone"
+        assert fm.get("requires-context") == "repo-clone"
         assert cursor_should_exclude(fm) is True
 
     def test_an_arbitrary_unmarked_skill_stays_portable(self):
         # Positive control: a skill with neither field ships to Cursor.
         fm = self._fm("recall")
         assert "hosts" not in fm
-        assert "context" not in fm
+        assert "requires-context" not in fm
         assert cursor_should_exclude(fm) is False

@@ -65,8 +65,10 @@ That's the minimum. The full field reference:
 | `argument-hint` | No | string | Shown when the user types `/claudna:<name>`. Convention: `[--flag] [positional-arg]`. Required if the skill accepts arguments (SKILL_CONTRACT §2). |
 | `requires` | No | list | External runtime dependencies — each entry has exactly one of `cli` or `env`, plus an optional `reason`. See [SKILL_CONTRACT.md](../../SKILL_CONTRACT.md) for the schema. |
 | `user-invocable` | No | boolean | Defaults to `true`. Set to `false` for context-only skills loaded by reference, not invoked as a slash command. |
+| `hosts` | No | list | Hosts the skill is known to function on (`claude-code`, `cursor`). Omit for "no restriction". See SKILL_CONTRACT §2.2. |
+| `requires-context` | No | string | A special execution context the skill needs beyond "any project directory". Only known value: `repo-clone`. Not `context` — that key is Claude Code's own (fork execution). See SKILL_CONTRACT §2.2. |
 
-The validator rejects unknown fields. Only the six fields listed above are accepted in frontmatter.
+The validator rejects unknown fields. Only the eight fields listed above are accepted in frontmatter.
 
 #### Writing the description
 

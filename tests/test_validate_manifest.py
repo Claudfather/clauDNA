@@ -207,10 +207,16 @@ def test_declared_path_may_not_be_absolute(tmp_path):
 
 
 def test_component_path_accepts_a_list(tmp_path):
-    """Cursor allows a list of paths per component; each entry is checked."""
+    """Cursor allows a list of paths per component; each entry is checked.
+
+    Nested under skills/, not a repo-root sibling: the cursor-scope gate
+    (#340/#343) refuses a skills[] entry outside skills/ by design, so a
+    fixture testing this UNRELATED generic path-existence check must not
+    also trip that one.
+    """
     root = build_repo(tmp_path)
-    (root / "extra-skills").mkdir()
-    patch(root, CURSOR, "skills", ["./skills/", "./extra-skills/"])
+    (root / "skills" / "extra-skills").mkdir()
+    patch(root, CURSOR, "skills", ["./skills/", "./skills/extra-skills/"])
     code, output = run_gate(root)
     assert code == 0, output
 
