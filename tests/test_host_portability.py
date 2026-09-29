@@ -1,7 +1,7 @@
-"""Host-portability checks (b)-(d) and the <claudna-root> definition (#336).
+"""Host-portability checks (b)-(e) and the <claudna-root> definition (#336).
 
 SKILL_CONTRACT §1.1 and §5.1. Check (a), the `_shared/` spelling, has its own
-file (test_shared_paths.py); the end-to-end test here runs all four through
+file (test_shared_paths.py); the end-to-end test here runs all five through
 validate-skills.py, so the validator's two call sites are pinned too.
 """
 

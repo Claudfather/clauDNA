@@ -149,12 +149,14 @@ For a **plan Issue** with `--loops N` (default `N=1`):
 2. Otherwise fold this cycle's findings into the plan body by dispatching one `general-purpose` subagent:
 
    ```
-   Read skills/forge/SKILL.md
+   Read <claudna-root>/skills/forge/SKILL.md
    Apply forge --reforge --dispatch to issue: <issue-url>
    Fold the comments posted since the last cycle into the §4.1 body; preserve [FORK-LOCK]'d content;
    snapshot the prior body as a comment before rewriting; re-publish via /claudna:publish.
    Operate non-interactively: do not enter plan mode, do not prompt for input.
    ```
+
+   Before sending, replace `<claudna-root>` with the plugin's absolute root, resolved per `../_shared/claudna-root.md`: the subagent has no skill directory to resolve it against.
 
 3. Increment the cycle and repeat from **Phase 3** (re-select and re-dispatch lenses against the updated body).
 
