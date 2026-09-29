@@ -4,7 +4,12 @@ Everything the store writes is private to the user (dirs ``0700``, files
 ``0600``). Projections are written temp-then-``os.replace`` so a reader never
 sees a torn file; they are rebuildable, so they skip ``fsync`` by default. Logs
 are the truth: appended one JSON object per line and fsynced. A reader tolerates
-a torn final line (a writer killed mid-append) by skipping it.
+a torn final line (a writer killed mid-append) by skipping it, and the next
+append first terminates that fragment so the torn write can't swallow a good one.
+
+Writers never create directories: the store creates them explicitly (the
+session directory on first write, a segment directory in ``open_segment``), so
+a write into a directory that doesn't exist is an error, not a side effect.
 
 ``flock`` is advisory and per open file description: two ``open()`` calls in the
 same process contend like two processes do, which is what the tests rely on.
@@ -52,8 +57,8 @@ def atomic_write_json(path: Path, obj: object, *, durable: bool = True) -> None:
 
     ``durable=False`` skips the ``fsync``: still atomic for readers, just not
     crash-durable — right for projections, which ``rebuild`` can regenerate.
+    ``path.parent`` must already exist.
     """
-    ensure_dir(path.parent)
     fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
@@ -81,14 +86,21 @@ def read_json(path: Path) -> object | None:
 def append_jsonl(path: Path, record: dict) -> None:
     """Append ``record`` as one line to ``path`` (created ``0600``) and fsync it.
 
-    One ``O_APPEND`` write per line; callers that need ordering across several
-    files (the store) serialize under their own lock rather than locking here.
+    If the file ends mid-line (a previous writer was killed), a newline is
+    written first so the fragment stays one skippable line and ``record`` lands
+    intact. Short writes are retried until the whole line is on disk. Callers
+    that need ordering across several files (the store) serialize under their
+    own lock; ``path.parent`` must already exist.
     """
-    ensure_dir(path.parent)
     line = json.dumps(record, sort_keys=True, ensure_ascii=False, separators=(",", ":")) + "\n"
-    fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, FILE_MODE)
+    fd = os.open(path, os.O_RDWR | os.O_APPEND | os.O_CREAT, FILE_MODE)
     try:
-        os.write(fd, line.encode("utf-8"))
+        size = os.fstat(fd).st_size
+        if size and os.pread(fd, 1, size - 1) != b"\n":
+            line = "\n" + line
+        view = memoryview(line.encode("utf-8"))
+        while view:
+            view = view[os.write(fd, view):]
         os.fsync(fd)
     finally:
         os.close(fd)

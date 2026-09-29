@@ -22,6 +22,8 @@ plugin-hooks/                   → Hook scripts + declarative hook config (rena
 project-template/               → Aux: per-project .claude/ setup template (not shipped via plugin)
 shell/                          → Aux: zshrc additions (not shipped via plugin)
 snowflake/                      → Aux: Snowflake connection config template (not shipped via plugin)
+lib/                            → Runtime Python (stdlib-only; hooks and skills call it). Rules: lib/CLAUDE.md
+  claudna/session_store/        → Session store core: event logs, projections, schemas, CLI
 scripts/
   validate-skills.py            → CI-enforced SKILL_CONTRACT validator (walks skills/)
 .claude/                        → Repo-local settings (permission allowlists for working in this repo)

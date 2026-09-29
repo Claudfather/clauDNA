@@ -8,7 +8,10 @@ Every line of every log is one envelope::
 Two sources of truth, each for one thing: ``schemas/event.schema.json`` owns
 the *envelope* (``v``, ``ts``, ``sid``, ``seg``, the shape of ``kind``), and the
 registry below owns the *kinds* — which exist, which log each belongs to, what
-its ``data`` must carry, and how long its free text may be.
+its ``data`` must carry, and how long its free text may be. Where a ``data``
+value ends up in a projection (``actor``, ``origin``, offsets, hashes), the
+registry constrains it with the projection schema's own fragment, so an event
+``make_event`` accepts always projects to something ``check`` accepts.
 
 Writers are strict (:func:`make_event` raises on anything malformed). Readers
 are lenient (:func:`classify`): a line from a newer envelope major or an unknown
@@ -47,8 +50,9 @@ class KindSpec:
     ``fields`` maps each required ``data`` key to the Python types it may hold;
     ``optional`` does the same for keys that may be absent. ``choices`` narrows
     a field to a closed vocabulary; ``caps`` bounds free-text fields (writers
-    truncate, readers reject). ``seg`` says whether the envelope's ``seg`` must
-    be set (``True``) or null (``False``).
+    truncate, readers reject); ``constraints`` maps a field to a JSON Schema
+    fragment its value must satisfy. ``seg`` says whether the envelope's ``seg``
+    must be set (``True``) or null (``False``).
     """
 
     log: Literal["lifecycle", "activity"]
@@ -57,7 +61,12 @@ class KindSpec:
     optional: dict[str, tuple[type, ...]] = field(default_factory=dict)
     choices: dict[str, tuple[object, ...]] = field(default_factory=dict)
     caps: dict[str, int] = field(default_factory=dict)
+    constraints: dict[str, dict] = field(default_factory=dict)
 
+
+_SESSION_DEFS = schema.load("session")["$defs"]
+_NON_NEGATIVE = {"minimum": 0}
+_SHA256 = {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}
 
 REGISTRY: dict[str, KindSpec] = {
     # ── lifecycle.jsonl: session scope ──────────────────────────────────────
@@ -73,6 +82,7 @@ REGISTRY: dict[str, KindSpec] = {
             "transcript_path": _OPT_STR,
         },
         choices={"source": ("startup", "clear", "resume")},
+        constraints={"actor": _SESSION_DEFS["actor_or_null"], "origin": _SESSION_DEFS["origin_or_null"]},
     ),
     "session.child_linked": KindSpec(log=LIFECYCLE, seg=False, fields={"child_sid": _STR}),
     "session.privacy_set": KindSpec(
@@ -93,6 +103,7 @@ REGISTRY: dict[str, KindSpec] = {
         seg=True,
         fields={"opened_by": _STR, "start": _INT},
         choices={"opened_by": ("session_open", "compact")},
+        constraints={"start": _NON_NEGATIVE},
     ),
     "segment.sealed": KindSpec(
         log=LIFECYCLE,
@@ -103,12 +114,14 @@ REGISTRY: dict[str, KindSpec] = {
             "sealed_by": ("precompact", "compact", "session_end"),
             "trigger": ("manual", "auto", None),
         },
+        constraints={"end": _NON_NEGATIVE, "sha256": _SHA256},
     ),
     "summary.requested": KindSpec(log=LIFECYCLE, seg=True, fields={"job_id": _STR}),
     "summary.completed": KindSpec(
         log=LIFECYCLE,
         seg=True,
         fields={"job_id": _STR, "artifact": _STR, "input_sha256": _STR, "duration_ms": _INT},
+        constraints={"input_sha256": _SHA256, "duration_ms": _NON_NEGATIVE},
     ),
     "summary.failed": KindSpec(
         log=LIFECYCLE,
@@ -129,8 +142,10 @@ REGISTRY: dict[str, KindSpec] = {
         fields={"prompt_id": _OPT_STR, "chars": _INT},
         optional={"text": _OPT_STR},
         caps={"text": 500},
+        constraints={"chars": _NON_NEGATIVE},
     ),
-    "skill.invoked": KindSpec(log=ACTIVITY, seg=True, fields={"skill": _STR, "args_chars": _INT}),
+    "skill.invoked": KindSpec(log=ACTIVITY, seg=True, fields={"skill": _STR, "args_chars": _INT},
+                              constraints={"args_chars": _NON_NEGATIVE}),
     "tool.failed": KindSpec(
         log=ACTIVITY,
         seg=True,
@@ -175,6 +190,9 @@ def data_errors(kind: str, data: object) -> list[str]:
     for key, cap in spec.caps.items():
         if isinstance(data.get(key), str) and len(data[key]) > cap:
             errors.append(f"data.{key} exceeds {cap} chars")
+    for key, fragment in spec.constraints.items():
+        if key in data:
+            errors.extend(schema.validate(data[key], fragment, path=f"data.{key}"))
     return errors
 
 
@@ -201,6 +219,23 @@ def classify(obj: object) -> Literal["ok", "unknown", "invalid"]:
     if spec.seg != (obj["seg"] is not None):
         return "invalid"
     return "invalid" if data_errors(obj["kind"], obj["data"]) else "ok"
+
+
+def placement_errors(obj: dict, *, sid: str, log: str, seg: int | None) -> list[str]:
+    """Problems with *where* an ``ok`` event sits: its log, session, and segment.
+
+    ``log`` is the log the event was read from; ``seg`` is the segment directory
+    for an activity log (``None`` for ``lifecycle.jsonl``). A well-formed event
+    in the wrong place is still wrong — it must not fold into this projection.
+    """
+    errors: list[str] = []
+    if obj["sid"] != sid:
+        errors.append(f"sid {obj['sid']!r} belongs to another session")
+    if REGISTRY[obj["kind"]].log != log:
+        errors.append(f"{obj['kind']} belongs in the {REGISTRY[obj['kind']].log} log")
+    elif log == ACTIVITY and obj["seg"] != seg:
+        errors.append(f"seg {obj['seg']} read from segment {seg}'s log")
+    return errors
 
 
 def cap_text(kind: str, data: dict) -> dict:

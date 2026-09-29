@@ -19,7 +19,7 @@ from pathlib import Path
 
 from . import events as ev
 from .fsio import DIR_MODE, append_jsonl, ensure_dir, exclusive_lock
-from .paths import SessionPaths, session_paths, state_root
+from .paths import InvalidSessionId, SessionPaths, session_paths, state_root, validate_sid
 from .project import RebuildReport, rebuild, refresh
 
 
@@ -58,17 +58,22 @@ class SessionHandle:
             return self._append_locked(kind, data, seg=seg)
 
     def _append_locked(self, kind: str, data: dict, *, seg: int | None) -> dict:
-        """Append and re-project; the caller holds the session lock."""
+        """Append and re-project; the caller holds the session lock.
+
+        Any segment-scoped event — activity or lifecycle — requires its segment
+        directory to exist: only :meth:`open_segment` creates segments.
+        """
         event = ev.make_event(kind, self.sid, data, seg=seg)
-        activity = ev.REGISTRY[kind].log == ev.ACTIVITY
-        if activity:
-            assert seg is not None  # make_event enforces this for activity kinds
-            if not self.paths.segment(seg).dir.is_dir():
-                raise StoreError(f"segment {seg} does not exist for session {self.sid}")
-            append_jsonl(self.paths.segment(seg).events, event)
+        if seg is not None and not self.paths.segment(seg).dir.is_dir():
+            raise StoreError(f"segment {seg} does not exist for session {self.sid}")
+        bytes_before = None
+        if ev.REGISTRY[kind].log == ev.ACTIVITY:
+            log = self.paths.segment(seg).events
+            bytes_before = log.stat().st_size if log.exists() else 0
         else:
-            append_jsonl(self.paths.lifecycle, event)
-        refresh(self.paths, seg=seg, activity_only=activity)
+            log = self.paths.lifecycle
+        append_jsonl(log, event)
+        refresh(self.paths, event, bytes_before=bytes_before)
         return event
 
     # ── lifecycle verbs (thin, named wrappers over append) ──────────────────
@@ -156,8 +161,20 @@ class SessionStore:
         return SessionHandle(session_paths(sid, self.root))
 
     def session_ids(self) -> list[str]:
-        """Every session directory under the root, sorted by name."""
+        """Every valid session directory under the root, sorted by name.
+
+        Stray directories whose names aren't valid session ids are skipped, so
+        every returned id can be passed straight back to :meth:`session`.
+        """
         sessions = self.root / "sessions"
         if not sessions.is_dir():
             return []
-        return sorted(p.name for p in sessions.iterdir() if p.is_dir())
+        return sorted(p.name for p in sessions.iterdir() if p.is_dir() and _is_sid(p.name))
+
+
+def _is_sid(name: str) -> bool:
+    try:
+        validate_sid(name)
+    except InvalidSessionId:
+        return False
+    return True

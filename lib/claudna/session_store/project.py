@@ -11,6 +11,10 @@ visible rather than silently shorter.
 ``session.json`` depends only on the lifecycle log and each segment's
 *projection* (status, summary) — never on activity. That is what lets
 :func:`refresh` re-fold just the pieces an append touched.
+
+Which segments exist is answered one way everywhere: the ``seg-NNN``
+directories. A ``segment.opened`` event whose directory is gone does not
+resurrect it, and nothing here ever creates a directory.
 """
 
 from __future__ import annotations
@@ -47,12 +51,27 @@ class Log:
     projected_from: dict
 
 
-def load_log(path) -> Log:
-    """Read a log, keep what :func:`~session_store.events.classify` calls ``ok``."""
+def load_log(path, *, sid: str, log: str, seg: int | None = None) -> Log:
+    """Read a log and keep only events that are well-formed *and* belong here.
+
+    An event is kept when :func:`~session_store.events.classify` calls it
+    ``ok`` and :func:`~session_store.events.placement_errors` finds nothing:
+    right session, right log, and (for activity) the right segment. Everything
+    else is counted in ``projected_from.skipped``.
+    """
     read = read_jsonl(path)
-    ok = [r for r in read.records if ev.classify(r) == "ok"]
+    ok = [r for r in read.records
+          if ev.classify(r) == "ok" and not ev.placement_errors(r, sid=sid, log=log, seg=seg)]
     skipped = read.skipped + len(read.records) - len(ok)
     return Log(events=ok, projected_from={"lines": read.lines, "bytes": read.bytes, "skipped": skipped})
+
+
+def load_lifecycle(paths: SessionPaths) -> Log:
+    return load_log(paths.lifecycle, sid=paths.sid, log=ev.LIFECYCLE)
+
+
+def load_activity(paths: SessionPaths, index: int) -> Log:
+    return load_log(paths.segment(index).events, sid=paths.sid, log=ev.ACTIVITY, seg=index)
 
 
 def by_segment(lifecycle: list[dict]) -> dict[int, list[dict]]:
@@ -170,27 +189,20 @@ class RebuildReport:
     skipped_lines: int
 
 
-def _segment_indices(paths: SessionPaths, lifecycle: list[dict]) -> list[int]:
-    """The union of ``seg-NNN`` dirs and indexes named by ``segment.opened`` events."""
-    named = {e["seg"] for e in lifecycle if e["kind"] == "segment.opened"}
-    return sorted(set(paths.segment_indices()) | named)
-
-
 def rebuild(paths: SessionPaths) -> RebuildReport:
     """Regenerate every projection for one session from its logs (the repair path)."""
-    lifecycle = load_log(paths.lifecycle)
+    lifecycle = load_lifecycle(paths)
     buckets = by_segment(lifecycle.events)
     transcript = transcript_path_of(lifecycle.events)
-    indices = _segment_indices(paths, lifecycle.events)
+    indices = paths.segment_indices()
     skipped = lifecycle.projected_from["skipped"]
 
     segments = []
     for index in indices:
-        seg_paths = paths.segment(index)
-        activity = load_log(seg_paths.events)
+        activity = load_activity(paths, index)
         skipped += activity.projected_from["skipped"]
         seg = project_segment(paths.sid, index, buckets[index], activity, transcript_path=transcript)
-        atomic_write_json(seg_paths.segment_json, seg, durable=False)
+        atomic_write_json(paths.segment(index).segment_json, seg, durable=False)
         segments.append(seg)
 
     atomic_write_json(paths.session_json,
@@ -198,32 +210,65 @@ def rebuild(paths: SessionPaths) -> RebuildReport:
     return RebuildReport(sid=paths.sid, segments=indices, skipped_lines=skipped)
 
 
-def refresh(paths: SessionPaths, *, seg: int | None, activity_only: bool) -> None:
-    """Re-project only what one append touched — the hot path.
+def _current_projection(path, *, bytes_before: int | None) -> dict | None:
+    """A segment projection that exactly reflects the log up to ``bytes_before``, else ``None``."""
+    projected = read_json(path)
+    if not isinstance(projected, dict) or projected.get("schema") != SEGMENT_SCHEMA:
+        return None
+    pf = projected.get("projected_from")
+    if bytes_before is None or not isinstance(pf, dict) or pf.get("bytes") != bytes_before:
+        return None
+    return projected
 
-    * activity append → that segment's ``segment.json`` only (``session.json``
-      never depends on activity);
-    * segment-scoped lifecycle append → that segment, then ``session.json``;
-    * session-scoped lifecycle append → ``session.json``.
 
-    ``session.json`` is folded from the lifecycle log plus the *other* segments'
-    existing projections. If any of those is missing or unreadable, fall back to
-    a full :func:`rebuild` — the logs are still the truth.
+def refresh(paths: SessionPaths, event: dict, *, bytes_before: int | None = None) -> None:
+    """Re-project only what appending ``event`` touched — the hot path.
+
+    * activity event → bump that segment's counter in place, O(1), when its
+      projection is current (``projected_from.bytes == bytes_before``, the log's
+      size before the append); otherwise re-fold that segment from its logs.
+      ``session.json`` never depends on activity.
+    * ``session.opened`` → full :func:`rebuild`: it can change the transcript
+      path every segment projection embeds.
+    * other segment-scoped lifecycle event → that segment, then ``session.json``.
+    * other session-scoped lifecycle event → ``session.json``.
+
+    ``session.json`` is folded from the lifecycle log plus the other segments'
+    existing projections; if any is missing or unreadable, fall back to a full
+    :func:`rebuild` — the logs are still the truth.
     """
-    lifecycle = load_log(paths.lifecycle)
-    transcript = transcript_path_of(lifecycle.events)
-    buckets = by_segment(lifecycle.events) if seg is not None else {}
-
-    fresh: dict[int, dict] = {}
-    if seg is not None:
-        fresh[seg] = project_segment(paths.sid, seg, buckets.get(seg, []), load_log(paths.segment(seg).events),
-                                     transcript_path=transcript)
-        atomic_write_json(paths.segment(seg).segment_json, fresh[seg], durable=False)
-    if activity_only:
+    kind, seg = event["kind"], event["seg"]
+    if ev.REGISTRY[kind].log == ev.ACTIVITY:
+        seg_json = paths.segment(seg).segment_json
+        projected = _current_projection(seg_json, bytes_before=bytes_before)
+        if projected is None:
+            lifecycle = load_lifecycle(paths)
+            projected = project_segment(paths.sid, seg, by_segment(lifecycle.events)[seg],
+                                        load_activity(paths, seg),
+                                        transcript_path=transcript_path_of(lifecycle.events))
+        else:
+            if kind in _COUNTED:
+                projected["counts"][_COUNTED[kind]] += 1
+            pf = projected["projected_from"]
+            projected["projected_from"] = {"lines": pf["lines"] + 1,
+                                           "bytes": paths.segment(seg).events.stat().st_size,
+                                           "skipped": pf["skipped"]}
+        atomic_write_json(seg_json, projected, durable=False)
+        return
+    if kind == "session.opened":
+        rebuild(paths)
         return
 
+    lifecycle = load_lifecycle(paths)
+    transcript = transcript_path_of(lifecycle.events)
+    fresh: dict[int, dict] = {}
+    if seg is not None:
+        fresh[seg] = project_segment(paths.sid, seg, by_segment(lifecycle.events)[seg],
+                                     load_activity(paths, seg), transcript_path=transcript)
+        atomic_write_json(paths.segment(seg).segment_json, fresh[seg], durable=False)
+
     segments = []
-    for index in _segment_indices(paths, lifecycle.events):
+    for index in paths.segment_indices():
         projected = fresh.get(index) or read_json(paths.segment(index).segment_json)
         if not isinstance(projected, dict) or projected.get("schema") != SEGMENT_SCHEMA:
             rebuild(paths)

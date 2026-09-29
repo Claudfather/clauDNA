@@ -1,4 +1,4 @@
-"""Tests for scripts/session_store — the session store core (spec phase 1).
+"""Tests for lib/claudna/session_store — the session store core (spec phase 1).
 
 What these guard, in the order the spec states the invariants:
 
@@ -31,12 +31,13 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT / "scripts"))
+LIB = REPO_ROOT / "lib"
+sys.path.insert(0, str(LIB))
 
-from session_store import events as ev  # noqa: E402
-from session_store import schema  # noqa: E402
-from session_store.cli import check_session  # noqa: E402
-from session_store.fsio import (  # noqa: E402
+from claudna.session_store import events as ev  # noqa: E402
+from claudna.session_store import schema  # noqa: E402
+from claudna.session_store.cli import check_session  # noqa: E402
+from claudna.session_store.fsio import (  # noqa: E402
     LockBusy,
     append_jsonl,
     atomic_write_json,
@@ -44,7 +45,7 @@ from session_store.fsio import (  # noqa: E402
     exclusive_lock,
     read_jsonl,
 )
-from session_store.paths import (  # noqa: E402
+from claudna.session_store.paths import (  # noqa: E402
     InvalidSessionId,
     parse_seg_dirname,
     seg_dirname,
@@ -52,11 +53,11 @@ from session_store.paths import (  # noqa: E402
     state_root,
     validate_sid,
 )
-from session_store.store import SessionStore, StoreError  # noqa: E402
+from claudna.session_store.store import SessionStore, StoreError  # noqa: E402
 
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "session-store" / "basic"
 FIXTURE_SID = "5f0c2d1e-0000-4000-8000-000000000001"
-STORE_PKG = REPO_ROOT / "scripts" / "session_store"
+STORE_PKG = LIB / "claudna" / "session_store"
 
 ACTOR = {"kind": "interactive", "fleet": None, "bot_id": None, "bot_name": None, "model": None, "entrypoint": "cli"}
 ORIGIN = {"cwd": "/work", "repo": None, "branch": None, "head": None}
@@ -184,6 +185,22 @@ class TestEvents:
     )
     def test_make_event_rejects_registry_violations(self, kind, data, seg, needle):
         with pytest.raises(ev.EventError, match=needle):
+            ev.make_event(kind, "s1", data, seg=seg)
+
+    @pytest.mark.parametrize(
+        "kind,data,seg",
+        [
+            ("session.opened", {"source": "startup", "parent_sid": None, "chain_id": "s", "actor": {"kind": "x"},
+                                "origin": ORIGIN, "transcript_path": None}, None),
+            ("session.opened", {"source": "startup", "parent_sid": None, "chain_id": "s", "actor": ACTOR,
+                                "origin": {}, "transcript_path": None}, None),
+            ("segment.sealed", {"end": 10, "sealed_by": "precompact", "trigger": None, "sha256": "abc"}, 1),
+            ("segment.opened", {"opened_by": "compact", "start": -1}, 1),
+            ("prompt.submitted", {"prompt_id": None, "chars": -3}, 1),
+        ],
+    )
+    def test_writers_reject_values_their_projections_would_reject(self, kind, data, seg):
+        with pytest.raises(ev.EventError):
             ev.make_event(kind, "s1", data, seg=seg)
 
     def test_free_text_is_capped_not_rejected(self):
@@ -319,7 +336,43 @@ class TestStore:
     def test_session_ids_lists_directories(self, store):
         opened(store, "b")
         opened(store, "a")
+        (store.root / "sessions" / ".tmp").mkdir()
+        (store.root / "sessions" / "has space").mkdir()
         assert store.session_ids() == ["a", "b"]
+
+    def test_a_torn_tail_never_swallows_the_next_event(self, store):
+        h = opened(store)
+        with h.paths.lifecycle.open("a") as fh:
+            fh.write('{"torn": ')  # a writer killed mid-append
+        h.close_session("other")
+        assert load(h.paths.session_json)["status"] == "closed"
+        assert read_jsonl(h.paths.lifecycle).skipped == 1
+
+    def test_segment_scoped_lifecycle_events_need_an_existing_segment(self, store):
+        h = opened(store)
+        h.open_segment("session_open", 0)
+        with pytest.raises(StoreError):
+            h.seal_segment(10, "precompact", index=7)
+        with pytest.raises(StoreError):
+            h.append("summary.requested", {"job_id": "j"}, seg=5)
+        assert h.paths.segment_indices() == [1] and h.open_segment("compact", 10) == 2
+
+    def test_a_log_named_segment_without_a_directory_is_not_resurrected(self, store):
+        h = opened(store)
+        h.open_segment("session_open", 0)
+        h.open_segment("compact", 10)
+        shutil.rmtree(h.paths.segment(2).dir)
+        h.rebuild()
+        assert h.paths.segment_indices() == [1]
+        assert load(h.paths.session_json)["segments"]["count"] == 1
+
+    def test_foreign_session_events_do_not_fold(self, store):
+        h = opened(store)
+        append_jsonl(h.paths.lifecycle, ev.make_event("session.privacy_set", "someone-else",
+                                                       {"private": True, "by": "user"}))
+        h.rebuild()
+        s = load(h.paths.session_json)
+        assert s["private"] is False and s["projected_from"]["skipped"] == 1
 
 
 # ── projections: golden fixture and round trip ───────────────────────────────
@@ -373,6 +426,25 @@ class TestProjection:
             f.unlink()
         h.rebuild()
         assert [f.read_text() for f in files] == incremental
+
+    def test_late_session_opened_updates_every_segment_projection(self, store):
+        h = store.session("late-open")
+        h.open_segment("session_open", 0)  # SessionStart missed; a segment opened first
+        h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl")
+        assert load(h.paths.segment(1).segment_json)["transcript"]["path"] == "/t.jsonl"
+        incremental = h.paths.segment(1).segment_json.read_text()
+        h.rebuild()
+        assert h.paths.segment(1).segment_json.read_text() == incremental
+
+    def test_activity_fast_path_falls_back_when_the_projection_is_stale(self, store):
+        h = opened(store)
+        seg = h.open_segment("session_open", 0)
+        h.append("prompt.submitted", {"prompt_id": None, "chars": 1}, seg=seg)
+        # a second writer appended behind the projection's back
+        append_jsonl(h.paths.segment(seg).events, ev.make_event("prompt.submitted", h.sid,
+                                                                {"prompt_id": None, "chars": 1}, seg=seg))
+        h.append("prompt.submitted", {"prompt_id": None, "chars": 1}, seg=seg)
+        assert load(h.paths.segment(seg).segment_json)["counts"]["prompts"] == 3
 
     def test_refresh_falls_back_to_rebuild_when_a_projection_is_damaged(self, store):
         h = opened(store)
@@ -485,37 +557,59 @@ def _schema_nodes():
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
 
-def run_cli(*args: str) -> subprocess.CompletedProcess:
-    return subprocess.run([sys.executable, str(STORE_PKG), *args], capture_output=True, text=True,
-                          env={**os.environ, "CLAUDNA_STATE_DIR": "/nonexistent-claudna-root"})
+def run_cli(*args: str, as_module: bool = True) -> subprocess.CompletedProcess:
+    cmd = [sys.executable, "-m", "claudna.session_store"] if as_module else [sys.executable, str(STORE_PKG)]
+    env = {**os.environ, "CLAUDNA_STATE_DIR": "/nonexistent-claudna-root", "PYTHONPATH": str(LIB)}
+    return subprocess.run([*cmd, *args], capture_output=True, text=True, env=env)
 
 
 class TestCli:
     def test_rebuild_then_check_passes(self, tmp_path):
         root = _copy_fixture(tmp_path)
-        rebuilt = run_cli("--root", str(root), "rebuild", FIXTURE_SID)
+        rebuilt = run_cli("rebuild", FIXTURE_SID, "--root", str(root))
         assert rebuilt.returncode == 0, rebuilt.stderr
         assert json.loads(rebuilt.stdout)["segments"] == [1, 2]
-        checked = run_cli("--root", str(root), "check", FIXTURE_SID)
+        checked = run_cli("check", FIXTURE_SID, "--root", str(root))
         assert checked.returncode == 0, checked.stdout
 
     def test_check_fails_before_projections_exist(self, tmp_path):
         root = _copy_fixture(tmp_path)
-        result = run_cli("--root", str(root), "check", FIXTURE_SID)
+        result = run_cli("check", FIXTURE_SID, "--root", str(root))
         assert result.returncode == 1 and "run rebuild" in result.stdout
 
     def test_check_flags_a_registry_violation_in_a_log(self, tmp_path):
         root = _copy_fixture(tmp_path)
-        run_cli("--root", str(root), "rebuild", FIXTURE_SID)
+        run_cli("rebuild", FIXTURE_SID, "--root", str(root))
         bad = ev.make_event("session.closed", FIXTURE_SID, {"reason": "other"})
         bad["data"]["reason"] = "bored"
         append_jsonl(session_paths(FIXTURE_SID, root).lifecycle, bad)
-        assert run_cli("--root", str(root), "check", FIXTURE_SID).returncode == 1
+        assert run_cli("check", FIXTURE_SID, "--root", str(root)).returncode == 1
         assert check_session(SessionStore(root).session(FIXTURE_SID))
 
     def test_unknown_and_invalid_sessions_exit_1(self, tmp_path):
-        assert run_cli("--root", str(tmp_path), "rebuild", "missing").returncode == 1
-        assert run_cli("--root", str(tmp_path), "rebuild", "../escape").returncode == 1
+        assert run_cli("rebuild", "missing", "--root", str(tmp_path)).returncode == 1
+        assert run_cli("rebuild", "../escape", "--root", str(tmp_path)).returncode == 1
+
+    def test_root_is_accepted_after_the_verb_and_the_directory_form_works(self, tmp_path):
+        root = _copy_fixture(tmp_path)
+        assert run_cli("rebuild", FIXTURE_SID, "--root", str(root)).returncode == 0
+        assert run_cli("check", FIXTURE_SID, "--root", str(root), as_module=False).returncode == 0
+
+    def test_check_skips_newer_envelopes_like_readers_do(self, tmp_path):
+        root = _copy_fixture(tmp_path)
+        run_cli("rebuild", FIXTURE_SID, "--root", str(root))
+        future = {**ev.make_event("session.closed", FIXTURE_SID, {"reason": "other"}), "v": 2, "newfield": 1}
+        append_jsonl(session_paths(FIXTURE_SID, root).lifecycle, future)
+        assert run_cli("check", FIXTURE_SID, "--root", str(root)).returncode == 0
+
+    def test_check_flags_misplaced_events(self, tmp_path):
+        root = _copy_fixture(tmp_path)
+        run_cli("rebuild", FIXTURE_SID, "--root", str(root))
+        paths = session_paths(FIXTURE_SID, root)
+        append_jsonl(paths.segment(2).events, ev.make_event("prompt.submitted", FIXTURE_SID,
+                                                            {"prompt_id": None, "chars": 1}, seg=1))
+        result = run_cli("check", FIXTURE_SID, "--root", str(root))
+        assert result.returncode == 1 and "read from segment 2" in result.stdout
 
     def test_usage_error_exits_2(self):
         assert run_cli("frobnicate").returncode == 2

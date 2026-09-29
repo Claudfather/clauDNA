@@ -166,7 +166,7 @@ ${CLAUDNA_STATE_DIR:-~/.claudna}/
 
 ## 6. Data models
 
-Schemas ship as JSON Schema (draft 2020-12) beside the code in `scripts/session_store/schemas/`, one file per model below, with a golden fixture (logs + expected projections) in `tests/fixtures/session-store/`. The field tables here are the human-readable spec; the schema files are normative.
+Schemas ship as JSON Schema (draft 2020-12) beside the code in `lib/claudna/session_store/schemas/`, one file per model below, with a golden fixture (logs + expected projections) in `tests/fixtures/session-store/`. The field tables here are the human-readable spec; the schema files are normative.
 
 ### 6.1 Shared types
 
@@ -423,10 +423,10 @@ Returns an envelope: `{ schema: "claudna.export/1", items: [{ sid, seg, session:
 
 ## 10. Implementation shape
 
-- **Language and location:** stdlib Python ≥ 3.11, the package `scripts/session_store/` (runtime Python already ships from `scripts/`, invoked as `${CLAUDE_PLUGIN_ROOT}/scripts/…`), called by thin `plugin-hooks/*.sh` wrappers. No third-party runtime deps.
+- **Language and location:** stdlib Python ≥ 3.11, the package `lib/claudna/session_store/`, called by thin `plugin-hooks/*.sh` wrappers as `python3 -m claudna.session_store` with `PYTHONPATH="${CLAUDE_PLUGIN_ROOT}/lib"`. `lib/` is runtime only — stdlib-only imports, strictly downward layering inside a package, and a single `sys.path` shim at the entry point, each gated by `tests/test_runtime_layout.py` (rules: `lib/CLAUDE.md`). No third-party runtime deps.
 - **Hosts:** the core (`paths`, `fsio`, `events`, `project`, `store`) is host-agnostic; only the hook adapter that maps a host's events onto store events is Claude Code-specific. The Cursor manifest ships no hooks, so on Cursor nothing is recorded — readers and harvest report "no session store on this host" rather than failing. A Cursor adapter can land later without touching the core.
 - **Modules:** `store` (paths, locking, atomic write, append), `events` (envelope + kind registry), `project` (log → projections), `boundaries` (hook → action table in §4.2), `summarize` (worker), `readers`, `export`. Each module owns one concern; the hook table is data, not branching.
-- **Validation:** JSON Schemas in `scripts/session_store/schemas/`, checked by `schema.py` — a stdlib JSON Schema subset that raises on any keyword it doesn't implement, so a schema can't silently ask for an unchecked rule. Tests pin a golden fixture byte-for-byte, a rebuild round trip, and a drift gate between `event.schema.json`'s kind enum and `events.REGISTRY`. `python3 scripts/session_store check <sid>` runs the same validation on a live store.
+- **Validation:** JSON Schemas in `lib/claudna/session_store/schemas/`, checked by `schema.py` — a stdlib JSON Schema subset that raises on any keyword it doesn't implement, so a schema can't silently ask for an unchecked rule. Tests pin a golden fixture byte-for-byte, a rebuild round trip, and a drift gate between `event.schema.json`'s kind enum and `events.REGISTRY`. `python3 -m claudna.session_store check <sid>` runs the same validation on a live store, including placement (each event in the right session, log, and segment).
 - **`telemetry-emit.sh`:** migrates onto `skill.invoked` events; the old path stays as a deprecated alias for one release.
 
 ## 11. Open questions
