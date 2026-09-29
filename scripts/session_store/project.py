@@ -1,21 +1,25 @@
-"""Log → projection folds (spec §6.4–6.5), and ``rebuild``.
+"""Log → projection folds (spec §6.4–6.5), ``rebuild``, and incremental ``refresh``.
 
-The fold functions are pure: records in, dict out. They never touch the disk,
+The fold functions are pure: events in, dict out. They never touch the disk,
 which is what makes the round-trip test meaningful (fold the logs, delete the
-projections, fold again, compare). :func:`rebuild` is the only function here
-that does I/O.
+projections, fold again, compare). ``rebuild`` and ``refresh`` do the I/O.
 
 Readers skip lines :func:`session_store.events.classify` marks ``unknown`` or
 ``invalid``; the count lands in ``projected_from.skipped`` so a damaged log is
 visible rather than silently shorter.
+
+``session.json`` depends only on the lifecycle log and each segment's
+*projection* (status, summary) — never on activity. That is what lets
+:func:`refresh` re-fold just the pieces an append touched.
 """
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
 
 from . import events as ev
-from .fsio import JsonlRead, atomic_write_json, read_jsonl
+from .fsio import atomic_write_json, read_json, read_jsonl
 from .paths import SessionPaths
 
 SESSION_SCHEMA = "claudna.session/1"
@@ -27,47 +31,69 @@ _SUMMARY_STATUS = {
     "summary.failed": "failed",
     "summary.skipped": "skipped",
 }
+_COUNTED = {
+    "prompt.submitted": "prompts",
+    "skill.invoked": "skills",
+    "tool.failed": "failures",
+    "checkpoint.noted": "checkpoints",
+}
 
 
-def usable(read: JsonlRead) -> tuple[list[dict], int]:
-    """Split a log read into foldable events and a count of skipped lines."""
+@dataclass(frozen=True)
+class Log:
+    """A log's foldable events plus the ``projected_from`` record describing the read."""
+
+    events: list[dict]
+    projected_from: dict
+
+
+def load_log(path) -> Log:
+    """Read a log, keep what :func:`~session_store.events.classify` calls ``ok``."""
+    read = read_jsonl(path)
     ok = [r for r in read.records if ev.classify(r) == "ok"]
-    return ok, read.skipped + (len(read.records) - len(ok))
+    skipped = read.skipped + len(read.records) - len(ok)
+    return Log(events=ok, projected_from={"lines": read.lines, "bytes": read.bytes, "skipped": skipped})
 
 
-def project_segment(
-    sid: str,
-    index: int,
-    lifecycle: list[dict],
-    activity: list[dict],
-    *,
-    transcript_path: str | None,
-    activity_read: JsonlRead | None = None,
-) -> dict:
-    """Fold one segment's boundary, summary, and activity events into ``segment.json``.
+def by_segment(lifecycle: list[dict]) -> dict[int, list[dict]]:
+    """Bucket segment-scoped lifecycle events by index, preserving order."""
+    buckets: dict[int, list[dict]] = defaultdict(list)
+    for e in lifecycle:
+        if e["seg"] is not None:
+            buckets[e["seg"]].append(e)
+    return buckets
+
+
+def transcript_path_of(lifecycle: list[dict]) -> str | None:
+    """The first non-null ``transcript_path`` any ``session.opened`` recorded."""
+    return next((e["data"]["transcript_path"] for e in lifecycle
+                 if e["kind"] == "session.opened" and e["data"]["transcript_path"]), None)
+
+
+def project_segment(sid: str, index: int, boundary: list[dict], activity: Log, *,
+                    transcript_path: str | None) -> dict:
+    """Fold one segment's lifecycle events (``boundary``) and activity into ``segment.json``.
 
     A segment directory with no ``segment.opened`` event (a crash between the
     ``mkdir`` and the append) still projects — as ``opened_by: "unknown"``.
+    A re-seal (after a blocked compaction) moves the end: last seal wins.
     """
-    opened = [e for e in lifecycle if e["kind"] == "segment.opened" and e["seg"] == index]
-    sealed = [e for e in lifecycle if e["kind"] == "segment.sealed" and e["seg"] == index]
-    summary_events = [e for e in lifecycle if e["kind"] in _SUMMARY_STATUS and e["seg"] == index]
-
-    first_open = opened[0] if opened else None
-    last_seal = sealed[-1] if sealed else None  # a re-seal (blocked compaction) moves the end
-
+    first_open = last_seal = None
     summary = {"status": "none", "job_id": None}
-    for e in summary_events:
-        summary = {"status": _SUMMARY_STATUS[e["kind"]], "job_id": e["data"].get("job_id", summary["job_id"])}
+    for e in boundary:
+        if e["kind"] == "segment.opened" and first_open is None:
+            first_open = e
+        elif e["kind"] == "segment.sealed":
+            last_seal = e
+        elif e["kind"] in _SUMMARY_STATUS:
+            summary = {"status": _SUMMARY_STATUS[e["kind"]], "job_id": e["data"].get("job_id", summary["job_id"])}
 
-    counts = {"prompts": 0, "skills": 0, "failures": 0, "checkpoints": 0}
-    counted = {"prompt.submitted": "prompts", "skill.invoked": "skills", "tool.failed": "failures",
-               "checkpoint.noted": "checkpoints"}
-    for e in activity:
-        if e["seg"] == index and e["kind"] in counted:
-            counts[counted[e["kind"]]] += 1
+    counts = dict.fromkeys(_COUNTED.values(), 0)
+    for e in activity.events:
+        if e["kind"] in _COUNTED:
+            counts[_COUNTED[e["kind"]]] += 1
 
-    out = {
+    return {
         "schema": SEGMENT_SCHEMA,
         "sid": sid,
         "index": index,
@@ -86,50 +112,35 @@ def project_segment(
         },
         "counts": counts,
         "summary": summary,
+        "projected_from": activity.projected_from,
     }
-    if activity_read is not None:
-        skipped = activity_read.skipped + (len(activity_read.records) - len(activity))
-        out["projected_from"] = {"lines": activity_read.lines, "bytes": activity_read.bytes, "skipped": skipped}
-    return out
 
 
-def project_session(
-    sid: str,
-    lifecycle: list[dict],
-    segments: list[dict],
-    *,
-    lifecycle_read: JsonlRead | None = None,
-) -> dict:
-    """Fold ``lifecycle.jsonl`` (plus already-projected segments) into ``session.json``."""
-    opened = [e for e in lifecycle if e["kind"] == "session.opened"]
-    first = opened[0] if opened else None
-
-    status = "unknown"
-    closed_at = close_reason = None
-    for e in lifecycle:
-        if e["kind"] == "session.opened":
-            status, closed_at, close_reason = "open", None, None  # a resume reopens
-        elif e["kind"] == "session.closed":
-            status, closed_at, close_reason = "closed", e["ts"], e["data"]["reason"]
-
+def project_session(sid: str, lifecycle: Log, segments: list[dict], *, transcript_path: str | None) -> dict:
+    """Fold the lifecycle log (plus already-projected segments) into ``session.json``, in one pass."""
+    first = None
+    status, closed_at, close_reason = "unknown", None, None
     children: list[str] = []
-    for e in lifecycle:
-        if e["kind"] == "session.child_linked" and e["data"]["child_sid"] not in children:
-            children.append(e["data"]["child_sid"])
-
     private = False
-    for e in lifecycle:
-        if e["kind"] == "session.privacy_set":
+    for e in lifecycle.events:
+        kind = e["kind"]
+        if kind == "session.opened":
+            first = first or e
+            status, closed_at, close_reason = "open", None, None  # a resume reopens
+        elif kind == "session.closed":
+            status, closed_at, close_reason = "closed", e["ts"], e["data"]["reason"]
+        elif kind == "session.child_linked" and e["data"]["child_sid"] not in children:
+            children.append(e["data"]["child_sid"])
+        elif kind == "session.privacy_set":
             private = e["data"]["private"]
 
-    transcript_path = next((e["data"]["transcript_path"] for e in opened if e["data"]["transcript_path"]), None)
-    open_segments = [s["index"] for s in segments if s["status"] == "open"]
-    tally = {"done": 0, "pending": 0, "failed": 0, "skipped": 0}
+    tally = dict.fromkeys(_SUMMARY_STATUS.values(), 0)
     for s in segments:
         if s["summary"]["status"] in tally:
             tally[s["summary"]["status"]] += 1
+    open_segments = [s["index"] for s in segments if s["status"] == "open"]
 
-    out = {
+    return {
         "schema": SESSION_SCHEMA,
         "sid": sid,
         "parent_sid": first["data"]["parent_sid"] if first else None,
@@ -145,17 +156,9 @@ def project_session(
         "closed_at": closed_at,
         "close_reason": close_reason,
         "segments": {"count": len(segments), "open": max(open_segments) if open_segments else None},
-        "summary": {
-            "segments_done": tally["done"],
-            "segments_pending": tally["pending"],
-            "segments_failed": tally["failed"],
-            "segments_skipped": tally["skipped"],
-        },
+        "summary": {f"segments_{k}": n for k, n in tally.items()},
+        "projected_from": lifecycle.projected_from,
     }
-    if lifecycle_read is not None:
-        skipped = lifecycle_read.skipped + (len(lifecycle_read.records) - len(lifecycle))
-        out["projected_from"] = {"lines": lifecycle_read.lines, "bytes": lifecycle_read.bytes, "skipped": skipped}
-    return out
 
 
 @dataclass(frozen=True)
@@ -167,34 +170,64 @@ class RebuildReport:
     skipped_lines: int
 
 
-def rebuild(paths: SessionPaths) -> RebuildReport:
-    """Regenerate every projection for one session from its logs.
-
-    Segment indexes are the union of ``seg-NNN`` directories and indexes named
-    by ``segment.opened`` events — the directories are the holder, but a log
-    that names a segment whose directory is missing still projects it.
-    """
-    lifecycle_read = read_jsonl(paths.lifecycle)
-    lifecycle, skipped = usable(lifecycle_read)
+def _segment_indices(paths: SessionPaths, lifecycle: list[dict]) -> list[int]:
+    """The union of ``seg-NNN`` dirs and indexes named by ``segment.opened`` events."""
     named = {e["seg"] for e in lifecycle if e["kind"] == "segment.opened"}
-    indices = sorted(set(paths.segment_indices()) | named)
+    return sorted(set(paths.segment_indices()) | named)
 
-    transcript_path = next(
-        (e["data"]["transcript_path"] for e in lifecycle
-         if e["kind"] == "session.opened" and e["data"]["transcript_path"]),
-        None,
-    )
+
+def rebuild(paths: SessionPaths) -> RebuildReport:
+    """Regenerate every projection for one session from its logs (the repair path)."""
+    lifecycle = load_log(paths.lifecycle)
+    buckets = by_segment(lifecycle.events)
+    transcript = transcript_path_of(lifecycle.events)
+    indices = _segment_indices(paths, lifecycle.events)
+    skipped = lifecycle.projected_from["skipped"]
+
     segments = []
     for index in indices:
         seg_paths = paths.segment(index)
-        activity_read = read_jsonl(seg_paths.events)
-        activity, seg_skipped = usable(activity_read)
-        skipped += seg_skipped
-        seg = project_segment(paths.sid, index, lifecycle, activity,
-                              transcript_path=transcript_path, activity_read=activity_read)
-        atomic_write_json(seg_paths.segment_json, seg)
+        activity = load_log(seg_paths.events)
+        skipped += activity.projected_from["skipped"]
+        seg = project_segment(paths.sid, index, buckets[index], activity, transcript_path=transcript)
+        atomic_write_json(seg_paths.segment_json, seg, durable=False)
         segments.append(seg)
 
     atomic_write_json(paths.session_json,
-                      project_session(paths.sid, lifecycle, segments, lifecycle_read=lifecycle_read))
+                      project_session(paths.sid, lifecycle, segments, transcript_path=transcript), durable=False)
     return RebuildReport(sid=paths.sid, segments=indices, skipped_lines=skipped)
+
+
+def refresh(paths: SessionPaths, *, seg: int | None, activity_only: bool) -> None:
+    """Re-project only what one append touched — the hot path.
+
+    * activity append → that segment's ``segment.json`` only (``session.json``
+      never depends on activity);
+    * segment-scoped lifecycle append → that segment, then ``session.json``;
+    * session-scoped lifecycle append → ``session.json``.
+
+    ``session.json`` is folded from the lifecycle log plus the *other* segments'
+    existing projections. If any of those is missing or unreadable, fall back to
+    a full :func:`rebuild` — the logs are still the truth.
+    """
+    lifecycle = load_log(paths.lifecycle)
+    transcript = transcript_path_of(lifecycle.events)
+    buckets = by_segment(lifecycle.events) if seg is not None else {}
+
+    fresh: dict[int, dict] = {}
+    if seg is not None:
+        fresh[seg] = project_segment(paths.sid, seg, buckets.get(seg, []), load_log(paths.segment(seg).events),
+                                     transcript_path=transcript)
+        atomic_write_json(paths.segment(seg).segment_json, fresh[seg], durable=False)
+    if activity_only:
+        return
+
+    segments = []
+    for index in _segment_indices(paths, lifecycle.events):
+        projected = fresh.get(index) or read_json(paths.segment(index).segment_json)
+        if not isinstance(projected, dict) or projected.get("schema") != SEGMENT_SCHEMA:
+            rebuild(paths)
+            return
+        segments.append(projected)
+    atomic_write_json(paths.session_json,
+                      project_session(paths.sid, lifecycle, segments, transcript_path=transcript), durable=False)

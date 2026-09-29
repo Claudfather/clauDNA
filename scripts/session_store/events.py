@@ -5,9 +5,10 @@ Every line of every log is one envelope::
     {"v": 1, "ts": "2026-09-28T17:04:05.123Z", "kind": "segment.sealed",
      "sid": "3fbb…", "seg": 2, "data": {...}}
 
-The registry below is the single source of truth for which kinds exist, which
-log each belongs to, and what its ``data`` must carry. ``event.schema.json``
-mirrors the kind list; a test fails if the two drift.
+Two sources of truth, each for one thing: ``schemas/event.schema.json`` owns
+the *envelope* (``v``, ``ts``, ``sid``, ``seg``, the shape of ``kind``), and the
+registry below owns the *kinds* — which exist, which log each belongs to, what
+its ``data`` must carry, and how long its free text may be.
 
 Writers are strict (:func:`make_event` raises on anything malformed). Readers
 are lenient (:func:`classify`): a line from a newer envelope major or an unknown
@@ -16,18 +17,16 @@ kind is *skipped*, not an error, so an older reader never breaks on a newer log.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Literal
+
+from . import schema
 
 ENVELOPE_VERSION = 1
 
 LIFECYCLE = "lifecycle"
 ACTIVITY = "activity"
-
-_TS_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
-_KIND_RE = re.compile(r"^[a-z]+(_[a-z]+)*\.[a-z]+(_[a-z]+)*$")
 
 _STR = (str,)
 _OPT_STR = (str, type(None))
@@ -47,8 +46,9 @@ class KindSpec:
 
     ``fields`` maps each required ``data`` key to the Python types it may hold;
     ``optional`` does the same for keys that may be absent. ``choices`` narrows
-    a field to a closed vocabulary. ``seg`` says whether the envelope's ``seg``
-    must be set (``True``), must be null (``False``).
+    a field to a closed vocabulary; ``caps`` bounds free-text fields (writers
+    truncate, readers reject). ``seg`` says whether the envelope's ``seg`` must
+    be set (``True``) or null (``False``).
     """
 
     log: Literal["lifecycle", "activity"]
@@ -56,6 +56,7 @@ class KindSpec:
     fields: dict[str, tuple[type, ...]]
     optional: dict[str, tuple[type, ...]] = field(default_factory=dict)
     choices: dict[str, tuple[object, ...]] = field(default_factory=dict)
+    caps: dict[str, int] = field(default_factory=dict)
 
 
 REGISTRY: dict[str, KindSpec] = {
@@ -113,6 +114,7 @@ REGISTRY: dict[str, KindSpec] = {
         log=LIFECYCLE,
         seg=True,
         fields={"job_id": _STR, "error": _STR, "retryable": _BOOL},
+        caps={"error": 200},
     ),
     "summary.skipped": KindSpec(
         log=LIFECYCLE,
@@ -126,6 +128,7 @@ REGISTRY: dict[str, KindSpec] = {
         seg=True,
         fields={"prompt_id": _OPT_STR, "chars": _INT},
         optional={"text": _OPT_STR},
+        caps={"text": 500},
     ),
     "skill.invoked": KindSpec(log=ACTIVITY, seg=True, fields={"skill": _STR, "args_chars": _INT}),
     "tool.failed": KindSpec(
@@ -138,19 +141,10 @@ REGISTRY: dict[str, KindSpec] = {
             "command": _OPT_STR,
             "error": _OPT_STR,
         },
+        caps={"command": 300, "error": 800},
     ),
-    "checkpoint.noted": KindSpec(log=ACTIVITY, seg=True, fields={"note": _STR}),
+    "checkpoint.noted": KindSpec(log=ACTIVITY, seg=True, fields={"note": _STR}, caps={"note": 1000}),
 }
-
-#: Free-text caps (spec §6.2). Writers truncate to these before building events.
-TEXT_CAPS: dict[tuple[str, str], int] = {
-    ("prompt.submitted", "text"): 500,
-    ("tool.failed", "command"): 300,
-    ("tool.failed", "error"): 800,
-    ("checkpoint.noted", "note"): 1000,
-    ("summary.failed", "error"): 200,
-}
-
 
 def now_ts() -> str:
     """Current UTC time as ``YYYY-MM-DDTHH:MM:SS.mmmZ``."""
@@ -163,6 +157,9 @@ def _type_ok(value: object, types: tuple[type, ...]) -> bool:
     if isinstance(value, bool) and bool not in types:
         return False
     return isinstance(value, types)
+
+
+_EVENT_SCHEMA = schema.load("event")
 
 
 def data_errors(kind: str, data: object) -> list[str]:
@@ -182,31 +179,15 @@ def data_errors(kind: str, data: object) -> list[str]:
     for key, allowed in spec.choices.items():
         if key in data and data[key] not in allowed:
             errors.append(f"data.{key} must be one of {list(allowed)}")
-    for (cap_kind, key), cap in TEXT_CAPS.items():
-        if cap_kind == kind and isinstance(data.get(key), str) and len(data[key]) > cap:
+    for key, cap in spec.caps.items():
+        if isinstance(data.get(key), str) and len(data[key]) > cap:
             errors.append(f"data.{key} exceeds {cap} chars")
     return errors
 
 
 def envelope_errors(obj: object) -> list[str]:
-    """Problems with the envelope itself, independent of kind."""
-    if not isinstance(obj, dict):
-        return ["event must be an object"]
-    errors: list[str] = []
-    if not _type_ok(obj.get("v"), _INT):
-        errors.append("v must be an int")
-    if not isinstance(obj.get("ts"), str) or not _TS_RE.match(obj["ts"]):
-        errors.append("ts must be RFC 3339 UTC with milliseconds")
-    if not isinstance(obj.get("kind"), str) or not _KIND_RE.match(obj["kind"]):
-        errors.append("kind must look like noun.verb")
-    if not isinstance(obj.get("sid"), str) or not obj["sid"]:
-        errors.append("sid must be a non-empty string")
-    seg = obj.get("seg")
-    if seg is not None and (not _type_ok(seg, _INT) or seg < 1):
-        errors.append("seg must be null or an int >= 1")
-    if not isinstance(obj.get("data"), dict):
-        errors.append("data must be an object")
-    return errors
+    """Problems with the envelope itself, independent of kind (``event.schema.json``)."""
+    return schema.validate(obj, _EVENT_SCHEMA)
 
 
 def classify(obj: object) -> Literal["ok", "unknown", "invalid"]:
@@ -215,10 +196,13 @@ def classify(obj: object) -> Literal["ok", "unknown", "invalid"]:
     ``unknown`` — a newer envelope major or an unregistered kind: skip quietly.
     ``invalid`` — malformed: skip and count. ``ok`` — fold it.
     """
+    # A newer envelope major is someone else's format: skip it before judging it by ours.
+    if isinstance(obj, dict) and _type_ok(obj.get("v"), _INT) and obj["v"] != ENVELOPE_VERSION:
+        return "unknown"
     if envelope_errors(obj):
         return "invalid"
     assert isinstance(obj, dict)
-    if obj["v"] != ENVELOPE_VERSION or obj["kind"] not in REGISTRY:
+    if obj["kind"] not in REGISTRY:
         return "unknown"
     spec = REGISTRY[obj["kind"]]
     if spec.seg != (obj["seg"] is not None):
@@ -229,8 +213,8 @@ def classify(obj: object) -> Literal["ok", "unknown", "invalid"]:
 def cap_text(kind: str, data: dict) -> dict:
     """Return a copy of ``data`` with free-text fields truncated to their caps."""
     out = dict(data)
-    for (cap_kind, key), cap in TEXT_CAPS.items():
-        if cap_kind == kind and isinstance(out.get(key), str) and len(out[key]) > cap:
+    for key, cap in REGISTRY[kind].caps.items():
+        if isinstance(out.get(key), str) and len(out[key]) > cap:
             out[key] = out[key][: cap - 1] + "…"
     return out
 

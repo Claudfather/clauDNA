@@ -25,5 +25,3 @@ Module map (one concern each):
 The core is host-agnostic: nothing here knows about Claude Code hook payloads.
 Mapping a host's hook events onto store events is an adapter's job.
 """
-
-STORE_SCHEMA_MAJOR = 1

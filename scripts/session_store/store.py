@@ -1,8 +1,10 @@
 """The write API: append events to a session and keep its projections current.
 
 Every mutation takes the session's exclusive lock, appends exactly one event,
-then re-projects — so two hook processes racing on one session can never leave
-a projection that reflects fewer events than the log holds.
+then re-projects what that event touched (:func:`session_store.project.refresh`)
+— so two hook processes racing on one session can never leave a projection that
+reflects fewer events than the log holds. The lock file's creation is also what
+creates a session directory on first write.
 
 Hook adapters call this module; they never write store files themselves.
 """
@@ -12,9 +14,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from . import events as ev
-from .fsio import append_jsonl, ensure_dir, exclusive_lock
+from .fsio import DIR_MODE, append_jsonl, exclusive_lock
 from .paths import SessionPaths, session_paths, state_root
-from .project import RebuildReport, rebuild
+from .project import RebuildReport, rebuild, refresh
 
 
 class StoreError(RuntimeError):
@@ -47,16 +49,17 @@ class SessionHandle:
             return self._append_locked(kind, data, seg=seg)
 
     def _append_locked(self, kind: str, data: dict, *, seg: int | None) -> dict:
+        """Append and re-project; the caller holds the session lock."""
         event = ev.make_event(kind, self.sid, data, seg=seg)
-        if ev.REGISTRY[kind].log == ev.ACTIVITY:
+        activity = ev.REGISTRY[kind].log == ev.ACTIVITY
+        if activity:
             assert seg is not None  # make_event enforces this for activity kinds
-            seg_dir = self.paths.segment(seg).dir
-            if not seg_dir.is_dir():
+            if not self.paths.segment(seg).dir.is_dir():
                 raise StoreError(f"segment {seg} does not exist for session {self.sid}")
             append_jsonl(self.paths.segment(seg).events, event)
         else:
             append_jsonl(self.paths.lifecycle, event)
-        rebuild(self.paths)
+        refresh(self.paths, seg=seg, activity_only=activity)
         return event
 
     # ── lifecycle verbs (thin, named wrappers over append) ──────────────────
@@ -72,7 +75,6 @@ class SessionHandle:
         chain_id: str | None = None,
     ) -> dict:
         """Record ``session.opened``. A session with no parent is its own chain root."""
-        ensure_dir(self.paths.dir)
         return self.append(
             "session.opened",
             {
@@ -91,10 +93,9 @@ class SessionHandle:
         The index is derived under the lock — ``max(existing) + 1`` — and the
         segment exists the moment its ``mkdir`` succeeds.
         """
-        ensure_dir(self.paths.dir)
         with exclusive_lock(self.paths.lock):
             index = (self.current_segment() or 0) + 1
-            self.paths.segment(index).dir.mkdir(mode=0o700)
+            self.paths.segment(index).dir.mkdir(mode=DIR_MODE)
             self._append_locked("segment.opened", {"opened_by": opened_by, "start": start}, seg=index)
             return index
 
@@ -107,14 +108,19 @@ class SessionHandle:
         trigger: str | None = None,
         sha256: str | None = None,
     ) -> dict:
-        """Record ``segment.sealed`` for ``index`` (default: current). Safe to repeat."""
-        index = index if index is not None else self.current_segment()
-        if index is None:
-            raise StoreError(f"session {self.sid} has no segment to seal")
+        """Record ``segment.sealed`` for ``index`` (default: current). Safe to repeat.
+
+        The default index is resolved under the lock, so a concurrent
+        ``open_segment`` can't slip in between choosing a segment and sealing it.
+        """
         data = {"end": end, "sealed_by": sealed_by, "trigger": trigger}
         if sha256 is not None:
             data["sha256"] = sha256
-        return self.append("segment.sealed", data, seg=index)
+        with exclusive_lock(self.paths.lock):
+            target = index if index is not None else self.current_segment()
+            if target is None:
+                raise StoreError(f"session {self.sid} has no segment to seal")
+            return self._append_locked("segment.sealed", data, seg=target)
 
     def close_session(self, reason: str) -> dict:
         return self.append("session.closed", {"reason": reason})

@@ -14,6 +14,7 @@ for a check this module doesn't perform.
 
 from __future__ import annotations
 
+import functools
 import json
 import re
 from pathlib import Path
@@ -35,8 +36,9 @@ class SchemaError(ValueError):
     """The schema itself uses something this validator does not support."""
 
 
+@functools.cache
 def load(name: str) -> dict:
-    """Load ``schemas/<name>.schema.json``."""
+    """Load ``schemas/<name>.schema.json`` (cached; callers must not mutate it)."""
     return json.loads((SCHEMA_DIR / f"{name}.schema.json").read_text(encoding="utf-8"))
 
 

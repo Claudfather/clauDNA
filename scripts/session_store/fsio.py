@@ -2,7 +2,8 @@
 
 Everything the store writes is private to the user (dirs ``0700``, files
 ``0600``). Projections are written temp-then-``os.replace`` so a reader never
-sees a torn file. Logs are appended one JSON object per line; a reader tolerates
+sees a torn file; they are rebuildable, so they skip ``fsync`` by default. Logs
+are the truth: appended one JSON object per line and fsynced. A reader tolerates
 a torn final line (a writer killed mid-append) by skipping it.
 
 ``flock`` is advisory and per open file description: two ``open()`` calls in the
@@ -44,16 +45,21 @@ def ensure_dir(path: Path) -> Path:
     return path
 
 
-def atomic_write_json(path: Path, obj: object) -> None:
-    """Write ``obj`` as pretty JSON to ``path`` atomically, mode ``0600``."""
+def atomic_write_json(path: Path, obj: object, *, durable: bool = True) -> None:
+    """Write ``obj`` as pretty JSON to ``path`` atomically, mode ``0600``.
+
+    ``durable=False`` skips the ``fsync``: still atomic for readers, just not
+    crash-durable — right for projections, which ``rebuild`` can regenerate.
+    """
     ensure_dir(path.parent)
     fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             json.dump(obj, fh, indent=2, sort_keys=True, ensure_ascii=False)
             fh.write("\n")
-            fh.flush()
-            os.fsync(fh.fileno())
+            if durable:
+                fh.flush()
+                os.fsync(fh.fileno())
         os.chmod(tmp, FILE_MODE)
         os.replace(tmp, path)
     except BaseException:
@@ -71,16 +77,19 @@ def read_json(path: Path) -> object | None:
 
 
 def append_jsonl(path: Path, record: dict) -> None:
-    """Append ``record`` as one line to ``path`` (created ``0600``), under an exclusive lock."""
+    """Append ``record`` as one line to ``path`` (created ``0600``) and fsync it.
+
+    One ``O_APPEND`` write per line; callers that need ordering across several
+    files (the store) serialize under their own lock rather than locking here.
+    """
     ensure_dir(path.parent)
     line = json.dumps(record, sort_keys=True, ensure_ascii=False, separators=(",", ":")) + "\n"
     fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, FILE_MODE)
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
         os.write(fd, line.encode("utf-8"))
         os.fsync(fd)
     finally:
-        os.close(fd)  # closing releases the flock
+        os.close(fd)
 
 
 @dataclass(frozen=True)
@@ -89,8 +98,12 @@ class JsonlRead:
 
     records: list[dict]
     skipped: int
-    lines: int
     bytes: int
+
+    @property
+    def lines(self) -> int:
+        """Non-blank lines read: every one is either a record or a skip."""
+        return len(self.records) + self.skipped
 
 
 def read_jsonl(path: Path) -> JsonlRead:
@@ -103,14 +116,12 @@ def read_jsonl(path: Path) -> JsonlRead:
     try:
         raw = path.read_bytes()
     except FileNotFoundError:
-        return JsonlRead(records=[], skipped=0, lines=0, bytes=0)
+        return JsonlRead(records=[], skipped=0, bytes=0)
     records: list[dict] = []
     skipped = 0
-    lines = 0
     for chunk in raw.split(b"\n"):
         if not chunk.strip():
             continue
-        lines += 1
         try:
             obj = json.loads(chunk.decode("utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError):
@@ -120,7 +131,7 @@ def read_jsonl(path: Path) -> JsonlRead:
             records.append(obj)
         else:
             skipped += 1
-    return JsonlRead(records=records, skipped=skipped, lines=lines, bytes=len(raw))
+    return JsonlRead(records=records, skipped=skipped, bytes=len(raw))
 
 
 class LockBusy(RuntimeError):

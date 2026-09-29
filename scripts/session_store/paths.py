@@ -33,7 +33,7 @@ class InvalidSessionId(ValueError):
 
 def validate_sid(sid: str) -> str:
     """Return ``sid`` unchanged, or raise :class:`InvalidSessionId`."""
-    if not isinstance(sid, str) or not _SID_RE.match(sid) or ".." in sid:
+    if not isinstance(sid, str) or not _SID_RE.match(sid):
         raise InvalidSessionId(f"invalid session id: {sid!r}")
     return sid
 
@@ -76,10 +76,6 @@ class SegmentPaths:
     def segment_json(self) -> Path:
         return self.dir / "segment.json"
 
-    @property
-    def summary_json(self) -> Path:
-        return self.dir / "summary.json"
-
 
 @dataclass(frozen=True)
 class SessionPaths:
@@ -101,14 +97,6 @@ class SessionPaths:
         return self.dir / "session.json"
 
     @property
-    def summary_json(self) -> Path:
-        return self.dir / "summary.json"
-
-    @property
-    def consumers_json(self) -> Path:
-        return self.dir / "consumers.json"
-
-    @property
     def lock(self) -> Path:
         return self.dir / ".lock"
 
@@ -127,7 +115,3 @@ def session_paths(sid: str, root: Path | None = None) -> SessionPaths:
     """Paths for ``sid`` under ``root`` (default: :func:`state_root`)."""
     return SessionPaths(root=state_root() if root is None else root, sid=validate_sid(sid))
 
-
-def links_dir(root: Path | None = None) -> Path:
-    """Directory for ephemeral clear-lineage handoff files (spec §6.9)."""
-    return (state_root() if root is None else root) / "links"

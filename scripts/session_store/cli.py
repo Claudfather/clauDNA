@@ -13,6 +13,7 @@ Exit codes: 0 ok · 1 not found or check failed · 2 usage.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import sys
 from pathlib import Path
@@ -40,26 +41,27 @@ def _handle(args: argparse.Namespace) -> SessionHandle | None:
 def check_session(handle: SessionHandle) -> list[str]:
     """Every schema or registry violation in one session's files."""
     problems: list[str] = []
-    event_schema = schema.load("event")
-    logs = [handle.paths.lifecycle] + [handle.paths.segment(i).events for i in handle.paths.segment_indices()]
+    event_schema, session_schema, segment_schema = (schema.load(n) for n in ("event", "session", "segment"))
+    indices = handle.paths.segment_indices()
+    logs = [handle.paths.lifecycle] + [handle.paths.segment(i).events for i in indices]
     for log in logs:
         read = read_jsonl(log)
         if read.skipped:
             problems.append(f"{log}: {read.skipped} unparseable line(s)")
         for n, record in enumerate(read.records, 1):
-            for err in schema.validate(record, event_schema):
-                problems.append(f"{log} record {n}: {err}")
-            if ev.classify(record) == "invalid":
+            envelope = schema.validate(record, event_schema)
+            problems.extend(f"{log} record {n}: {err}" for err in envelope)
+            if not envelope and ev.classify(record) == "invalid":
                 problems.append(f"{log} record {n}: violates the kind registry")
-    targets = [(handle.paths.session_json, "session")] + [
-        (handle.paths.segment(i).segment_json, "segment") for i in handle.paths.segment_indices()
+    targets = [(handle.paths.session_json, session_schema)] + [
+        (handle.paths.segment(i).segment_json, segment_schema) for i in indices
     ]
-    for path, name in targets:
+    for path, target_schema in targets:
         obj = read_json(path)
         if obj is None:
             problems.append(f"{path}: missing or unparseable (run rebuild)")
             continue
-        problems.extend(f"{path}: {err}" for err in schema.validate(obj, schema.load(name)))
+        problems.extend(f"{path}: {err}" for err in schema.validate(obj, target_schema))
     return problems
 
 
@@ -78,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if args.verb == "rebuild":
         report = handle.rebuild()
-        print(json.dumps({"sid": report.sid, "segments": report.segments, "skipped_lines": report.skipped_lines}))
+        print(json.dumps(dataclasses.asdict(report)))
         return 0
     problems = check_session(handle)
     for line in problems:

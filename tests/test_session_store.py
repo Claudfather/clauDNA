@@ -10,14 +10,18 @@ What these guard, in the order the spec states the invariants:
 * **Writers strict, readers lenient.** ``make_event`` rejects bad data; a torn
   line or a newer envelope in a log is skipped and counted, never fatal.
 * **Private by default.** Every dir the store creates is 0700, every file 0600.
-* **Schemas match code.** The kind enum in ``event.schema.json`` equals the
-  registry, and every projection validates against its schema.
+* **Schemas match code.** Every registry kind fits the envelope schema, the
+  projection schemas' vocabularies match the registry's, every ``ts`` pattern is
+  the envelope's, and every projection validates against its schema.
+* **Incremental equals full.** The hot-path ``refresh`` produces exactly what a
+  full ``rebuild`` does.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -77,11 +81,11 @@ def load(path: Path) -> dict:
 
 
 class TestPaths:
-    @pytest.mark.parametrize("sid", ["3fbbf216-f848-4d8b-b5b5-7839fc98b820", "a", "A.b_c-1"])
+    @pytest.mark.parametrize("sid", ["3fbbf216-f848-4d8b-b5b5-7839fc98b820", "a", "A.b_c-1", "a..b"])
     def test_accepts_safe_ids(self, sid):
         assert validate_sid(sid) == sid
 
-    @pytest.mark.parametrize("sid", ["", "../etc", "a/b", ".hidden", "a..b", "x" * 200, None, 5])
+    @pytest.mark.parametrize("sid", ["", "..", "../etc", "a/b", ".hidden", "x" * 200, None, 5])
     def test_rejects_ids_that_are_not_one_safe_path_component(self, sid):
         with pytest.raises(InvalidSessionId):
             validate_sid(sid)
@@ -183,7 +187,7 @@ class TestEvents:
         assert e["data"]["error"].endswith("…")
 
     def test_timestamps_are_utc_millisecond_z(self):
-        assert ev._TS_RE.match(ev.now_ts())
+        assert re.match(schema.load("event")["properties"]["ts"]["pattern"], ev.now_ts())
 
     def test_readers_skip_newer_envelopes_and_unknown_kinds(self):
         base = ev.make_event("session.closed", "s1", {"reason": "other"})
@@ -332,6 +336,34 @@ class TestProjection:
         assert handle.paths.session_json.read_text() == first
         assert [p.read_bytes() for p in logs] == before
 
+    def test_incremental_refresh_equals_full_rebuild(self, store):
+        h = opened(store)
+        s1 = h.open_segment("session_open", 0)
+        h.append("prompt.submitted", {"prompt_id": "p", "chars": 3}, seg=s1)
+        h.append("summary.requested", {"job_id": "j"}, seg=s1)
+        h.seal_segment(50, "precompact", trigger="auto")
+        s2 = h.open_segment("compact", 50)
+        h.append("tool.failed", {"tool": "Bash", "signature": "s", "exit_code": 1, "command": None,
+                                 "error": None}, seg=s2)
+        h.link_child("c")
+        h.seal_segment(80, "session_end")
+        h.close_session("other")
+        files = [h.paths.session_json, h.paths.segment(1).segment_json, h.paths.segment(2).segment_json]
+        incremental = [f.read_text() for f in files]
+        for f in files:
+            f.unlink()
+        h.rebuild()
+        assert [f.read_text() for f in files] == incremental
+
+    def test_refresh_falls_back_to_rebuild_when_a_projection_is_damaged(self, store):
+        h = opened(store)
+        h.open_segment("session_open", 0)
+        h.open_segment("compact", 10)
+        h.paths.segment(1).segment_json.write_text("{not json")
+        h.close_session("other")  # session refresh must not trust the damaged seg-001 projection
+        assert load(h.paths.segment(1).segment_json)["index"] == 1
+        assert load(h.paths.session_json)["segments"]["count"] == 2
+
     def test_fixture_captures_lineage(self):
         s = load(FIXTURE / "expected" / "session.json")
         assert (s["parent_sid"], s["chain_id"], s["opened_by"]) == ("parent-sid-1", "root-sid-0", "clear")
@@ -343,16 +375,31 @@ class TestProjection:
 
 
 class TestSchemas:
-    def test_event_schema_kind_enum_matches_the_registry(self):
-        kinds = schema.load("event")["properties"]["kind"]["enum"]
-        assert sorted(kinds) == sorted(ev.REGISTRY), "event.schema.json drifted from events.REGISTRY"
+    def test_every_registry_kind_fits_the_envelope_schema(self):
+        pattern = schema.load("event")["properties"]["kind"]["pattern"]
+        assert all(re.match(pattern, kind) for kind in ev.REGISTRY)
 
-    def test_every_schema_file_uses_only_supported_keywords(self):
-        for path in sorted((STORE_PKG / "schemas").glob("*.schema.json")):
-            doc = json.loads(path.read_text())
-            schema.validate({}, doc)  # raises SchemaError on an unsupported keyword anywhere reached
-            for sub in doc.get("$defs", {}).values():
-                schema.validate(None, sub, root=doc)
+    @pytest.mark.parametrize(
+        "schema_name,prop,kind,field,extra",
+        [
+            ("segment", "opened_by", "segment.opened", "opened_by", ["unknown"]),
+            ("segment", "sealed_by", "segment.sealed", "sealed_by", [None]),
+            ("session", "opened_by", "session.opened", "source", [None]),
+            ("session", "close_reason", "session.closed", "reason", [None]),
+        ],
+    )
+    def test_projection_vocabularies_match_the_registry(self, schema_name, prop, kind, field, extra):
+        enum = schema.load(schema_name)["properties"][prop]["enum"]
+        assert enum == list(ev.REGISTRY[kind].choices[field]) + extra
+
+    def test_every_timestamp_pattern_is_the_envelopes(self):
+        ts = schema.load("event")["properties"]["ts"]["pattern"]
+        seen = [n["pattern"] for n in _schema_nodes() if "\\d{4}-" in n.get("pattern", "")]
+        assert seen and all(p == ts for p in seen)
+
+    def test_every_schema_node_uses_only_supported_keywords(self):
+        for node in _schema_nodes():
+            assert set(node) <= schema._SUPPORTED, sorted(set(node) - schema._SUPPORTED)
 
     def test_golden_projections_validate(self):
         expected = FIXTURE / "expected"
@@ -400,6 +447,20 @@ class TestSchemas:
     def test_unsupported_keyword_raises_instead_of_silently_passing(self):
         with pytest.raises(schema.SchemaError):
             schema.validate(1, {"oneOf": [{"type": "integer"}]})
+
+
+def _schema_nodes():
+    """Every schema node in every schema file (the maps under properties/$defs hold names, not keywords)."""
+    def walk(node):
+        yield node
+        for key, value in node.items():
+            if key in ("properties", "$defs"):
+                for sub in value.values():
+                    yield from walk(sub)
+            elif isinstance(value, dict):
+                yield from walk(value)
+    for path in sorted((STORE_PKG / "schemas").glob("*.schema.json")):
+        yield from walk(json.loads(path.read_text()))
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────────
