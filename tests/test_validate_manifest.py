@@ -37,6 +37,11 @@ def build_repo(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     (root / "scripts").mkdir(parents=True)
     shutil.copy2(SCRIPT, root / "scripts" / "validate-manifest.py")
+    # validate-manifest.py imports check_cursor_scope, which imports
+    # skill_checks (#340) -- both travel with it so the subprocess's
+    # top-level import resolves.
+    for module in ("check_cursor_scope.py", "skill_checks.py"):
+        shutil.copy2(REPO_ROOT / "scripts" / module, root / "scripts" / module)
 
     for manifest_dir in (".claude-plugin", ".cursor-plugin"):
         (root / manifest_dir).mkdir()
@@ -44,6 +49,15 @@ def build_repo(tmp_path: Path) -> Path:
             shutil.copy2(REPO_ROOT / manifest_dir / name, root / manifest_dir / name)
 
     (root / "skills").mkdir()
+    # A cursor manifest may declare skills as an explicit list of individual
+    # directories rather than one directory string (#340); each entry then
+    # needs to exist for validate_declared_path()'s existence check. Mirror
+    # whatever the REAL manifest currently declares, rather than hardcoding
+    # a list that goes stale the next time a skill is added or removed.
+    real_cursor_skills = json.loads((REPO_ROOT / CURSOR).read_text()).get("skills")
+    if isinstance(real_cursor_skills, list):
+        for entry in real_cursor_skills:
+            (root / entry.lstrip("./")).mkdir(parents=True, exist_ok=True)
     (root / "agents").mkdir()
     (root / "assets").mkdir()
     (root / "assets" / "logo.svg").write_text("<svg />\n")
@@ -193,10 +207,16 @@ def test_declared_path_may_not_be_absolute(tmp_path):
 
 
 def test_component_path_accepts_a_list(tmp_path):
-    """Cursor allows a list of paths per component; each entry is checked."""
+    """Cursor allows a list of paths per component; each entry is checked.
+
+    Nested under skills/, not a repo-root sibling: the cursor-scope gate
+    (#340/#343) refuses a skills[] entry outside skills/ by design, so a
+    fixture testing this UNRELATED generic path-existence check must not
+    also trip that one.
+    """
     root = build_repo(tmp_path)
-    (root / "extra-skills").mkdir()
-    patch(root, CURSOR, "skills", ["./skills/", "./extra-skills/"])
+    (root / "skills" / "extra-skills").mkdir()
+    patch(root, CURSOR, "skills", ["./skills/", "./skills/extra-skills/"])
     code, output = run_gate(root)
     assert code == 0, output
 

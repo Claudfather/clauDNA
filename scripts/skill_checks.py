@@ -18,7 +18,26 @@ KNOWN_FIELDS = REQUIRED_FIELDS | {
     "argument-hint",
     "requires",
     "user-invocable",
+    "hosts",
+    "requires-context",
 }
+
+# clauDNA #340: hosts a skill is known to function on, and a special
+# execution context it needs beyond "any project directory". Both are
+# optional and additive -- their absence means "no restriction", which is
+# why most skills never need either. See cursor_should_exclude() below for
+# the one place today that reads them.
+#
+# #343: the field is `requires-context`, not `context` -- Claude Code's own
+# skills reference already defines `context` (set to `fork` to run in a
+# forked subagent context, paired with `agent:`). A same-named field here
+# collides with that: this repo's validator rejected Claude Code's own
+# `fork` value as an unknown context, and the exclusion predicate below
+# would have treated any skill that later adopts `context: fork` for its
+# native meaning as needing a repo clone. `requires-context` is a key
+# Claude Code does not define.
+KNOWN_HOSTS = {"claude-code", "cursor"}
+KNOWN_CONTEXTS = {"repo-clone"}
 
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*$")
 DESC_MIN = 20
@@ -78,9 +97,7 @@ def walk_gate_files(root: Path) -> list[Path]:
     out: list[Path] = []
     for dirpath, dirnames, filenames in os.walk(root):
         here = Path(dirpath)
-        dirnames[:] = [
-            d for d in dirnames if d not in GATE_PRUNE_DIRS and not is_virtualenv(here / d)
-        ]
+        dirnames[:] = [d for d in dirnames if d not in GATE_PRUNE_DIRS and not is_virtualenv(here / d)]
         for fname in filenames:
             if Path(fname).suffix in GATE_EXTENSIONS:
                 out.append(here / fname)
@@ -221,6 +238,66 @@ def validate_requires(value) -> list[str]:
             errors.append(f"{prefix}.reason must be a string, got {type(reason).__name__}")
 
     return errors
+
+
+def validate_hosts(value) -> list[str]:
+    """Validate the `hosts` field (list of known host identifiers, #340).
+
+    Absence means "no host restriction" (ships everywhere this skill's
+    other fields don't otherwise exclude it from). An empty list is a
+    likely mistake -- a skill declaring it runs NOWHERE -- so it is
+    rejected rather than silently treated as "no restriction"; the way to
+    say "no restriction" is to omit the field entirely.
+    """
+    errors: list[str] = []
+    if not isinstance(value, list):
+        errors.append(f"hosts must be a list, got {type(value).__name__}")
+        return errors
+    if not value:
+        errors.append("hosts must not be empty (omit the field entirely for 'all hosts')")
+        return errors
+    for i, entry in enumerate(value):
+        if not isinstance(entry, str):
+            errors.append(f"hosts[{i}] must be a string, got {type(entry).__name__}")
+        elif entry not in KNOWN_HOSTS:
+            errors.append(f"hosts[{i}] {entry!r} is not a known host (known: {sorted(KNOWN_HOSTS)})")
+    return errors
+
+
+def validate_requires_context(value) -> list[str]:
+    """Validate the `requires-context` field (a single known execution-context id, #340)."""
+    errors: list[str] = []
+    if not isinstance(value, str):
+        errors.append(f"requires-context must be a string, got {type(value).__name__}")
+    elif value not in KNOWN_CONTEXTS:
+        errors.append(f"requires-context {value!r} is not a known context (known: {sorted(KNOWN_CONTEXTS)})")
+    return errors
+
+
+def cursor_should_exclude(fm: dict) -> bool:
+    """Whether a skill's frontmatter marks it out of scope for the Cursor
+    distribution (clauDNA #340).
+
+    Two independent reasons exclude a skill; either is sufficient:
+      - `hosts` is declared and does not include "cursor" (the skill uses
+        host-specific features -- e.g. Claude Code plugin/hook internals --
+        that Cursor does not have).
+      - `requires-context` is declared at all (the skill needs to run from
+        inside a clone of this repo; Cursor's marketplace install gives no
+        such guarantee).
+
+    Scope: this predicate is Cursor-specific, not a general host resolver.
+    Per #340's acceptance criteria, Claude Code's manifest is UNCHANGED by
+    these fields -- it ships every skill regardless, as it always has; that
+    is a deliberate, conservative scoping choice for this issue, not a claim
+    that Claude Code is somehow exempt from what the fields describe.
+    """
+    hosts = fm.get("hosts")
+    if hosts is not None and "cursor" not in hosts:
+        return True
+    if fm.get("requires-context") is not None:
+        return True
+    return False
 
 
 def check_dependencies(requires: list[dict]) -> list[dict]:
@@ -377,9 +454,7 @@ def check_description_trigger_convention(fm: dict, body: str) -> list[str]:
         return warnings
     if not desc.startswith("Use "):
         preview = desc if len(desc) <= 60 else desc[:57] + "..."
-        warnings.append(
-            f'description does not lead with a trigger clause ("Use when ..."): {preview!r}'
-        )
+        warnings.append(f'description does not lead with a trigger clause ("Use when ..."): {preview!r}')
     return warnings
 
 
@@ -730,6 +805,15 @@ def validate_skill_md(skill_md: Path, dir_name: str | None = None) -> list[str]:
     user_invocable = fm.get("user-invocable")
     if user_invocable is not None and not isinstance(user_invocable, bool):
         errors.append(f"user-invocable must be a boolean, got {type(user_invocable).__name__}")
+
+    # hosts rules (#340)
+    if "hosts" in fm:
+        errors.extend(validate_hosts(fm["hosts"]))
+
+    # requires-context rules (#340, renamed from `context` in #343 -- see
+    # KNOWN_FIELDS above for why)
+    if "requires-context" in fm:
+        errors.extend(validate_requires_context(fm["requires-context"]))
 
     # body length
     body_chars = len(body.strip())

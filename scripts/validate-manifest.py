@@ -39,6 +39,8 @@ import subprocess
 import sys
 from pathlib import Path, PurePosixPath
 
+from check_cursor_scope import run_check as run_cursor_scope_check
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CLAUDE_PLUGIN_DIR = REPO_ROOT / ".claude-plugin"
 CURSOR_PLUGIN_DIR = REPO_ROOT / ".cursor-plugin"
@@ -139,7 +141,10 @@ def validate_component_paths(label: str, data: dict, fields: tuple[str, ...]) ->
         raw = data.get(field)
         if not raw:
             continue
-        # Cursor accepts a single path or a list of them for every component.
+        # Cursor accepts a single path or a list of them for every component
+        # (#335); an explicit value REPLACES discovery rather than adding to
+        # it (#340), so each entry names something that must exist in its
+        # own right.
         values = [raw] if isinstance(raw, str) else raw
         if not isinstance(values, list):
             error(f"{label}: {field} must be a string or a list of strings")
@@ -375,6 +380,15 @@ def main() -> int:
     validate_marketplace_json(CURSOR_PLUGIN_DIR, cursor=True)
     validate_cursor_hook_free()
     validate_version_sync()
+
+    print("Validating cursor-plugin skill scoping (#340)...")
+    cursor_scope_errors, cursor_scope_warnings, cursor_scope_notes = run_cursor_scope_check(REPO_ROOT)
+    for note in cursor_scope_notes:
+        print(f"  NOTE: {note}")
+    for warning in cursor_scope_warnings:
+        print(f"  WARN: {warning}")
+    for msg in cursor_scope_errors:
+        error(msg)
 
     print()
     if errors:

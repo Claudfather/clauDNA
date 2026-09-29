@@ -19,7 +19,7 @@ That's it. Skills become available as `/claudna:<skill-name>` (namespaced under 
 
 ### Cursor
 
-The Cursor manifest is [`.cursor-plugin/plugin.json`](./.cursor-plugin/plugin.json). It ships `skills/` and `agents/` and **deliberately no hooks** — the shell hooks in `plugin-hooks/` are wired only from `.claude-plugin/plugin.json`, so nothing from this pack fires in a Cursor-based environment. Skills appear under *Agent Decides* and are invocable as `/<skill-name>` in chat.
+The Cursor manifest is [`.cursor-plugin/plugin.json`](./.cursor-plugin/plugin.json). It ships `skills/` (minus a few host-/context-restricted skills, #340) and `agents/`, and **deliberately no hooks** — the shell hooks in `plugin-hooks/` are wired only from `.claude-plugin/plugin.json`, so nothing from this pack fires in a Cursor-based environment. Skills appear under *Agent Decides* and are invocable as `/<skill-name>` in chat.
 
 Three install paths, depending on what you have:
 
@@ -48,7 +48,7 @@ For bots, CI runners, and Docker images, drop a `settings.json` with `enabledPlu
 | `agents/` | 8 | `snowflake-analyst`, `dbt-engineer`, `neon-analyst`, `modal-ops`, `railway-ops`, `vercel-ops`, `code-reviewer`, `spec-reviewer` |
 | `plugin-hooks/` | 6 wired + 1 opt-in | SessionStart briefing (opt-out `CLAUDNA_SESSION_BRIEFING=0`), auto-format on Write/Edit, PreToolUse permission expansion, PreCompact capture gate, opt-in skill telemetry, macOS notifications. (`statusline.sh` is opt-in — see [SETUP_GUIDE §3.2](./SETUP_GUIDE.md#32-statusline-optional).) Named `plugin-hooks/` to avoid a Claude Code bug that deletes any project-root `hooks/` directory between tool calls. |
 
-Claude Code gets all three. Cursor gets `skills/` and `agents/` only — see [Cursor](#cursor) above. The `plugin-hooks/` name does double duty: besides dodging the Claude Code bug, it keeps the hooks out of `hooks/`, which is where Cursor's folder discovery would otherwise find and wire them.
+Claude Code gets all three. Cursor gets `skills/` (minus a few host-/context-restricted skills, #340) and `agents/` only — see [Cursor](#cursor) above. The `plugin-hooks/` name does double duty: besides dodging the Claude Code bug, it keeps the hooks out of `hooks/`, which is where Cursor's folder discovery would otherwise find and wire them.
 
 ## Design Philosophy
 
