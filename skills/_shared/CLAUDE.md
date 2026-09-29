@@ -1,4 +1,4 @@
-# skills/_shared/ — placement guidance
+# skills/_shared — placement guidance
 
 Shared orchestration material referenced by skills (no SKILL.md — nothing here is invocable;
 consumers reference these files by disk path from skill bodies).
