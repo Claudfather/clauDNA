@@ -152,13 +152,6 @@ def now_ts() -> str:
     return now.strftime("%Y-%m-%dT%H:%M:%S.") + f"{now.microsecond // 1000:03d}Z"
 
 
-def _type_ok(value: object, types: tuple[type, ...]) -> bool:
-    # bool is a subclass of int; an int field must not accept True/False.
-    if isinstance(value, bool) and bool not in types:
-        return False
-    return isinstance(value, types)
-
-
 _EVENT_SCHEMA = schema.load("event")
 
 
@@ -171,10 +164,10 @@ def data_errors(kind: str, data: object) -> list[str]:
     for key, types in spec.fields.items():
         if key not in data:
             errors.append(f"data.{key} is required")
-        elif not _type_ok(data[key], types):
+        elif not schema.is_instance(data[key], types):
             errors.append(f"data.{key} has the wrong type")
     for key, types in spec.optional.items():
-        if key in data and not _type_ok(data[key], types):
+        if key in data and not schema.is_instance(data[key], types):
             errors.append(f"data.{key} has the wrong type")
     for key, allowed in spec.choices.items():
         if key in data and data[key] not in allowed:
@@ -197,7 +190,7 @@ def classify(obj: object) -> Literal["ok", "unknown", "invalid"]:
     ``invalid`` — malformed: skip and count. ``ok`` — fold it.
     """
     # A newer envelope major is someone else's format: skip it before judging it by ours.
-    if isinstance(obj, dict) and _type_ok(obj.get("v"), _INT) and obj["v"] != ENVELOPE_VERSION:
+    if isinstance(obj, dict) and schema.is_instance(obj.get("v"), _INT) and obj["v"] != ENVELOPE_VERSION:
         return "unknown"
     if envelope_errors(obj):
         return "invalid"

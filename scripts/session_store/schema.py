@@ -42,10 +42,20 @@ def load(name: str) -> dict:
     return json.loads((SCHEMA_DIR / f"{name}.schema.json").read_text(encoding="utf-8"))
 
 
-def _is_type(value: object, name: str) -> bool:
-    if name in ("integer", "number") and isinstance(value, bool):
+def is_instance(value: object, types: type | tuple[type, ...]) -> bool:
+    """``isinstance`` with one correction: a ``bool`` is never an ``int``/``float``.
+
+    Python makes ``bool`` a subclass of ``int``; JSON does not. Every type check
+    in the store goes through here, so that rule lives in exactly one place.
+    """
+    types = types if isinstance(types, tuple) else (types,)
+    if isinstance(value, bool) and bool not in types:
         return False
-    return isinstance(value, _TYPES[name])
+    return isinstance(value, types)
+
+
+def _is_type(value: object, name: str) -> bool:
+    return is_instance(value, _TYPES[name])
 
 
 def validate(instance: object, schema: dict, *, root: dict | None = None, path: str = "$") -> list[str]:
@@ -75,7 +85,7 @@ def validate(instance: object, schema: dict, *, root: dict | None = None, path: 
             errors.append(f"{path}: shorter than {schema['minLength']}")
         if "pattern" in schema and not re.search(schema["pattern"], instance):
             errors.append(f"{path}: does not match {schema['pattern']}")
-    if isinstance(instance, (int, float)) and not isinstance(instance, bool):
+    if is_instance(instance, (int, float)):
         if "minimum" in schema and instance < schema["minimum"]:
             errors.append(f"{path}: below minimum {schema['minimum']}")
     if isinstance(instance, dict):

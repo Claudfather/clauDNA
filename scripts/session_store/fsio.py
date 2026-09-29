@@ -32,6 +32,8 @@ def ensure_dir(path: Path) -> Path:
     ancestors are created one at a time. Directories that already exist are
     left untouched — never chmod something the store didn't create.
     """
+    if path.is_dir():
+        return path  # the common case: one stat, no ancestor walk
     missing = []
     probe = path
     while not probe.exists():
@@ -143,9 +145,9 @@ def exclusive_lock(path: Path, *, blocking: bool = True) -> Iterator[None]:
     """Hold an exclusive ``flock`` on ``path`` for the ``with`` body.
 
     With ``blocking=False`` a held lock raises :class:`LockBusy` immediately —
-    the single-flight pattern (skip rather than queue).
+    the single-flight pattern (skip rather than queue). The lock file's
+    directory must already exist: taking a lock never creates directories.
     """
-    ensure_dir(path.parent)
     fd = os.open(path, os.O_RDWR | os.O_CREAT, FILE_MODE)
     try:
         flags = fcntl.LOCK_EX if blocking else fcntl.LOCK_EX | fcntl.LOCK_NB

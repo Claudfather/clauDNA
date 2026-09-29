@@ -144,6 +144,12 @@ class TestFsio:
         read = read_jsonl(tmp_path / "nope.jsonl")
         assert (read.records, read.skipped, read.lines, read.bytes) == ([], 0, 0, 0)
 
+    def test_taking_a_lock_never_creates_directories(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            with exclusive_lock(tmp_path / "missing" / ".lock"):
+                pass
+        assert not (tmp_path / "missing").exists()
+
     def test_non_blocking_lock_reports_busy_while_held(self, tmp_path):
         lock = tmp_path / ".lock"
         with exclusive_lock(lock):
@@ -296,6 +302,19 @@ class TestStore:
             assert stat.S_IMODE(path.stat().st_mode) == 0o700, path
         for path in (h.paths.lifecycle, h.paths.session_json, h.paths.segment(1).segment_json):
             assert stat.S_IMODE(path.stat().st_mode) == 0o600, path
+
+    def test_writes_before_session_opened_land_instead_of_dropping(self, store):
+        h = store.session("missed-start")  # SessionStart never fired
+        h.open_segment("session_open", 0)
+        s = load(h.paths.session_json)
+        assert (s["status"], s["segments"]["count"], s["chain_id"]) == ("unknown", 1, "missed-start")
+
+    def test_bools_are_never_ints_anywhere(self):
+        assert schema.is_instance(1, int) and not schema.is_instance(True, int)
+        assert schema.is_instance(True, bool) and schema.is_instance(True, (bool, int))
+        with pytest.raises(ValueError):
+            seg_dirname(True)
+        assert schema.validate(True, {"type": "integer"}) != []
 
     def test_session_ids_lists_directories(self, store):
         opened(store, "b")

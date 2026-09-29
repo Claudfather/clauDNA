@@ -19,6 +19,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from .schema import is_instance
+
 STATE_DIR_ENV = "CLAUDNA_STATE_DIR"
 DEFAULT_STATE_DIR = "~/.claudna"
 
@@ -47,7 +49,7 @@ def state_root(env: dict[str, str] | None = None) -> Path:
 
 def seg_dirname(index: int) -> str:
     """``3`` → ``seg-003``. Widens past 999 without breaking int parsing."""
-    if not isinstance(index, int) or isinstance(index, bool) or index < 1:
+    if not is_instance(index, int) or index < 1:
         raise ValueError(f"segment index must be an int >= 1, got {index!r}")
     return f"seg-{index:03d}"
 

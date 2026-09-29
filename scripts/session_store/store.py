@@ -3,8 +3,12 @@
 Every mutation takes the session's exclusive lock, appends exactly one event,
 then re-projects what that event touched (:func:`session_store.project.refresh`)
 — so two hook processes racing on one session can never leave a projection that
-reflects fewer events than the log holds. The lock file's creation is also what
-creates a session directory on first write.
+reflects fewer events than the log holds.
+
+A session directory is created in exactly one place, :meth:`SessionHandle._locked`,
+on the session's first write. That deliberately includes writes that arrive before
+``session.opened`` (a missed SessionStart): those events land and project as
+``status: "unknown"`` rather than being dropped.
 
 Hook adapters call this module; they never write store files themselves.
 """
@@ -14,7 +18,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from . import events as ev
-from .fsio import DIR_MODE, append_jsonl, exclusive_lock
+from .fsio import DIR_MODE, append_jsonl, ensure_dir, exclusive_lock
 from .paths import SessionPaths, session_paths, state_root
 from .project import RebuildReport, rebuild, refresh
 
@@ -43,9 +47,14 @@ class SessionHandle:
 
     # ── generic append ──────────────────────────────────────────────────────
 
+    def _locked(self):
+        """The session lock — creating the session directory on first write."""
+        ensure_dir(self.paths.dir)
+        return exclusive_lock(self.paths.lock)
+
     def append(self, kind: str, data: dict, *, seg: int | None = None) -> dict:
         """Append one event to the log its kind belongs to, then re-project."""
-        with exclusive_lock(self.paths.lock):
+        with self._locked():
             return self._append_locked(kind, data, seg=seg)
 
     def _append_locked(self, kind: str, data: dict, *, seg: int | None) -> dict:
@@ -93,7 +102,7 @@ class SessionHandle:
         The index is derived under the lock — ``max(existing) + 1`` — and the
         segment exists the moment its ``mkdir`` succeeds.
         """
-        with exclusive_lock(self.paths.lock):
+        with self._locked():
             index = (self.current_segment() or 0) + 1
             self.paths.segment(index).dir.mkdir(mode=DIR_MODE)
             self._append_locked("segment.opened", {"opened_by": opened_by, "start": start}, seg=index)
@@ -116,7 +125,7 @@ class SessionHandle:
         data = {"end": end, "sealed_by": sealed_by, "trigger": trigger}
         if sha256 is not None:
             data["sha256"] = sha256
-        with exclusive_lock(self.paths.lock):
+        with self._locked():
             target = index if index is not None else self.current_segment()
             if target is None:
                 raise StoreError(f"session {self.sid} has no segment to seal")
@@ -133,7 +142,7 @@ class SessionHandle:
 
     def rebuild(self) -> RebuildReport:
         """Regenerate projections from the logs (read-only with respect to logs)."""
-        with exclusive_lock(self.paths.lock):
+        with self._locked():
             return rebuild(self.paths)
 
 
