@@ -210,6 +210,40 @@ def test_declared_path_may_not_be_absolute(tmp_path):
     assert "must be relative with no '..'" in output
 
 
+# --- dot-leading path resolution (#344) ---
+#
+# resolve_component_path() used to lstrip("./") -- stripping *characters*,
+# not a prefix -- so a declared ".agents/skills" silently resolved to the
+# SAME Path as the undotted "agents/skills". Reverting the fix (restoring
+# lstrip("./")) keeps the rest of this suite green: nothing else pinned it.
+# Both tests below use the "agents" component field rather than "skills",
+# deliberately -- "skills" also runs through the cursor-scope gate (#340),
+# which would coincidentally reject a directory with no SKILL.md before
+# resolve_component_path()'s own existence check ever ran, and these two
+# tests exist to isolate that one function (#344, otis's review of PR #346,
+# issuecomment-5888490329).
+
+
+def test_a_dot_leading_path_is_not_resolved_to_its_undotted_lookalike(tmp_path):
+    """The dangerous direction: a declared path that does not exist passes,
+    because its undotted lookalike does."""
+    root = build_repo(tmp_path)
+    (root / "agents" / "skills").mkdir(parents=True)  # what lstrip("./") would resolve to
+    patch(root, CURSOR, "agents", ".agents/skills")  # declared, and absent
+    code, output = run_gate(root)
+    assert code != 0
+    assert "'.agents/skills' does not exist" in output
+
+
+def test_a_dot_leading_path_that_exists_passes(tmp_path):
+    """The mirror case: a real dot-leading path must still pass."""
+    root = build_repo(tmp_path)
+    (root / ".agents" / "skills").mkdir(parents=True)
+    patch(root, CURSOR, "agents", ".agents/skills")
+    code, output = run_gate(root)
+    assert code == 0, output
+
+
 def test_component_path_accepts_a_list(tmp_path):
     """Cursor allows a list of paths per component; each entry is checked.
 
