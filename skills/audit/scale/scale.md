@@ -78,7 +78,7 @@ The audited target is read-only. Never modify the audited repository, run its mi
 
 Follow these steps exactly in order.
 
-**Enter Plan Mode.** Call `EnterPlanMode` per `skills/_shared/audit-lens-contract.md` §6 — discovery, tracing, and report assembly below are read-only.
+**Enter Plan Mode.** Call `EnterPlanMode` per `../../_shared/audit-lens-contract.md` §6 — discovery, tracing, and report assembly below are read-only.
 
 Do NOT read CLAUDE.md or MEMORY.md — already in system prompt.
 
@@ -98,7 +98,7 @@ If the system has neither an isolation unit nor any scale-out surface (no replic
 
 **Scratch directory:** `/tmp/scale-audit-<YYYY-MM-DD_HHMMSS>/research/`
 
-Launch four `general-purpose` subagents in parallel (disk-write pattern per `skills/_shared/orchestration-guide.md` — subagents write findings to the scratch dir and return 2-4 line summaries; the orchestrator never reads full research files):
+Launch four `general-purpose` subagents in parallel (disk-write pattern per `../../_shared/orchestration-guide.md` — subagents write findings to the scratch dir and return 2-4 line summaries; the orchestrator never reads full research files):
 
 - **Subagent A: Identity & data isolation** — scan categories A–B: authentication, membership, role resolution, server-side tenant derivation; fail-open interfaces; tenant-aware keys, uniqueness, indexes, aggregates, caches. Writes `research/identity-data.md`.
 - **Subagent B: Coordination & providers** — scan categories C–D: queues, jobs, leases, outboxes, idempotency keys, provider-operation keys, ambiguous external effects. Writes `research/coordination-providers.md`.
@@ -113,7 +113,7 @@ Launch one convergence subagent that reads all four research files and traces ea
 
 ### Phase 3: Report assembly
 
-Assemble the report **exactly** per `report-template.md` in this lens directory — stable section order, scorecard dimensions, finding fields, and severity ladder are all defined there. Grade findings P0–P3 per the template's ladder; carry each finding's concern area from the canonical vocabulary (`skills/_shared/contracts/lens-result-contract.md` — contract §3; this lens mints no new concern). Present the report summary: boxed header (lens, scope, verdict, counts by severity), then the report body.
+Assemble the report **exactly** per `report-template.md` in this lens directory — stable section order, scorecard dimensions, finding fields, and severity ladder are all defined there. Grade findings P0–P3 per the template's ladder; carry each finding's concern area from the canonical vocabulary (`../../_shared/contracts/lens-result-contract.md` — contract §3; this lens mints no new concern). Present the report summary: boxed header (lens, scope, verdict, counts by severity), then the report body.
 
 ---
 
@@ -125,7 +125,7 @@ Present the report and ask:
 
 Do NOT proceed to Phase 4 without explicit confirmation.
 
-**Exit Plan Mode.** Call `ExitPlanMode` per `skills/_shared/audit-lens-contract.md` §6 — doc generation past this point requires the Write tool.
+**Exit Plan Mode.** Call `ExitPlanMode` per `../../_shared/audit-lens-contract.md` §6 — doc generation past this point requires the Write tool.
 
 ---
 
@@ -141,11 +141,11 @@ documentation/planning/scale/<session_name>_<YYYY-MM-DD>/
 
 Plan agents write the family to the session's scratch docs directory (`/tmp/scale-audit-<YYYY-MM-DD_HHMMSS>/docs/`); the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/scale/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide, Section 3).
 
-`00_SCALE_AUDIT.md` is the full Phase 3 report. Each numbered doc is exactly one PR, grouping related findings (e.g., all mandatory-tenant-context changes → one PR; all lease-fencing changes → one PR), ordered P0 first, and must include the required invariants it discharges plus the acceptance-test rows that prove it. Plan agents follow Section 9 of the orchestration guide and `skills/_shared/planning-standard.md`.
+`00_SCALE_AUDIT.md` is the full Phase 3 report. Each numbered doc is exactly one PR, grouping related findings (e.g., all mandatory-tenant-context changes → one PR; all lease-fencing changes → one PR), ordered P0 first, and must include the required invariants it discharges plus the acceptance-test rows that prove it. Plan agents follow Section 9 of the orchestration guide and `../../_shared/planning-standard.md`.
 
-**Adversarial review pass:** follow `skills/_shared/pre-handoff-checklist.md` on every doc before publishing. Prioritize `concern_area` values `security`, `data-integrity`, `error-handling`. If a critic finds that a proposed remediation *itself* opens a cross-tenant window (e.g., a backfill that guesses ownership), elevate to CRITICAL.
+**Adversarial review pass:** follow `../../_shared/pre-handoff-checklist.md` on every doc before publishing. Prioritize `concern_area` values `security`, `data-integrity`, `error-handling`. If a critic finds that a proposed remediation *itself* opens a cross-tenant window (e.g., a backfill that guesses ownership), elevate to CRITICAL.
 
-Then hand off: **"Plans are ready. Run `/claudna:build documentation/planning/scale/<session>/` to start building."** This lens produces plans, not code — see `skills/_shared/orchestration-guide.md` §11.
+Then hand off: **"Plans are ready. Run `/claudna:build documentation/planning/scale/<session>/` to start building."** This lens produces plans, not code — see `../../_shared/orchestration-guide.md` §11.
 
 ---
 
@@ -153,12 +153,12 @@ Then hand off: **"Plans are ready. Run `/claudna:build documentation/planning/sc
 
 This lens supports `--output github`, `--output session` (the engine default, contract §2), and the `docs` deliverable above.
 
-Follow the output guide at `skills/_shared/output-guide.md`:
+Follow the output guide at `../../_shared/output-guide.md`:
 - For `github`: write each finding-cluster as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>`. Map severities per `report-template.md`: P0 → `priority:critical`, P1 → `priority:high`, P2 → `priority:medium`, P3 → `priority:low`.
 - For `session` (engine default): produce the report doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5).
 - For `docs`: the Phase 4 subagent workflow above.
 
-**Credential rule:** tenant credentials and connection strings surface in exactly this kind of audit. Never reproduce a secret value — file:line and variable name only, and scrub every research/findings file in place with the redactor (`python3 scripts/redact.py <file>`; resolve the path per `skills/_shared/orchestration-guide.md` §7) before it leaves a subagent or is published.
+**Credential rule:** tenant credentials and connection strings surface in exactly this kind of audit. Never reproduce a secret value — file:line and variable name only, and scrub every research/findings file in place with the redactor (`python3 scripts/redact.py <file>`; resolve the path per `../../_shared/orchestration-guide.md` §7) before it leaves a subagent or is published.
 
 ---
 
@@ -183,7 +183,7 @@ Follow the output guide at `skills/_shared/output-guide.md`:
 
 - **Subagent pattern.** Four parallel discovery subagents + one convergence subagent (disk-write pattern, orchestration guide Sections 2 & 6). Phase 4 uses Plan agents per Section 9. The orchestrator coordinates only.
 - **Technology-agnostic.** The scan categories and failure windows are written to the *shapes* of multi-tenant systems (optional scopes, leases, outboxes, pooled connections), not to any specific framework, broker, database vendor, or hosting platform. Adapt grep patterns to the detected stack.
-- **Compatibility.** Shared arguments, output routing, autonomous mode, and plan-mode discipline are owned by `skills/_shared/audit-lens-contract.md`; this lens adds no divergent behavior.
+- **Compatibility.** Shared arguments, output routing, autonomous mode, and plan-mode discipline are owned by `../../_shared/audit-lens-contract.md`; this lens adds no divergent behavior.
 
 ---
 
@@ -196,7 +196,7 @@ When `--auto` is set (implies `--output github`; lens contract §4, orchestratio
 3. Use the engine's `[focus]` argument as scope; if none, audit the full system.
 4. Create GitHub Issues for all P0 and P1 findings (immediately), P2 batched; skip P3 unless particularly noteworthy. **Confidence floor:** a `low`-confidence (pattern-only) lead never files as P0/P1 — batch it with the P2s, naming the evidence that would confirm or dismiss it.
 5. Scrub every published doc through the redactor (orchestration-guide §7) — no raw credential values in issue bodies or artifacts.
-6. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+6. **Emit the structured-result shape** per `../../_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
 ```json
 {

@@ -12,7 +12,7 @@ requires:
 
 # Neon
 
-One engine for Neon PostgreSQL — `query`, `branch`, and `info` as verb modes. Shared behavior lives in `skills/_shared/infra-cli-contract.md`; this file supplies only routing and the Neon deltas.
+One engine for Neon PostgreSQL — `query`, `branch`, and `info` as verb modes. Shared behavior lives in `../_shared/infra-cli-contract.md`; this file supplies only routing and the Neon deltas.
 
 ## Mode dispatch (contract §3)
 

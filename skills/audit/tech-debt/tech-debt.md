@@ -9,7 +9,7 @@ Invoked by /claudna:audit in tech-debt mode — find, report, and plan remediati
 - For a portfolio view across many repos → use `/claudna:audit repo-health`
 - For product feature gaps → use `/claudna:product-enhance`
 
-**Enter Plan Mode.** Call `EnterPlanMode` per `skills/_shared/audit-lens-contract.md` §6 — the discovery, analysis, and proposal steps below are read-only.
+**Enter Plan Mode.** Call `EnterPlanMode` per `../../_shared/audit-lens-contract.md` §6 — the discovery, analysis, and proposal steps below are read-only.
 
 ## Constraints
 
@@ -147,7 +147,7 @@ After presenting the scan results, **ask the user to confirm** whether they want
 
 Ask: "Would you like me to generate detailed tech debt documentation and phased remediation plans?"
 
-**Exit Plan Mode.** Call `ExitPlanMode` per `skills/_shared/audit-lens-contract.md` §6 — doc generation past this point requires the Write tool.
+**Exit Plan Mode.** Call `ExitPlanMode` per `../../_shared/audit-lens-contract.md` §6 — doc generation past this point requires the Write tool.
 
 If yes, ask the user for a **short session name** (e.g., `api-cleanup`, `db-layer`) or derive one from the focus area. Output lands in:
 
@@ -195,13 +195,13 @@ Each plan document represents **exactly 1 PR** and must include:
 
 #### C. Subagent Workflow
 
-Follow Section 9 of the orchestration guide (`skills/_shared/orchestration-guide.md`). Plan agents must also read `skills/_shared/planning-standard.md` for quality standards and phase doc structure. Scratch directory: `/tmp/tech-debt-<YYYY-MM-DD_HHMMSS>/research/`.
+Follow Section 9 of the orchestration guide (`../../_shared/orchestration-guide.md`). Plan agents must also read `../../_shared/planning-standard.md` for quality standards and phase doc structure. Scratch directory: `/tmp/tech-debt-<YYYY-MM-DD_HHMMSS>/research/`.
 
 ---
 
 ## Phase 2.5: Adversarial Review Pass
 
-Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. The adversarial-review `--dispatch` output is markdown with YAML frontmatter per `skills/_shared/contracts/lens-result-contract.md` — parse `status` from frontmatter and findings from body sections. Run on each phase doc (`<NN>_*.md`) and the master `00_TECH_DEBT.md` in the session's scratch docs directory, before the family is published to `documentation/planning/tech_debt/<session>/`. Apply in all output modes and `--auto`.
+Follow `../../_shared/pre-handoff-checklist.md` for the full procedure. The adversarial-review `--dispatch` output is markdown with YAML frontmatter per `../../_shared/contracts/lens-result-contract.md` — parse `status` from frontmatter and findings from body sections. Run on each phase doc (`<NN>_*.md`) and the master `00_TECH_DEBT.md` in the session's scratch docs directory, before the family is published to `documentation/planning/tech_debt/<session>/`. Apply in all output modes and `--auto`.
 
 ---
 
@@ -209,7 +209,7 @@ Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. The adv
 
 `--output` flag semantics are owned by the lens contract (§2). This lens supports `github` and `session` in addition to the `docs` deliverable produced by the full interactive procedure above.
 
-Follow the output guide at `skills/_shared/output-guide.md`:
+Follow the output guide at `../../_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Map scan priorities: High → `priority:high`, Medium → `priority:medium`, Low → `priority:low`.
 - For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
 - For `docs`: follow the subagent workflow in the orchestration guide (publish step: `--dir documentation/planning/tech_debt/<session_name>_<YYYY-MM-DD>/`)
@@ -226,7 +226,7 @@ When `--auto` is set (see the lens contract §4 and orchestration guide Section 
 3. Implies `--output github`
 4. Use the focus area from the dispatched arguments as scope. If none provided, scan full codebase but limit to top 10 findings.
 5. Create GitHub Issues per the output guide (`--output github`) for all findings above LOW severity
-6. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+6. **Emit the structured-result shape** per `../../_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
 ```json
 {

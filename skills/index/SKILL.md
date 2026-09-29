@@ -5,7 +5,7 @@ description: "Use after creating, promoting, or editing docs in a directory whos
 argument-hint: "[directory-path] [--validate-only] [--recursive] [--fix] [--stale]"
 requires:
   - cli: claudron
-    reason: "Optional — engine-managed-root detection in Step 1 only (a `(claudron vault)` root is never indexed); without it, index degrades per the standard notice in skills/_shared/claudron-engine.md §3.1 and treats the target as a raw tree"
+    reason: "Optional — engine-managed-root detection in Step 1 only (a `(claudron vault)` root is never indexed); without it, index degrades per the standard notice in ../_shared/claudron-engine.md §3.1 and treats the target as a raw tree"
 ---
 
 # Index
@@ -17,7 +17,7 @@ Scan, validate, and index shared documentation. INDEX.md is the discovery layer 
 ## Arguments
 
 Parse `$ARGUMENTS` at invocation:
-- **First positional arg:** Directory path to index. Defaults to the shared docs root, resolved per `skills/_shared/documentation-standard.md` §10 ("locating the root" — env override, else the CLAUDE.md `## Shared Documentation` section; env wins on disagreement, note the mismatch). §10 owns which env name applies; do not re-derive it here. No root resolves → detect from cwd.
+- **First positional arg:** Directory path to index. Defaults to the shared docs root, resolved per `../_shared/documentation-standard.md` §10 ("locating the root" — env override, else the CLAUDE.md `## Shared Documentation` section; env wins on disagreement, note the mismatch). §10 owns which env name applies; do not re-derive it here. No root resolves → detect from cwd.
 - `--validate-only`: Check frontmatter without regenerating INDEX.md.
 - `--recursive`: Index all subdirectories, not just the target.
 - `--fix`: Auto-fill missing required fields where inferrable.
@@ -27,9 +27,9 @@ Parse `$ARGUMENTS` at invocation:
 
 ## Step 1: Discover Documents
 
-**Engine-managed roots are never indexed.** If the target is a root annotated `(claudron vault)` in CLAUDE.md's `## Shared Documentation` section, or came from the engine env var, stop and emit §10's engine-managed-root message (`skills/_shared/documentation-standard.md` §10, Annotation semantics — including its env-derived suffix). The engine owns vault indexing; an INDEX.md written there would be stale on arrival.
+**Engine-managed roots are never indexed.** If the target is a root annotated `(claudron vault)` in CLAUDE.md's `## Shared Documentation` section, or came from the engine env var, stop and emit §10's engine-managed-root message (`../_shared/documentation-standard.md` §10, Annotation semantics — including its env-derived suffix). The engine owns vault indexing; an INDEX.md written there would be stale on arrival.
 
-**With Claudron absent, say so rather than assuming.** The annotation above is the only signal that survives without the CLI, so a root that *is* engine-managed but carries no annotation is indistinguishable from a raw tree. When `claudron` is not on PATH, emit the standard degradation notice (`skills/_shared/claudron-engine.md` §3.1 — the `/claudna:index` row) before indexing, and in `--auto` put the same line in `errors[]`. Indexing an unannotated engine-managed root is the failure this notice exists to make visible; it is never a silent assumption.
+**With Claudron absent, say so rather than assuming.** The annotation above is the only signal that survives without the CLI, so a root that *is* engine-managed but carries no annotation is indistinguishable from a raw tree. When `claudron` is not on PATH, emit the standard degradation notice (`../_shared/claudron-engine.md` §3.1 — the `/claudna:index` row) before indexing, and in `--auto` put the same line in `errors[]`. Indexing an unannotated engine-managed root is the failure this notice exists to make visible; it is never a silent assumption.
 
 Walk all `.md` files in the target directory (excluding `INDEX.md` itself).
 
@@ -42,7 +42,7 @@ If `--recursive`, walk subdirectories too. Each subdirectory gets its own INDEX.
 
 ## Step 2: Parse and Validate Frontmatter
 
-For each file, read and parse YAML frontmatter. Validate against the schema (vocabulary SSOT: `skills/_shared/output-guide.md` §3 — the repo's only type/status enum table):
+For each file, read and parse YAML frontmatter. Validate against the schema (vocabulary SSOT: `../_shared/output-guide.md` §3 — the repo's only type/status enum table):
 
 **Required fields:**
 

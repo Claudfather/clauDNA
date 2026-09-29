@@ -1,5 +1,5 @@
 Panel lens for /claudna:ironclad — steps back from a plan's proposed solution to assess whether the right problem is being solved the right way, catching plans that extend suboptimal foundations, introduce accidental complexity, or miss simpler alternatives.
-Dispatched by the panel (or via /claudna:ironclad --lens first-principles); emits structured markdown per skills/_shared/contracts/lens-result-contract.md. Not user-invocable.
+Dispatched by the panel (or via /claudna:ironclad --lens first-principles); emits structured markdown per ../../_shared/contracts/lens-result-contract.md. Not user-invocable.
 
 # First Principles
 
@@ -11,7 +11,7 @@ Stand back from the proposed solution. Forget the plan exists. Ask: what is the 
 
 ## Dispatch Rules
 
-Follow the dispatch discipline in `skills/_shared/contracts/lens-result-contract.md` (§ Dispatch Rules): run non-interactively (no `EnterPlanMode`, no `AskUserQuestion`), execute silently, and emit the structured result as the FINAL output with no text after it.
+Follow the dispatch discipline in `../../_shared/contracts/lens-result-contract.md` (§ Dispatch Rules): run non-interactively (no `EnterPlanMode`, no `AskUserQuestion`), execute silently, and emit the structured result as the FINAL output with no text after it.
 
 **Blocked condition:** If the plan lacks a Goal section or is too ambiguous to review, emit `status: blocked` with a description of what is missing.
 
@@ -88,7 +88,7 @@ If the plan does NOT extend an existing system (greenfield), skip this step.
 
 ### Step 5: Emit Findings
 
-Classify each finding using the severity vocabulary defined in `skills/_shared/contracts/lens-result-contract.md` (`critical` > `major` > `minor` > `info`).
+Classify each finding using the severity vocabulary defined in `../../_shared/contracts/lens-result-contract.md` (`critical` > `major` > `minor` > `info`).
 
 Tag each finding with a concern area. This lens's primary concern areas are `architecture` and `scope`. Secondary: `dependencies`, `compatibility`. Use the closest match from the canonical set in the contract.
 
@@ -106,7 +106,7 @@ Map findings to body sections:
 
 ## Structured Result Emission
 
-**Format:** Follow the canonical schema at `skills/_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all panel lens output.
+**Format:** Follow the canonical schema at `../../_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all panel lens output.
 
 For this lens, set `lens: first-principles` in frontmatter. All other fields, severity vocabulary, body sections (Blockers/Risks/Gaps/Questions/Observations), concern area values, and blocked/failed output shape are defined in the contract.
 

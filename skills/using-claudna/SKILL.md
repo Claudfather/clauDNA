@@ -16,7 +16,7 @@ The orientation skill: how to find the right installed skill for a task, and how
 
 When a task might have a matching skill and the picker didn't surface one:
 
-1. **Enumerate the installed set.** The catalog is the skill directories of this plugin — marketplace install: `~/.claude/plugins/cache/Claudfather/claudna/<version>/skills/`; development checkout: `<repo>/skills/`. One directory per skill; `_shared/` is support material, not a skill.
+1. **Enumerate the installed set.** The catalog is the skill directories of this plugin — marketplace install: `~/.claude/plugins/cache/Claudfather/claudna/<version>/skills/`; development checkout: `<repo>/skills/`. One directory per skill; `../_shared/` is support material, not a skill.
 2. **Match intent against `description` fields, not names.** Descriptions are the routing surface (SKILL_CONTRACT §2.1): trigger-first, with negative routing between confusable siblings. Read the frontmatter of plausible candidates; the description states *when* to reach for the skill.
 3. **Engines carry verbs.** Consolidated capabilities live as modes, not skills: infra operations are `/claudna:modal|railway|vercel|neon <verb>`, audits are `/claudna:audit <lens>`, session continuity is `/claudna:session <mode>`, review is `/claudna:review-work <mode>`, shared-vault knowledge is `/claudna:claudron <verb>`, and the review panel's lenses run via `/claudna:ironclad --lens <name>`. If a remembered skill name is missing, its successor's description carries a `Replaces /old-name` breadcrumb — search descriptions for the old name.
 4. **Nothing installed fits →** `/claudna:find-skills` searches the public ecosystem; a genuinely new repeatable workflow is a candidate for `/claudna:skill-scaffold`.
@@ -68,7 +68,7 @@ Read `$PLUGIN_ROOT/plugin-hooks/hooks.json`. Verify **all six wired hooks** and 
 
 ### 4. Scan skills
 
-List skill directories under `$PLUGIN_ROOT/skills/` (excluding `_shared/`). For each `SKILL.md`, parse the frontmatter: `name` matches the directory, `description` non-empty. Count total / parsed / failed.
+List skill directories under `$PLUGIN_ROOT/skills/` (excluding `../_shared/`). For each `SKILL.md`, parse the frontmatter: `name` matches the directory, `description` non-empty. Count total / parsed / failed.
 
 - **PASS** — all parse. **WARN** — 1–2 fail (list). **FAIL** — 3+ fail, or the directory is missing/empty.
 

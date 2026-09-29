@@ -1,5 +1,5 @@
 Panel lens for /claudna:ironclad — checks whether a plan or implementation PR has prior art in the project's history: previous attempts at the same problem, what was tried, what succeeded or failed, and whether the current plan learns from or repeats the past.
-Dispatched by the panel (or via /claudna:ironclad --lens precedent-check); emits structured markdown per skills/_shared/contracts/lens-result-contract.md. Not user-invocable.
+Dispatched by the panel (or via /claudna:ironclad --lens precedent-check); emits structured markdown per ../../_shared/contracts/lens-result-contract.md. Not user-invocable.
 
 # Precedent Check
 
@@ -9,7 +9,7 @@ Before building something new, check what came before. Plans that ignore prior a
 
 ## Dispatch Rules
 
-Follow the dispatch discipline in `skills/_shared/contracts/lens-result-contract.md` (§ Dispatch Rules): run non-interactively (no `EnterPlanMode`, no `AskUserQuestion`), execute silently, and emit the structured result as the FINAL output with no text after it.
+Follow the dispatch discipline in `../../_shared/contracts/lens-result-contract.md` (§ Dispatch Rules): run non-interactively (no `EnterPlanMode`, no `AskUserQuestion`), execute silently, and emit the structured result as the FINAL output with no text after it.
 
 **Blocked condition:** If the plan lacks identifiable topics or scope, emit `status: blocked` with a description of what is missing.
 
@@ -107,7 +107,7 @@ Novel ground is not a finding. It is context: the plan cannot learn from history
 
 ### Step 5: Emit Findings
 
-Classify each finding using the severity vocabulary defined in `skills/_shared/contracts/lens-result-contract.md` (`critical` > `major` > `minor` > `info`).
+Classify each finding using the severity vocabulary defined in `../../_shared/contracts/lens-result-contract.md` (`critical` > `major` > `minor` > `info`).
 
 Tag each finding with a concern area. This lens's primary concern areas are `architecture` and `scope`. Secondary: `compatibility` (when prior art reveals that a previous approach was abandoned due to migration or compatibility barriers). Use the closest match from the canonical set in the contract.
 
@@ -123,7 +123,7 @@ Map findings to body sections:
 
 ## Structured Result Emission
 
-**Format:** Follow the canonical schema at `skills/_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all panel lens output.
+**Format:** Follow the canonical schema at `../../_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all panel lens output.
 
 For this lens, set `lens: precedent-check` in frontmatter. All other fields, severity vocabulary, body sections (Blockers/Risks/Gaps/Questions/Observations), concern area values, and blocked/failed output shape are defined in the contract.
 

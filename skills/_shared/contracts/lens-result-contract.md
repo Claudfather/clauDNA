@@ -158,5 +158,5 @@ When changing this file, update every panel lens that references it and coordina
 - Consumer: `/claudna:ironclad` (`skills/ironclad/SKILL.md`); producers: `skills/ironclad/lenses/*.md` + `skills/adversarial-review/`
 - Severity vocabulary: shared with `pr-comment-hygiene` protocol (claudlobby)
 - Concern area vocabulary: `skills/build/challenge-round-questions.md`
-- Sibling contract: `skills/_shared/contracts/synthesis-contract.md` (weigh-development-paths <-> build)
-- General structured-result shape: `skills/_shared/orchestration-guide.md` §10.C
+- Sibling contract: `../../_shared/contracts/synthesis-contract.md` (weigh-development-paths <-> build)
+- General structured-result shape: `../../_shared/orchestration-guide.md` §10.C

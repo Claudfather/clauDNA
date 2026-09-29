@@ -11,7 +11,7 @@ requires:
 
 `/ironclad` runs a panel of independent review lenses against a **§4.1 plan Issue** or a **pull request**, aggregates their findings into comments, and reports whether the target is converged — no open blockers, and (for plans) all decision forks locked. For a plan Issue it is the *hardening loop*: `--loops N` repeats dispatch → fold (via `forge --reforge`) → convergence-check until converged or N cycles run. For an implementation PR it is a single review pass (no re-forge). It never authors the plan body itself — it dispatches `/forge` to.
 
-This skill is **subagent-preferred**: each lens runs as a parallel `general-purpose` subagent on the current machine. On a host with no dispatch primitive, run the lenses inline and sequentially per `skills/_shared/orchestration-guide.md` §14 — and report the independence cost honestly: inline lenses share context, so a convergence verdict from an inline run is weaker evidence than the same verdict from dispatched lenses (§14.3). Six lenses live as panel-internal files under `lenses/` in this skill directory; `adversarial-review` remains a standalone skill and is dispatched as one. Replaces the standalone lens skills /first-principles, /align-to-mission, /extension-check, /precedent-check, /plan-health-audit, /cost-benefit — for a one-off interactive challenge use `/claudna:adversarial-review`; for a one-off single-lens report use `--lens <name>` (below). Fleet deployments override the dispatch step via a compositor-injected protocol (see the dispatch preamble below); the skill itself contains no fleet concepts (no tmux, no `[BOTREPORT]`, no `fleet-state.json`).
+This skill is **subagent-preferred**: each lens runs as a parallel `general-purpose` subagent on the current machine. On a host with no dispatch primitive, run the lenses inline and sequentially per `../_shared/orchestration-guide.md` §14 — and report the independence cost honestly: inline lenses share context, so a convergence verdict from an inline run is weaker evidence than the same verdict from dispatched lenses (§14.3). Six lenses live as panel-internal files under `lenses/` in this skill directory; `adversarial-review` remains a standalone skill and is dispatched as one. Replaces the standalone lens skills /first-principles, /align-to-mission, /extension-check, /precedent-check, /plan-health-audit, /cost-benefit — for a one-off interactive challenge use `/claudna:adversarial-review`; for a one-off single-lens report use `--lens <name>` (below). Fleet deployments override the dispatch step via a compositor-injected protocol (see the dispatch preamble below); the skill itself contains no fleet concepts (no tmux, no `[BOTREPORT]`, no `fleet-state.json`).
 
 ## Dispatch preamble — read before Phase 4
 
@@ -19,7 +19,7 @@ Before dispatching lenses, check whether your composed `CLAUDE.md` contains a **
 
 - **Protocol present →** follow its dispatch instructions instead of Phase 4 — it *substitutes* the dispatch path, it does not add behavior alongside it (a distinct override pattern, not an ordinary additive protocol). Run mode is `fleet`.
 - **Protocol absent →** use the subagent dispatch in Phase 4. Run mode is `subagent`.
-- **Protocol absent and the host has no dispatch primitive at all** (`skills/_shared/orchestration-guide.md` §14.1) → run the lenses inline per §14.2. Run mode is `inline`.
+- **Protocol absent and the host has no dispatch primitive at all** (`../_shared/orchestration-guide.md` §14.1) → run the lenses inline per §14.2. Run mode is `inline`.
 - **`FLEET_STATE_PATH` set but no `fleet-dispatch-capability` protocol found →** this is a misconfiguration (a fleet bot that would silently run subagents instead of distributing to workers). Emit the warning `FLEET_STATE_PATH is set but no fleet-dispatch-capability protocol found — falling back to subagent mode.` and run in `subagent` mode.
 
 **Mode indicator (required in every run, both modes).** When you dispatch, emit a visible line and make it the first line under the PR comment header:
@@ -50,7 +50,7 @@ If the target cannot be fetched, report the error verbatim and stop.
 
 ### Phase 2: Prepare the scratch directory
 
-Create a scratch directory at `/tmp/ironclad-<YYYY-MM-DD_HHMMSS>/` (referred to as `<scratch>` below). Use the Write tool to create files inside it (auto-creates parents, so no `mkdir`, per the scratch-dir convention in `skills/_shared/orchestration-guide.md`). Write `<scratch>/source.md` with the PR metadata, type, and the full (transitively-resolved) plan or diff summary the lenses will review. Lay out per-lens result paths as `<scratch>/lenses/<lens>/result.md`.
+Create a scratch directory at `/tmp/ironclad-<YYYY-MM-DD_HHMMSS>/` (referred to as `<scratch>` below). Use the Write tool to create files inside it (auto-creates parents, so no `mkdir`, per the scratch-dir convention in `../_shared/orchestration-guide.md`). Write `<scratch>/source.md` with the PR metadata, type, and the full (transitively-resolved) plan or diff summary the lenses will review. Lay out per-lens result paths as `<scratch>/lenses/<lens>/result.md`.
 
 **Cycle** starts at `1`. With `--loops N` on a plan Issue the procedure repeats (Phase 10) for up to `N` cycles; cross-cycle state lives in the **Issue's comments** (prior lens findings, `[FORK-LOCK]` markers) and the re-forged body — not `/tmp`, which stays ephemeral.
 
@@ -74,7 +74,7 @@ Dispatch only the lenses whose **Applies to** matches the target type. A new pan
 
 Skip this phase entirely if the dispatch preamble routed you to a `fleet-dispatch-capability` protocol.
 
-**No dispatch primitive (`inline` run mode) →** run each applicable lens inline and sequentially per `skills/_shared/orchestration-guide.md` §14.2, in the Phase-3 table's order, using the same launch prompts below as the instructions you follow yourself. Write each result to the same `<scratch>/lenses/<lens>/result.md` path, in the same `skills/_shared/contracts/lens-result-contract.md` format — Phases 5 through 8 then run unchanged off those files. Emit §14.3's independence line in the report.
+**No dispatch primitive (`inline` run mode) →** run each applicable lens inline and sequentially per `../_shared/orchestration-guide.md` §14.2, in the Phase-3 table's order, using the same launch prompts below as the instructions you follow yourself. Write each result to the same `<scratch>/lenses/<lens>/result.md` path, in the same `../_shared/contracts/lens-result-contract.md` format — Phases 5 through 8 then run unchanged off those files. Emit §14.3's independence line in the report.
 
 Launch one `general-purpose` subagent per applicable lens, all in parallel (`run_in_background: true`). Use `general-purpose` (not a read-only explorer) — the subagent needs the Write tool to emit its result. Launch prompt per lens — the read target differs by source type:
 
@@ -85,7 +85,7 @@ Read skills/ironclad/lenses/<lens>.md
 Apply it to: <SOURCE_PATH>
 Write your result to: <scratch>/lenses/<lens>/result.md
 Operate non-interactively: do not enter plan mode, do not prompt for input.
-Emit structured markdown per skills/_shared/contracts/lens-result-contract.md.
+Emit structured markdown per ../_shared/contracts/lens-result-contract.md.
 ```
 
 - **Adversarial Review** (a skill): replace the first two lines with `Read skills/adversarial-review/SKILL.md` / `Apply the skill with --dispatch to: <SOURCE_PATH>`.
@@ -166,7 +166,7 @@ With `--lens <name>` (a lens name from the Phase-3 table), skip panel selection:
 
 ## `--auto` mode
 
-With `--auto`, run the full procedure non-interactively (no plan mode, no prompting) and emit a single fenced JSON **structured-result** block as the final output, per `skills/_shared/orchestration-guide.md` §10.C. Emit nothing after it — no chat summary. Shape:
+With `--auto`, run the full procedure non-interactively (no plan mode, no prompting) and emit a single fenced JSON **structured-result** block as the final output, per `../_shared/orchestration-guide.md` §10.C. Emit nothing after it — no chat summary. Shape:
 
 ```json
 {

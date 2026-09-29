@@ -90,7 +90,7 @@ Tell user: **"Run `/claudna:build` on the phase directory to start building."** 
 
 ## Pre-Handoff
 
-Before presenting output (all modes), run the adversarial review gate per `skills/_shared/pre-handoff-checklist.md` on each generated doc. Plan output must meet the quality standard in `skills/_shared/planning-standard.md`.
+Before presenting output (all modes), run the adversarial review gate per `../../_shared/pre-handoff-checklist.md` on each generated doc. Plan output must meet the quality standard in `../../_shared/planning-standard.md`.
 
 ---
 
@@ -108,7 +108,7 @@ Before presenting output (all modes), run the adversarial review gate per `skill
 
 This lens supports `--output github`, `--output session` (the engine default, contract §2), and a `docs` target.
 
-Follow the output guide at `skills/_shared/output-guide.md`:
+Follow the output guide at `../../_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Apply `design` label. Include SAFE vs RISK classification in issue body.
 - For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
 - For `docs`: follow the subagent workflow in the orchestration guide (publish step: `--dir documentation/planning/phases/<session_name>_<YYYY-MM-DD>/`)

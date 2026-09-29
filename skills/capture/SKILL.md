@@ -29,7 +29,7 @@ Never set or infer `maturity`/status — the engine stamps `draft`; promotion is
 
 ## Step 0: Gate on the vault verdict
 
-Run the detection ladder (`skills/_shared/claudron-engine.md` §1) first. Route on the verdict:
+Run the detection ladder (`../_shared/claudron-engine.md` §1) first. Route on the verdict:
 - **present-with-vault** → continue (Step 1).
 - **present-no-vault** / **absent** → the engine can't write. Take the **frozen raw-tree fallback** (bottom of this file) and say so — capture is an occasion-workflow with a fallback (claudron-engine.md §3), unlike the bare `/claudron` engine skill.
 
@@ -85,10 +85,10 @@ Decide the fields:
 - **body** — the processed content. Default is a tight summary (30–50% length, keep all technical substance, strip boilerplate); `--full` captures verbatim. Provenance for URL/file input follows the Step 1 branch: on a flags-capable engine it rides frontmatter (`--source-url` / `--source-type`, Step 4), **not** the body; on an older engine, **append** the `Source:` line at the end (never first — the first body line becomes the recall summary).
 - **wikilinks** — if the note relates to one already in the vault (Step 5's dedup surfaces near-matches, or you know its title), link it in the body as `[[Exact Title]]`. This is the vault's authoring convention — **relate** notes, don't duplicate them; capture just writes the `[[Title]]` into the body (Claudron resolves those references on demand, read-side — not at write time).
 - **tags** — from flags or inferred from context.
-- **project / fleet — scope by what the note is *about*, and state the call.** Claudron files by location — there is no `scope:` field; the tier follows the flag you pass, or none. Read the scope from the content, then **say which you chose and why** (`Scoped to project clauDNA — a gotcha in this repo`); the flags are manual overrides on that inference. When genuinely ambiguous, state your reasoning and pick — but **reusable / general knowledge wins `_shared/` even when it is also repo-flavored** (filing it in a project tier hides it from cross-repo recall); reserve the narrower tier for notes that are genuinely repo- or fleet-bound. The three tiers:
-  - **General / foreign / cross-project** (an article, a reusable pattern, a foreign repo) → **unscoped → `_shared/`**. The default — leave both flags off.
+- **project / fleet — scope by what the note is *about*, and state the call.** Claudron files by location — there is no `scope:` field; the tier follows the flag you pass, or none. Read the scope from the content, then **say which you chose and why** (`Scoped to project clauDNA — a gotcha in this repo`); the flags are manual overrides on that inference. When genuinely ambiguous, state your reasoning and pick — but **reusable / general knowledge wins `../_shared/` even when it is also repo-flavored** (filing it in a project tier hides it from cross-repo recall); reserve the narrower tier for notes that are genuinely repo- or fleet-bound. The three tiers:
+  - **General / foreign / cross-project** (an article, a reusable pattern, a foreign repo) → **unscoped → `../_shared/`**. The default — leave both flags off.
   - **Specifically about this repo** (session learnings, a decision or gotcha about this codebase) → `--project <cwd-git-root-name>`. Pass it **explicitly** — capture, unlike recall, won't infer it from cwd — so a bare `/claudna:recall` later surfaces it in the project tier.
-  - **A fleet-wide workflow or process** (how the fleet's tools interoperate, a protocol spanning repos) → `--fleet <name>`, when the ambient vault registers that fleet — read the names from `data.fleets` in the Step 0 status envelope (re-run `claudron status --json` if you didn't retain it; claudron-engine.md §2 owns the shape). A Claudlobby-provisioned bot vault carries them. No fleet registered → it falls to `_shared/`; never invent a `--fleet` name.
+  - **A fleet-wide workflow or process** (how the fleet's tools interoperate, a protocol spanning repos) → `--fleet <name>`, when the ambient vault registers that fleet — read the names from `data.fleets` in the Step 0 status envelope (re-run `claudron status --json` if you didn't retain it; claudron-engine.md §2 owns the shape). A Claudlobby-provisioned bot vault carries them. No fleet registered → it falls to `../_shared/`; never invent a `--fleet` name.
 
 ## Step 4: Build the capture call
 

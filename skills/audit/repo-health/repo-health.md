@@ -6,7 +6,7 @@ Scan for open PRs, CI status, stale branches, pending plan docs, and uncommitted
 
 ## Lens arguments (beyond contract §2)
 
-Shared argument semantics live in `skills/_shared/audit-lens-contract.md` §2. Lens-specific:
+Shared argument semantics live in `../../_shared/audit-lens-contract.md` §2. Lens-specific:
 
 - `[focus]` — a parent directory path to scan. If provided, skip the discovery prompt (Step 1).
 - **Interactive-only** (**auto: no** in the engine table). This lens has no non-interactive variant — `--auto` is answered by the engine's blocked-result path (contract §4); never improvise one here.
@@ -74,7 +74,7 @@ Once the user picks a repo, suggest the relevant skill (`/claudna:session resume
 
 ## Output Targets
 
-Follow the output guide at `skills/_shared/output-guide.md`. Beyond the shared `--output github|session` surface (contract §2), this lens supports a `docs` target for persisting the dashboard:
+Follow the output guide at `../../_shared/output-guide.md`. Beyond the shared `--output github|session` surface (contract §2), this lens supports a `docs` target for persisting the dashboard:
 
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Create one issue per repo with actionable findings (stale branches, failing CI, PRs needing review). Label with `auto-audit` and `repo-health`.
 - For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)

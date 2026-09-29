@@ -10,7 +10,7 @@ requires:
 
 # Audit
 
-One engine for codebase audits — concern lenses as verb modes. Shared behavior (arguments, output routing, autonomous mode, orchestration) lives in `skills/_shared/audit-lens-contract.md`; this file supplies only the lens table and dispatch rules.
+One engine for codebase audits — concern lenses as verb modes. Shared behavior (arguments, output routing, autonomous mode, orchestration) lives in `../_shared/audit-lens-contract.md`; this file supplies only the lens table and dispatch rules.
 
 ## Lens dispatch (contract §2, §4)
 
@@ -35,12 +35,12 @@ No lens token → infer only when the request wording is unambiguous (e.g. "chec
 
 For the selected lens, read ONLY its depth file in this skill directory and follow it exactly — never load another lens's depth (contract §1).
 
-Lenses that fan out dispatch research subagents. Where the host has no dispatch primitive, they scan inline and sequentially instead — one shared fallback, defined in `skills/_shared/orchestration-guide.md` §14 and bound for audit by `skills/_shared/audit-lens-contract.md`. Dispatch stays the preferred path.
+Lenses that fan out dispatch research subagents. Where the host has no dispatch primitive, they scan inline and sequentially instead — one shared fallback, defined in `../_shared/orchestration-guide.md` §14 and bound for audit by `../_shared/audit-lens-contract.md`. Dispatch stays the preferred path.
 
 ## Surfaces (contract §2–§4)
 
-- `--output github` files findings as issues per `skills/_shared/output-guide.md` (all filing routes through `/claudna:publish`); `--output session` (default) presents in chat.
-- `--auto` runs non-interactively for lenses marked **Auto: yes** and emits the structured-result JSON per `skills/_shared/orchestration-guide.md` §10.C as the final output. For an **Auto: no** lens, emit the structured result with `"outcome": "blocked"` naming the lens as interactive-only — never improvise a non-interactive variant.
+- `--output github` files findings as issues per `../_shared/output-guide.md` (all filing routes through `/claudna:publish`); `--output session` (default) presents in chat.
+- `--auto` runs non-interactively for lenses marked **Auto: yes** and emits the structured-result JSON per `../_shared/orchestration-guide.md` §10.C as the final output. For an **Auto: no** lens, emit the structured result with `"outcome": "blocked"` naming the lens as interactive-only — never improvise a non-interactive variant.
 
 ## Related
 

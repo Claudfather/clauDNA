@@ -10,7 +10,7 @@ requires:
 
 # Railway
 
-One engine for Railway — `deploy`, `logs`, and `status` as verb modes over the Railway CLI. Shared behavior lives in `skills/_shared/infra-cli-contract.md`; this file supplies only routing and the Railway deltas.
+One engine for Railway — `deploy`, `logs`, and `status` as verb modes over the Railway CLI. Shared behavior lives in `../_shared/infra-cli-contract.md`; this file supplies only routing and the Railway deltas.
 
 ## Mode dispatch (contract §3)
 

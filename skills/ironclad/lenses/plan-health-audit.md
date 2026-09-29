@@ -1,5 +1,5 @@
 Panel lens for /claudna:ironclad — checks whether a /claudna:forge plan is structurally complete, internally consistent, and ready for implementation: missing sections, unsized phases, vague validation criteria, undocumented decision forks.
-Dispatched by the panel (or via /claudna:ironclad --lens plan-health-audit); emits structured markdown per skills/_shared/contracts/lens-result-contract.md. Not user-invocable.
+Dispatched by the panel (or via /claudna:ironclad --lens plan-health-audit); emits structured markdown per ../../_shared/contracts/lens-result-contract.md. Not user-invocable.
 
 # Plan Health Audit
 
@@ -11,7 +11,7 @@ Most checks in this lens are deterministic -- section presence, frontmatter comp
 
 ## Dispatch Rules
 
-Follow the dispatch discipline in `skills/_shared/contracts/lens-result-contract.md` (§ Dispatch Rules): run non-interactively (no `EnterPlanMode`, no `AskUserQuestion`), execute silently, and emit the structured result as the FINAL output with no text after it.
+Follow the dispatch discipline in `../../_shared/contracts/lens-result-contract.md` (§ Dispatch Rules): run non-interactively (no `EnterPlanMode`, no `AskUserQuestion`), execute silently, and emit the structured result as the FINAL output with no text after it.
 
 **Blocked condition:** If the plan is unreadable or not a markdown document, emit `status: blocked` with a description of what is wrong.
 
@@ -204,7 +204,7 @@ Include the health verdict in the output.
 
 ### Step 11: Emit Findings
 
-Assemble the findings classified in Steps 2-9 into the output format. Severity assignments from each step are final -- do not re-evaluate them here. Use the severity vocabulary defined in `skills/_shared/contracts/lens-result-contract.md` (`critical` > `major` > `minor` > `info`).
+Assemble the findings classified in Steps 2-9 into the output format. Severity assignments from each step are final -- do not re-evaluate them here. Use the severity vocabulary defined in `../../_shared/contracts/lens-result-contract.md` (`critical` > `major` > `minor` > `info`).
 
 Tag each finding with a concern area. This lens's primary concern area is `scope` (missing sections, incomplete coverage). Secondary: `architecture` (when structural issues reflect design gaps, e.g., phases without concrete deliverables suggest the architecture isn't thought through).
 
@@ -220,7 +220,7 @@ Map findings to body sections:
 
 ## Structured Result Emission
 
-**Format:** Follow the canonical schema at `skills/_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all panel lens output.
+**Format:** Follow the canonical schema at `../../_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all panel lens output.
 
 For this lens, set `lens: plan-health-audit` in frontmatter. All other fields, severity vocabulary, body sections (Blockers/Risks/Gaps/Questions/Observations), concern area values, and blocked/failed output shape are defined in the contract.
 

@@ -15,7 +15,7 @@ Surface observations from the implementation journey — things you noticed *whi
 ## Arguments
 
 Parse `$ARGUMENTS` at invocation:
-- `--output github`: Write findings and plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
+- `--output github`: Write findings and plans as GitHub Issues. See output guide (`../_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
 
 Default (no flag): Present retro in chat (session-only by default).
@@ -146,7 +146,7 @@ Omit any section that genuinely has nothing — but challenge yourself before sk
 
 This skill supports `--output github` and `--output session` in addition to the default `session` target.
 
-Follow the output guide at `skills/_shared/output-guide.md`:
+Follow the output guide at `../_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Create one issue per systemic pattern or breadcrumb trail that warrants follow-up work. Label with `auto-audit` and `tech-debt` or `enhancement` as appropriate.
 - For `session` (default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
 - For `docs`: author the retro as a publishable doc in scratch named `00_RETRO.md` (master-class: no §4.1 skeleton required — publish Step 1b), then `/claudna:publish <file> --to docs --dir documentation/planning/retros/<session_name>_<YYYY-MM-DD>/`

@@ -100,6 +100,6 @@ When changing this file, update both `skills/weigh-development-paths/SKILL.md` a
 
 ## Related
 
-- `skills/_shared/orchestration-guide.md` §10.C — the structured-result envelope this nests in.
+- `../../_shared/orchestration-guide.md` §10.C — the structured-result envelope this nests in.
 - `skills/weigh-development-paths/SKILL.md` — the producer (7-dimension synthesis).
 - `skills/build/SKILL.md` — the consumer (Step 3-AUTO).

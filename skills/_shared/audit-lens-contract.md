@@ -13,24 +13,24 @@ The shared skeleton for the `/audit` engine and its lenses. The engine (`skills/
 Every lens accepts, via the engine:
 
 - `[focus]` — free-text scope narrowing (an area, path, page, or repo set, per the lens's Focus note in the table).
-- `--output github|session` — `github` files findings as issues per `skills/_shared/output-guide.md` (routing through `/claudna:publish`; lenses never call `gh` directly); `session` (default) presents the analysis in chat.
+- `--output github|session` — `github` files findings as issues per `../_shared/output-guide.md` (routing through `/claudna:publish`; lenses never call `gh` directly); `session` (default) presents the analysis in chat.
 - `--auto` — non-interactive run, only for lenses whose table row says **auto: yes**. See §4.
 
 ## 3. Shared output conventions
 
-- Findings carry the concern vocabulary from `skills/_shared/contracts/lens-result-contract.md` — that file is the **single source** for concern-area names (architecture, scope, performance, compatibility, dependencies, testing, observability, data-integrity); lenses do not mint their own.
+- Findings carry the concern vocabulary from `../_shared/contracts/lens-result-contract.md` — that file is the **single source** for concern-area names (architecture, scope, performance, compatibility, dependencies, testing, observability, data-integrity); lenses do not mint their own.
 - `--output github`: one issue per finding-cluster per the output-guide's §4.1 body contract, labels per its label rules, dedup before filing.
 - Session output: severity-ordered findings with file:line evidence, then a phased remediation sketch. Boxed summary at the top: lens, scope, counts by severity.
 
 ## 4. Autonomous mode
 
-- Lenses marked **auto: yes** run non-interactively under `--auto`: no plan-mode entry, no blocking questions, and a single fenced structured-result JSON block as the final output per `skills/_shared/orchestration-guide.md` §10.C (skill: `audit`, plus `"lens": "<lens>"` inside `artifacts`).
+- Lenses marked **auto: yes** run non-interactively under `--auto`: no plan-mode entry, no blocking questions, and a single fenced structured-result JSON block as the final output per `../_shared/orchestration-guide.md` §10.C (skill: `audit`, plus `"lens": "<lens>"` inside `artifacts`).
 - `--auto` with a lens marked **auto: no** does not improvise: emit the §10.C structured result with `"outcome": "blocked"` and `blocker_description` naming the lens as interactive-only. The engine's `--auto` surface never over-advertises a lens that cannot honor it.
 - Headless contexts (`claude -p`, subagent dispatch): the lens verb is **required** — never inferred.
 
 ## 5. Orchestration
 
-Lenses that fan out (multi-area scans, per-repo sweeps) follow `skills/_shared/orchestration-guide.md`: research subagents write findings to the scratch dir, the lens procedure aggregates; subagents never return long results through the orchestrator's context. Lens procedures reference their own `subagent-prompts.md` where one exists.
+Lenses that fan out (multi-area scans, per-repo sweeps) follow `../_shared/orchestration-guide.md`: research subagents write findings to the scratch dir, the lens procedure aggregates; subagents never return long results through the orchestrator's context. Lens procedures reference their own `subagent-prompts.md` where one exists.
 
 **Hosts without subagents.** Fan-out is the *preferred* path, not the only one. Where the host has no dispatch primitive (orchestration-guide §14.1), a fan-out lens scans its areas inline and sequentially per §14.2 — announcing the inline path, writing each area's findings to the same scratch-dir path and in the same shape the subagent prompt specifies, so the lens's aggregation step runs unchanged. The independence caveat in §14.3 applies and is reported: areas scanned inline share context.
 

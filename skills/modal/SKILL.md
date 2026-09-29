@@ -10,7 +10,7 @@ requires:
 
 # Modal
 
-One engine for Modal serverless operations — `deploy`, `logs`, and `status` as verb modes over the `modal` CLI. Shared behavior lives in `skills/_shared/infra-cli-contract.md`; this file supplies only routing and the Modal deltas.
+One engine for Modal serverless operations — `deploy`, `logs`, and `status` as verb modes over the `modal` CLI. Shared behavior lives in `../_shared/infra-cli-contract.md`; this file supplies only routing and the Modal deltas.
 
 ## Mode dispatch (contract §3)
 

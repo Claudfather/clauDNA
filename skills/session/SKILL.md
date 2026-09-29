@@ -8,7 +8,7 @@ allowed-tools: Bash(git *), Bash(gh *), Bash(ls *), Bash(wc *), Bash(date *), Ba
 
 # Session
 
-One engine for session continuity — `handoff`, `resume`, `name`, and `checkpoint` as verb modes over the per-cwd substrate: `<cwd>/.claude/session.md`, reaped by `skills/_shared/reaper-rules.md`. Session continuity only — durable knowledge capture is `/claudna:capture` territory.
+One engine for session continuity — `handoff`, `resume`, `name`, and `checkpoint` as verb modes over the per-cwd substrate: `<cwd>/.claude/session.md`, reaped by `../_shared/reaper-rules.md`. Session continuity only — durable knowledge capture is `/claudna:capture` territory.
 
 ## Mode dispatch
 
@@ -36,5 +36,5 @@ For the selected verb, read ONLY its depth file in this skill directory and foll
 - **Identity:** keyed by cwd. The handoff lives at `<cwd>/.claude/session.md`. No global slug, no cross-project state, and **no writes to `~/.claude/`** — this engine stays out of the user-config tree entirely.
 - **Atomic writes:** always `session.md.tmp` then `mv` — a concurrent reader never sees a half-written file.
 - **No compound commands:** separate parallel tool calls; `allowed-tools` patterns match simple commands only.
-- **`--auto` is silent:** no questions, reaper as the only pruning mechanism, and a §10.C structured result (per `skills/_shared/orchestration-guide.md`) as the final output — `"skill": "session"` with `"mode"` inside `artifacts`.
+- **`--auto` is silent:** no questions, reaper as the only pruning mechanism, and a §10.C structured result (per `../_shared/orchestration-guide.md`) as the final output — `"skill": "session"` with `"mode"` inside `artifacts`.
 - **Speed over thoroughness:** resume under 30 seconds; handoff under 60 with `--auto`; checkpoint faster than both.

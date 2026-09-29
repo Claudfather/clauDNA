@@ -78,7 +78,7 @@ This is idempotent — step 1 catches both "already there" and "ignored by paren
 
 ### 10. Structured-result emission (`--auto` only)
 
-When invoked with `--auto`, emit the §10.C structured result from `_shared/orchestration-guide.md §10.C` as the **final** output — nothing after it. Orchestrators (and `/restart`'s pre-stop check) key off this to confirm the handoff landed instead of inferring it from file mtime.
+When invoked with `--auto`, emit the §10.C structured result from `../_shared/orchestration-guide.md §10.C` as the **final** output — nothing after it. Orchestrators (and `/restart`'s pre-stop check) key off this to confirm the handoff landed instead of inferring it from file mtime.
 
 ```json
 {
@@ -108,6 +108,6 @@ Interactive mode (no `--auto`) skips this step entirely.
 ## Rules
 
 - **Speed over thoroughness.** Reap, scan, write. Not a documentation exercise.
-- **Reaper rules in `_shared/`.** Do not duplicate them inline. Read `../_shared/reaper-rules.md` and apply.
+- **Reaper rules in `../_shared/`.** Do not duplicate them inline. Read `../_shared/reaper-rules.md` and apply.
 - **`State` is always regenerated.** Never reaped, never merged with prior State.
 - **`--auto` means silent.** Reaper is the only pruning mechanism in `--auto`; user-driven pruning is interactive-only.

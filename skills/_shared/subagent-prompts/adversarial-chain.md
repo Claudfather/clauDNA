@@ -18,7 +18,7 @@ Operate non-interactively per the skill's `--dispatch` mode rules:
 
 Spawn parallel critic subagents per the skill's Phase 3 dispatch procedure.
 
-Return ONLY a structured markdown document per `skills/_shared/contracts/lens-result-contract.md`. Format:
+Return ONLY a structured markdown document per `../../_shared/contracts/lens-result-contract.md`. Format:
 
 ---
 lens: adversarial-review
@@ -74,7 +74,7 @@ Use one value per finding (the dominant area). If a finding spans two areas, pic
 
 After the subagent returns, the calling planning skill:
 
-1. Parses the markdown output — reads YAML frontmatter for `status` and `severity`, then extracts findings from the body sections (Blockers, Risks, Gaps, Questions, Observations). See `skills/_shared/contracts/lens-result-contract.md` for the full field reference.
+1. Parses the markdown output — reads YAML frontmatter for `status` and `severity`, then extracts findings from the body sections (Blockers, Risks, Gaps, Questions, Observations). See `../../_shared/contracts/lens-result-contract.md` for the full field reference.
 2. If `status` is not `completed`, log the issue and skip folding for that doc.
 3. Uses the Edit tool to append (or create) an `## Adversarial Review Findings` section in the plan doc. The section format:
 

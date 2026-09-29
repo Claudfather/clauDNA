@@ -50,8 +50,8 @@ Parse the invocation arguments:
 - `--source github` (no number): Browse all open issues via paginated picker — select one or more to implement.
 - Remaining text (or no flag): treated as a file path or session directory.
 - No arguments at all: scan for plan directories and present a picker.
-- See source guide (`skills/_shared/source-guide.md`) for details on both GitHub modes.
-- `--auto` (alias: `--autonomous`): Fully non-interactive mode. Replaces user input with sensible defaults and machine synthesis. Requires an explicit work item (`--source github <number>` OR a single file path) — picker modes and queue mode are disallowed. Never merges. Emits the structured-result shape from `skills/_shared/orchestration-guide.md` §10.C as the final output. See the "Autonomous Mode (`--auto`)" section below for the full behavior contract.
+- See source guide (`../_shared/source-guide.md`) for details on both GitHub modes.
+- `--auto` (alias: `--autonomous`): Fully non-interactive mode. Replaces user input with sensible defaults and machine synthesis. Requires an explicit work item (`--source github <number>` OR a single file path) — picker modes and queue mode are disallowed. Never merges. Emits the structured-result shape from `../_shared/orchestration-guide.md` §10.C as the final output. See the "Autonomous Mode (`--auto`)" section below for the full behavior contract.
 
 ## Autonomous Mode (`--auto`)
 
@@ -90,11 +90,11 @@ If invoked with `--auto` and any ambiguous source, exit immediately with the str
 
 Per design §5.5.2, when Step 2 (Codebase Comparison) completes in `--auto`, replace the interactive challenge round with a machine synthesis pass that delegates to `/claudna:weigh-development-paths --auto`.
 
-The producer/consumer schema between the two skills is documented at `skills/_shared/contracts/synthesis-contract.md`. Step 3-AUTO below packages a context bundle, dispatches the synthesizer, and parses its structured result per that contract.
+The producer/consumer schema between the two skills is documented at `../_shared/contracts/synthesis-contract.md`. Step 3-AUTO below packages a context bundle, dispatches the synthesizer, and parses its structured result per that contract.
 
 ### Output (structured result)
 
-After Step 9, emit a single fenced JSON block as the FINAL output (full schema in `skills/_shared/orchestration-guide.md` §10.C):
+After Step 9, emit a single fenced JSON block as the FINAL output (full schema in `../_shared/orchestration-guide.md` §10.C):
 
 ```json
 {
@@ -431,7 +431,7 @@ For direct paths (A and B): the queue contains a single item. Steps 2-9 execute 
 
 After the work item is loaded into the queue (Step 1), validate that the plan body has enough detail to implement.
 
-**A plan is "implementable" if its body contains an `## Implementation Plan` section** with a `### Steps` (or equivalent step-by-step prose) sub-section. This convention is set by the output-guide (`skills/_shared/output-guide.md` §4.1) — every planning skill produces this section on every target: GitHub Issues carry it directly, and phase docs on disk (`documentation/planning/`) are the same publishable-doc shape (planning-standard's content sections map onto the §4.1 skeleton — see its mapping table; older docs may carry the legacy "Detailed Implementation Plan" heading instead).
+**A plan is "implementable" if its body contains an `## Implementation Plan` section** with a `### Steps` (or equivalent step-by-step prose) sub-section. This convention is set by the output-guide (`../_shared/output-guide.md` §4.1) — every planning skill produces this section on every target: GitHub Issues carry it directly, and phase docs on disk (`documentation/planning/`) are the same publishable-doc shape (planning-standard's content sections map onto the §4.1 skeleton — see its mapping table; older docs may carry the legacy "Detailed Implementation Plan" heading instead).
 
 **If the plan IS implementable:** proceed to Step 2.
 
@@ -535,7 +535,7 @@ Read `challenge-round-questions.md` for the question matrix and `red-flags-and-r
 
 #### Step 3-AUTO: Synthesis pass (`--auto` only)
 
-Per design §5.5.2 and the canonical Autonomous Mode reference earlier in this skill, replace the interactive challenge round with a machine synthesis pass that delegates to `/claudna:weigh-development-paths --auto`. The producer/consumer schema between the two skills is canonical at `skills/_shared/contracts/synthesis-contract.md`.
+Per design §5.5.2 and the canonical Autonomous Mode reference earlier in this skill, replace the interactive challenge round with a machine synthesis pass that delegates to `/claudna:weigh-development-paths --auto`. The producer/consumer schema between the two skills is canonical at `../_shared/contracts/synthesis-contract.md`.
 
 1. **Create scratch directory.** Use the Write tool to create a file at `/tmp/build-<YYYY-MM-DD_HHMMSS>/synthesis-bundle.md`. The Write tool creates parent directories automatically.
 
@@ -546,7 +546,7 @@ Per design §5.5.2 and the canonical Autonomous Mode reference earlier in this s
 
    Assign each an id `D1`, `D2`, ... in the order found.
 
-3. **Write the bundle.** Compose the synthesis bundle at the scratch path, per `skills/_shared/contracts/synthesis-contract.md`'s input-bundle shape:
+3. **Write the bundle.** Compose the synthesis bundle at the scratch path, per `../_shared/contracts/synthesis-contract.md`'s input-bundle shape:
 
 ```markdown
 # Synthesis bundle — <plan title>
@@ -575,12 +575,12 @@ Apply the skill with --auto mode against the context bundle at:
   /tmp/build-<timestamp>/synthesis-bundle.md
 
 Return ONLY the structured-result JSON block per the skill's emission contract
-(canonical schema: skills/_shared/contracts/synthesis-contract.md).
+(canonical schema: ../_shared/contracts/synthesis-contract.md).
 Do NOT enter Plan Mode. Do NOT issue interactive user-input prompts.
 Do NOT write to any plan file — the orchestrator handles that.
 ```
 
-5. **Parse the subagent's structured result** per `skills/_shared/contracts/synthesis-contract.md`, and remap its outcome to `build`'s own:
+5. **Parse the subagent's structured result** per `../_shared/contracts/synthesis-contract.md`, and remap its outcome to `build`'s own:
 
    Use the Read tool to read the subagent's final output (it should be a single fenced JSON block). Parse it.
 
@@ -721,7 +721,7 @@ Apply `engineering-principles.md` ("Applying During Implementation" checklist). 
 
 After Step 6 verification passes, evaluate whether the diff warrants a simplification pass via `/simplify`. /simplify reshapes recently changed code for clarity and removes incidental complexity. It operates non-interactively on the working tree.
 
-Follow the procedure in `skills/_shared/subagent-prompts/simplify-chain.md`.
+Follow the procedure in `../_shared/subagent-prompts/simplify-chain.md`.
 
 **Trigger condition:**
 
@@ -847,7 +847,7 @@ Suggest worktree parallelism for independent phases. **Do NOT auto-start** — t
 
 - **Interactive mode:** Present an Implementation Summary: session name, phases completed/remaining with PR numbers, challenges resolved, updates made, archive location. If items remain in the queue, list them with their status.
 
-- **`--auto` mode:** Emit the structured-result block per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run. No human-readable summary, no queue prompt, nothing after the JSON block.
+- **`--auto` mode:** Emit the structured-result block per `../_shared/orchestration-guide.md` §10.C as the FINAL output of the run. No human-readable summary, no queue prompt, nothing after the JSON block.
 
 The structured-result for a successful `--auto` run:
 

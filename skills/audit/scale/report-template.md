@@ -1,8 +1,8 @@
 # Scale Audit Report Template
 
-The output contract for the `/claudna:audit scale` lens. The report is **stable**: sections appear in exactly this order with these headings, so downstream consumers (issue filing per `skills/_shared/output-guide.md`, re-audits, diffs between audits) can rely on the structure. Sections with nothing to report state that explicitly ("No open decisions.") — never omit a section.
+The output contract for the `/claudna:audit scale` lens. The report is **stable**: sections appear in exactly this order with these headings, so downstream consumers (issue filing per `../../_shared/output-guide.md`, re-audits, diffs between audits) can rely on the structure. Sections with nothing to report state that explicitly ("No open decisions.") — never omit a section.
 
-Severity and confidence vocabulary are defined at the bottom; findings carry the canonical concern areas from `skills/_shared/contracts/lens-result-contract.md`.
+Severity and confidence vocabulary are defined at the bottom; findings carry the canonical concern areas from `../../_shared/contracts/lens-result-contract.md`.
 
 ---
 

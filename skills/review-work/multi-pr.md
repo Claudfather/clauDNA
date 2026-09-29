@@ -12,7 +12,7 @@ All PRs must belong to the current repository — cross-repo sets are out of sco
 
 ## Step 2: Scratch Directory
 
-Define the session scratch directory per the research-agent pattern in `skills/_shared/orchestration-guide.md` (§1–§2):
+Define the session scratch directory per the research-agent pattern in `../_shared/orchestration-guide.md` (§1–§2):
 
 ```
 /tmp/review-work-<YYYY-MM-DD_HHMMSS>/research/

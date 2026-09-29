@@ -25,7 +25,7 @@ Parse `$ARGUMENTS`:
 
 ## Step 0: Detection ladder
 
-Run the detection ladder (`skills/_shared/claudron-engine.md` §1) before anything else. Route on the verdict:
+Run the detection ladder (`../_shared/claudron-engine.md` §1) before anything else. Route on the verdict:
 - **present-with-vault** → the engine path (Step 1).
 - **present-no-vault** / **absent** → the frozen INDEX.md-scan fallback (below). Degrade loudly — say which path you took and why.
 

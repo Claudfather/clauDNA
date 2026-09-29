@@ -5,21 +5,21 @@ description: "Use when a finished markdown document — plan, audit or review fi
 argument-hint: "<source-file-or-dir> [--to vault|docs|github-issue|github-pr|session|notion] [--dir <path>] [--update <issue#|url>] [--repo <name>] [--dry-run]"
 requires:
   - cli: claudron
-    reason: "Optional — `--to vault` routes the doc through `claudron capture` when the engine is present; without it, that one adapter degrades per the standard notice in skills/_shared/claudron-engine.md §3.1 and writes the frozen raw tree. Every other adapter is unaffected"
+    reason: "Optional — `--to vault` routes the doc through `claudron capture` when the engine is present; without it, that one adapter degrades per the standard notice in ../_shared/claudron-engine.md §3.1 and writes the frozen raw tree. Every other adapter is unaffected"
 ---
 
 # Publish
 
 Markdown-first, output-last. Takes a doc with frontmatter and publishes it to the right destination. The doc is always the source of truth — /claudna:publish is just the adapter.
 
-**This skill is the single output sink.** Analysis/planning skills are *authors*: they produce a markdown doc with valid frontmatter and the house-style body skeleton, then hand it to /claudna:publish. /claudna:publish is the *publisher*: it enforces house style, dedups per-medium, and routes the one manuscript to whichever edition the caller asked for. Skills must never call `gh issue create` / `gh pr create` themselves — they delegate here. The canonical house-style spec (frontmatter schema, per-type body skeleton, label taxonomy) lives in `skills/_shared/output-guide.md`; this skill enforces it.
+**This skill is the single output sink.** Analysis/planning skills are *authors*: they produce a markdown doc with valid frontmatter and the house-style body skeleton, then hand it to /claudna:publish. /claudna:publish is the *publisher*: it enforces house style, dedups per-medium, and routes the one manuscript to whichever edition the caller asked for. Skills must never call `gh issue create` / `gh pr create` themselves — they delegate here. The canonical house-style spec (frontmatter schema, per-type body skeleton, label taxonomy) lives in `../_shared/output-guide.md`; this skill enforces it.
 
 ## Arguments
 
 Parse `$ARGUMENTS` at invocation:
 - **First positional arg:** Path to the source markdown file — or, for the docs adapter's family mode, a directory holding one `00_*.md` master plus `NN_*.md` phase docs. Required.
 - `--to <dest>`: Destination adapter. One of: `vault` (default), `docs`, `github-issue`, `github-pr`, `session`, `notion`.
-- `--dir <path>`: docs adapter only — the target directory under `documentation/` (the calling skill knows its category; registry in `skills/_shared/documentation-standard.md` §2). Required with `--to docs`.
+- `--dir <path>`: docs adapter only — the target directory under `documentation/` (the calling skill knows its category; registry in `../_shared/documentation-standard.md` §2). Required with `--to docs`.
 - `--update <issue#|url>`: Replace the named GitHub issue's body instead of creating anything. Implies `--to github-issue` — the only adapter with an update path — so `--to` may be omitted. See "In-place update" under the github-issue adapter.
 - `--repo <name>`: Target repository (for github adapters).
 - `--dry-run`: Show what would be published without doing it.
@@ -37,7 +37,7 @@ Validate required fields exist and are well-formed:
 | Field | Rule |
 |-------|------|
 | `title` | non-empty string |
-| `type` | a valid note type — vocabulary table in `skills/_shared/output-guide.md` §3 (the repo's only enum table, rendered from the Claudron SSOT) |
+| `type` | a valid note type — vocabulary table in `../_shared/output-guide.md` §3 (the repo's only enum table, rendered from the Claudron SSOT) |
 | `status` | valid for the `type` per the §3 vocabulary table: canonical values pass silently; accepted legacy values (e.g. `active` on a knowledge doc) pass with a one-line mapping note — never a rejection |
 | `owner` | non-empty string |
 | `created` | valid `YYYY-MM-DD` |
@@ -50,10 +50,10 @@ Pass-through fields (accepted, never rejected, never required — output-guide �
 
 The body must match the house-style skeleton for its `type:`. This is keyed off `type:` (≤6 types) — publish validates the *skeleton*, never the prose, and never rewrites the body.
 
-- **`audit`, `review`, `plan`** — must contain the implementation-ready skeleton (see `skills/_shared/output-guide.md` Section 4.1):
+- **`audit`, `review`, `plan`** — must contain the implementation-ready skeleton (see `../_shared/output-guide.md` Section 4.1):
   `## Summary`, `## Evidence`, `## Implementation Plan` (with `### Dependencies`, `### Blocks`, `### Steps`), `## Test Plan`, `## Verification Checklist`, `## What NOT To Do`, `## Context`.
   **Hard gate:** the `## Implementation Plan` heading and its `### Steps` subsection MUST be present. This is the contract `/claudna:build --source github` depends on to tell an implementable issue from a findings-only one — without it, `--auto` implementation blocks. Reject the publish if missing.
-- **`decision`, `knowledge`, `runbook`** — require a non-trivial body (not just frontmatter) and a leading `#`/`##` heading. No fixed section gate (see `skills/_shared/documentation-standard.md`); validate presence, not structure.
+- **`decision`, `knowledge`, `runbook`** — require a non-trivial body (not just frontmatter) and a leading `#`/`##` heading. No fixed section gate (see `../_shared/documentation-standard.md`); validate presence, not structure.
 
 **Master-doc exception (docs adapter):** a `00_*.md` doc validates like the knowledge tier — frontmatter + non-trivial body + leading heading, no §4.1 skeleton gate — even when its `type:` is `audit`/`review`/`plan`, whether it arrives as a family member (directory source) or alone (single-doc source: retros, dashboards, findings reports). Masters and standalone reports are inventories, not implementation plans; the skeleton hard gate exists for build readiness, which is a property of the `NN_*` phase docs (which validate in full). This exemption is the design, not a workaround.
 
@@ -61,14 +61,14 @@ The body must match the house-style skeleton for its `type:`. This is keyed off 
 
 ## Step 2: Route to Adapter
 
-Two disk-backed adapters serve two different planes — the plane doctrine and which-door table live in `skills/_shared/documentation-standard.md`:
+Two disk-backed adapters serve two different planes — the plane doctrine and which-door table live in `../_shared/documentation-standard.md`:
 
 - **`vault`** → the shared-docs vault (cross-project referential knowledge; INDEX-discovered)
 - **`docs`** → the current repo's `documentation/` tree (work-in-flight + repo-coupled records; git/PR-discovered)
 
 ### Adapter: vault (default)
 
-This plane has two backends — a Claudron vault (engine) and a raw tree (fallback). Run the **detection ladder in `skills/_shared/claudron-engine.md` §1** first, then route:
+This plane has two backends — a Claudron vault (engine) and a raw tree (fallback). Run the **detection ladder in `../_shared/claudron-engine.md` §1** first, then route:
 
 **Engine path — verdict present-with-vault.** Route the finished doc through Claudron rather than writing files directly; map its frontmatter onto a capture call:
 
@@ -81,7 +81,7 @@ claudron capture --type <type> --title "<title>" --body "<body>" --tags "<tags>"
 
 **Provenance (capability-probed).** If the doc's frontmatter carries `source_url` / `source_type` (SCHEMA optional fields), map them onto `--source-url` / `--source-type` — but **only on a flags-capable engine**: `data.engine_version` present and ≥ **0.4.0** (the Claudron C2 release that added the flags; the same version probe `/claudna:capture` Step 1 uses, and the same floor its PreCompact defer keys on). An older / absent / unreadable version omits them (it would reject the flags, exit 2). Provenance is **never** folded into the body here: that trailing `Source:` workaround was capture's alone, and the github-pr adapter's `Source:` footer is an unrelated surface.
 
-**Fallback path — verdict present-no-vault or absent** (frozen behavior). Emit the standard degradation notice first (`skills/_shared/claudron-engine.md` §3.1 — quote the `/claudna:publish --to vault` row), then write the doc to the raw-tree directory for its `type:`:
+**Fallback path — verdict present-no-vault or absent** (frozen behavior). Emit the standard degradation notice first (`../_shared/claudron-engine.md` §3.1 — quote the `/claudna:publish --to vault` row), then write the doc to the raw-tree directory for its `type:`:
 
 | Type | Destination |
 |------|-------------|
@@ -110,7 +110,7 @@ Write the doc — or doc family — into the current repo's `documentation/` tre
 
 **Dedup first (mandatory).** A dedup that silently misses is exactly the failure it exists to
 prevent, so this step is bounded on purpose and **states its bound in the output**. Run it
-before creating, then apply the decision rules in `skills/_shared/output-guide.md` Section 4.5.
+before creating, then apply the decision rules in `../_shared/output-guide.md` Section 4.5.
 
 **1. Pick 2–3 deliberately different terms** from the doc's title, tags and cited files. GitHub
 issue search is *lexical, not semantic* — it cannot match a duplicate whose filer chose different
@@ -191,7 +191,7 @@ After creating:
 gh issue edit <number> --repo <owner>/<repo> --body-file <rendered-body-file>
 ```
 
-Rules: dedup is skipped (the target is explicit); the title is never changed (`gh issue edit --body-file` only — retitling stays a manual act); labels are additive only (`--add-label` for new `tags:`, never removing existing ones); report the issue URL and note "updated in place". The exact-match dedup rule lives in `skills/_shared/output-guide.md` §4.5 and routes here: an exact match prefers an offered `--update` over a skip.
+Rules: dedup is skipped (the target is explicit); the title is never changed (`gh issue edit --body-file` only — retitling stays a manual act); labels are additive only (`--add-label` for new `tags:`, never removing existing ones); report the issue URL and note "updated in place". The exact-match dedup rule lives in `../_shared/output-guide.md` §4.5 and routes here: an exact match prefers an offered `--update` over a skip.
 
 ### Adapter: github-pr
 
