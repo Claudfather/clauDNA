@@ -2,6 +2,7 @@
 name: using-claudna
 user-invocable: true
 description: "Use at conversation start to orient in the clauDNA skill set, when unsure which installed skill fits a task, or to verify the installation is healthy — version, hooks, skills loadable, dependencies (Installation Health section). For discovering third-party skills from the public ecosystem, use /claudna:find-skills. Replaces /skill-health."
+hosts: [claude-code]
 argument-hint: "[health]"
 ---
 

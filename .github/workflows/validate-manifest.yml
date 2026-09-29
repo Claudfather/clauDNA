@@ -9,6 +9,8 @@ on:
       - "assets/**"
       - "plugin-hooks/hooks.json"
       - "scripts/validate-manifest.py"
+      - "scripts/check_cursor_scope.py"
+      - "scripts/skill_checks.py"
   pull_request:
     branches: [main]
     paths:
@@ -17,6 +19,8 @@ on:
       - "assets/**"
       - "plugin-hooks/hooks.json"
       - "scripts/validate-manifest.py"
+      - "scripts/check_cursor_scope.py"
+      - "scripts/skill_checks.py"
 
 jobs:
   validate:
@@ -29,6 +33,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      # validate-manifest.py imports check_cursor_scope, which imports
+      # skill_checks for frontmatter parsing (#340) -- this job used to need
+      # nothing beyond stdlib, so it skipped make deps entirely; it now needs
+      # PyYAML. Installing the pinned dev set (rather than pyyaml alone) keeps
+      # one definition of the version instead of two that can drift.
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
 
       - name: Validate manifest files
         run: python scripts/validate-manifest.py

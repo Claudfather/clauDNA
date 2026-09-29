@@ -2,6 +2,7 @@
 name: promotion-intake
 user-invocable: true
 description: "Use when a Claudosseum promotion package (manifest + battle history + telemetry + SKILL.md bundle) is ready to land in clauDNA — validates it against the promotion contract and stages the skill as a reviewable PR. Not for authoring new skills by hand; use /claudna:skill-scaffold for those."
+context: repo-clone
 argument-hint: "<package-path-or-url> [--dry-run] [--auto]"
 requires:
   - cli: gh

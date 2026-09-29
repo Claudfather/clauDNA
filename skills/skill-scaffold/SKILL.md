@@ -2,6 +2,7 @@
 name: skill-scaffold
 user-invocable: true
 description: "Use when you want to scaffold a new clauDNA skill directory with correct structure, valid frontmatter, and a starter body that passes validation."
+context: repo-clone
 argument-hint: "[skill-name]"
 allowed-tools:
   - Bash(python3 *)
