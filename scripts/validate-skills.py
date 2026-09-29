@@ -16,6 +16,7 @@ from pathlib import Path
 from check_schema_drift import run_check as run_schema_drift_check
 from check_vault_address import run_check as run_vault_address_check
 from skill_checks import (
+    SKIP_DIRS,
     STALE_PATH_RE,
     check_removed_name_mentions,
     collect_skill_reference_errors,
@@ -34,7 +35,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SKILLS_DIR = REPO_ROOT / "skills"
 REMOVED_SKILLS_FILE = REPO_ROOT / "scripts" / "removed-skills.txt"
 
-SKIP_DIRS = {"_shared"}
 SKIP_SKILLS: set[str] = set()  # add skill names here to intentionally bypass validation
 
 # Removed-names gate scope: skill_checks.walk_gate_files (shared with the
@@ -192,9 +192,7 @@ def main() -> int:
             text = md_file.read_text()
             shared_key = f"_shared/{md_file.relative_to(shared_dir)}"
             stale_errors = [
-                f"stale hardcoded path: {line.strip()}"
-                for line in text.splitlines()
-                if STALE_PATH_RE.search(line)
+                f"stale hardcoded path: {line.strip()}" for line in text.splitlines() if STALE_PATH_RE.search(line)
             ]
             if stale_errors:
                 all_errors[shared_key] = stale_errors

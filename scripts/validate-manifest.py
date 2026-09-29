@@ -102,7 +102,11 @@ def get_latest_tag_version() -> tuple[int, ...] | None:
 
 
 def resolve_component_path(raw_path: str) -> Path:
-    return (REPO_ROOT / raw_path.lstrip("./")).resolve()
+    # Path(...) already normalizes a leading "./" on join; lstrip("./") strips
+    # *characters*, not a prefix, so a real dot-leading name (".agents/skills")
+    # would lose its dot too -- the same bug #343 fixed in check_cursor_scope.py's
+    # own path resolution, present here since #335 (#344).
+    return (REPO_ROOT / raw_path).resolve()
 
 
 def is_safe_relative(raw_path: str) -> bool:
@@ -123,17 +127,11 @@ def is_safe_relative(raw_path: str) -> bool:
 def validate_declared_path(label: str, field: str, raw_path: str) -> None:
     """A declared path must be relative, escape-free, and present on disk."""
     if not is_safe_relative(raw_path):
-        error(
-            f"{label}: {field} path '{raw_path}' must be relative with no '..' "
-            "and no absolute prefix"
-        )
+        error(f"{label}: {field} path '{raw_path}' must be relative with no '..' and no absolute prefix")
         return
     resolved = resolve_component_path(raw_path)
     if not resolved.exists():
-        error(
-            f"{label}: {field} path '{raw_path}' does not exist "
-            f"(resolved: {resolved})"
-        )
+        error(f"{label}: {field} path '{raw_path}' does not exist (resolved: {resolved})")
 
 
 def validate_component_paths(label: str, data: dict, fields: tuple[str, ...]) -> None:
@@ -275,10 +273,7 @@ def validate_marketplace_json(plugin_dir: Path, *, cursor: bool = False) -> None
         if not entry_name:
             error(f"{label}: plugins[{i}] missing 'name' field")
         elif known_plugin_name and entry_name != known_plugin_name:
-            error(
-                f"{label}: plugins[{i}].name '{entry_name}' "
-                f"does not match plugin.json name '{known_plugin_name}'"
-            )
+            error(f"{label}: plugins[{i}].name '{entry_name}' does not match plugin.json name '{known_plugin_name}'")
         if entry_name:
             if entry_name in seen_names:
                 error(f"{label}: duplicate plugin name '{entry_name}'")
@@ -294,14 +289,9 @@ def validate_marketplace_json(plugin_dir: Path, *, cursor: bool = False) -> None
             error(f"{label}: plugins[{i}].source must be a relative path string")
             continue
         if not is_safe_relative(source):
-            error(
-                f"{label}: plugins[{i}].source '{source}' must be relative "
-                "with no '..' and no absolute prefix"
-            )
+            error(f"{label}: plugins[{i}].source '{source}' must be relative with no '..' and no absolute prefix")
             continue
-        source_manifest = (
-            (REPO_ROOT / source).resolve() / ".cursor-plugin" / "plugin.json"
-        )
+        source_manifest = (REPO_ROOT / source).resolve() / ".cursor-plugin" / "plugin.json"
         if not source_manifest.exists():
             error(
                 f"{label}: plugins[{i}].source '{source}' has no "

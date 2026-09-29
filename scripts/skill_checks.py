@@ -39,6 +39,12 @@ KNOWN_FIELDS = REQUIRED_FIELDS | {
 KNOWN_HOSTS = {"claude-code", "cursor"}
 KNOWN_CONTEXTS = {"repo-clone"}
 
+# clauDNA #344: the one definition of "not a skill directory" -- was three
+# independent copies (here, validate-skills.py, integration-test.py,
+# check_cursor_scope.py), which is exactly how a gate and a validator end up
+# disagreeing about what counts as a skill without either one changing.
+SKIP_DIRS = {"_shared"}
+
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*$")
 DESC_MIN = 20
 DESC_MAX = 500

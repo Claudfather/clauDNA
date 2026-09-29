@@ -84,8 +84,9 @@ Every skill must satisfy [SKILL_CONTRACT.md](./SKILL_CONTRACT.md). The short ver
 - Body is at least 200 characters of markdown
 - No hardcoded paths to `~/.claude/skills/`, `~/.claude/commands/`, or `~/.claude/agents/`
 - `name` is globally unique across the repo
+- **Add it to `.cursor-plugin/plugin.json`'s `skills` list**, unless it's restricted to a host or a context (below) — the list is explicit, not directory-discovered (#340), so a new portable skill that's missing from it fails `make check-manifest` at CI time, not before. If the skill needs Claude Code's own plugin/hook internals, or a clone of this repo, mark it instead of listing it: `hosts: [claude-code]` or `requires-context: repo-clone` in its frontmatter (SKILL_CONTRACT §2.2) — the gate then requires it to be *absent* from the Cursor list.
 
-Run `make check-skills` to catch contract violations while iterating, and `make check` before pushing.
+Run `make check-skills` to catch contract violations while iterating, `make check-manifest` for the Cursor-list step specifically, and `make check` before pushing.
 
 ### Modifying Hooks
 

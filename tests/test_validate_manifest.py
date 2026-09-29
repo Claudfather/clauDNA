@@ -57,7 +57,11 @@ def build_repo(tmp_path: Path) -> Path:
     real_cursor_skills = json.loads((REPO_ROOT / CURSOR).read_text()).get("skills")
     if isinstance(real_cursor_skills, list):
         for entry in real_cursor_skills:
-            (root / entry.lstrip("./")).mkdir(parents=True, exist_ok=True)
+            # Path(...) already normalizes a leading "./" on join -- lstrip("./")
+            # strips characters, not a prefix, and repeats the #344 fix this
+            # fixture exists to guard (harmless today, since every real entry
+            # starts with "./skills/", but the fixture should match the fix).
+            (root / entry).mkdir(parents=True, exist_ok=True)
     (root / "agents").mkdir()
     (root / "assets").mkdir()
     (root / "assets" / "logo.svg").write_text("<svg />\n")
@@ -206,6 +210,40 @@ def test_declared_path_may_not_be_absolute(tmp_path):
     assert "must be relative with no '..'" in output
 
 
+# --- dot-leading path resolution (#344) ---
+#
+# resolve_component_path() used to lstrip("./") -- stripping *characters*,
+# not a prefix -- so a declared ".agents/skills" silently resolved to the
+# SAME Path as the undotted "agents/skills". Reverting the fix (restoring
+# lstrip("./")) keeps the rest of this suite green: nothing else pinned it.
+# Both tests below use the "agents" component field rather than "skills",
+# deliberately -- "skills" also runs through the cursor-scope gate (#340),
+# which would coincidentally reject a directory with no SKILL.md before
+# resolve_component_path()'s own existence check ever ran, and these two
+# tests exist to isolate that one function (#344, otis's review of PR #346,
+# issuecomment-5888490329).
+
+
+def test_a_dot_leading_path_is_not_resolved_to_its_undotted_lookalike(tmp_path):
+    """The dangerous direction: a declared path that does not exist passes,
+    because its undotted lookalike does."""
+    root = build_repo(tmp_path)
+    (root / "agents" / "skills").mkdir(parents=True)  # what lstrip("./") would resolve to
+    patch(root, CURSOR, "agents", ".agents/skills")  # declared, and absent
+    code, output = run_gate(root)
+    assert code != 0
+    assert "'.agents/skills' does not exist" in output
+
+
+def test_a_dot_leading_path_that_exists_passes(tmp_path):
+    """The mirror case: a real dot-leading path must still pass."""
+    root = build_repo(tmp_path)
+    (root / ".agents" / "skills").mkdir(parents=True)
+    patch(root, CURSOR, "agents", ".agents/skills")
+    code, output = run_gate(root)
+    assert code == 0, output
+
+
 def test_component_path_accepts_a_list(tmp_path):
     """Cursor allows a list of paths per component; each entry is checked.
 
@@ -287,3 +325,49 @@ def test_non_semver_version_is_rejected(tmp_path):
     code, output = run_gate(root)
     assert code != 0
     assert "not valid semver" in output
+
+
+# --- cursor-scope gate wiring (#344 -- #343 shipped the gate; nothing pinned
+# that validate-manifest.py actually calls it) ---
+
+
+def build_repo_with_restricted_skill(tmp_path: Path) -> tuple[Path, str]:
+    """build_repo(), plus a real SKILL.md on one already-listed Cursor skill,
+    marking it host-restricted -- reproducing #340's exact failure mode: a
+    skill that cannot run on Cursor, shipped to Cursor anyway.
+
+    build_repo()'s skill directories are deliberately empty (skill *content*
+    is validate-skills.py's business, not this gate's -- see its docstring).
+    This writes just enough frontmatter for check_cursor_scope.run_check() to
+    read, without needing to satisfy validate-skills.py's own contract (a
+    different script, not exercised by validate-manifest.py or this test).
+    """
+    root = build_repo(tmp_path)
+    real_cursor_skills = json.loads((REPO_ROOT / CURSOR).read_text()).get("skills")
+    assert isinstance(real_cursor_skills, list) and real_cursor_skills, (
+        "the real Cursor manifest must be a non-empty explicit list for this "
+        "fixture to mark one entry -- if it ever reverts to directory "
+        "discovery, this fixture needs a different way to pick a skill"
+    )
+    marked = Path(real_cursor_skills[0]).name
+    skill_md = root / "skills" / marked / "SKILL.md"
+    skill_md.write_text(f"---\nname: {marked}\ndescription: fixture\nhosts: [claude-code]\n---\nfixture body\n")
+    return root, marked
+
+
+def test_cursor_manifest_shipping_a_restricted_skill_is_rejected(tmp_path):
+    """Pins the wiring #343 left unpinned (#344, ravi's review of #343,
+    issuecomment-5883111726). If validate-manifest.py's call to
+    run_cursor_scope_check were removed, or its errors were printed instead
+    of passed to error(), this is the only test in the suite that would
+    notice: make check still catches manifest drift through
+    test_cursor_scope.py's test_real_repo_passes_clean, which calls run_check
+    directly, but the standalone `validate-manifest.yml` workflow runs only
+    this script as a subprocess, with no such backstop -- and that gap is
+    exactly what let a restricted skill ship to Cursor in the first place.
+    """
+    root, marked = build_repo_with_restricted_skill(tmp_path)
+    code, output = run_gate(root)
+    assert code != 0
+    assert marked in output
+    assert "#340" in output
