@@ -216,7 +216,11 @@ def test_recall_skill_invokes_the_resolver(tmp_path):
     """Pins the fix at the skill surface — the prose is what actually ships."""
     body = RECALL_SKILL.read_text()
     assert "resolve_memory_dir.py" in body, "recall must resolve the memory dir, not rebuild the path"
+    # Claude Code fills ${CLAUDE_PLUGIN_ROOT} in here, so the command is kept as
+    # it was; every other host takes the <claudna-root> fallback beside it
+    # (SKILL_CONTRACT §1.1), which is also the plugin cache's only way in now.
     assert "${CLAUDE_PLUGIN_ROOT}/scripts/resolve_memory_dir.py" in body
-    # Same plugin-root fallback convention redact.py established.
-    assert "~/.claude/plugins/cache/Claudfather/claudna/*/scripts/resolve_memory_dir.py" in body
+    assert "<claudna-root>/scripts/resolve_memory_dir.py" in body
+    assert "../_shared/claudna-root.md" in body
+    assert "plugins/cache" not in body
     assert RESOLVER_PY.is_file()
