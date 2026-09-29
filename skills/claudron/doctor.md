@@ -1,4 +1,4 @@
-Invoked by /claudna:claudron in doctor mode. This verb runs the detection ladder itself (claudron-engine.md §1), because the vault that most needs a doctor may be one walk-up no longer finds. The diagnosis is read-only. The one write, `claudron doctor --fix`, runs only after the user confirms.
+Invoked by /claudna:claudron in doctor mode. This verb runs the detection ladder itself (claudron-engine.md §1), because the vault that most needs a doctor may be one walk-up no longer finds. `claudron doctor` itself is read-only; the ladder's `claudron status --json` may refresh the engine's index. The one write, `claudron doctor --fix`, runs only after the user confirms.
 
 # Doctor
 
@@ -6,7 +6,7 @@ Check the vault against the rules of the installed engine and explain what it fo
 
 ## Step 1: Resolve the vault (claudron-engine.md §1)
 
-With an explicit `--vault <path>` argument, the user has named the vault, so skip the walk-up. Run `claudron status --json --vault <path>` and pass `--vault <path>` on every later call. If that path is the user's home directory or `/`, say so before anything else: migrating it would make every repo beneath it bind as the vault (Claudron #202).
+With an explicit `--vault <path>` argument, the user has named the vault. **If that path is the user's home directory or `/`, stop before any engine call and say why:** migrating it would make every repo beneath it bind as the vault (Claudron #202), and even `claudron status` writes into the directory it is given. If that directory really is their vault, they can run `claudron doctor --vault <path>` themselves. Otherwise skip the walk-up: run `claudron status --json --vault <path>` and pass `--vault <path>` on every later call.
 
 Otherwise, run the detection ladder as separate Bash calls:
 
@@ -72,7 +72,7 @@ The engine's message is authoritative. This table only adds the next step. This 
 
 | Code | In plain terms | What to do |
 |---|---|---|
-| `D001` | The vault's format is older than the engine's: a migration is pending | `--fix` applies it (Step 6) |
+| `D001` | The vault's format is older than the engine's: a migration is pending, or, with nothing pending, only the recorded format is behind | `--fix` applies it, or records the format (Step 6) |
 | `D002` | Some notes break the schema; the finding carries only a count | `claudron validate` has the detail. `--fix` never touches notes |
 | `D003` | The search index has drifted from the notes | `claudron index` |
 | `D004` | Git is not clean, ahead or behind: for example conflicted, mid-rebase, or on a side branch | `claudron sync --check`, then fix it in git |
@@ -93,13 +93,15 @@ Also report the format line: `vault format <vault_format>, engine format <engine
 - the migrations in `data.pending`, in order: show each one's `id` and `title`;
 - the structure findings that `data.fixable` names.
 
+With a `D001` finding and nothing pending, only the vault's recorded format is behind: `--fix` records the engine's format in the identity file and commits that alone.
+
 Say plainly what `--fix` will **not** do:
 - it never deletes a note;
 - it never untracks a file, so a `D008` stays a human's call;
 - it never changes schema findings (`D002`);
 - it lands everything as one local commit, `migrate(<ids>): claudron doctor --fix`.
 
-If `data.fixable` is empty, there is nothing to apply: report the diagnosis and stop.
+If `data.fixable` is empty and there is no `D001` finding, there is nothing to apply: report the diagnosis and stop.
 
 ## Step 6: Apply, only after the user confirms
 
@@ -112,7 +114,7 @@ claudron doctor --fix --json
 Add `--vault <path>` when Step 1 used one. Then report:
 
 - `data.applied`: the migration ids, in order;
-- `data.repairs`;
+- `data.repairs`: for a format-only `D001`, the one repair that records the format, with `data.applied` empty;
 - `data.commit`: its `message` when `committed` is true, or its `error` verbatim when not. A clone that is mid-rebase gets the files but not the commit;
 - what is still pending (`data.pending` after the run is `[]` on success), and every finding the run still carries.
 

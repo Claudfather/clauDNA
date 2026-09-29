@@ -123,3 +123,38 @@ class TestFixOnlyAfterAnExplicitYes:
         assert auto, "precondition: the mode defines its --auto behavior"
         assert "never runs `--fix`" in auto[0]
         assert not [c for c in bash_commands(auto[0]) if "--fix" in c]
+
+
+class TestTheOneWriteKeepsItsConditions:
+    """Review on #352: the tests above pin WHERE `--fix` may appear, not WHEN it runs.
+    Deleting "only on an explicit yes" left every one of them green."""
+
+    def test_the_write_step_asks_for_an_explicit_yes_and_refuses_without_a_human(self):
+        body = next(b for h, b in steps(doctor_text()) if "confirm" in h.lower())
+        assert "Only on an explicit yes" in body
+        assert "no human in the session, do not run `--fix`" in body
+
+    def test_home_and_root_are_named_in_both_branches_and_not_offered(self):
+        text = doctor_text()
+        assert text.count("home directory or `/`") == 2
+        assert "do not offer it" in text
+
+    def test_a_named_home_or_root_is_refused_before_any_engine_call(self):
+        # `claudron status --json --vault <path>` already writes `.claudron/` into the
+        # named directory, so the refusal has to come before that call, not after it.
+        step1 = next(b for h, b in steps(doctor_text()) if h.startswith("Step 1"))
+        para = next(p for p in step1.split("\n\n") if "explicit `--vault <path>`" in p)
+        refusal = para.find("home directory or `/`")
+        call = para.find("claudron status --json --vault <path>")
+        assert refusal != -1, para
+        assert call == -1 or refusal < call, para
+        assert "stop" in para[refusal : refusal + 120], para
+
+
+class TestNothingToApplyMeansNoD001:
+    def test_empty_fixable_with_a_d001_is_not_nothing_to_apply(self):
+        # Real 0.5.3: a vault that records an older format with nothing pending has
+        # `fixable: []` and one D001, and `--fix` records the format and commits.
+        step5 = next(b for h, b in steps(doctor_text()) if h.startswith("Step 5"))
+        sentence = next(line for line in step5.splitlines() if "nothing to apply" in line)
+        assert "D001" in sentence, sentence
