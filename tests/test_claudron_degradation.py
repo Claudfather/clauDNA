@@ -25,7 +25,7 @@ ENGINE = SKILLS_DIR / "_shared" / "claudron-engine.md"
 #: degradation branches in depth files, not in SKILL.md, so the map is per-file.
 CONSUMER_FILES = {
     "capture": ["capture/SKILL.md"],
-    "claudron": ["claudron/lookup.md", "claudron/status.md"],
+    "claudron": ["claudron/lookup.md", "claudron/status.md", "claudron/doctor.md"],
     "index": ["index/SKILL.md"],
     "init-project": ["init-project/SKILL.md"],
     "publish": ["publish/SKILL.md"],

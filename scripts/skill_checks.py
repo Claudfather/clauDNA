@@ -918,6 +918,7 @@ def check_allowed_tools_usage(fm: dict, body: str) -> list[str]:
 #: being incomplete makes the check miss a call, never invent one.
 CLAUDRON_CLI_VERBS = (
     "capture",
+    "doctor",
     "hooks",
     "index",
     "init",
