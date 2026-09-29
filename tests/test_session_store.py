@@ -38,7 +38,6 @@ from claudna.session_store import events as ev  # noqa: E402
 from claudna.session_store import schema  # noqa: E402
 from claudna.session_store.cli import check_session  # noqa: E402
 from claudna.session_store.fsio import (  # noqa: E402
-    LockBusy,
     append_jsonl,
     atomic_write_json,
     ensure_dir,
@@ -86,7 +85,7 @@ class TestPaths:
     def test_accepts_safe_ids(self, sid):
         assert validate_sid(sid) == sid
 
-    @pytest.mark.parametrize("sid", ["", "..", "../etc", "a/b", ".hidden", "x" * 200, None, 5])
+    @pytest.mark.parametrize("sid", ["", "..", "../etc", "a/b", ".hidden", "abc\n", "ab\u0663", "x" * 200, None, 5])
     def test_rejects_ids_that_are_not_one_safe_path_component(self, sid):
         with pytest.raises(InvalidSessionId):
             validate_sid(sid)
@@ -95,8 +94,8 @@ class TestPaths:
         assert seg_dirname(3) == "seg-003"
         assert seg_dirname(1234) == "seg-1234"
         assert parse_seg_dirname("seg-1234") == 1234
-        assert parse_seg_dirname("seg-000") is None
-        assert parse_seg_dirname("segment-1") is None
+        for bad in ("seg-000", "segment-1", "seg-001\n", "seg-0002", "seg-02", "seg-\u0660\u0660\u0662"):
+            assert parse_seg_dirname(bad) is None, bad
         with pytest.raises(ValueError):
             seg_dirname(0)
         with pytest.raises(ValueError):
@@ -105,6 +104,8 @@ class TestPaths:
     def test_state_root_env_override_and_default(self, tmp_path):
         assert state_root({"CLAUDNA_STATE_DIR": str(tmp_path)}) == tmp_path
         assert state_root({}) == Path("~/.claudna").expanduser()
+        with pytest.raises(ValueError, match="absolute"):
+            state_root({"CLAUDNA_STATE_DIR": "relative/store"})
 
 
 # ── fsio ─────────────────────────────────────────────────────────────────────
@@ -151,14 +152,6 @@ class TestFsio:
                 pass
         assert not (tmp_path / "missing").exists()
 
-    def test_non_blocking_lock_reports_busy_while_held(self, tmp_path):
-        lock = tmp_path / ".lock"
-        with exclusive_lock(lock):
-            with pytest.raises(LockBusy):
-                with exclusive_lock(lock, blocking=False):
-                    pass
-        with exclusive_lock(lock, blocking=False):
-            pass  # released after the outer block
 
 
 # ── events ───────────────────────────────────────────────────────────────────
@@ -251,6 +244,74 @@ class TestStore:
         seg = load(h.paths.segment(1).segment_json)
         assert seg["status"] == "sealed" and seg["transcript"]["range"] == {"start": 0, "end": 140}
 
+    def test_a_lost_lifecycle_refresh_is_detected_and_healed(self, store):
+        h = opened(store)
+        h.open_segment("session_open", 0)
+        # a hook killed between appending the seal and refreshing
+        append_jsonl(h.paths.lifecycle, ev.make_event("segment.sealed", h.sid,
+                                                       {"end": 100, "sealed_by": "precompact", "trigger": "auto"}, seg=1))
+        h.open_segment("compact", 100)
+        h.close_session("other")
+        seg1 = load(h.paths.segment(1).segment_json)
+        assert (seg1["status"], seg1["sealed_by"], seg1["transcript"]["range"]["end"]) == ("sealed", "precompact", 100)
+
+    def test_opening_a_segment_seals_an_unsealed_predecessor(self, store):
+        h = opened(store)
+        h.open_segment("session_open", 0)
+        h.open_segment("compact", 50)  # PreCompact was missed
+        seg1 = load(h.paths.segment(1).segment_json)
+        assert (seg1["status"], seg1["sealed_by"], seg1["transcript"]["range"]) == \
+            ("sealed", "compact", {"start": 0, "end": 50})
+        h.close_session("other")  # SessionEnd lost its seal, then the session resumes
+        h.open_session("resume", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl")
+        h.open_segment("session_open", 80)
+        assert load(h.paths.segment(2).segment_json)["sealed_by"] == "resume"
+        assert load(h.paths.session_json)["segments"]["open"] == 3
+
+    def test_activity_goes_only_to_the_current_segment_of_an_open_session(self, store):
+        h = opened(store)
+        h.open_segment("session_open", 0)
+        h.seal_segment(10, "precompact", trigger="manual")  # a blocked compaction: sealed, still current
+        h.append("prompt.submitted", {"prompt_id": None, "chars": 1}, seg=1)
+        h.seal_segment(30, "precompact", trigger="manual")  # the next PreCompact re-seals later
+        h.open_segment("compact", 30)
+        with pytest.raises(StoreError, match="superseded"):
+            h.append("prompt.submitted", {"prompt_id": None, "chars": 1}, seg=1)
+        h.close_session("other")
+        with pytest.raises(StoreError, match="closed"):
+            h.append("prompt.submitted", {"prompt_id": None, "chars": 1}, seg=2)
+        assert load(h.paths.segment(1).segment_json)["counts"]["prompts"] == 1
+
+    def test_segment_scoped_appends_without_seg_go_to_the_current_segment(self, store):
+        h = opened(store)
+        with pytest.raises(StoreError):
+            h.append("prompt.submitted", {"prompt_id": None, "chars": 1})
+        h.open_segment("session_open", 0)
+        h.open_segment("compact", 5)
+        assert h.append("prompt.submitted", {"prompt_id": None, "chars": 1})["seg"] == 2
+
+    def test_a_seal_cannot_end_before_its_segment_starts(self, store):
+        h = opened(store)
+        h.open_segment("session_open", 100)
+        with pytest.raises(StoreError, match="starts at 100"):
+            h.seal_segment(10, "precompact")
+        assert load(h.paths.segment(1).segment_json)["status"] == "open"
+
+    def test_each_segment_keeps_the_transcript_it_opened_in(self, store):
+        h = opened(store)  # transcript /t.jsonl
+        h.open_segment("session_open", 0)
+        h.seal_segment(10, "session_end")
+        h.close_session("other")
+        h.open_session("resume", actor=ACTOR, origin=ORIGIN, transcript_path="/t2.jsonl")
+        h.open_segment("session_open", 0)
+        assert load(h.paths.segment(1).segment_json)["transcript"]["path"] == "/t.jsonl"
+        assert load(h.paths.segment(2).segment_json)["transcript"]["path"] == "/t2.jsonl"
+        assert load(h.paths.session_json)["transcript_path"] == "/t2.jsonl"
+        files = [h.paths.session_json, h.paths.segment(1).segment_json, h.paths.segment(2).segment_json]
+        incremental = [f.read_text() for f in files]
+        h.rebuild()
+        assert [f.read_text() for f in files] == incremental
+
     def test_activity_requires_an_existing_segment(self, store):
         h = opened(store)
         with pytest.raises(StoreError):
@@ -333,12 +394,10 @@ class TestStore:
             seg_dirname(True)
         assert schema.validate(True, {"type": "integer"}) != []
 
-    def test_session_ids_lists_directories(self, store):
+    def test_each_session_gets_its_own_directory(self, store):
         opened(store, "b")
         opened(store, "a")
-        (store.root / "sessions" / ".tmp").mkdir()
-        (store.root / "sessions" / "has space").mkdir()
-        assert store.session_ids() == ["a", "b"]
+        assert sorted(p.name for p in (store.root / "sessions").iterdir()) == ["a", "b"]
 
     def test_a_torn_tail_never_swallows_the_next_event(self, store):
         h = opened(store)
@@ -365,6 +424,23 @@ class TestStore:
         h.rebuild()
         assert h.paths.segment_indices() == [1]
         assert load(h.paths.session_json)["segments"]["count"] == 1
+        assert h.open_segment("compact", 20) == 3  # index 2 is never reused
+        assert load(h.paths.segment(3).segment_json)["status"] == "open"
+
+    def test_indexes_are_never_reused_after_retention_deletes_segments(self, store):
+        h = opened(store)
+        for i in (1, 2, 3):
+            h.open_segment("session_open" if i == 1 else "compact", i * 100)
+            h.seal_segment(i * 100 + 99, "precompact")
+        h.close_session("other")
+        for i in (1, 2, 3):
+            shutil.rmtree(h.paths.segment(i).dir)
+        h.open_session("resume", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl")
+        new = h.open_segment("session_open", 400)
+        seg = load(h.paths.segment(new).segment_json)
+        assert new == 4 and seg["status"] == "open"
+        assert seg["transcript"]["range"] == {"start": 400, "end": None}
+        assert load(h.paths.session_json)["segments"] == {"count": 1, "open": 4}
 
     def test_foreign_session_events_do_not_fold(self, store):
         h = opened(store)
@@ -524,16 +600,12 @@ class TestSchemas:
         mutate(doc)
         assert schema.validate(doc, schema.load(name)) != []
 
-    def test_consumers_and_clear_link_schemas(self):
-        ok_consumers = {"schema": "claudna.consumers/1", "sid": "s",
-                        "consumers": {"claudron": {"through_seg": 2, "acked_at": "2026-09-28T10:00:00.000Z"}}}
-        assert schema.validate(ok_consumers, schema.load("consumers")) == []
-        ok_consumers["consumers"]["claudron"]["through_seg"] = 0
-        assert schema.validate(ok_consumers, schema.load("consumers")) != []
-        link = {"schema": "claudna.clear-link/1", "pid": 4242, "sid": "s", "chain_id": "s",
-                "ts": "2026-09-28T10:00:00.000Z"}
-        assert schema.validate(link, schema.load("clear-link")) == []
-        assert schema.validate({**link, "pid": 0}, schema.load("clear-link")) != []
+    def test_patterns_use_json_schema_semantics(self):
+        ts = schema.load("event")["properties"]["ts"]
+        assert schema.validate("2026-09-28T17:04:05.123Z", ts) == []
+        assert schema.validate("2026-09-28T17:04:05.123Z\n", ts) != []  # $ is end-of-string
+        assert schema.validate("\u0662026-09-28T17:04:05.123Z", ts) != []  # \d is ASCII
+        assert schema.validate("x$", {"pattern": "\\$$"}) == []  # an escaped $ stays literal
 
     def test_unsupported_keyword_raises_instead_of_silently_passing(self):
         with pytest.raises(schema.SchemaError):
@@ -584,7 +656,7 @@ class TestCli:
         bad["data"]["reason"] = "bored"
         append_jsonl(session_paths(FIXTURE_SID, root).lifecycle, bad)
         assert run_cli("check", FIXTURE_SID, "--root", str(root)).returncode == 1
-        assert check_session(SessionStore(root).session(FIXTURE_SID))
+        assert check_session(SessionStore(root).session(FIXTURE_SID)).problems
 
     def test_unknown_and_invalid_sessions_exit_1(self, tmp_path):
         assert run_cli("rebuild", "missing", "--root", str(tmp_path)).returncode == 1
@@ -610,6 +682,15 @@ class TestCli:
                                                             {"prompt_id": None, "chars": 1}, seg=1))
         result = run_cli("check", FIXTURE_SID, "--root", str(root))
         assert result.returncode == 1 and "read from segment 2" in result.stdout
+
+    def test_crash_debris_is_a_warning_not_a_failure(self, tmp_path):
+        root = _copy_fixture(tmp_path)
+        lifecycle = session_paths(FIXTURE_SID, root).lifecycle
+        with lifecycle.open("a") as fh:
+            fh.write('{"v":1,"kind":"segment.sea')  # a torn write
+        run_cli("rebuild", FIXTURE_SID, "--root", str(root))
+        result = run_cli("check", FIXTURE_SID, "--root", str(root))
+        assert result.returncode == 0 and "warning:" in result.stdout and "crash debris" in result.stdout
 
     def test_usage_error_exits_2(self):
         assert run_cli("frobnicate").returncode == 2

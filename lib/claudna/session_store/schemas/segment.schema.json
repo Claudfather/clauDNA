@@ -53,6 +53,7 @@
         "precompact",
         "compact",
         "session_end",
+        "resume",
         null
       ]
     },

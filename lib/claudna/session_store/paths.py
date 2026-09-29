@@ -25,8 +25,10 @@ STATE_DIR_ENV = "CLAUDNA_STATE_DIR"
 DEFAULT_STATE_DIR = "~/.claudna"
 
 #: Opaque, but safe as a single path component: no separators, no leading dot.
-_SID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
-_SEG_RE = re.compile(r"^seg-(\d{3,})$")
+#: Always ``fullmatch`` with ``re.ASCII``: ``$`` also matches before a trailing
+#: newline, and ``\d`` matches non-ASCII digits.
+_SID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", re.ASCII)
+_SEG_RE = re.compile(r"seg-([0-9]{3,})", re.ASCII)
 
 
 class InvalidSessionId(ValueError):
@@ -35,16 +37,23 @@ class InvalidSessionId(ValueError):
 
 def validate_sid(sid: str) -> str:
     """Return ``sid`` unchanged, or raise :class:`InvalidSessionId`."""
-    if not isinstance(sid, str) or not _SID_RE.match(sid):
+    if not isinstance(sid, str) or not _SID_RE.fullmatch(sid):
         raise InvalidSessionId(f"invalid session id: {sid!r}")
     return sid
 
 
 def state_root(env: dict[str, str] | None = None) -> Path:
-    """Resolve the store root: ``$CLAUDNA_STATE_DIR``, else ``~/.claudna``."""
+    """Resolve the store root: ``$CLAUDNA_STATE_DIR``, else ``~/.claudna``.
+
+    A relative ``$CLAUDNA_STATE_DIR`` is rejected: hooks run in the user's
+    project, so it would put the store — captured text included — inside a
+    repository where it can be committed.
+    """
     env = os.environ if env is None else env
-    raw = env.get(STATE_DIR_ENV) or DEFAULT_STATE_DIR
-    return Path(raw).expanduser()
+    root = Path(env.get(STATE_DIR_ENV) or DEFAULT_STATE_DIR).expanduser()
+    if not root.is_absolute():
+        raise ValueError(f"{STATE_DIR_ENV} must be an absolute path, got {str(root)!r}")
+    return root
 
 
 def seg_dirname(index: int) -> str:
@@ -55,12 +64,14 @@ def seg_dirname(index: int) -> str:
 
 
 def parse_seg_dirname(name: str) -> int | None:
-    """``seg-003`` → ``3``; anything else → ``None``."""
-    m = _SEG_RE.match(name)
-    if not m:
-        return None
-    index = int(m.group(1))
-    return index if index >= 1 else None
+    """``seg-003`` → ``3``; anything else → ``None``.
+
+    Only the canonical spelling counts (``seg_dirname(i) == name``), so
+    ``seg-0002`` or ``seg-02`` can never claim index 2 beside ``seg-002``.
+    """
+    m = _SEG_RE.fullmatch(name)
+    index = int(m.group(1)) if m else 0
+    return index if index >= 1 and seg_dirname(index) == name else None
 
 
 @dataclass(frozen=True)

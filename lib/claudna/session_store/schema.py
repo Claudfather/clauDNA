@@ -42,6 +42,19 @@ def load(name: str) -> dict:
     return json.loads((SCHEMA_DIR / f"{name}.schema.json").read_text(encoding="utf-8"))
 
 
+@functools.cache
+def _pattern(source: str) -> re.Pattern:
+    """Compile a schema ``pattern`` with JSON Schema (ECMAScript) semantics.
+
+    Python differs in two ways that matter here: ``$`` also matches before a
+    trailing newline (ECMAScript's ``$`` is end-of-string), and ``\\d``/``\\w``
+    match non-ASCII characters. An unescaped ``$`` becomes ``\\Z`` and the
+    pattern compiles with ``re.ASCII``. (``$`` inside a character class isn't
+    rewritten correctly; no store schema uses one.)
+    """
+    return re.compile(re.sub(r"(?<!\\)\$", r"\\Z", source), re.ASCII)
+
+
 def is_instance(value: object, types: type | tuple[type, ...]) -> bool:
     """``isinstance`` with one correction: a ``bool`` is never an ``int``/``float``.
 
@@ -83,7 +96,7 @@ def validate(instance: object, schema: dict, *, root: dict | None = None, path: 
     if isinstance(instance, str):
         if "minLength" in schema and len(instance) < schema["minLength"]:
             errors.append(f"{path}: shorter than {schema['minLength']}")
-        if "pattern" in schema and not re.search(schema["pattern"], instance):
+        if "pattern" in schema and not _pattern(schema["pattern"]).search(instance):
             errors.append(f"{path}: does not match {schema['pattern']}")
     if is_instance(instance, (int, float)):
         if "minimum" in schema and instance < schema["minimum"]:

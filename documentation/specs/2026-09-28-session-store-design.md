@@ -78,7 +78,7 @@ Not yet verified (open, §11): that PreCompact's transcript byte offset lines up
 - **P1 — Logs are truth; JSON files are projections.** Every `.json` in the store is rebuildable from the `.jsonl` logs beside it (`session rebuild <sid>`). A torn or deleted projection is a cache miss, never data loss.
 - **P2 — One writer per file.** Hooks append events. The projector (same process, right after the append) rewrites projections via temp + `os.replace`. The summarizer writes only its own artifact, then appends an event announcing it.
 - **P3 — Reference, don't copy.** The transcript is never copied into the store. Segments point at it by path + byte range + content hash.
-- **P4 — Metadata by default.** Free text (prompts, stderr) is off unless opted in, and when on is scrubbed (`scripts/redact.py` rules) and capped.
+- **P4 — Metadata by default.** Free text (prompts, stderr) is off unless opted in, and when on is scrubbed (`scripts/redact.py` rules) and capped. Capping happens in `make_event`, so no caller can forget it; redaction joins it there — one choke point — when free-text capture ships (phase 2 moves `redact.py` into `lib/claudna/`).
 - **P5 — Boundaries are observed, never inferred.** Only harness hook events open or close sessions and segments. Counters are derived from what exists on disk, never stored.
 - **P6 — Fail open, bounded.** A store hook never blocks, never fails a session, and returns in well under a second. Heavy work detaches.
 - **P7 — Everything is versioned.** Every event carries `v`; every projection and artifact carries `schema: "claudna.<name>/<major>"`.
@@ -107,13 +107,13 @@ Identity hierarchy, each level stable across a different boundary:
 
 | Hook event | Store action |
 |---|---|
-| SessionStart `startup` / `resume` | `session.opened` (resume: reopen existing dir, open a new segment); `segment.opened` |
+| SessionStart `startup` / `resume` | `session.opened` (resume: reopen existing dir, open a new segment); `segment.opened`. If the previous segment is unsealed (a lost SessionEnd), `open_segment` seals it first at the new start, `sealed_by: "resume"`. |
 | SessionStart `clear` | `session.opened` with `parent_sid` from the clear link (§4.3); `segment.opened` |
 | UserPromptSubmit | `prompt.submitted` (segment events) |
 | PostToolUse (Skill) | `skill.invoked` |
 | PostToolUseFailure | `tool.failed` (failing calls fire this event, not PostToolUse, and only it carries the error field) |
 | PreCompact | `segment.sealed` — record end offset; start summarizer on that range. Idempotent: a second PreCompact (first was blocked) re-seals with the later offset. |
-| SessionStart `compact` | `segment.opened` for index N+1, start = last seal offset. If no seal exists (missed PreCompact), seal first at current transcript size. |
+| SessionStart `compact` | `segment.opened` for index N+1, start = last seal offset. If no seal exists (missed PreCompact), `open_segment` seals first at the new start, `sealed_by: "compact"`. |
 | SessionEnd | `segment.sealed` (final); `session.closed`; start summarizer; on `reason=clear` write the clear link. |
 
 **Why cut at SessionStart(compact), not PreCompact:** PreCompact can fire without a compaction following (clauDNA's own `precompact-reflect.sh` blocks the first attempt by design). Sealing is safe to repeat; opening a segment is not.
@@ -202,11 +202,11 @@ Every line in every log:
 
 | kind | data |
 |---|---|
-| `session.opened` | `{ source: "startup"\|"clear"\|"resume", parent_sid: SessionId\|null, chain_id: SessionId, actor: Actor, origin: Origin, transcript_path: string }` |
+| `session.opened` | `{ source: "startup"\|"clear"\|"resume", parent_sid: SessionId\|null, chain_id: SessionId, actor: Actor, origin: Origin, transcript_path: string\|null }` |
 | `session.child_linked` | `{ child_sid: SessionId }` |
 | `session.privacy_set` | `{ private: bool, by: "user"\|"policy" }` |
 | `segment.opened` | `{ opened_by: "session_open"\|"compact", start: int }` |
-| `segment.sealed` | `{ end: int, sealed_by: "precompact"\|"compact"\|"session_end", trigger: "manual"\|"auto"\|null }` |
+| `segment.sealed` | `{ end: int ≥ start, sealed_by: "precompact"\|"compact"\|"session_end"\|"resume", trigger: "manual"\|"auto"\|null, sha256?: hex64\|null }` |
 | `summary.requested` | `{ job_id: string }` |
 | `summary.completed` | `{ job_id: string, artifact: "seg-NNN/summary.json", input_sha256: string, duration_ms: int }` |
 | `summary.failed` | `{ job_id: string, error: string (≤200), retryable: bool }` |
@@ -224,7 +224,7 @@ Every line in every log:
 
 ### 6.3 Why two logs
 
-`lifecycle.jsonl` is low-volume and session-scope (dozens of lines); it is what `session.json` projects from and what the export cursor reads. `events.jsonl` is per-segment and higher-volume; sealing a segment freezes its file. Readers that only need structure never touch activity.
+`lifecycle.jsonl` is low-volume and session-scope (dozens of lines); it is what `session.json` projects from and what the export cursor reads. `events.jsonl` is per-segment and higher-volume. A segment's activity log is frozen once it is superseded (a later segment opened) or its session is closed; the store refuses activity anywhere but the current segment of an open session. A *sealed but current* segment still accepts activity — a blocked compaction seals at PreCompact, work continues, and the next PreCompact re-seals with a later end. Adapters pass `seg=None` so the current segment is resolved under the session lock. Readers that only need structure never touch activity.
 
 ### 6.4 `session.json` — projection of `lifecycle.jsonl`
 
@@ -248,7 +248,7 @@ Every line in every log:
 }
 ```
 
-`status`: `open` → `closed`. `segments.open` is the open segment's index or `null`. `projected_from` lets a reader detect a stale projection (log grew since) and rebuild.
+`status`: `open` → `closed`. `segments.open` is the open segment's index or `null`. `projected_from` is a watermark: `session.json` carries the lifecycle log's (lines, bytes, skipped), each `segment.json` its activity log's. Before re-folding, a write compares the watermark with the log's size before its append; a mismatch means an earlier refresh never ran (a killed hook), and the store rebuilds.
 
 ### 6.5 `segment.json` — projection
 
@@ -417,21 +417,22 @@ Returns an envelope: `{ schema: "claudna.export/1", items: [{ sid, seg, session:
 ## 9. Retention
 
 - A segment is deletable once every registered consumer has acked it, or once it passes the hard cap (default 30 days), whichever comes first.
+- **An index is never reused.** `open_segment` numbers one past every index the session has ever named (directories *and* `segment.opened` events), so a new segment can't inherit a deleted one's lifecycle events, and export watermarks (`through_seg`) stay monotonic. When retention ships (phase 6) it records each deletion as a `segment.retired` lifecycle event before removing the directory, so a deletion is visible in the log rather than inferred from a missing directory.
 - Sessions with no registered consumers use the age cap alone.
 - Sweeping runs at SessionStart (bounded to a few ms of `stat` calls), never at SessionEnd.
 - Private sessions are swept on the same rules; they are never exported.
 
 ## 10. Implementation shape
 
-- **Language and location:** stdlib Python ≥ 3.11, the package `lib/claudna/session_store/`, called by thin `plugin-hooks/*.sh` wrappers as `python3 -m claudna.session_store` with `PYTHONPATH="${CLAUDE_PLUGIN_ROOT}/lib"`. `lib/` is runtime only — stdlib-only imports, strictly downward layering inside a package, and a single `sys.path` shim at the entry point, each gated by `tests/test_runtime_layout.py` (rules: `lib/CLAUDE.md`). No third-party runtime deps.
+- **Language and location:** stdlib Python ≥ 3.9 (stock macOS `/usr/bin/python3`; CI runs 3.12 — a 3.9 CI leg lands with the first hook, see §11), the package `lib/claudna/session_store/`, called by thin `plugin-hooks/*.sh` wrappers as `python3 -m claudna.session_store` with `PYTHONPATH="${CLAUDE_PLUGIN_ROOT}/lib"`. `lib/` is runtime only — stdlib-only imports, strictly downward layering inside a package, and a single `sys.path` shim at the entry point, each gated by `tests/test_runtime_layout.py` (rules: `lib/CLAUDE.md`). No third-party runtime deps.
 - **Hosts:** the core (`paths`, `fsio`, `events`, `project`, `store`) is host-agnostic; only the hook adapter that maps a host's events onto store events is Claude Code-specific. The Cursor manifest ships no hooks, so on Cursor nothing is recorded — readers and harvest report "no session store on this host" rather than failing. A Cursor adapter can land later without touching the core.
-- **Modules:** `store` (paths, locking, atomic write, append), `events` (envelope + kind registry), `project` (log → projections), `boundaries` (hook → action table in §4.2), `summarize` (worker), `readers`, `export`. Each module owns one concern; the hook table is data, not branching.
-- **Validation:** JSON Schemas in `lib/claudna/session_store/schemas/`, checked by `schema.py` — a stdlib JSON Schema subset that raises on any keyword it doesn't implement, so a schema can't silently ask for an unchecked rule. Tests pin a golden fixture byte-for-byte, a rebuild round trip, and a drift gate between `event.schema.json`'s kind enum and `events.REGISTRY`. `python3 -m claudna.session_store check <sid>` runs the same validation on a live store, including placement (each event in the right session, log, and segment).
+- **Modules (phase 1):** `paths` (layout, id validation) · `fsio` (private dirs, atomic JSON, JSONL append/read, locks) · `schema` (stdlib JSON Schema subset) · `events` (kind registry) · `project` (log → projections, `rebuild`, `refresh`) · `store` (the write API) · `cli`. Later phases add `boundaries` (hook → action table in §4.2), `summarize` (worker), `readers`, `export`. Each module owns one concern; the hook table is data, not branching.
+- **Validation:** JSON Schemas in `lib/claudna/session_store/schemas/`, checked by `schema.py` — a stdlib JSON Schema subset that raises on any keyword it doesn't implement, so a schema can't silently ask for an unchecked rule. Tests pin a golden fixture byte-for-byte, a rebuild round trip, and incremental-equals-full refresh; drift gates keep the schemas and the registry in step (every kind fits the envelope's kind pattern, projection vocabularies match registry choices, one timestamp pattern everywhere, only supported keywords at every schema node). `python3 -m claudna.session_store check <sid>` runs the same validation on a live store, including placement (each event in the right session, log, and segment).
 - **`telemetry-emit.sh`:** migrates onto `skill.invoked` events; the old path stays as a deprecated alias for one release.
 
 ## 11. Open questions
 
-1. **State dir default** — `~/.claudna/` proposed. Alternatives: `$XDG_STATE_HOME/claudna`.
+1. **State dir default** — `~/.claudna/` proposed (must be absolute; a relative `CLAUDNA_STATE_DIR` is rejected so the store can't land inside a repo). The real alternative is `${CLAUDE_PLUGIN_DATA}`: it survives plugin updates, but is deleted on uninstall (losing session history) and is invisible to Claudron and Claudlobby outside Claude Code, which read through `export`.
 2. **Prompt text capture** — off by default (§6.2). On for interactive, off for bots?
 3. **Compact offset canary** — confirm PreCompact's transcript size equals the offset where post-compact content begins.
 4. **Pid stability across `/clear`** — the clear link (§4.3) assumes the same `claude` pid; confirm with a hook that records the `claude` pid, not the hook shell's.
@@ -439,6 +440,8 @@ Returns an envelope: `{ schema: "claudna.export/1", items: [{ sid, seg, session:
 6. **Claudron pull verb** — Claudron-side work; this spec defines only the door it calls.
 7. **#203 re-ratification** — §4.4 adds a SessionEnd hook, reversing #203's "clauDNA adds no SessionEnd hook" (whose only stated rationale was the role split). Update `SETUP_GUIDE.md` §7.4 with the hooks PR. Claudron's session-loop table needs no amendment: `R-record` owes the knowledge layer nothing.
 8. **Memory homes and tag registry** — Claudron schema work ([Claudron#200](https://github.com/Claudfather/Claudron/issues/200)); block `home` values track it.
+9. **Python floor for hooks** — the store runs unchanged on 3.9 (stock macOS). Phase 2 is the first time a hook depends on Python; it should add a 3.9 CI leg for `tests/test_session_store.py` and `tests/test_runtime_layout.py`, and `lib/CLAUDE.md` should name the floor.
+10. **Skill contract and `lib/`** — `SKILL_CONTRACT.md` §1.1 and its validator know bundled scripts only as `scripts/<name>`. The first skill text that calls `lib/` (the `/claudna:session` readers, or `redact.py`'s move) extends the contract and the validator together.
 
 ## 12. Phasing
 

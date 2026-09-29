@@ -2,7 +2,7 @@
 
 Everything the store writes is private to the user (dirs ``0700``, files
 ``0600``). Projections are written temp-then-``os.replace`` so a reader never
-sees a torn file; they are rebuildable, so they skip ``fsync`` by default. Logs
+sees a torn file; they are rebuildable, so they are not fsynced. Logs
 are the truth: appended one JSON object per line and fsynced. A reader tolerates
 a torn final line (a writer killed mid-append) by skipping it, and the next
 append first terminates that fragment so the torn write can't swallow a good one.
@@ -52,11 +52,12 @@ def ensure_dir(path: Path) -> Path:
     return path
 
 
-def atomic_write_json(path: Path, obj: object, *, durable: bool = True) -> None:
+def atomic_write_json(path: Path, obj: object) -> None:
     """Write ``obj`` as pretty JSON to ``path`` atomically, mode ``0600``.
 
-    ``durable=False`` skips the ``fsync``: still atomic for readers, just not
-    crash-durable — right for projections, which ``rebuild`` can regenerate.
+    Atomic for readers, not crash-durable (no ``fsync``) — right for
+    projections, which ``rebuild`` regenerates. A file that must survive a
+    crash (e.g. export acks) should add a durable variant with its first caller.
     ``path.parent`` must already exist.
     """
     fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
@@ -64,9 +65,6 @@ def atomic_write_json(path: Path, obj: object, *, durable: bool = True) -> None:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             json.dump(obj, fh, indent=2, sort_keys=True, ensure_ascii=False)
             fh.write("\n")
-            if durable:
-                fh.flush()
-                os.fsync(fh.fileno())
         os.chmod(tmp, FILE_MODE)
         os.replace(tmp, path)
     except BaseException:
@@ -148,25 +146,16 @@ def read_jsonl(path: Path) -> JsonlRead:
     return JsonlRead(records=records, skipped=skipped, bytes=len(raw))
 
 
-class LockBusy(RuntimeError):
-    """A non-blocking lock attempt found the lock held."""
-
-
 @contextlib.contextmanager
-def exclusive_lock(path: Path, *, blocking: bool = True) -> Iterator[None]:
-    """Hold an exclusive ``flock`` on ``path`` for the ``with`` body.
+def exclusive_lock(path: Path) -> Iterator[None]:
+    """Hold an exclusive ``flock`` on ``path`` for the ``with`` body (blocking).
 
-    With ``blocking=False`` a held lock raises :class:`LockBusy` immediately —
-    the single-flight pattern (skip rather than queue). The lock file's
-    directory must already exist: taking a lock never creates directories.
+    The lock file's directory must already exist: taking a lock never creates
+    directories.
     """
     fd = os.open(path, os.O_RDWR | os.O_CREAT, FILE_MODE)
     try:
-        flags = fcntl.LOCK_EX if blocking else fcntl.LOCK_EX | fcntl.LOCK_NB
-        try:
-            fcntl.flock(fd, flags)
-        except BlockingIOError as exc:
-            raise LockBusy(str(path)) from exc
+        fcntl.flock(fd, fcntl.LOCK_EX)
         yield
     finally:
         os.close(fd)

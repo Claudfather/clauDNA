@@ -111,7 +111,8 @@ REGISTRY: dict[str, KindSpec] = {
         fields={"end": _INT, "sealed_by": _STR, "trigger": _OPT_STR},
         optional={"sha256": _OPT_STR},
         choices={
-            "sealed_by": ("precompact", "compact", "session_end"),
+            # "compact"/"resume": open_segment sealing an unsealed predecessor (missed PreCompact / lost SessionEnd)
+            "sealed_by": ("precompact", "compact", "session_end", "resume"),
             "trigger": ("manual", "auto", None),
         },
         constraints={"end": _NON_NEGATIVE, "sha256": _SHA256},

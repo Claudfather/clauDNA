@@ -18,9 +18,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from . import events as ev
-from .fsio import DIR_MODE, append_jsonl, ensure_dir, exclusive_lock
-from .paths import InvalidSessionId, SessionPaths, session_paths, state_root, validate_sid
-from .project import RebuildReport, rebuild, refresh
+from .fsio import DIR_MODE, append_jsonl, ensure_dir, exclusive_lock, read_json
+from .paths import SessionPaths, session_paths, state_root
+from .project import RebuildReport, by_segment, load_lifecycle, rebuild, refresh
 
 
 class StoreError(RuntimeError):
@@ -41,7 +41,11 @@ class SessionHandle:
         return self.paths.dir.is_dir()
 
     def current_segment(self) -> int | None:
-        """The highest existing segment index. Only it can be open (spec §4.2)."""
+        """The highest existing segment index — the only one that can be open.
+
+        The store enforces that: :meth:`open_segment` seals an unsealed
+        predecessor before opening the next segment.
+        """
         indices = self.paths.segment_indices()
         return indices[-1] if indices else None
 
@@ -53,28 +57,53 @@ class SessionHandle:
         return exclusive_lock(self.paths.lock)
 
     def append(self, kind: str, data: dict, *, seg: int | None = None) -> dict:
-        """Append one event to the log its kind belongs to, then re-project."""
+        """Append one event to the log its kind belongs to, then re-project.
+
+        A segment-scoped kind with ``seg=None`` goes to the current segment,
+        resolved under the lock so a concurrent ``open_segment`` can't slip in.
+        """
         with self._locked():
+            if seg is None and ev.REGISTRY[kind].seg:
+                seg = self.current_segment()
+                if seg is None:
+                    raise StoreError(f"session {self.sid} has no segment for {kind}")
             return self._append_locked(kind, data, seg=seg)
 
     def _append_locked(self, kind: str, data: dict, *, seg: int | None) -> dict:
         """Append and re-project; the caller holds the session lock.
 
-        Any segment-scoped event — activity or lifecycle — requires its segment
-        directory to exist: only :meth:`open_segment` creates segments.
+        Any segment-scoped event requires its segment directory to exist (only
+        :meth:`open_segment` creates segments). Activity is accepted only into
+        the *current* segment of a session that isn't closed: a superseded or
+        closed segment's log is frozen. A current segment that is sealed still
+        accepts activity — a blocked compaction seals at PreCompact, work goes
+        on, and the next PreCompact re-seals with a later end.
         """
         event = ev.make_event(kind, self.sid, data, seg=seg)
         if seg is not None and not self.paths.segment(seg).dir.is_dir():
             raise StoreError(f"segment {seg} does not exist for session {self.sid}")
-        bytes_before = None
         if ev.REGISTRY[kind].log == ev.ACTIVITY:
+            if seg != self.current_segment():
+                raise StoreError(f"segment {seg} of session {self.sid} is superseded; its log is frozen")
+            if self._is_closed():
+                raise StoreError(f"session {self.sid} is closed; its logs are frozen")
             log = self.paths.segment(seg).events
-            bytes_before = log.stat().st_size if log.exists() else 0
         else:
             log = self.paths.lifecycle
+        bytes_before = log.stat().st_size if log.exists() else 0
         append_jsonl(log, event)
         refresh(self.paths, event, bytes_before=bytes_before)
         return event
+
+    def _is_closed(self) -> bool:
+        """Is the session closed? ``session.json`` answers when it's current; the log otherwise."""
+        projected = read_json(self.paths.session_json)
+        if isinstance(projected, dict) and projected.get("status") in ("open", "closed", "unknown"):
+            return projected["status"] == "closed"
+        status = None
+        for e in load_lifecycle(self.paths).events:
+            status = {"session.opened": "open", "session.closed": "closed"}.get(e["kind"], status)
+        return status == "closed"
 
     # ── lifecycle verbs (thin, named wrappers over append) ──────────────────
 
@@ -102,13 +131,28 @@ class SessionHandle:
         )
 
     def open_segment(self, opened_by: str, start: int) -> int:
-        """Create the next segment directory and record ``segment.opened``; return its index.
+        """Create the next segment and record ``segment.opened``; return its index.
 
-        The index is derived under the lock — ``max(existing) + 1`` — and the
-        segment exists the moment its ``mkdir`` succeeds.
+        Under the lock:
+
+        * the index is one past every index the session has *ever* used — the
+          directories and every ``segment.opened`` in the log — so a segment
+          deleted by retention never has its index (and its old lifecycle
+          events) inherited by a new one;
+        * an unsealed predecessor is sealed first, at this segment's start
+          (never before its own), ``sealed_by`` ``"compact"`` or ``"resume"``
+          — a missed PreCompact or a lost SessionEnd can't leave two open.
         """
         with self._locked():
-            index = (self.current_segment() or 0) + 1
+            buckets = by_segment(load_lifecycle(self.paths).events)
+            named = [i for i, events in buckets.items() if any(e["kind"] == "segment.opened" for e in events)]
+            previous = self.current_segment()
+            if previous is not None and not any(e["kind"] == "segment.sealed" for e in buckets[previous]):
+                sealed_by = "compact" if opened_by == "compact" else "resume"
+                end = max(start, _segment_start(buckets[previous]))
+                self._append_locked("segment.sealed", {"end": end, "sealed_by": sealed_by, "trigger": None},
+                                    seg=previous)
+            index = max([*self.paths.segment_indices(), *named], default=0) + 1
             self.paths.segment(index).dir.mkdir(mode=DIR_MODE)
             self._append_locked("segment.opened", {"opened_by": opened_by, "start": start}, seg=index)
             return index
@@ -124,8 +168,9 @@ class SessionHandle:
     ) -> dict:
         """Record ``segment.sealed`` for ``index`` (default: current). Safe to repeat.
 
-        The default index is resolved under the lock, so a concurrent
-        ``open_segment`` can't slip in between choosing a segment and sealing it.
+        Under the lock: the default index is resolved there, and ``end`` may not
+        precede the segment's ``start`` — an inverted range would hand the
+        summarizer nonsense.
         """
         data = {"end": end, "sealed_by": sealed_by, "trigger": trigger}
         if sha256 is not None:
@@ -134,6 +179,9 @@ class SessionHandle:
             target = index if index is not None else self.current_segment()
             if target is None:
                 raise StoreError(f"session {self.sid} has no segment to seal")
+            start = _segment_start(by_segment(load_lifecycle(self.paths).events)[target])
+            if end < start:
+                raise StoreError(f"segment {target} starts at {start}; cannot seal it at {end}")
             return self._append_locked("segment.sealed", data, seg=target)
 
     def close_session(self, reason: str) -> dict:
@@ -160,21 +208,7 @@ class SessionStore:
     def session(self, sid: str) -> SessionHandle:
         return SessionHandle(session_paths(sid, self.root))
 
-    def session_ids(self) -> list[str]:
-        """Every valid session directory under the root, sorted by name.
 
-        Stray directories whose names aren't valid session ids are skipped, so
-        every returned id can be passed straight back to :meth:`session`.
-        """
-        sessions = self.root / "sessions"
-        if not sessions.is_dir():
-            return []
-        return sorted(p.name for p in sessions.iterdir() if p.is_dir() and _is_sid(p.name))
-
-
-def _is_sid(name: str) -> bool:
-    try:
-        validate_sid(name)
-    except InvalidSessionId:
-        return False
-    return True
+def _segment_start(boundary: list[dict]) -> int:
+    """A segment's start offset from its lifecycle events (0 if it never logged an open)."""
+    return next((e["data"]["start"] for e in boundary if e["kind"] == "segment.opened"), 0)

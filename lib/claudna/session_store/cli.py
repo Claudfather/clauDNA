@@ -11,7 +11,12 @@ kind registry, and placement (right session, log, and segment), without writing
 anything. Lines from a newer envelope version or an unknown kind are skipped,
 exactly as readers skip them — an older ``check`` never fails on a newer log.
 
-Exit codes: 0 ok · 1 not found or check failed · 2 usage.
+``check`` fails only on what a writer can prevent: schema, registry, and
+placement violations, and bad or missing projections. Unparseable lines are
+crash debris — a torn write the store deliberately keeps as one skippable
+line, and that no ``rebuild`` can remove — so they are reported as warnings.
+
+Exit codes: 0 ok (warnings allowed) · 1 not found or check failed · 2 usage.
 """
 
 from __future__ import annotations
@@ -42,9 +47,18 @@ def _handle(args: argparse.Namespace) -> SessionHandle | None:
     return handle
 
 
-def check_session(handle: SessionHandle) -> list[str]:
-    """Every schema or registry violation in one session's files."""
+@dataclasses.dataclass(frozen=True)
+class CheckReport:
+    """``problems`` fail a check; ``warnings`` (crash debris) are reported but don't."""
+
+    problems: list[str]
+    warnings: list[str]
+
+
+def check_session(handle: SessionHandle) -> CheckReport:
+    """Every schema, registry, or placement violation in one session's files."""
     problems: list[str] = []
+    warnings: list[str] = []
     event_schema, session_schema, segment_schema = (schema.load(n) for n in ("event", "session", "segment"))
     indices = handle.paths.segment_indices()
     logs = [(handle.paths.lifecycle, ev.LIFECYCLE, None)] + [
@@ -53,7 +67,7 @@ def check_session(handle: SessionHandle) -> list[str]:
     for log, log_kind, seg in logs:
         read = read_jsonl(log)
         if read.skipped:
-            problems.append(f"{log}: {read.skipped} unparseable line(s)")
+            warnings.append(f"{log}: {read.skipped} unparseable line(s) (crash debris; readers skip them)")
         for n, record in enumerate(read.records, 1):
             verdict = ev.classify(record)
             if verdict == "unknown":
@@ -76,7 +90,7 @@ def check_session(handle: SessionHandle) -> list[str]:
             problems.append(f"{path}: missing or unparseable (run rebuild)")
             continue
         problems.extend(f"{path}: {err}" for err in schema.validate(obj, target_schema))
-    return problems
+    return CheckReport(problems=problems, warnings=warnings)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -96,7 +110,9 @@ def main(argv: list[str] | None = None) -> int:
         report = handle.rebuild()
         print(json.dumps(dataclasses.asdict(report)))
         return 0
-    problems = check_session(handle)
-    for line in problems:
+    report = check_session(handle)
+    for line in report.warnings:
+        print(f"warning: {line}")
+    for line in report.problems:
         print(line)
-    return 1 if problems else 0
+    return 1 if report.problems else 0
