@@ -1,7 +1,7 @@
-"""Host-portability checks (b)-(d) and the <claudna-root> definition (#336).
+"""Host-portability checks (b)-(e) and the <claudna-root> definition (#336).
 
 SKILL_CONTRACT §1.1 and §5.1. Check (a), the `_shared/` spelling, has its own
-file (test_shared_paths.py); the end-to-end test here runs all four through
+file (test_shared_paths.py); the end-to-end test here runs all five through
 validate-skills.py, so the validator's two call sites are pinned too.
 """
 
@@ -24,6 +24,7 @@ from skill_checks import (  # noqa: E402
     check_cwd_script_calls,
     check_plugin_cache_paths,
     check_plugin_variables,
+    check_resolver_pointer,
 )
 
 CACHE = "~/.claude/plugins/cache/Claudfather/claudna/1.0.0/scripts/redact.py"
@@ -120,6 +121,16 @@ def test_a_working_directory_script_call_passes_only_in_a_repo_clone_skill(skill
     assert check_cwd_script_calls(mention, md_file, skills, {}) == []
 
 
+def test_a_file_using_the_placeholder_points_at_its_definition(skills: Path) -> None:
+    body = "x\nForward: Read <claudna-root>/skills/_shared/guide.md\n"
+    md_file = _file(skills, "demo/SKILL.md", body)
+    [error] = check_resolver_pointer(body, md_file, skills)
+    assert error.startswith("demo/SKILL.md:2: uses `<claudna-root>` but never points at `claudna-root.md`")
+    pointed = body + "Fill it in per `../_shared/claudna-root.md` before sending.\n"
+    assert check_resolver_pointer(pointed, md_file, skills) == []
+    assert check_resolver_pointer("no placeholder here\n", md_file, skills) == []
+
+
 def _findings(tree: Path) -> list[str]:
     env = {k: v for k, v in os.environ.items() if k != "GITHUB_ACTIONS"}
     env["SCHEMA_DRIFT_OFFLINE"] = "1"
@@ -138,6 +149,7 @@ PORTABILITY = (
     "fallback on its line",
     "a Claude Code plugin-cache path",
     "runs from the working directory",
+    "never points at `claudna-root.md`",
 )
 
 
@@ -154,7 +166,7 @@ def test_the_validator_reports_each_check_once_from_both_of_its_loops(tmp_path: 
     assert text.count("`../_shared/infra-cli-contract.md`") == 1
     railway.write_text(
         text.replace("`../_shared/infra-cli-contract.md`", "`skills/_shared/infra-cli-contract.md`")
-        + f"\nScrub with {CACHE}.\nOr run `python3 scripts/redact.py out.txt`.\n"
+        + f"\nScrub with {CACHE}.\nOr run `python3 scripts/redact.py out.txt`.\nForward <claudna-root>/skills/x.\n"
     )
     contract = tmp_path / "skills" / "_shared" / "infra-cli-contract.md"
     contract.write_text(contract.read_text() + '\nRun `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/redact.py" f`.\n')
@@ -165,6 +177,7 @@ def test_the_validator_reports_each_check_once_from_both_of_its_loops(tmp_path: 
         ("railway/SKILL.md:", "a Claude Code plugin-cache path"),
         ("railway/SKILL.md:", "`python3 scripts/redact.py` runs from the working directory"),
         ("_shared/infra-cli-contract.md:", "`${CLAUDE_PLUGIN_ROOT}` is filled in only in a SKILL.md body"),
+        ("railway/SKILL.md:", "uses `<claudna-root>` but never points at `claudna-root.md`"),
     ]
     for where, what in expected:
         assert sum(where in f and what in f for f in new) == 1, (where, what, new)

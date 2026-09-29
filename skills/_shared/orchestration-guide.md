@@ -78,7 +78,7 @@ Plan agents read research from disk, read this guide for quality standards, and 
 
 ### Launch prompt template for Plan agents
 
-The orchestrator constructs a prompt for each Plan agent that includes:
+The orchestrator constructs a prompt for each Plan agent that includes the following, with `<claudna-root>` filled in first (per `../_shared/claudna-root.md`; the Plan agent has no skill directory to resolve it against):
 
 ```
 ## Setup

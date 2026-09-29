@@ -175,7 +175,7 @@ def main() -> int:
             text = md_file.read_text()
             for target, msg in collect_skill_reference_errors(text, valid_names):
                 cross_skill_errors.append(({name, target}, name, f"{rel}: {msg}"))
-            # Host portability, checks (a)-(d) of SKILL_CONTRACT §5.1 (#336).
+            # Host portability, checks (a)-(e) of SKILL_CONTRACT §5.1 (#336).
             # No cross-skill registration needed: a PR can only break one by
             # editing this skill or skills/_shared/, and any _shared/ change
             # makes get_touched_skills() fall back to full blocking validation.

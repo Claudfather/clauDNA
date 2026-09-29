@@ -35,7 +35,7 @@ Use the first of these candidates that contains the file you need:
 1. **The path Claude Code filled in for `${CLAUDE_PLUGIN_ROOT}`.** Claude Code does this only in a `SKILL.md` body, fenced blocks included. In any other file the variable stays literal, and the shell never has it set.
 2. **`$CLAUDNA_ROOT`**, when your host or operator sets it.
 3. **`<skill-dir>/../..`**, two directories above the directory of the skill you are running. Claude Code prints that directory as "Base directory for this skill"; any other host knows where it loaded `SKILL.md` from.
-4. **The highest-versioned `~/.claude/plugins/cache/Claudfather/claudna/*/`**, Claude Code's plugin cache. It comes last because it can hold a newer copy than the one that is loaded.
+4. **The highest-versioned `~/.claude/plugins/cache/Claudfather/claudna/*/`**, Claude Code's plugin cache. Compare the version directories as version numbers, not as text: `0.19.0` is above `0.9.0` (`sort -V` orders them so). It comes last because it can hold a newer copy than the one that is loaded.
 
 If none of them contains the file, stop and say so. Never fall back to a path in the working directory, which is the user's project, not this plugin. Write the resolved absolute path into the command, and keep the command a bare one. In a prompt you forward to another agent, replace `<claudna-root>` with the absolute path before you send it, because the receiving agent has no skill directory to resolve against.
 <!-- claudna-root:end -->
@@ -76,6 +76,8 @@ The `description` is a routing surface: it is what the model reads when choosing
 6. **Rename breadcrumbs.** A skill that supersedes older skills says so at the end: `Replaces /product-brainstorm.` Old muscle memory still resolves. Breadcrumbs to **removed** skills must use the bare slash form (`Replaces /old-name`), never `/claudna:old-name` — the reference check requires every `claudna:<name>` mention to resolve to an *existing* skill.
 
 Cross-references to living skills use the `/claudna:<name>` form. Every `claudna:<name>` mention anywhere in a skill's markdown (or in `_shared/`) must resolve to an existing skill directory — dangling references are a **hard error** (see §5.1). Scope note: only the `claudna:<name>` form is checked; bare `/name` prose mentions are out of the check's scope by design (they are indistinguishable from generic slash-command prose), so load-bearing references should prefer the checked form.
+
+**On a host without Claude Code's namespaced commands, read `/claudna:<name> [args]` as "invoke the skill `<name>` with `[args]`"**, through that host's own way of invoking a skill (#336). The skill's file is `../<name>/SKILL.md` from any skill directory. The rule covers every reference, because the validator refuses a `claudna:<name>` whose `<name>` has no skill directory (§5.1), and `tests/test_inter_skill_rule.py` pins that premise across `skills/`.
 
 ### Frontmatter example
 
@@ -129,6 +131,8 @@ The one consumer of these fields today is `scripts/check_cursor_scope.py` (`make
 **Claude Code's own manifest is unaffected by either field** — it ships every skill regardless, as it always has. That is a deliberate, conservative scoping choice for #340 (limit the fix to the surface the issue is actually about), not a claim that Claude Code is somehow exempt from what the fields describe: a `requires-context: repo-clone` skill installed via marketplace onto a random project is just as non-functional there as it would be on Cursor. If a second distribution channel ever needs the same curation Claude Code currently skips, extend `check_cursor_scope.py`'s caller rather than overloading `cursor_should_exclude()`'s scope.
 
 `scripts/skill_checks.py` validates the field *shapes* (`validate_hosts`, `validate_requires_context`) as part of `make check-skills` — unknown values are rejected there, independent of what any one consumer does with them.
+
+The two fields also carry two of the host-portability exemptions (§1.1, §5.1): a `hosts: [claude-code]` skill may name Claude Code's plugin cache, and a `requires-context: repo-clone` skill may run this repo's own tools from the working directory. Each field also drops the skill from the Cursor build, so neither is a way to quiet a check.
 
 ---
 
@@ -185,6 +189,7 @@ Beyond frontmatter structure, the validator enforces behavioral consistency betw
 | **Plugin variables** | `${CLAUDE_PLUGIN_ROOT}` or `${CLAUDE_SKILL_DIR}` in a skill's markdown or in `_shared/` | Only in a `SKILL.md` body, with `<claudna-root>` on the same line or in the paragraph after its code block. | Claude Code fills these in only in an expanded `SKILL.md` body. Elsewhere they stay literal, and the shell never has them set (§1.1). |
 | **Plugin-cache paths** | `plugins/cache/Claudfather/claudna` in a skill's markdown or in `_shared/` | Only inside the `<claudna-root>` definition (between its markers), or in a skill whose `hosts` is `[claude-code]`. | The cache is Claude Code's, and it can hold a newer copy than the loaded one. It is the last `<claudna-root>` candidate, not a path to write (§1.1). |
 | **Working-directory script calls** | `python3`, `bash` or `sh` followed by `scripts/<name>` or `./scripts/<name>` | Only in a skill that declares `requires-context: repo-clone`. | The working directory is the user's project, not this plugin; everywhere else the call is `python3 "<claudna-root>/scripts/<name>"` (§1.1). |
+| **Resolver pointer** | `<claudna-root>` in a skill's markdown or in `_shared/` | The same file must also name `claudna-root.md`. | A reader who meets the placeholder, or an orchestrator filling it into a prompt it forwards, needs the candidate list; a pointer in another file is not found (§1.1). |
 
 All checks produce hard errors that fail CI.
 

@@ -60,6 +60,8 @@ Claude Code gets all three. Cursor gets `skills/` (minus a few host-/context-res
 
 Invocable as `/claudna:<name>` after marketplace install (e.g. `/claudna:audit tech-debt`). Bare names below are shown without the prefix for readability.
 
+On a host without Claude Code's namespaced commands (Cursor, or an agent that reads `skills/` directly), read `/claudna:<name>` in skill text as the skill `<name>`, invoked however that host invokes skills ([SKILL_CONTRACT §2.1](./SKILL_CONTRACT.md)).
+
 ### Workflow
 
 | Skill | Description |
