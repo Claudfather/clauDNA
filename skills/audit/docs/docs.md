@@ -62,7 +62,7 @@ Ask the user to confirm the inventory and categories before proceeding. The user
 For each document categorized as **Coding overview**:
 
 1. Read the document thoroughly
-2. Use subagents (Task tool with `Explore` type) to trace every claim back to real code:
+2. Use subagents (Task tool with `Explore` type) to trace every claim back to real code — or, where the host has no dispatch primitive, trace the claims inline and sequentially per `skills/_shared/orchestration-guide.md` §14.2:
    - File path references → verify files exist at stated paths
    - Function/class mentions → verify they exist and match descriptions
    - Architecture claims → verify the described patterns in the actual code

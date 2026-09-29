@@ -32,7 +32,7 @@ If none match, warn the user this lens targets Python/Postgres/SQLAlchemy and of
 
 **Scratch directory:** `/tmp/data-model-audit-<YYYY-MM-DD_HHMMSS>/research/`
 
-Launch two `general-purpose` subagents in parallel (Agent tool, `subagent_type: "general-purpose"`). Each writes findings to scratch dir, returns 2-4 line summary. Orchestrator does NOT read full research files. (General-purpose because Explore lacks Write tool.)
+Launch two `general-purpose` subagents in parallel (Agent tool, `subagent_type: "general-purpose"`). Each writes findings to scratch dir, returns 2-4 line summary. Orchestrator does NOT read full research files. (General-purpose because Explore lacks Write tool.) With no dispatch primitive available, scan the two areas inline and sequentially per `skills/_shared/orchestration-guide.md` §14.2, writing to the same scratch paths so aggregation is unchanged.
 
 ### Subagent A: Schema Discovery
 

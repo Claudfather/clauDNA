@@ -172,7 +172,7 @@ All §4.1 sections are mandatory — `/claudna:publish` rejects a `type: plan` d
 
 ## Phase 3: Pre-flight (structural self-check)
 
-Forge does **not** run the review panel — that's `/ironclad`'s job. `/ironclad <issue> --loops N` dispatches the lenses (`adversarial-review`, `align-to-mission`, `first-principles`, `extension-check`, `precedent-check`, `plan-health-audit`, `cost-benefit` — ironclad's Phase-3 table is the single source of truth) as parallel subagents and drives convergence. Forge's pre-flight is only the minimal structural check that keeps cycle-1 ironclad from being wasted on trivial defects:
+Forge does **not** run the review panel — that's `/ironclad`'s job. `/ironclad <issue> --loops N` dispatches the lenses (`adversarial-review`, `align-to-mission`, `first-principles`, `extension-check`, `precedent-check`, `plan-health-audit`, `cost-benefit` — ironclad's Phase-3 table is the single source of truth) as parallel subagents, or inline and sequentially where the host cannot dispatch (`skills/_shared/orchestration-guide.md` §14), and drives convergence. Forge's pre-flight is only the minimal structural check that keeps cycle-1 ironclad from being wasted on trivial defects:
 
 1. **Skeleton present** — every §4.1 section exists in each doc (publish rejects a `plan` doc missing `## Implementation Plan` / `### Steps`).
 2. **Claims verified** — every `## Evidence` claim checks out against the codebase (paths exist, symbols match). Forge read the code in Phase 1; confirm it didn't drift.
@@ -243,7 +243,7 @@ Emit structured-result JSON per `skills/_shared/orchestration-guide.md` §10 (St
 
 ## Re-forge Mode (`forge --reforge <issue-url>`)
 
-The hardening loop's **author** step. `/ironclad` posts lens findings as comments on the plan's Issue; `--reforge` folds them back into the body. Invoked per cycle by `/ironclad --loops` as a `--dispatch` subagent, or by hand.
+The hardening loop's **author** step. `/ironclad` posts lens findings as comments on the plan's Issue; `--reforge` folds them back into the body. Invoked per cycle by `/ironclad --loops` as a `--dispatch` subagent, or by hand. On a host with no dispatch primitive (`skills/_shared/orchestration-guide.md` §14.1), ironclad runs it inline between cycles as an ordinary skill invocation — nothing here needs a fresh context, since every step reads the live Issue and writes the body, so the inline path costs only the parallelism ironclad never had for this step anyway.
 
 1. **Read the live Issue** — the body (canonical plan) plus every comment since the last re-forge: lens findings + collaborator input. Treat the Issue head as truth; never overwrite from a stale local copy.
 2. **Fold each open finding** — make the smallest body edit that resolves it, or, if it's a genuine choice, add/update a `## Decision Forks` entry. **Preserve locked content**: do not reopen a `[FORK-LOCK]`'d fork or rewrite a settled phase without a `[FORK-REOPEN F<N>]`.

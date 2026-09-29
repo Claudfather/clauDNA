@@ -35,6 +35,8 @@ No lens token → infer only when the request wording is unambiguous (e.g. "chec
 
 For the selected lens, read ONLY its depth file in this skill directory and follow it exactly — never load another lens's depth (contract §1).
 
+Lenses that fan out dispatch research subagents. Where the host has no dispatch primitive, they scan inline and sequentially instead — one shared fallback, defined in `skills/_shared/orchestration-guide.md` §14 and bound for audit by `skills/_shared/audit-lens-contract.md`. Dispatch stays the preferred path.
+
 ## Surfaces (contract §2–§4)
 
 - `--output github` files findings as issues per `skills/_shared/output-guide.md` (all filing routes through `/claudna:publish`); `--output session` (default) presents in chat.

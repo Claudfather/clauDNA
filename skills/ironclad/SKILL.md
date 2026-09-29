@@ -1,6 +1,6 @@
 ---
 name: ironclad
-description: "Use to harden a plan or review a PR with a panel of independent lenses — primary target a §4.1 plan Issue produced by /claudna:forge; also reviews implementation PRs. Subagent-only: dispatch it, don't follow it inline."
+description: "Use to harden a plan or review a PR with a panel of independent lenses — primary target a §4.1 plan Issue produced by /claudna:forge; also reviews implementation PRs. Subagent-preferred: dispatch it rather than following it inline."
 argument-hint: "<issue-or-pr-url> [--loops N] [--lens first-principles|align-to-mission|extension-check|precedent-check|plan-health-audit|cost-benefit] [--auto]"
 requires:
   - cli: gh
@@ -11,7 +11,7 @@ requires:
 
 `/ironclad` runs a panel of independent review lenses against a **§4.1 plan Issue** or a **pull request**, aggregates their findings into comments, and reports whether the target is converged — no open blockers, and (for plans) all decision forks locked. For a plan Issue it is the *hardening loop*: `--loops N` repeats dispatch → fold (via `forge --reforge`) → convergence-check until converged or N cycles run. For an implementation PR it is a single review pass (no re-forge). It never authors the plan body itself — it dispatches `/forge` to.
 
-This skill is **subagent-only**: each lens runs as a parallel `general-purpose` subagent on the current machine. Six lenses live as panel-internal files under `lenses/` in this skill directory; `adversarial-review` remains a standalone skill and is dispatched as one. Replaces the standalone lens skills /first-principles, /align-to-mission, /extension-check, /precedent-check, /plan-health-audit, /cost-benefit — for a one-off interactive challenge use `/claudna:adversarial-review`; for a one-off single-lens report use `--lens <name>` (below). Fleet deployments override the dispatch step via a compositor-injected protocol (see the dispatch preamble below); the skill itself contains no fleet concepts (no tmux, no `[BOTREPORT]`, no `fleet-state.json`).
+This skill is **subagent-preferred**: each lens runs as a parallel `general-purpose` subagent on the current machine. On a host with no dispatch primitive, run the lenses inline and sequentially per `skills/_shared/orchestration-guide.md` §14 — and report the independence cost honestly: inline lenses share context, so a convergence verdict from an inline run is weaker evidence than the same verdict from dispatched lenses (§14.3). Six lenses live as panel-internal files under `lenses/` in this skill directory; `adversarial-review` remains a standalone skill and is dispatched as one. Replaces the standalone lens skills /first-principles, /align-to-mission, /extension-check, /precedent-check, /plan-health-audit, /cost-benefit — for a one-off interactive challenge use `/claudna:adversarial-review`; for a one-off single-lens report use `--lens <name>` (below). Fleet deployments override the dispatch step via a compositor-injected protocol (see the dispatch preamble below); the skill itself contains no fleet concepts (no tmux, no `[BOTREPORT]`, no `fleet-state.json`).
 
 ## Dispatch preamble — read before Phase 4
 
@@ -19,13 +19,14 @@ Before dispatching lenses, check whether your composed `CLAUDE.md` contains a **
 
 - **Protocol present →** follow its dispatch instructions instead of Phase 4 — it *substitutes* the dispatch path, it does not add behavior alongside it (a distinct override pattern, not an ordinary additive protocol). Run mode is `fleet`.
 - **Protocol absent →** use the subagent dispatch in Phase 4. Run mode is `subagent`.
+- **Protocol absent and the host has no dispatch primitive at all** (`skills/_shared/orchestration-guide.md` §14.1) → run the lenses inline per §14.2. Run mode is `inline`.
 - **`FLEET_STATE_PATH` set but no `fleet-dispatch-capability` protocol found →** this is a misconfiguration (a fleet bot that would silently run subagents instead of distributing to workers). Emit the warning `FLEET_STATE_PATH is set but no fleet-dispatch-capability protocol found — falling back to subagent mode.` and run in `subagent` mode.
 
 **Mode indicator (required in every run, both modes).** When you dispatch, emit a visible line and make it the first line under the PR comment header:
 
-`Dispatching <N> lenses via <fleet|subagent> mode.`
+`Dispatching <N> lenses via <fleet|subagent|inline> mode.`
 
-Never dispatch silently — the indicator is what makes a misconfigured fleet bot detectable. In the plain standalone case (no protocol, no `FLEET_STATE_PATH`) it must read `via subagent mode`, with no warning.
+Never dispatch silently — the indicator is what makes a misconfigured fleet bot detectable. In the plain standalone case (no protocol, no `FLEET_STATE_PATH`) it must read `via subagent mode`, with no warning. `via inline mode` is the no-subagent host, and it carries §14.3's independence line in the report as well.
 
 ## Pre-flight
 
@@ -73,6 +74,8 @@ Dispatch only the lenses whose **Applies to** matches the target type. A new pan
 
 Skip this phase entirely if the dispatch preamble routed you to a `fleet-dispatch-capability` protocol.
 
+**No dispatch primitive (`inline` run mode) →** run each applicable lens inline and sequentially per `skills/_shared/orchestration-guide.md` §14.2, in the Phase-3 table's order, using the same launch prompts below as the instructions you follow yourself. Write each result to the same `<scratch>/lenses/<lens>/result.md` path, in the same `skills/_shared/contracts/lens-result-contract.md` format — Phases 5 through 8 then run unchanged off those files. Emit §14.3's independence line in the report.
+
 Launch one `general-purpose` subagent per applicable lens, all in parallel (`run_in_background: true`). Use `general-purpose` (not a read-only explorer) — the subagent needs the Write tool to emit its result. Launch prompt per lens — the read target differs by source type:
 
 - **Panel-file lenses** (all rows sourced from `lenses/`):
@@ -95,7 +98,7 @@ Collect subagent completions **one at a time** — never gather multiple in a si
 
 ### Phase 6: Retry failed lenses
 
-Retry each failed lens **once**, as a fresh `general-purpose` subagent on the same machine (there is no alternative worker in subagent mode). If the retry also fails, proceed with partial results — a single lens failure does not block the run or convergence.
+Retry each failed lens **once**, as a fresh `general-purpose` subagent on the same machine (there is no alternative worker in subagent mode). In `inline` mode the retry is a second inline pass over the same lens. If the retry also fails, proceed with partial results — a single lens failure does not block the run or convergence.
 
 ### Phase 7: Aggregate and deduplicate
 

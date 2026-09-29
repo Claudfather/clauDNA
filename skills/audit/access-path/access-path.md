@@ -59,7 +59,7 @@ If fewer than 2 access paths found, tell the user: "This system appears to have 
 
 **Scratch directory:** `/tmp/access-path-audit-<YYYY-MM-DD_HHMMSS>/research/`
 
-Launch two `general-purpose` subagents in parallel (Agent tool, `subagent_type: "general-purpose"`). Each writes findings to scratch dir, returns 2-4 line summary. Orchestrator does NOT read full research files.
+Launch two `general-purpose` subagents in parallel (Agent tool, `subagent_type: "general-purpose"`). Each writes findings to scratch dir, returns 2-4 line summary. Orchestrator does NOT read full research files. With no dispatch primitive available, scan the two areas inline and sequentially per `skills/_shared/orchestration-guide.md` §14.2, writing to the same scratch paths so aggregation is unchanged.
 
 - **Subagent A: Access Path Inventory** — every access path, transport, entry point, auth, domain services called. Writes to `research/path-inventory.md`.
 - **Subagent B: Cross-Cutting Concern Mapping** — for each concern in `scan-categories.md`, maps enforcement across every access path. Writes to `research/concern-mapping.md`.

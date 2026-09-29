@@ -476,3 +476,62 @@ When multiple skills could apply to a task, invoke them in tier order. Process s
 - **Higher tiers first.** When a task could benefit from skills in multiple tiers, start with the lowest-numbered tier. Example: a bug report should invoke investigate-app (Tier 1) before build (Tier 3).
 - **Within a tier, order does not matter.** Tier 1 skills can run in any order relative to each other.
 - **Skipping tiers is allowed when inapplicable.** Not every task needs all four tiers. A simple deploy needs only Tier 4. A code review needs only Tier 3. The rule is: do not skip a tier that IS applicable.
+
+---
+
+## 14. No-subagent hosts — the inline sequential fallback
+
+Sections 2, 3, 6 and 9 above assume the host can dispatch subagents: a Task/Agent-style tool taking a prompt and a `subagent_type`, plus the eight bundled agents in `agents/`. Not every host that loads `skills/` has that. A host may load `skills/` and ignore `agents/`; a surface may expose no subagent primitive at all. This section is the single fallback for that case.
+
+**Subagent dispatch remains the primary path** — take this one only after the detection in §14.1 says the primitive is missing. Like the Claudron raw-tree paths (`claudron-engine.md` §4), the inline path is **frozen**: it exists so the skills still run, and no new capability lands on it.
+
+### 14.1 Detection
+
+Answer two questions before the first dispatch, cheapest first:
+
+1. **Is there a dispatch primitive?** A tool that accepts a prompt plus an agent type and runs it in a *fresh* context. Absent → **no-subagent host**, use §14.2. Note that the *name* of the general-purpose type is host-specific (`general-purpose` on Claude Code); a host with the primitive under another name is not a no-subagent host, so use its name rather than falling back.
+2. **Is the named agent loaded?** Only applies where a skill names a *bundled* agent from `agents/` instead of a built-in type — see §14.4.
+
+Answer both by inspecting the tools available in the session. **Never probe by dispatching and seeing whether it fails** — a dispatch that errors may already have run something, and a retry then double-runs it.
+
+### 14.2 The inline sequential path
+
+Run the dispatched units yourself, in the main session, one at a time:
+
+1. **Announce it once, before the first unit:** `No subagent dispatch available — running <N> <units> inline and sequentially in this session.` An unannounced inline run is indistinguishable from a parallel one in the transcript, and the independence caveat in §14.3 only reaches the reader if this notice does.
+2. **Per unit, read only that unit's own instructions** (the lens file, the prompt template, the phase doc), do the work, then **write the result to disk at exactly the path the subagent would have written — same directory, same filename, same format.** This is the load-bearing rule: every downstream phase (collection, retry, aggregation, publishing) reads from disk, so honoring the disk contract is what lets those phases run completely unchanged.
+3. **Do not read a finished result back** beyond what the dispatched path reads — typically the frontmatter or first ~15 lines (§6). The disk-write pattern's purpose survives the fallback only if this holds.
+4. **Drop each unit's raw material before starting the next.** The findings are in the file; carrying the working context forward buys nothing and costs the window.
+5. **Handle failure exactly as the dispatched path does** — record it, retry once where the skill's procedure retries once, and continue with partial results rather than aborting the run.
+
+Order is the skill's own: keep a stated dispatch order where one exists, and otherwise run units in the order the skill lists them, so two inline runs of the same target are comparable.
+
+### 14.3 What the inline path costs — state it, never paper over it
+
+**Inline units share context, and no amount of care recovers what that loses.**
+
+- **Independence is gone.** Parallel subagents each start clean, which is exactly why a panel of lenses produces genuinely different readings. Inline, unit N has already seen units 1…N-1, so its findings are anchored on theirs. A panel run inline is a sequence of one reviewer's passes, not a panel — so **any convergence verdict it produces is weaker evidence than the same verdict from dispatched lenses**, and must not be reported as equivalent.
+- **Say so in the output.** Every report produced through this path carries one line: `Produced inline (no subagent dispatch available) — unit independence is reduced; findings share context.` Under `--auto` the same line goes into `errors[]` (§10.C) and the run still reports `completed` — a degraded result that is labeled is a result; an unlabeled one is a false claim.
+- **Context pressure is real.** N units in one window can exhaust it where N fresh windows would not. Where the unit count is caller-controlled, run fewer units inline rather than truncating each one.
+- **No parallel speedup.** Wall-clock cost is the sum of the units, not the maximum.
+
+### 14.4 When a skill names a bundled agent
+
+A skill naming a bundled agent from `agents/` (rather than a built-in type) must say what to do when `agents/` is not loaded. The ladder, in order:
+
+1. **Dispatch the host's general-purpose agent with the bundled agent's instructions inlined.** Agent files are markdown — read `agents/<name>.md` and put its body into the prompt. This keeps the fresh context, which is the property worth preserving.
+2. **No dispatch primitive either → run those same instructions inline** per §14.2.
+3. **Never silently substitute** a different bundled agent, or a built-in type, for the one the skill named. Say which agent was asked for and what ran instead.
+
+No skill in the canonical set names a bundled agent today — every dispatch uses a built-in type — so this is the rule for the next one, not a description of current behavior.
+
+### 14.5 Which skills carry this fallback
+
+| Skill | Dispatched unit | Inline fallback |
+|---|---|---|
+| `/claudna:ironclad` | one subagent per review lens (Phase 4) | run each lens inline in the Phase-3 table's order, writing `<scratch>/lenses/<lens>/result.md`; Phases 5–8 (collect, retry, aggregate, report) run unchanged off those files |
+| `/claudna:adversarial-review` (`--dispatch`) | one critic subagent per review angle (Phase 5) | run each angle inline as a separate pass, aggregate per Phase 3, and emit the same `lens-result-contract.md` document |
+| `/claudna:audit` (fan-out lenses) | research subagents per scan area | scan the areas one at a time, writing each area's findings to the scratch dir in the shape `subagent-prompts.md` specifies; the lens's aggregation step is unchanged |
+| `/claudna:worktree` | one general-purpose agent per worktree | one worktree at a time, from the main session — which means the orchestrator does the work Step 3b reserves for subagents, so expect a permission prompt per command against the sibling directory. Never more than one worktree in flight, and if the prompts are not acceptable, say so and work serially on branches in place instead of pretending the isolation held |
+| `/claudna:build-all` | per-phase in-session subagent decomposition | run the phase's tasks inline in the declared order; the per-phase gates (test, simplify, verify, scope check) are unchanged and are what the sprint actually depends on |
+| `/claudna:forge` (`--reforge`) | invoked by `/claudna:ironclad --loops` as a `--dispatch` subagent | run `--reforge` inline between cycles as an ordinary skill invocation; it reads the live Issue and writes the body, so nothing in it needs a fresh context |

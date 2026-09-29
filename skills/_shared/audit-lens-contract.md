@@ -32,6 +32,8 @@ Every lens accepts, via the engine:
 
 Lenses that fan out (multi-area scans, per-repo sweeps) follow `skills/_shared/orchestration-guide.md`: research subagents write findings to the scratch dir, the lens procedure aggregates; subagents never return long results through the orchestrator's context. Lens procedures reference their own `subagent-prompts.md` where one exists.
 
+**Hosts without subagents.** Fan-out is the *preferred* path, not the only one. Where the host has no dispatch primitive (orchestration-guide §14.1), a fan-out lens scans its areas inline and sequentially per §14.2 — announcing the inline path, writing each area's findings to the same scratch-dir path and in the same shape the subagent prompt specifies, so the lens's aggregation step runs unchanged. The independence caveat in §14.3 applies and is reported: areas scanned inline share context.
+
 ## 6. Plan-mode discipline (interactive lenses)
 
 Interactive lenses (every mode except `--auto`, which §4 governs) bracket their read-only deliberation with plan mode: all scan, analysis, and proposal steps sit between the Enter and Exit calls. Each lens references the two paragraphs below rather than restating them.

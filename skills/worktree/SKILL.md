@@ -44,13 +44,15 @@ To minimize friction:
 2. **Create one worktree per task** (Step 3).
 3. **Launch Task agents in parallel** — one Task tool call per agent, all in a single message.
 
-**CRITICAL — `subagent_type` MUST be `"general-purpose"`**. This gives all tools (Bash, Read, Edit, Write, Grep, Glob). Any other type fails silently.
+**CRITICAL — `subagent_type` MUST be `"general-purpose"`** (that is Claude Code's name for it; a host that calls the general-purpose type something else is still the dispatch path — use its name). This gives all tools (Bash, Read, Edit, Write, Grep, Glob). Any other type fails silently.
 
 Set `run_in_background: true` for concurrency. Build each prompt from `subagent-prompt-template.md`, substituting absolute paths and full task description.
 
+**No dispatch primitive at all** (`skills/_shared/orchestration-guide.md` §14.1) → the parallelism this skill exists for is unavailable, so say so and change shape rather than faking it. Per §14.2 and §14.5: announce the inline path, then work **one worktree at a time** from the main session, following `subagent-prompt-template.md` yourself as the task description. Two consequences to state to the user up front, not discover later: the orchestrator is now doing exactly the work Step 3b reserves for subagents, so **every** Bash/Read/Edit against the sibling directory raises a permission prompt; and there is no concurrency, so the cost is the sum of the tasks. If the prompt volume is unacceptable, the honest answer is to skip worktrees and work serially on branches in place — not to keep the worktree ceremony without the isolation it was buying.
+
 ### Step 5: Monitor and handle failures
 
-Use TaskOutput with `block=false` for non-blocking checks. Wait for all agents to complete.
+Use TaskOutput with `block=false` for non-blocking checks. Wait for all agents to complete. (On the inline path there is nothing to monitor — each task is finished before the next starts.)
 
 **If a subagent fails:** read its output, report to the user, ask whether to relaunch, fix manually, or skip. Do NOT silently retry.
 
