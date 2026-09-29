@@ -102,7 +102,7 @@ On a host without Claude Code's namespaced commands (Cursor, or an agent that re
 | `/index` | Organize the shared knowledge store; regenerate INDEX.md |
 | `/recall` | Orientation briefing — what the fleet and this project already know, before you start |
 | `/publish` | Distribute knowledge to other surfaces (bots, docs sites) |
-| `/claudron` | Claudron vault engine — `lookup` / `status` over the shared knowledge vault (needs the Claudron CLI); save via `/capture` |
+| `/claudron` | Claudron vault engine — `lookup` / `status` / `doctor` over the shared knowledge vault (needs the Claudron CLI); `doctor` applies the engine's migrations only after you confirm; save via `/capture` |
 
 ### Git
 

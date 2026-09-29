@@ -1,16 +1,16 @@
 ---
 name: claudron
 user-invocable: true
-description: "Use to search the shared fleet vault by term, or check vault health — the lookup and status verbs over the Claudron CLI. Requires the Claudron CLI. To save knowledge to the vault (a note, external content, or the current session's learnings), use /claudna:capture; to recall prior knowledge before starting work, use /claudna:recall."
-argument-hint: "[lookup|status] [--project p] [--fleet f] [--limit n] [--auto]"
+description: "Use to search the shared fleet vault by term, check its health, or diagnose and migrate it — the lookup, status and doctor verbs over the Claudron CLI. Requires the Claudron CLI. To save knowledge to the vault (a note, external content, or the current session's learnings), use /claudna:capture; to recall prior knowledge before starting work, use /claudna:recall."
+argument-hint: "[lookup|status|doctor] [--project p] [--fleet f] [--limit n] [--vault path] [--auto]"
 requires:
   - cli: claudron>=0.2
-    reason: "Claudron CLI — vault search (lookup) and health (status) verbs; v0.2.0 is the envelope/exit-code contract this engine targets"
+    reason: "Claudron CLI — vault search (lookup), health (status) and doctor verbs; v0.2.0 is the envelope/exit-code contract this engine targets, and doctor also gates at runtime on the engine's declared doctor capability"
 ---
 
 # Claudron
 
-One engine for reading the shared knowledge vault — `lookup` and `status` as verb modes over the `claudron` CLI. Shared engine behavior lives in `../_shared/infra-cli-contract.md`; the Claudron-specific detection ladder, envelope validation, and degrade-loudly posture live in `../_shared/claudron-engine.md`. This file supplies only routing and the Claudron deltas. (Writing to the vault is `/claudna:capture` — one write door, off the engine.)
+One engine for the shared knowledge vault — `lookup`, `status` and `doctor` as verb modes over the `claudron` CLI. Shared engine behavior lives in `../_shared/infra-cli-contract.md`; the Claudron-specific detection ladder, envelope validation, and degrade-loudly posture live in `../_shared/claudron-engine.md`. This file supplies only routing and the Claudron deltas. (Writing to the vault is `/claudna:capture` — one write door, off the engine.)
 
 ## Mode dispatch (contract §3)
 
@@ -22,12 +22,13 @@ No verb token → infer only when the request wording is unambiguous ("what does
 |------|------|------------|
 | `lookup` | Search the vault for existing notes by term | `lookup.md` |
 | `status` | Vault health — tiers, doc counts, staleness — or whether Claudron is installed and configured at all | `status.md` |
+| `doctor` | Diagnose the vault against the installed engine's rules, explain each finding, and apply the engine's migrations (`--fix`) only after the user confirms | `doctor.md` |
 
 For the selected verb, read ONLY its depth file in this skill directory and follow it exactly — never load another verb's depth (contract §1, §3).
 
 ## Pre-flight deltas (contract §4)
 
-Each verb resolves its state through the **detection ladder in `../_shared/claudron-engine.md` §1** — it replaces the generic CLI-installed / auth / target-discovery pre-flight and yields one of three verdicts (present-with-vault / present-no-vault / absent). `lookup` runs it at pre-flight and requires present-with-vault; `status` runs it as its own Step 1 and reports the verdict in all three states. Each verb gates on the verdict in its depth file's Step 0. Every `--json` call is envelope-validated per §2; failures follow the exit-code posture in §3.
+Each verb resolves its state through the **detection ladder in `../_shared/claudron-engine.md` §1** — it replaces the generic CLI-installed / auth / target-discovery pre-flight and yields one of three verdicts (present-with-vault / present-no-vault / absent). `lookup` runs it at pre-flight and requires present-with-vault; `status` runs it as its own Step 1 and reports the verdict in all three states; `doctor` also runs it as its own Step 1, because a vault from before the identity file is reachable only by explicit address. Each verb gates on the verdict in its depth file's Step 0. Every `--json` call is envelope-validated per §2; failures follow the exit-code posture in §3.
 
 **Door note.** clauDNA ships no MCP servers — this engine *is* the CLI. If Claudron's own MCP tools are configured in the session, they are the same engine with equivalent semantics; the CLI is the contract floor this skill targets.
 
@@ -35,4 +36,4 @@ Each verb resolves its state through the **detection ladder in `../_shared/claud
 
 In `--auto`, each verb's final output is the single **structured result** JSON block defined in `../_shared/orchestration-guide.md` ("Structured Result Shape") — `status` carries `artifacts.verdict` (per claudron-engine.md §3), any degradation in `errors[]`, and no interactive prompts. Per-verb fields are defined in the depth files.
 
-`lookup` and `status` are both read-only and never gate — this engine no longer mutates. The vault's write door is `/claudna:capture`.
+`lookup` and `status` are read-only and never gate. `doctor` is read-only until the user confirms `--fix`, which runs the engine's migration door: it changes the vault's shape (its identity file, its ignore rules), never a note. Writing knowledge stays `/claudna:capture`'s, the one write door for notes.

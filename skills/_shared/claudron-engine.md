@@ -21,7 +21,7 @@ Run before any engine call, as separate Bash calls (never chained — infra-cli-
 
 **Vault resolution is Claudron's contract, not ours** — see `documentation-standard.md` §10 ("locating the root"), which owns the clauDNA-side statement and cites the owner. Not restated here. This ladder only *acts* on it: it never sets env (no clauDNA skill does), and it flags the one divergence §10's mismatch rule does not reach — §10 pairs env against the section, but once the engine is present the binding pair is **engine vs section**: a `## Shared Documentation` section path that differs from `data.root` in `claudron status --json`. Report both paths; the engine's is the one in force for every engine call.
 
-**Version probe.** On **present-with-vault**, `data.engine_version` (Claudron ≥ 0.3.0) is the capability probe — guard on it, not on an install pin. Absent ⇒ pre-0.3.0.
+**Identity, then capability.** On **present-with-vault**, `data.engine_version` (Claudron ≥ 0.3.0) says which engine is here: identity, read off the envelope rather than an install pin. Absent ⇒ pre-0.3.0. It is **not a feature gate**. A feature the engine declares is gated on `data.capabilities` (Claudron CLI_CONTRACT §Capability probe): `/claudna:claudron doctor` gates on `"doctor"` there. Absent `capabilities` means an engine that predates the list, which is the right answer for every capability in it. (`/claudna:capture`'s provenance-flags gate still reads `engine_version`; moving it is clauDNA#334.)
 
 Verdict → action:
 - **present-with-vault** → use the engine.
@@ -48,6 +48,7 @@ Assert on every call: top-level `ok` (bool) / `command` (matches the verb) / `da
 | `lookup` → `lookup` | `query`, `results` (list) |
 | `recall` → `recall` | `project`, `query`, `conventions`, `notes` (list) |
 | `status` → `status` | `root`, `tiers`, `total_docs`, `total_stale`, `projects`, `fleets`, `quarantined`, `index_present`, `index_fresh`, `warnings` |
+| `doctor` → `doctor` | `vault_format`, `engine_format`, `pending` (list), `fixable` (list); after `--fix` also `applied`, `commit` |
 
 A missing top-level key, a `command` mismatch, or an absent expected `data` key is an **unrecognized envelope** → engine failure (§3). Do not parse a partial or guessed shape.
 
@@ -74,11 +75,13 @@ The engine always stamps a new note `draft`; **consumers never set or promote `m
 | **2** | usage / bad input — malformed args or stdin JSON | the skill built the call wrong — a bug; surface stderr verbatim; never retry |
 | **3** | environment — no vault, or `SyncError` (not a git repo / git missing / timeout) | the **degrade** case (below) |
 
+`doctor` is the one verb whose exit **1** is a completed result, not a refusal: it means at least one finding is an error (Claudron §Exit codes). `doctor.md` continues from it.
+
 Transient exit-3 conditions get a **bounded retry — 2 attempts, short backoff** (a deliberate widening of infra-cli-contract §7's single retry) — then degrade. (`capture` is an unlocked local write in v0.2.0, so there is no lock contention to retry — cross-machine serialization is git's job in `sync`.)
 
 **Degrade loudly** on exit 3 or an unrecognized envelope — whether the ladder returned a non-usable verdict *or* a usable verdict turned into a failure mid-call:
 - **Writing consumer** (`/claudna:capture`, `publish --to vault`): take the frozen raw-tree path (write + `/claudna:index`) and **say so**, using the standard notice below. The *vault* is never written unguarded; the raw tree is the compat holding pen, not a second vault door.
-- **Reading consumer** (`/claudron lookup`, `/claudron status`): nothing to fall back to — report the verdict + remedy (init pointer for no-vault; the git remedy for `SyncError`) and stop. `/claudna:recall` is the exception: its frozen fallback is the INDEX.md scan (§4).
+- **Reading consumer** (`/claudron lookup`, `/claudron status`, `/claudron doctor`): nothing to fall back to — report the verdict + remedy (init pointer for no-vault; the git remedy for `SyncError`) and stop. `/claudna:recall` is the exception: its frozen fallback is the INDEX.md scan (§4).
 
 ### 3.1 The standard degradation notice
 
@@ -95,7 +98,7 @@ Every branch in every consumer that finds Claudron missing or unusable emits **t
 | `/claudna:recall` | `scanning the raw tree's INDEX.md instead` |
 | `/claudna:index` | `treating the target as a raw tree, since engine-managed roots cannot be confirmed` |
 | `/claudna:init-project` (Step 6.5) | `offering a raw-tree scaffold instead of a vault` (absent), or `printing the vault-init remedy and writing nothing` (present-no-vault) |
-| `/claudna:claudron` (`lookup`, `status`) | `no fallback — reporting the verdict and stopping` |
+| `/claudna:claudron` (`lookup`, `status`, `doctor`) | `no fallback — reporting the verdict and stopping` |
 
 Consumers quote their row rather than wording it themselves. One shape is the point: a user who has seen the notice once recognizes it from any skill, and a literal prefix stays greppable across transcripts — which an improvised sentence per skill is not.
 
