@@ -81,16 +81,16 @@ Launch one `general-purpose` subagent per applicable lens, all in parallel (`run
 - **Panel-file lenses** (all rows sourced from `lenses/`):
 
 ```
-Read skills/ironclad/lenses/<lens>.md
+Read <claudna-root>/skills/ironclad/lenses/<lens>.md
 Apply it to: <SOURCE_PATH>
 Write your result to: <scratch>/lenses/<lens>/result.md
 Operate non-interactively: do not enter plan mode, do not prompt for input.
 Emit structured markdown per <claudna-root>/skills/_shared/contracts/lens-result-contract.md.
 ```
 
-- **Adversarial Review** (a skill): replace the first two lines with `Read skills/adversarial-review/SKILL.md` / `Apply the skill with --dispatch to: <SOURCE_PATH>`.
+- **Adversarial Review** (a skill): replace the first two lines with `Read <claudna-root>/skills/adversarial-review/SKILL.md` / `Apply the skill with --dispatch to: <SOURCE_PATH>`.
 
-Substitute `<SOURCE_PATH>` with the `<scratch>/source.md` path (or the PR URL for codebase-reading lenses such as extension-check and precedent-check), `<scratch>` with the scratch dir, and `<lens>` with each lens name. For `align-to-mission`, append the target's repo (and local checkout path if the cwd differs) to the launch prompt — the lens reads mission documents (PROJECT_MISSION.md / README / CLAUDE.md) from the repo under review, never from an unrelated invoking directory, otherwise it grades the plan against the wrong mission.
+Substitute `<SOURCE_PATH>` with the `<scratch>/source.md` path (or the PR URL for codebase-reading lenses such as extension-check and precedent-check), `<scratch>` with the scratch dir, `<lens>` with each lens name, and `<claudna-root>` with the plugin's absolute root, resolved per `../_shared/claudna-root.md` (the subagent has no skill directory to resolve it against). For `align-to-mission`, append the target's repo (and local checkout path if the cwd differs) to the launch prompt — the lens reads mission documents (PROJECT_MISSION.md / README / CLAUDE.md) from the repo under review, never from an unrelated invoking directory, otherwise it grades the plan against the wrong mission.
 
 ### Phase 5: Collect results
 

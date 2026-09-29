@@ -7,7 +7,7 @@ Used by planning skills to chain `/claudna:adversarial-review` at the end of pla
 When a planning skill needs to run adversarial review on a generated plan document, it dispatches a `general-purpose` subagent (NOT `Explore` — that type lacks the tools adversarial-review needs) with this prompt:
 
 ```
-Read the skill body at skills/adversarial-review/SKILL.md.
+Read the skill body at <claudna-root>/skills/adversarial-review/SKILL.md.
 
 Apply the skill with --dispatch mode to the plan document at: <DOC_PATH>
 
@@ -51,7 +51,7 @@ severity: <highest severity across findings: critical/major/minor/info>
 Omit empty sections. If the plan body cannot be reviewed (empty, malformed), emit status: blocked with the reason in the body.
 ```
 
-Substitute `<DOC_PATH>` with the actual filesystem path or issue URL.
+Substitute `<DOC_PATH>` with the actual filesystem path or issue URL, and `<claudna-root>` with the plugin's absolute root, resolved per `../../_shared/claudna-root.md` before you send the prompt: the subagent has no skill directory to resolve it against.
 
 ## Concern area vocabulary
 

@@ -569,7 +569,7 @@ Per design §5.5.2 and the canonical Autonomous Mode reference earlier in this s
 4. **Dispatch the synthesis subagent.** Launch a `general-purpose` subagent with this prompt:
 
 ```
-Read the skill body at skills/weigh-development-paths/SKILL.md.
+Read the skill body at <claudna-root>/skills/weigh-development-paths/SKILL.md.
 
 Apply the skill with --auto mode against the context bundle at:
   /tmp/build-<timestamp>/synthesis-bundle.md
@@ -579,6 +579,8 @@ Return ONLY the structured-result JSON block per the skill's emission contract
 Do NOT enter Plan Mode. Do NOT issue interactive user-input prompts.
 Do NOT write to any plan file — the orchestrator handles that.
 ```
+
+Before sending, replace `<claudna-root>` with the plugin's absolute root, resolved per `../_shared/claudna-root.md`: the subagent has no skill directory to resolve it against.
 
 5. **Parse the subagent's structured result** per `../_shared/contracts/synthesis-contract.md`, and remap its outcome to `build`'s own:
 

@@ -753,14 +753,29 @@ def check_cwd_script_calls(text: str, md_file: Path, skills_dir: Path, fm: dict 
     ]
 
 
+def check_resolver_pointer(text: str, md_file: Path, skills_dir: Path) -> list[str]:
+    """Check (e): a file that writes <claudna-root> also names the file that
+    says how to resolve it, so the reader -- or the orchestrator filling it
+    into a prompt it forwards -- is not left to find the definition."""
+    if CLAUDNA_ROOT not in text or "claudna-root.md" in text:
+        return []
+    rel = md_file.relative_to(skills_dir)
+    first = next(i for i, line in enumerate(text.split("\n"), 1) if CLAUDNA_ROOT in line)
+    return [
+        f"{rel}:{first}: uses `{CLAUDNA_ROOT}` but never points at `claudna-root.md` -- add the pointer beside it "
+        "(SKILL_CONTRACT §1.1)"
+    ]
+
+
 def check_host_portability(text: str, md_file: Path, skills_dir: Path, fm: dict | None) -> list[str]:
-    """Checks (a)-(d) of SKILL_CONTRACT §5.1 (#336) for one markdown file under
+    """Checks (a)-(e) of SKILL_CONTRACT §5.1 (#336) for one markdown file under
     skills/. fm is the owning skill's frontmatter, or None for skills/_shared/."""
     return (
         check_shared_paths(text, md_file, skills_dir)
         + check_plugin_variables(text, md_file, skills_dir)
         + check_plugin_cache_paths(text, md_file, skills_dir, fm)
         + check_cwd_script_calls(text, md_file, skills_dir, fm)
+        + check_resolver_pointer(text, md_file, skills_dir)
     )
 
 
