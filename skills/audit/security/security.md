@@ -14,7 +14,7 @@ Invoked by /claudna:audit in security mode — scan the codebase for security vu
 
 Follow these steps exactly in order.
 
-**Enter Plan Mode.** Call `EnterPlanMode` per `skills/_shared/audit-lens-contract.md` §6 — the discovery, analysis, and proposal steps below are read-only.
+**Enter Plan Mode.** Call `EnterPlanMode` per `../../_shared/audit-lens-contract.md` §6 — the discovery, analysis, and proposal steps below are read-only.
 
 ---
 
@@ -34,7 +34,7 @@ Present the findings table and ask:
 
 Do NOT proceed to Phase 2 without explicit confirmation.
 
-**Exit Plan Mode.** Call `ExitPlanMode` per `skills/_shared/audit-lens-contract.md` §6 — doc generation past this point requires the Write tool.
+**Exit Plan Mode.** Call `ExitPlanMode` per `../../_shared/audit-lens-contract.md` §6 — doc generation past this point requires the Write tool.
 
 ---
 
@@ -88,15 +88,15 @@ Each doc represents **exactly 1 PR** and must include:
 
 #### Subagent Workflow
 
-Follow Section 9 of the orchestration guide (`skills/_shared/orchestration-guide.md`). Plan agents must also read `skills/_shared/planning-standard.md` for quality standards and phase doc structure. Scratch directory: `/tmp/security-audit-<YYYY-MM-DD_HHMMSS>/research/`.
+Follow Section 9 of the orchestration guide (`../../_shared/orchestration-guide.md`). Plan agents must also read `../../_shared/planning-standard.md` for quality standards and phase doc structure. Scratch directory: `/tmp/security-audit-<YYYY-MM-DD_HHMMSS>/research/`.
 
-**Security-specific rule:** Never surface a raw secret value. Prose masking is not the mechanism — "show `sk-****`" leaked live tokens twice (a Telegram bot token, then a neon API key) because it relied on the model remembering to mask and only illustrated the `sk-` shape. Each subagent MUST scrub its research/findings file **in place** with the bundled redactor before handoff — `python3 scripts/redact.py <file>` (resolve the path per `skills/_shared/orchestration-guide.md` §7 "Redacting credentials in CLI output"). It masks the known token shapes and `SECRET=value` assignments to `[REDACTED]` while sparing `file:line`, so keep reporting file:line + the variable name for readability; the redactor is the deterministic backstop, not a substitute for it.
+**Security-specific rule:** Never surface a raw secret value. Prose masking is not the mechanism — "show `sk-****`" leaked live tokens twice (a Telegram bot token, then a neon API key) because it relied on the model remembering to mask and only illustrated the `sk-` shape. Each subagent MUST scrub its research/findings file **in place** with the bundled redactor before handoff — `python3 scripts/redact.py <file>` (resolve the path per `../../_shared/orchestration-guide.md` §7 "Redacting credentials in CLI output"). It masks the known token shapes and `SECRET=value` assignments to `[REDACTED]` while sparing `file:line`, so keep reporting file:line + the variable name for readability; the redactor is the deterministic backstop, not a substitute for it.
 
 ---
 
 ## Phase 2.5: Adversarial Review Pass
 
-Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. The adversarial-review `--dispatch` output is markdown with YAML frontmatter per `skills/_shared/contracts/lens-result-contract.md` — parse `status` from frontmatter and findings from body sections. Run on each remediation doc (`<NN>_*.md`) and the master `00_SECURITY_AUDIT.md` in the session's scratch docs directory, before the family is published to `documentation/planning/security/<session>/`. Apply in all output modes and `--auto`.
+Follow `../../_shared/pre-handoff-checklist.md` for the full procedure. The adversarial-review `--dispatch` output is markdown with YAML frontmatter per `../../_shared/contracts/lens-result-contract.md` — parse `status` from frontmatter and findings from body sections. Run on each remediation doc (`<NN>_*.md`) and the master `00_SECURITY_AUDIT.md` in the session's scratch docs directory, before the family is published to `documentation/planning/security/<session>/`. Apply in all output modes and `--auto`.
 
 ### Security-specific rules
 
@@ -139,7 +139,7 @@ Then tell the user:
 
 **"Plans are ready. Run `/claudna:build documentation/planning/security/<session>/` to start building — it will handle challenge review, branching, implementation, and PRs for each phase doc."**
 
-**This lens produces plans, not code** — see the shared reminder in `skills/_shared/orchestration-guide.md` §11: build, branch, and PR steps are always `/claudna:build`'s job.
+**This lens produces plans, not code** — see the shared reminder in `../../_shared/orchestration-guide.md` §11: build, branch, and PR steps are always `/claudna:build`'s job.
 
 ---
 
@@ -150,7 +150,7 @@ Then tell the user:
 - **Group related fixes.** One finding per PR creates review fatigue. Group logically.
 - **Skip missing tools gracefully.** If `pip-audit` isn't installed, note it and move on. Don't block the audit.
 - **User gates at every phase transition.** Scan → confirm → plan.
-- **Subagent strategy.** Phase 1 can use Explore agents for deep code analysis (disk-write pattern). Phase 2 uses Plan agents for remediation docs (disk-write pattern). Both patterns defined in `skills/_shared/orchestration-guide.md`. Context never flows through the orchestrator.
+- **Subagent strategy.** Phase 1 can use Explore agents for deep code analysis (disk-write pattern). Phase 2 uses Plan agents for remediation docs (disk-write pattern). Both patterns defined in `../../_shared/orchestration-guide.md`. Context never flows through the orchestrator.
 - See orchestration guide, Section 10 for shared reminders (one PR per doc, testing, plans-not-code).
 
 ---
@@ -159,7 +159,7 @@ Then tell the user:
 
 `--output` flag semantics are owned by the lens contract (§2). This lens supports `github` and `session` in addition to the `docs` deliverable produced by the full interactive procedure above.
 
-Follow the output guide at `skills/_shared/output-guide.md`:
+Follow the output guide at `../../_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Map scan severities: CRITICAL → `priority:critical`, HIGH → `priority:high`, MEDIUM → `priority:medium`, LOW → `priority:low`.
 - For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
 - For `docs`: follow the subagent workflow in the orchestration guide (publish step: `--dir documentation/planning/security/<session_name>_<YYYY-MM-DD>/`)
@@ -178,7 +178,7 @@ When `--auto` is set (implies `--output github`; see the lens contract §4 and o
 5. Skip LOW/INFO findings unless particularly noteworthy
 6. Return structured summary for audit tracking
 7. **Security-specific:** Never include a raw secret value in issue bodies — scrub the doc with the redactor (`python3 scripts/redact.py <file>`; path per orchestration-guide §7) before publishing, and report file:line + variable name only.
-8. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+8. **Emit the structured-result shape** per `../../_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
 ```json
 {

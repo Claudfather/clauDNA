@@ -86,7 +86,7 @@ Ask: **"What would you like to focus on?"**
 
 ### 8. Structured-result emission (`--auto` only)
 
-When invoked with `--auto`, emit the §10.C structured result from `_shared/orchestration-guide.md §10.C` as the **final** output — nothing after it. The step 5 briefing still emits as the agent's context payload; the JSON block is appended at the end so orchestrators can parse the outcome.
+When invoked with `--auto`, emit the §10.C structured result from `../_shared/orchestration-guide.md §10.C` as the **final** output — nothing after it. The step 5 briefing still emits as the agent's context payload; the JSON block is appended at the end so orchestrators can parse the outcome.
 
 ```json
 {
@@ -118,6 +118,6 @@ Interactive mode (no `--auto`) skips this step entirely.
 
 - **Read-only by default.** Only writes are step 4 (write back if reaped) and step 1 legacy import. Never modifies code, never commits.
 - **Speed over depth.** Scan, reap, summarize. No deep analysis.
-- **Reaper rules in `_shared/`.** Do not duplicate them inline.
+- **Reaper rules in `../_shared/`.** Do not duplicate them inline.
 - **`--auto` is silent on the prompt.** Briefing and focus suggestion still emit (they are the agent's context payload); only the explicit user-question is suppressed.
 - **Legacy import is one-shot per cwd.** Once imported, the legacy file is deleted, so this branch only fires once per project.

@@ -16,7 +16,7 @@ You are a critical thinker, not an advocate. Your job is to find the weaknesses,
 Parse `$ARGUMENTS` at invocation:
 - **First positional arg:** Path to the plan document. If omitted, prompt for it.
 - `--dispatch`: Multi-reviewer mode AND non-interactive mode. Spawns parallel subagents with different review angles AND suppresses all interactive elements (no Plan Mode, no AskUserQuestion). Emits a markdown document with YAML frontmatter containing structured findings (see Structured Result Emission below). Use this mode when invoking adversarial-review from another skill or from an orchestrator (e.g., ironclad). Without this flag, perform a single consolidated review interactively.
-- `--output github`: Write findings as GitHub Issues. See `skills/_shared/output-guide.md`.
+- `--output github`: Write findings as GitHub Issues. See `../_shared/output-guide.md`.
 - `--output session`: Present findings in chat only (default).
 
 ---
@@ -28,7 +28,7 @@ When `--dispatch` is passed (typically when invoked as a subagent from another s
 - **Do NOT call `EnterPlanMode`.** The caller has its own Plan Mode lifecycle.
 - **Do NOT call `AskUserQuestion`.** The caller is not a human; questions cannot be answered.
 - **Do NOT prompt for clarification.** If the plan is too ambiguous to review, exit `outcome: blocked` with a populated `blocker_description`.
-- Spawn parallel critic subagents per Phase 3 — or, where the host has no dispatch primitive, run them inline and sequentially per `skills/_shared/orchestration-guide.md` §14.
+- Spawn parallel critic subagents per Phase 3 — or, where the host has no dispatch primitive, run them inline and sequentially per `../_shared/orchestration-guide.md` §14.
 - Aggregate critic findings into the structured markdown format.
 - Emit the markdown document (YAML frontmatter + body) as the final output and stop.
 
@@ -202,7 +202,7 @@ Each reviewer writes findings to `/tmp/adversarial-review-<timestamp>/<reviewer>
 
 After all return, synthesize: merge overlapping findings, resolve contradictions, rank by severity.
 
-**No dispatch primitive** (`skills/_shared/orchestration-guide.md` §14.1) → run the reviewers inline per §14.2: one pass per angle in the table's order, each writing to the same `<reviewer>.md` path so synthesis is unchanged. Note honestly that the anti-groupthink guards below are weakened rather than preserved by this path — a reviewer that has already read its predecessors is the correlated-bias case those guards exist to catch, so trigger the 10th Man Rule regardless of the Blocker count and carry §14.3's independence line in the output.
+**No dispatch primitive** (`../_shared/orchestration-guide.md` §14.1) → run the reviewers inline per §14.2: one pass per angle in the table's order, each writing to the same `<reviewer>.md` path so synthesis is unchanged. Note honestly that the anti-groupthink guards below are weakened rather than preserved by this path — a reviewer that has already read its predecessors is the correlated-bias case those guards exist to catch, so trigger the 10th Man Rule regardless of the Blocker count and carry §14.3's independence line in the output.
 
 ### 10th Man Rule
 
@@ -324,7 +324,7 @@ This prevents strawmanning of criticism. Can be invoked as a follow-up: `/claudn
 - **The reviewer should be uncomfortable.** If the review feels easy, you're not challenging hard enough.
 - **Plans survive adversarial review by improving, not by being defended.** The goal is a better plan, not a winning argument.
 - **Dispatch mode is expensive but worth it for major initiatives.** Use single mode for smaller plans; dispatch for anything that will take >1 week to implement or affects multiple systems.
-- Orchestration guide at `skills/_shared/orchestration-guide.md` for subagent patterns.
+- Orchestration guide at `../_shared/orchestration-guide.md` for subagent patterns.
 
 ### Methodology Sources
 
@@ -346,7 +346,7 @@ This skill synthesizes established techniques from decision science and strategi
 
 After Phase 3 aggregation, emit a single markdown document with YAML frontmatter as the FINAL output. No text after this document. The consumer (e.g., `/ironclad` in claudlobby) writes this output to a file path for synthesis.
 
-**Format:** Follow the canonical schema at `skills/_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all lens skill `--dispatch` output.
+**Format:** Follow the canonical schema at `../_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all lens skill `--dispatch` output.
 
 For this skill, set `lens: adversarial-review` in frontmatter. All other fields, severity vocabulary, body sections (Blockers/Risks/Gaps/Questions/Observations), concern area values, and blocked/failed output are defined in the contract.
 

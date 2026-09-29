@@ -6,7 +6,7 @@ Prompt caching is a prefix match — static content at the front is cached and r
 
 ## Lens arguments (beyond contract §2)
 
-Shared argument semantics live in `skills/_shared/audit-lens-contract.md` §2. Lens-specific:
+Shared argument semantics live in `../../_shared/audit-lens-contract.md` §2. Lens-specific:
 
 - `[focus]` — a directory to scope the scan (default: the repo root's `CLAUDE.md` + `.claude/`).
 - **auto: yes** — deterministic and read-only; runs non-interactively under `--auto` (contract §4).
@@ -34,7 +34,7 @@ Beyond the shared `--output github|session` surface (contract §2):
 - `session` (engine default): present the summary + findings table in chat.
 - `github`: author each WARN/FAIL cluster as a finding doc (frontmatter + the §4.1 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels. Label `auto-audit` + `cache`.
 
-Under `--auto` (auto: yes): emit the single fenced structured-result JSON per `skills/_shared/orchestration-guide.md` §10.C (skill: `audit`, `"lens": "cache"` inside `artifacts`), findings included — no chat prose.
+Under `--auto` (auto: yes): emit the single fenced structured-result JSON per `../../_shared/orchestration-guide.md` §10.C (skill: `audit`, `"lens": "cache"` inside `artifacts`), findings included — no chat prose.
 
 ## Notes
 

@@ -34,7 +34,7 @@ digraph when_to_use {
 }
 ```
 
-**Not for:** a single plan doc (`/claudna:build`), independent parallelizable tasks (`/claudna:worktree` orchestrating parallel subagents — or running them inline per `skills/_shared/orchestration-guide.md` §14 where the host cannot dispatch), or planning the epic in the first place (`/claudna:forge`).
+**Not for:** a single plan doc (`/claudna:build`), independent parallelizable tasks (`/claudna:worktree` orchestrating parallel subagents — or running them inline per `../_shared/orchestration-guide.md` §14 where the host cannot dispatch), or planning the epic in the first place (`/claudna:forge`).
 
 ## Inputs — refuse to start without all three
 
@@ -87,7 +87,7 @@ Cross-repo pairs (hub PR + dbt twin) get an explicit merge order in the ledger, 
 Each phase, in order — the composition is the point; do not inline what a skill already owns:
 
 1. **Isolate** — `/claudna:worktree`. One phase, one workspace, clean test baseline.
-2. **Implement** — `/claudna:build` on that phase's doc (or decompose into independent in-session subagent tasks when the phase itself splits cleanly and you're staying in-session). On a host with no dispatch primitive, run the decomposed tasks inline in the declared order per `skills/_shared/orchestration-guide.md` §14.2 and say so; the per-phase gates below are unchanged and are what the sprint actually depends on.
+2. **Implement** — `/claudna:build` on that phase's doc (or decompose into independent in-session subagent tasks when the phase itself splits cleanly and you're staying in-session). On a host with no dispatch primitive, run the decomposed tasks inline in the declared order per `../_shared/orchestration-guide.md` §14.2 and say so; the per-phase gates below are unchanged and are what the sprint actually depends on.
 3. **Test per the doc** — run the phase doc's own test plan, not a generic suite pass. A checklist item the session cannot reach (needs a credential, a deploy, a week-long window) is recorded as BLOCKED in the ledger with the smallest unblocking action — never silently skipped, never quietly narrowed.
 4. **Simplify** — run the native `/simplify` command before the push. This is not polish. In the origin epic, both code PRs shipped green with pasted verification and still carried defects their own tests were structured to miss — one had two tests passing for the wrong reason. Green CI plus honest evidence was not sufficient; a second independent read was. Skipping this step is how a compiling, green, wrong change ships.
 5. **Verify** — `/claudna:verify-completion`. Evidence before claims, fresh output pasted into the ledger.
@@ -184,5 +184,5 @@ A sprint that ends with "all PRs open" has ended correctly if the repo's convent
 ## Integration
 
 - **Upstream:** `/claudna:forge` produces the epic and phase docs this skill drives; `/claudna:ironclad` hardens them.
-- **Per phase:** `/claudna:worktree` (isolate) · `/claudna:build` (or in-session subagent decomposition for phases that split cleanly — inline and sequential on a host without subagents, per `skills/_shared/orchestration-guide.md` §14) · the native `/simplify` command · `/claudna:verify-completion` · `/claudna:ship` (ship).
+- **Per phase:** `/claudna:worktree` (isolate) · `/claudna:build` (or in-session subagent decomposition for phases that split cleanly — inline and sequential on a host without subagents, per `../_shared/orchestration-guide.md` §14) · the native `/simplify` command · `/claudna:verify-completion` · `/claudna:ship` (ship).
 - **Merge gates:** the repo's own review/merge conventions apply unchanged — this skill never merges anything a repo's policy reserves for humans.

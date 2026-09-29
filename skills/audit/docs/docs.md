@@ -2,7 +2,7 @@ Invoked by /claudna:audit in docs mode — a rigorous audit of project documenta
 
 Update inaccuracies, mark development plan statuses, archive stale docs, and identify gaps — ensuring full handoff-readiness.
 
-**Framing principle:** This project is being handed off to another engineering team. There must be zero gaps. Any engineer who picks up the codebase should be able to fully understand it, have complete context, and confidently edit and enhance the codebase without asking the original team a single question. See `skills/_shared/planning-standard.md` for the shared quality standard that all plan output must meet.
+**Framing principle:** This project is being handed off to another engineering team. There must be zero gaps. Any engineer who picks up the codebase should be able to fully understand it, have complete context, and confidently edit and enhance the codebase without asking the original team a single question. See `../../_shared/planning-standard.md` for the shared quality standard that all plan output must meet.
 
 ## When NOT to use
 
@@ -62,7 +62,7 @@ Ask the user to confirm the inventory and categories before proceeding. The user
 For each document categorized as **Coding overview**:
 
 1. Read the document thoroughly
-2. Use subagents (Task tool with `Explore` type) to trace every claim back to real code — or, where the host has no dispatch primitive, trace the claims inline and sequentially per `skills/_shared/orchestration-guide.md` §14.2:
+2. Use subagents (Task tool with `Explore` type) to trace every claim back to real code — or, where the host has no dispatch primitive, trace the claims inline and sequentially per `../../_shared/orchestration-guide.md` §14.2:
    - File path references → verify files exist at stated paths
    - Function/class mentions → verify they exist and match descriptions
    - Architecture claims → verify the described patterns in the actual code
@@ -114,7 +114,7 @@ Execute the user's choices — create or update docs as requested.
 
 ### Step 5.5: Adversarial Review Pass on Gap Proposals
 
-Follow `skills/_shared/pre-handoff-checklist.md` for the general procedure. The adversarial-review `--dispatch` output is markdown with YAML frontmatter per `skills/_shared/contracts/lens-result-contract.md` — parse `status` from frontmatter and findings from body sections. For the docs lens, the workflow is adapted:
+Follow `../../_shared/pre-handoff-checklist.md` for the general procedure. The adversarial-review `--dispatch` output is markdown with YAML frontmatter per `../../_shared/contracts/lens-result-contract.md` — parse `status` from frontmatter and findings from body sections. For the docs lens, the workflow is adapted:
 
 1. Write each gap-fix proposal to a temporary scratch file at `/tmp/audit-docs-<timestamp>/proposals/<gap-slug>.md`.
 
@@ -170,7 +170,7 @@ Could a new engineer onboard from these docs alone?
 
 This lens supports `--output github` and `--output session`. **Lens delta (predecessor-faithful, overrides contract §2's session default):** with no `--output` flag this lens fixes docs inline and asks about gaps — its distinctive behavior.
 
-Follow the output guide at `skills/_shared/output-guide.md`:
+Follow the output guide at `../../_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Apply `docs` label. Auto-fix verifiable inaccuracies first, then create issues for gaps requiring human judgment.
 - For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
 - No flag (lens delta): fix docs inline and ask about gaps
@@ -188,7 +188,7 @@ When `--auto` is set (see orchestration guide Section 10), run fully non-interac
 4. Auto-mark development plan statuses
 5. Auto-archive fully completed plans
 6. Create GitHub Issues for gaps that require human judgment (new docs to write, structural decisions)
-7. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+7. **Emit the structured-result shape** per `../../_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
 ```json
 {

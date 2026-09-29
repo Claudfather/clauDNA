@@ -1,6 +1,6 @@
 # Shared Orchestration Guide
 
-Shared reference for skills that use subagent orchestration to produce design documents. This file is not a skill — it has no `SKILL.md` and does not appear in skill listings. Skills reference it by telling subagents to read it from disk at `skills/_shared/orchestration-guide.md`.
+Shared reference for skills that use subagent orchestration to produce design documents. This file is not a skill — it has no `SKILL.md` and does not appear in skill listings. Skills reference it by telling subagents to read it from disk at `../_shared/orchestration-guide.md`.
 
 ---
 
@@ -83,7 +83,7 @@ The orchestrator constructs a prompt for each Plan agent that includes:
 ```
 ## Setup
 
-1. Read skills/_shared/planning-standard.md — follow the Quality
+1. Read ../_shared/planning-standard.md — follow the Quality
    Standard and Phase Doc Structure exactly (docs are publishable docs:
    output-guide §3 frontmatter + the §4.1 body skeleton; the standard's
    content sections map onto it — see its mapping table).
@@ -117,7 +117,7 @@ After all Plan agents complete, the **orchestrator composes the `00_` master** f
 /claudna:publish /tmp/<skill>-<timestamp>/docs/ --to docs --dir documentation/planning/<subdirectory>/<session_name>_<YYYY-MM-DD>/
 ```
 
-Family mode validates each doc — `NN_*` phase docs against the full §4.1 skeleton, the `00_*` master under the presence-only exemption — and writes nothing on any failure (see `skills/publish/SKILL.md` Step 1b / the docs adapter). The `--dir` value comes from the registry in `skills/_shared/documentation-standard.md` §2.
+Family mode validates each doc — `NN_*` phase docs against the full §4.1 skeleton, the `00_*` master under the presence-only exemption — and writes nothing on any failure (see `skills/publish/SKILL.md` Step 1b / the docs adapter). The `--dir` value comes from the registry in `../_shared/documentation-standard.md` §2.
 
 ### What the orchestrator MUST NOT do
 
@@ -130,7 +130,7 @@ Family mode validates each doc — `NN_*` phase docs against the full §4.1 skel
 
 ## 4. Quality Standards
 
-See `skills/_shared/planning-standard.md` for the full quality standard. All plan output — phase docs, master docs, GitHub Issue bodies — must meet this standard.
+See `../_shared/planning-standard.md` for the full quality standard. All plan output — phase docs, master docs, GitHub Issue bodies — must meet this standard.
 
 Plan agents must read `planning-standard.md` from disk alongside this guide.
 
@@ -138,7 +138,7 @@ Plan agents must read `planning-standard.md` from disk alongside this guide.
 
 ## 5. Phase Doc Structure
 
-See `skills/_shared/planning-standard.md` for the required phase doc structure (9 mandatory sections). Skills with domain-specific sections specify those in their own SKILL.md — they layer on top of the shared structure.
+See `../_shared/planning-standard.md` for the required phase doc structure (9 mandatory sections). Skills with domain-specific sections specify those in their own SKILL.md — they layer on top of the shared structure.
 
 ---
 
@@ -186,7 +186,7 @@ Both Read and Write are blanket-allowed via the `claude-workflow` permission cat
 
 - Research subagents writing research to `/tmp/` → **no permission prompt**
 - Plan agents reading research from `/tmp/` → **no permission prompt**
-- Plan agents reading this guide from `skills/_shared/` → **no permission prompt**
+- Plan agents reading this guide from `../_shared/` → **no permission prompt**
 - Plan agents writing docs to the scratch docs directory (`/tmp/…/docs/`) → **no permission prompt**
 - `/claudna:publish --to docs` placing the family under `documentation/planning/` (Read/Write tools) → **no permission prompt**
 
@@ -236,7 +236,7 @@ Run it over any research or findings file that captured command output before th
 
 ## 8. Archive Convention
 
-Output directories follow this pattern per skill (reached via `publish --to docs --dir` — the registry in `skills/_shared/documentation-standard.md` §2; skills never *place finished docs* here directly. Documented exceptions: `/claudna:build`'s status-marker write-backs and its `git mv` archive move):
+Output directories follow this pattern per skill (reached via `publish --to docs --dir` — the registry in `../_shared/documentation-standard.md` §2; skills never *place finished docs* here directly. Documented exceptions: `/claudna:build`'s status-marker write-backs and its `git mv` archive move):
 
 ```
 documentation/planning/<subdirectory>/<session_name>_<YYYY-MM-DD>/
@@ -262,12 +262,12 @@ via `git mv`. This is handled by `/claudna:build` — planning skills only gener
 
 When a skill's doc generation step (typically the final step) delegates to Plan subagents, include this reference instead of inlining the full workflow:
 
-> **Follow the subagent workflow defined in the orchestration guide (`skills/_shared/orchestration-guide.md`):**
+> **Follow the subagent workflow defined in the orchestration guide (`../_shared/orchestration-guide.md`):**
 > - Plan Agent → Disk pattern (Section 3)
-> - Quality standards and phase doc structure (`skills/_shared/planning-standard.md`)
+> - Quality standards and phase doc structure (`../_shared/planning-standard.md`)
 > - Context window management (Section 6)
 > - Archive convention (Section 8)
-> - Pre-handoff adversarial review (`skills/_shared/pre-handoff-checklist.md`)
+> - Pre-handoff adversarial review (`../_shared/pre-handoff-checklist.md`)
 >
 > Plan agents read research from the session's scratch directory, write docs into the scratch docs directory (the orchestrator publishes the family via `/claudna:publish --to docs` — §3), and return only a metadata summary.
 >
@@ -279,7 +279,7 @@ Skills that have domain-specific quality requirements or custom phase doc sectio
 
 Skills support `--output github` and `--output session` in addition to the default `docs` target. When `--output github` is active, the skill runs the full analysis and plan generation pipeline (no phases are skipped), then writes output as GitHub Issues instead of planning docs. When `--output session` is active, findings are presented in chat only with no persistence.
 
-Follow the output guide at `skills/_shared/output-guide.md` for target-specific formatting, deduplication, labels, and subagent workflow details.
+Follow the output guide at `../_shared/output-guide.md` for target-specific formatting, deduplication, labels, and subagent workflow details.
 
 ---
 

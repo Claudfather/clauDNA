@@ -368,7 +368,7 @@ def check_output_github_reference(fm: dict, body: str) -> list[str]:
         if "output-guide" not in body:
             errors.append(
                 "argument-hint claims '--output github' but body does not reference "
-                "output-guide.md (expected: skills/_shared/output-guide.md)"
+                "output-guide.md (expected a reference to ../_shared/output-guide.md)"
             )
     return errors
 
@@ -501,6 +501,95 @@ def collect_skill_reference_errors(text: str, valid_names: set[str]) -> list[tup
 def check_skill_references(text: str, valid_names: set[str]) -> list[str]:
     """String-only projection of collect_skill_reference_errors."""
     return [msg for _target, msg in collect_skill_reference_errors(text, valid_names)]
+
+
+# clauDNA #336: a path in skill text resolves against the directory of the file
+# it is written in -- plain markdown semantics, and what every reference between
+# a skill's own files already does -- so a host that knows where it loaded a
+# file can follow the path without this repo's layout or working directory.
+# `_shared/` material is therefore spelled one way only: one "../" per directory
+# between the file and skills/, then "_shared/<path>" (SKILL_CONTRACT §1).
+_SHARED_SEGMENT_RE = re.compile(r"(?<![\w-])_shared/")
+# Whatever path text runs up to the segment is part of how the path is written
+# (`skills/`, `../`, `${CLAUDE_PLUGIN_ROOT}/skills/`, `~/.claude/skills/`).
+_SHARED_PREFIX_RE = re.compile(r"[\w.~${}/-]*$")
+_SHARED_TAIL_RE = re.compile(r"[\w./-]*")
+
+
+def _shared_path_spans(line: str) -> list[tuple[int, int, str]]:
+    """(start, end, tail) of every `_shared/` path in line, its prefix included."""
+    spans: list[tuple[int, int, str]] = []
+    for m in _SHARED_SEGMENT_RE.finditer(line):
+        start = _SHARED_PREFIX_RE.search(line, 0, m.start()).start()
+        if spans and start < spans[-1][1]:
+            continue  # a second segment inside a path already taken
+        tail = _SHARED_TAIL_RE.match(line, m.end()).group(0).rstrip(".")
+        spans.append((start, m.end() + len(tail), tail))
+    return spans
+
+
+def _shared_spelling(md_file: Path, skills_dir: Path, tail: str) -> str | None:
+    """The accepted spelling of `_shared/<tail>` from md_file, or None when
+    <tail> names nothing under skills/_shared/ (so there is nothing to spell)."""
+    shared_root = (skills_dir / "_shared").resolve()
+    target = (shared_root / tail).resolve()
+    if not target.exists() or (target != shared_root and shared_root not in target.parents):
+        return None
+    depth = len(md_file.relative_to(skills_dir).parts) - 1
+    return "../" * depth + "_shared/" + tail
+
+
+def shared_path_findings(text: str, md_file: Path, skills_dir: Path) -> list[tuple[int, str, str | None]]:
+    """Every `_shared/` path in md_file's text not written relative to md_file.
+
+    Returns (line number, path as written, accepted spelling) triples. The
+    spelling is None when the path names nothing under skills/_shared/: there
+    is then nothing to rewrite it to, and a human has to decide.
+    """
+    findings: list[tuple[int, str, str | None]] = []
+    for lineno, line in enumerate(text.split("\n"), 1):
+        for start, end, tail in _shared_path_spans(line):
+            written = line[start:end]
+            spelling = _shared_spelling(md_file, skills_dir, tail)
+            if written != spelling:
+                findings.append((lineno, written, spelling))
+    return findings
+
+
+def check_shared_paths(text: str, md_file: Path, skills_dir: Path) -> list[str]:
+    """String projection of shared_path_findings, for the validator."""
+    rel = md_file.relative_to(skills_dir)
+    errors: list[str] = []
+    for lineno, written, spelling in shared_path_findings(text, md_file, skills_dir):
+        if spelling is None:
+            errors.append(f"{rel}:{lineno}: `{written}` names nothing under skills/_shared/")
+        else:
+            errors.append(
+                f"{rel}:{lineno}: `{written}` is not relative to this file -- write `{spelling}` "
+                "(SKILL_CONTRACT §1; `python3 scripts/fix_shared_paths.py` rewrites these)"
+            )
+    return errors
+
+
+def rewrite_shared_paths(text: str, md_file: Path, skills_dir: Path) -> tuple[str, int]:
+    """Rewrite every `_shared/` path that has an accepted spelling to it.
+
+    Returns (new text, paths rewritten). Paths naming nothing under
+    skills/_shared/ are left as written, for shared_path_findings to report.
+    """
+    lines = text.split("\n")
+    count = 0
+    for i, line in enumerate(lines):
+        pieces: list[str] = []
+        pos = 0
+        for start, end, tail in _shared_path_spans(line):
+            spelling = _shared_spelling(md_file, skills_dir, tail)
+            if spelling is not None and line[start:end] != spelling:
+                pieces += [line[pos:start], spelling]
+                pos = end
+                count += 1
+        lines[i] = "".join(pieces) + line[pos:]
+    return "\n".join(lines), count
 
 
 def load_removed_skills(path: Path) -> list[str]:

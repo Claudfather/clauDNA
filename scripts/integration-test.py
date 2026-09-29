@@ -25,7 +25,6 @@ from skill_checks import SKIP_DIRS
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SKILLS_DIR = REPO_ROOT / "skills"
 AGENTS_DIR = REPO_ROOT / "agents"
-SHARED_DIR = SKILLS_DIR / "_shared"
 
 # Skills where reference resolution is not meaningful — e.g., skills that list
 # external filesystem paths to search/delete rather than local supporting files.
@@ -87,22 +86,6 @@ def get_agent_names() -> set[str]:
     if not AGENTS_DIR.is_dir():
         return set()
     return {p.stem for p in AGENTS_DIR.glob("*.md")}
-
-
-def get_shared_files() -> set[str]:
-    """Return set of filenames in skills/_shared/, recursing into subdirectories.
-
-    Top-level files are returned as bare names (e.g., "output-guide.md"); files
-    inside subdirectories are returned as relative paths (e.g.,
-    "subagent-prompts/adversarial-chain.md") so references can match either form.
-    """
-    if not SHARED_DIR.is_dir():
-        return set()
-    files: set[str] = set()
-    for p in SHARED_DIR.rglob("*"):
-        if p.is_file():
-            files.add(str(p.relative_to(SHARED_DIR)))
-    return files
 
 
 def get_skill_files(skill_dir: Path) -> set[str]:
@@ -193,16 +176,6 @@ def resolve_reference(ref: str, skill_dir: Path) -> Path | None:
     """Resolve a file reference to an actual path. Returns None if not found."""
     # Clean up markdown link artifacts: [text](path or (path)
     ref = ref.lstrip("[").split("](")[-1].rstrip(")")
-
-    # Absolute-style: skills/_shared/filename.md
-    if ref.startswith("skills/_shared/"):
-        candidate = REPO_ROOT / ref
-        return candidate if candidate.is_file() else None
-
-    # Also handle _shared/ without skills/ prefix
-    if ref.startswith("_shared/"):
-        candidate = SKILLS_DIR / ref
-        return candidate if candidate.is_file() else None
 
     # Cross-skill reference: skills/<other-skill>/<file>.md
     if ref.startswith("skills/"):
@@ -314,19 +287,6 @@ def check_agent_references(skill_name: str, body: str, agent_names: set[str]) ->
         # Check if it matches an agent file
         if agent_type not in agent_names:
             warnings.append(f"subagent_type `{agent_type}` does not match any agent in agents/")
-
-    return errors, warnings
-
-
-def check_shared_references(skill_name: str, body: str, shared_files: set[str]) -> tuple[list[str], list[str]]:
-    """Check that _shared/ references resolve to actual files."""
-    errors = []
-    warnings = []
-
-    for m in re.finditer(r"skills/_shared/(\S+\.md)", body):
-        fname = m.group(1).rstrip(")`")
-        if fname not in shared_files:
-            errors.append(f"broken shared reference: `skills/_shared/{fname}` not found")
 
     return errors, warnings
 
@@ -465,7 +425,6 @@ def main() -> int:
             print("CI mode: no skills touched in this PR — all errors reported as warnings\n")
 
     agent_names = get_agent_names()
-    shared_files = get_shared_files()
 
     skill_dirs = sorted(p for p in SKILLS_DIR.iterdir() if p.is_dir() and p.name not in SKIP_DIRS)
 
@@ -512,22 +471,17 @@ def main() -> int:
         errors.extend(e)
         warnings.extend(w)
 
-        # 5. Shared file references
-        e, w = check_shared_references(name, body, shared_files)
-        errors.extend(e)
-        warnings.extend(w)
-
-        # 6. Argument-hint / --output consistency
+        # 5. Argument-hint / --output consistency
         e, w = check_argument_hint_output(name, fm, body)
         errors.extend(e)
         warnings.extend(w)
 
-        # 7. Code block syntax
+        # 6. Code block syntax
         e, w = check_code_blocks(name, body)
         errors.extend(e)
         warnings.extend(w)
 
-        # 8. Requires consistency
+        # 7. Requires consistency
         e, w = check_requires_consistency(name, fm, body)
         errors.extend(e)
         warnings.extend(w)

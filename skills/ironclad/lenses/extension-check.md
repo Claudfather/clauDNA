@@ -1,5 +1,5 @@
 Panel lens for /claudna:ironclad — verifies that a plan or implementation PR isn't duplicating existing codebase abstractions: parallel implementations, redundant patterns, naming drift, sprawl where an existing component should have been extended.
-Dispatched by the panel (or via /claudna:ironclad --lens extension-check); emits structured markdown per skills/_shared/contracts/lens-result-contract.md. Not user-invocable.
+Dispatched by the panel (or via /claudna:ironclad --lens extension-check); emits structured markdown per ../../_shared/contracts/lens-result-contract.md. Not user-invocable.
 
 # Extension Check
 
@@ -11,7 +11,7 @@ For every new component a plan or PR proposes, check whether an existing abstrac
 
 ## Dispatch Rules
 
-Follow the dispatch discipline in `skills/_shared/contracts/lens-result-contract.md` (§ Dispatch Rules): run non-interactively (no `EnterPlanMode`, no `AskUserQuestion`), execute silently, and emit the structured result as the FINAL output with no text after it.
+Follow the dispatch discipline in `../../_shared/contracts/lens-result-contract.md` (§ Dispatch Rules): run non-interactively (no `EnterPlanMode`, no `AskUserQuestion`), execute silently, and emit the structured result as the FINAL output with no text after it.
 
 **Blocked condition:** If the source lacks identifiable proposed components, emit `status: blocked` with a description of what is missing.
 
@@ -99,7 +99,7 @@ Is the proposed component at the right level of abstraction?
 
 ### Step 4: Emit Findings
 
-Classify each finding using the severity vocabulary defined in `skills/_shared/contracts/lens-result-contract.md` (`critical` > `major` > `minor` > `info`).
+Classify each finding using the severity vocabulary defined in `../../_shared/contracts/lens-result-contract.md` (`critical` > `major` > `minor` > `info`).
 
 Tag each finding with a concern area. This lens's primary concern areas are `architecture` and `compatibility`. Secondary: `scope`, `dependencies`.
 
@@ -117,7 +117,7 @@ Map findings to body sections:
 
 ## Structured Result Emission
 
-**Format:** Follow the canonical schema at `skills/_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all panel lens output.
+**Format:** Follow the canonical schema at `../../_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all panel lens output.
 
 For this lens, set `lens: extension-check` in frontmatter. All other fields, severity vocabulary, body sections (Blockers/Risks/Gaps/Questions/Observations), concern area values, and blocked/failed output shape are defined in the contract.
 

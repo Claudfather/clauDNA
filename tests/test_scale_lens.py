@@ -352,8 +352,8 @@ def test_lens_preserves_shared_audit_surfaces():
     # canonical concern vocabulary, and §10.C structured-result emission.
     text = LENS_MD.read_text()
     for ref in (
-        "skills/_shared/audit-lens-contract.md",
-        "skills/_shared/output-guide.md",
+        "_shared/audit-lens-contract.md",
+        "_shared/output-guide.md",
         "lens-result-contract.md",
         "§10.C",
     ):

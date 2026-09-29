@@ -13,7 +13,7 @@ Act as a product strategist with deep technical fluency. Unlike generic brainsto
 
 Parse `$ARGUMENTS` at invocation:
 - `--auto`: Fully non-interactive. Implies `--output github`. Explore, analyze, create issues, return summary. See Section: Autonomous Mode.
-- `--output github`: Write findings as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
+- `--output github`: Write findings as GitHub Issues. See output guide (`../_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
 - Remaining text is a focus area or constraint. If provided, scope exploration to that area.
 
@@ -171,7 +171,7 @@ When `--auto` is set:
 4. Use focus area from `$ARGUMENTS` as scope. If none, explore full codebase.
 5. Create GitHub Issues for all ideas scored 🟢 or 🟡
 6. Do NOT write PROJECT_MISSION.md — just include proposed mission in summary
-7. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+7. **Emit the structured-result shape** per `../_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
 ```json
 {
@@ -199,7 +199,7 @@ When `--auto` is set:
 
 ## Output Targets
 
-Follow the output guide at `skills/_shared/output-guide.md`:
+Follow the output guide at `../_shared/output-guide.md`:
 - For `github`: write each finding/play as a doc (frontmatter + Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish dedups and applies labels from `tags:`
 - For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
 - For `docs` (default): author the vision report as a publishable doc in scratch named `00_VISION.md` (master-class: no §4.1 skeleton required — publish Step 1b; compound-play/feature docs that ARE implementation-ready go out per-finding via `github`), then `/claudna:publish <file> --to docs --dir documentation/planning/product-vision/<session_name>_<YYYY-MM-DD>/`
@@ -208,7 +208,7 @@ Follow the output guide at `skills/_shared/output-guide.md`:
 
 ## Pre-Handoff
 
-Before presenting output (all modes), run the adversarial review gate per `skills/_shared/pre-handoff-checklist.md` on each generated doc. Plan output must meet the quality standard in `skills/_shared/planning-standard.md`.
+Before presenting output (all modes), run the adversarial review gate per `../_shared/pre-handoff-checklist.md` on each generated doc. Plan output must meet the quality standard in `../_shared/planning-standard.md`.
 
 ---
 

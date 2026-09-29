@@ -31,7 +31,7 @@ The full per-part requirements live in `evaluation-prompt-template.md` (same dir
 
 ## Procedure
 
-Follow the steps in order. Call `EnterPlanMode` first per the lens contract (`skills/_shared/audit-lens-contract.md`) §6 — every step through the direction gate (1–6) is read-only for the orchestrator. After the gate, follow the **mode-specific** plan-mode transition in Step 7. All pre-gate scratch files are written by subagents (Task = separate sessions, not bound by the orchestrator's plan mode), per the house pattern (`skills/_shared/orchestration-guide.md` §2–§3, §6).
+Follow the steps in order. Call `EnterPlanMode` first per the lens contract (`../../_shared/audit-lens-contract.md`) §6 — every step through the direction gate (1–6) is read-only for the orchestrator. After the gate, follow the **mode-specific** plan-mode transition in Step 7. All pre-gate scratch files are written by subagents (Task = separate sessions, not bound by the orchestrator's plan mode), per the house pattern (`../../_shared/orchestration-guide.md` §2–§3, §6).
 
 **Scratch root** for this run: `/tmp/audit-<YYYY-MM-DD_HHMMSS>/data-model-redesign/` — reconstruction files under `research/`, authored deliverables under `docs/`. The Write tool creates directories on first write; do not `mkdir`.
 
@@ -96,7 +96,7 @@ The orchestrator reads `research/evaluation.md` and presents — **in protocol o
 
 ### Step 7: Migration plan (Part 7) — Plan agents
 
-Delegate authoring to `general-purpose` subagents acting as Plan agents (orchestration guide §3; the orchestrator never authors docs itself). Each reads the `research/` files, `skills/_shared/planning-standard.md`, and `migration-playbook.md` (this directory), and writes publishable docs (output-guide §3 frontmatter + §4.1 body skeleton) to `docs/` in scratch, returning metadata summaries only:
+Delegate authoring to `general-purpose` subagents acting as Plan agents (orchestration guide §3; the orchestrator never authors docs itself). Each reads the `research/` files, `../../_shared/planning-standard.md`, and `migration-playbook.md` (this directory), and writes publishable docs (output-guide §3 frontmatter + §4.1 body skeleton) to `docs/` in scratch, returning metadata summaries only:
 
 - `00_DATA_MODEL_REDESIGN.md` — master: the seven-part deliverable — reconstruction summary, source-of-truth table, path traces, evaluation, comparison matrix, recommendation, the chosen direction, and the migration-stage index. Authored by a dedicated Plan agent from the `research/` files (master-class: the §4.1 skeleton is not required — publish Step 1b's presence-only exemption), since it carries substantive content the orchestrator must not compose from summaries alone.
 - `NN_<stage-slug>.md` — one phase doc per migration stage (or coherent stage group), each = one PR, following the playbook: expand → backfill → dual-write → shadow-read → cutover → contract, with the **per-consumer coverage matrix** (every consumer from Part 1's inventory has a disposition in every stage) and a **rollback entry per stage** (trigger, mechanism, blast radius). If the chosen direction is incremental repair, the plan is the repair sequence under the same staging discipline (playbook's adaptation rules — skipped stages are named and justified, never silent).
@@ -109,7 +109,7 @@ Before anything is presented or published, run `verification-checklist.md` (this
 
 ## Output Targets
 
-`--output` semantics are owned by the lens contract (§2). Follow `skills/_shared/output-guide.md`:
+`--output` semantics are owned by the lens contract (§2). Follow `../../_shared/output-guide.md`:
 
 - **`session`** (default): after verification, `/claudna:publish <docs>/00_DATA_MODEL_REDESIGN.md --to session` presents the deliverable in chat; migration stage docs stay in scratch, offered on request. No repo writes.
 - **`github`**: one issue per migration stage doc plus the master as the umbrella — `/claudna:publish <file> --to github-issue --repo <repo>`, sequentially so publish's dedup sees prior creations. Label `auto-audit` + `enhancement`; map severity → `priority:*` per output-guide §4.4.

@@ -1,6 +1,6 @@
 # Output Guide
 
-Shared reference for planning skills that support `--output <target>`. Skills reference this file at `skills/_shared/output-guide.md`.
+Shared reference for planning skills that support `--output <target>`. Skills reference this file at `../_shared/output-guide.md`.
 
 **Author writes content → `/claudna:publish` enforces + routes.** Skills are *authors*: they run their analysis and produce a markdown doc with valid frontmatter and the house-style body skeleton (defined below). They never call `gh` themselves. `/claudna:publish` is the *publisher*: it validates the doc against this spec, dedups per-medium, and routes it to the chosen edition. This guide is the canonical spec for **body structure and publish routing**; the **frontmatter vocabulary** (types, per-type status values, optional fields) is ratified in [Claudron `SCHEMA.md`](https://github.com/Claudfather/Claudron/blob/main/SCHEMA.md) — Section 3 summarizes it, changes to it PR Claudron first.
 
@@ -16,7 +16,7 @@ Planning skills support three output targets. The target controls **where** the 
 | `github` | `--output github` | `/claudna:publish --to github-issue` | Create a GitHub issue from the doc |
 | `session` | `--output session` | `/claudna:publish --to session` | Print the doc body back into the chat, no persistence |
 
-**Every target routes through `/claudna:publish` — the docs plane included.** Publish serves two disk planes with two adapters: `--to docs` writes the current repo's `documentation/` tree (work-in-flight, repo-coupled, git/PR-discovered), and `--to vault` (the default adapter; formerly `disk`) writes the shared-docs vault (`shared/…`, cross-project, INDEX-discovered). The plane doctrine — what belongs where, and which door each writing skill is — lives in `skills/_shared/documentation-standard.md`. For a multi-doc session directory, the docs adapter's **family mode** validates phase docs in full and the `00_*` master under the presence-only exemption (see `skills/publish/SKILL.md` Step 1b).
+**Every target routes through `/claudna:publish` — the docs plane included.** Publish serves two disk planes with two adapters: `--to docs` writes the current repo's `documentation/` tree (work-in-flight, repo-coupled, git/PR-discovered), and `--to vault` (the default adapter; formerly `disk`) writes the shared-docs vault (`shared/…`, cross-project, INDEX-discovered). The plane doctrine — what belongs where, and which door each writing skill is — lives in `../_shared/documentation-standard.md`. For a multi-doc session directory, the docs adapter's **family mode** validates phase docs in full and the `00_*` master under the presence-only exemption (see `skills/publish/SKILL.md` Step 1b).
 
 **All targets use Plan Mode** for the deliberation phase.
 
@@ -53,7 +53,7 @@ The output target is a persistence decision, not a quality decision.
 >
 > **Claudron is not required.** This table remains the complete contract `/claudna:publish` enforces, and no skill invokes `claudron` at runtime — the SSOT link governs where vocabulary *changes* are ratified, not what users must install. Docs written without Claudron adopt cleanly later: its lenient tier accepts this vocabulary as-is (warnings at most, never errors).
 >
-> **Verbs, too.** The same deference governs clauDNA's vault-facing *verbs*, named for Claudron's CLI primitives — the verb contract lives in `skills/_shared/claudron-engine.md`.
+> **Verbs, too.** The same deference governs clauDNA's vault-facing *verbs*, named for Claudron's CLI primitives — the verb contract lives in `../_shared/claudron-engine.md`.
 
 Every doc an author hands to `/claudna:publish` carries YAML frontmatter. Publish validates these (and rejects malformed docs):
 
@@ -270,7 +270,7 @@ This enables the "stale area" detection that drives the rolling audit rotation.
 
 In the skill's Arguments section:
 ```
-- `--output github`: Write findings and plans as GitHub Issues (via /claudna:publish). See output guide (`skills/_shared/output-guide.md`).
+- `--output github`: Write findings and plans as GitHub Issues (via /claudna:publish). See output guide (`../_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
 - Default (no flag): Publish planning docs to the repo's documentation/ tree (via /claudna:publish).
 ```
@@ -282,7 +282,7 @@ In the skill's output section:
 This skill supports `--output github` and `--output session` in addition to the default `docs` target.
 
 Produce each unit of output as a markdown doc with frontmatter + the body skeleton in
-`skills/_shared/output-guide.md` (written to a scratch directory), then delegate to `/claudna:publish`:
+`../_shared/output-guide.md` (written to a scratch directory), then delegate to `/claudna:publish`:
 - `--output github` → `/claudna:publish <file> --to github-issue --repo <repo>` (Section 4)
 - `--output session` → `/claudna:publish <file> --to session` (Section 5)
 - `docs` (default) → `/claudna:publish <scratch-file-or-dir> --to docs --dir documentation/planning/<skill-category>/<session>_<date>/` (family mode for 00_ + NN_ directories; Section 1)

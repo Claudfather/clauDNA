@@ -21,7 +21,7 @@ These plans will be handed off to a **junior engineering team for implementation
 
 ## Phase Doc Structure
 
-Each phase doc represents **exactly 1 PR**, and is authored as a **publishable doc**: YAML frontmatter per `skills/_shared/output-guide.md` §3 (`title`, `type`, `status`, `owner`, `created`, plus `tags`/`repos` as applicable) over the §4.1 body skeleton (`## Summary`, `## Evidence`, `## Implementation Plan` with `### Dependencies`/`### Blocks`/`### Steps`, `## Test Plan`, `## Verification Checklist`, `## What NOT To Do`, `## Context`) — `/claudna:publish` validates exactly that shape and rejects docs without it. The content sections below map onto and ride alongside that skeleton (forge models the same layering):
+Each phase doc represents **exactly 1 PR**, and is authored as a **publishable doc**: YAML frontmatter per `../_shared/output-guide.md` §3 (`title`, `type`, `status`, `owner`, `created`, plus `tags`/`repos` as applicable) over the §4.1 body skeleton (`## Summary`, `## Evidence`, `## Implementation Plan` with `### Dependencies`/`### Blocks`/`### Steps`, `## Test Plan`, `## Verification Checklist`, `## What NOT To Do`, `## Context`) — `/claudna:publish` validates exactly that shape and rejects docs without it. The content sections below map onto and ride alongside that skeleton (forge models the same layering):
 
 | This standard's section | Lands in |
 |---|---|

@@ -1,5 +1,5 @@
 Panel lens for /claudna:ironclad — checks whether every phase in a plan serves the project's stated mission, catching scope creep, tangential work, misaligned success metrics, and aggregate drift from the north star.
-Dispatched by the panel (or via /claudna:ironclad --lens align-to-mission); emits structured markdown per skills/_shared/contracts/lens-result-contract.md. Not user-invocable.
+Dispatched by the panel (or via /claudna:ironclad --lens align-to-mission); emits structured markdown per ../../_shared/contracts/lens-result-contract.md. Not user-invocable.
 
 # Align to Mission
 
@@ -11,7 +11,7 @@ Check whether every phase and deliverable in a plan serves the project's north s
 
 ## Dispatch Rules
 
-Follow the dispatch discipline in `skills/_shared/contracts/lens-result-contract.md` (§ Dispatch Rules): run non-interactively (no `EnterPlanMode`, no `AskUserQuestion`), execute silently, and emit the structured result as the FINAL output with no text after it.
+Follow the dispatch discipline in `../../_shared/contracts/lens-result-contract.md` (§ Dispatch Rules): run non-interactively (no `EnterPlanMode`, no `AskUserQuestion`), execute silently, and emit the structured result as the FINAL output with no text after it.
 
 **Blocked condition:** If the plan lacks phases or is too ambiguous to assess, emit `status: blocked` with a description of what is missing.
 
@@ -79,7 +79,7 @@ After assessing individual phases, step back and check the plan as a whole:
 
 ### Step 5: Emit Findings
 
-Classify each finding using the severity vocabulary defined in `skills/_shared/contracts/lens-result-contract.md` (`critical` > `major` > `minor` > `info`).
+Classify each finding using the severity vocabulary defined in `../../_shared/contracts/lens-result-contract.md` (`critical` > `major` > `minor` > `info`).
 
 Tag each finding with a concern area. This lens's primary concern area is `scope`. Secondary: `architecture` (when misalignment stems from structural choices). Use the closest match from the canonical set in the contract.
 
@@ -97,7 +97,7 @@ Map findings to body sections:
 
 ## Structured Result Emission
 
-**Format:** Follow the canonical schema at `skills/_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all panel lens output.
+**Format:** Follow the canonical schema at `../../_shared/contracts/lens-result-contract.md`. That contract is the single source of truth for all panel lens output.
 
 For this lens, set `lens: align-to-mission` in frontmatter. All other fields, severity vocabulary, body sections (Blockers/Risks/Gaps/Questions/Observations), concern area values, and blocked/failed output shape are defined in the contract.
 

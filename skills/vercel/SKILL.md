@@ -10,7 +10,7 @@ requires:
 
 # Vercel
 
-One engine for Vercel — `deploy`, `logs`, and `status` as verb modes over the `vercel` CLI. Shared behavior lives in `skills/_shared/infra-cli-contract.md`; this file supplies only routing and the Vercel deltas.
+One engine for Vercel — `deploy`, `logs`, and `status` as verb modes over the `vercel` CLI. Shared behavior lives in `../_shared/infra-cli-contract.md`; this file supplies only routing and the Vercel deltas.
 
 ## Mode dispatch (contract §3)
 

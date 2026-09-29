@@ -14,8 +14,8 @@ Structured multi-dimensional evaluation for development junctions.
 ## Arguments
 
 Parse `$ARGUMENTS` at invocation:
-- `--auto`: Non-interactive synthesis mode. Suppresses Plan Mode and all interactive user-question gates. Requires a context bundle path in `$ARGUMENTS`. Emits the structured-result shape from `skills/_shared/orchestration-guide.md` §10.C with a refined plan in `artifacts.refined_plan`. See "Autonomous Mode" section below.
-- `--output github`: Write findings and plans as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
+- `--auto`: Non-interactive synthesis mode. Suppresses Plan Mode and all interactive user-question gates. Requires a context bundle path in `$ARGUMENTS`. Emits the structured-result shape from `../_shared/orchestration-guide.md` §10.C with a refined plan in `artifacts.refined_plan`. See "Autonomous Mode" section below.
+- `--output github`: Write findings and plans as GitHub Issues. See output guide (`../_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
 - Remaining text: the junction description (interactive mode) or path to a context bundle file (--auto mode).
 
@@ -105,7 +105,7 @@ State your recommendation with:
 
 This skill supports `--output github` and `--output session` in addition to the default `session` target.
 
-Follow the output guide at `skills/_shared/output-guide.md`:
+Follow the output guide at `../_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Create one issue documenting the junction analysis — include the comparison matrix, holistic assessment, and recommendation. Label with `auto-audit` and `enhancement`.
 - For `session` (default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
 - For `docs`: author the full analysis as a publishable doc in scratch with `type: decision` (knowledge-tier validation — no §4.1 skeleton gate; a junction analysis is a decision record, not an implementation plan), then `/claudna:publish <file> --to docs --dir documentation/planning/decisions/<session_name>_<YYYY-MM-DD>/`
@@ -122,11 +122,11 @@ Follow the output guide at `skills/_shared/output-guide.md`:
 
 ## Autonomous Mode (`--auto`)
 
-`weigh-development-paths --auto <bundle-path>` runs the synthesis non-interactively — it's the **synthesis pass** that `build --auto` delegates to when a plan has open decisions. No human, no plan mode, no prompts. Contract: `skills/_shared/contracts/synthesis-contract.md`.
+`weigh-development-paths --auto <bundle-path>` runs the synthesis non-interactively — it's the **synthesis pass** that `build --auto` delegates to when a plan has open decisions. No human, no plan mode, no prompts. Contract: `../_shared/contracts/synthesis-contract.md`.
 
 ### Input contract
 
-`$ARGUMENTS` after the `--auto` flag MUST contain a path to a context bundle file — the only argument. The bundle carries `## Open decisions` (one block per junction needing resolution, each with its options, source, and context), `## Codebase-comparison artifacts` (so the Existing-Patterns / Extension / DRY dimensions are grounded — do **not** re-explore the codebase; the consumer already did Step 2 and handed you its findings), and the full `## Plan`. Exact shape: `skills/_shared/contracts/synthesis-contract.md`.
+`$ARGUMENTS` after the `--auto` flag MUST contain a path to a context bundle file — the only argument. The bundle carries `## Open decisions` (one block per junction needing resolution, each with its options, source, and context), `## Codebase-comparison artifacts` (so the Existing-Patterns / Extension / DRY dimensions are grounded — do **not** re-explore the codebase; the consumer already did Step 2 and handed you its findings), and the full `## Plan`. Exact shape: `../_shared/contracts/synthesis-contract.md`.
 
 If the bundle is missing/unreadable or has zero open decisions, emit the §10.C block with `outcome: "blocked"` and stop — an empty synthesis is the consumer's bug, not a resolution.
 
@@ -144,7 +144,7 @@ When `--auto` is active:
 
 ### Output (structured result)
 
-The canonical schema for this output is `skills/_shared/contracts/synthesis-contract.md`. When this skill is invoked as the synthesis producer (typically by `/claudna:build --auto`), the consumer parses against that contract. If you change the shape here, update `skills/_shared/contracts/synthesis-contract.md` in the same commit.
+The canonical schema for this output is `../_shared/contracts/synthesis-contract.md`. When this skill is invoked as the synthesis producer (typically by `/claudna:build --auto`), the consumer parses against that contract. If you change the shape here, update `../_shared/contracts/synthesis-contract.md` in the same commit.
 
 Emit exactly one fenced ```json §10.C block (the FINAL output, nothing after it), shaped per the synthesis-contract: `skill: "weigh-development-paths"`, `artifacts.refined_plan` (the plan body with every resolved choice woven in), `artifacts.decisions_resolved` / `decisions_unresolved` (junction-keyed arrays, not counts — see the contract), and `artifacts.synthesis_rationales` (the per-dimension reasoning behind each pick, keyed by junction id, as the audit trail).
 

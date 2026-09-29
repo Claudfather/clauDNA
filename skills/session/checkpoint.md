@@ -27,7 +27,7 @@ Ensure `<cwd>/.claude/` exists (`mkdir -p <cwd>/.claude`). Use the format in [`t
 ### 5. Confirm
 
 - **Without `--auto`:** one line — "Checkpoint saved (<N> new items). Full handoff still recommended at session end."
-- **With `--auto`:** emit the §10.C structured result from `_shared/orchestration-guide.md §10.C` as the final output — nothing after it:
+- **With `--auto`:** emit the §10.C structured result from `../_shared/orchestration-guide.md §10.C` as the final output — nothing after it:
 
 ```json
 {

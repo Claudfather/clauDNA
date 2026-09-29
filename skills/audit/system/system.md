@@ -167,7 +167,7 @@ Body = a leading `# System map — <scope>` heading, then the repo-intake, valid
 
 ## Output Targets
 
-`--output` semantics are owned by the lens contract (§2). This lens supports `github` and `session` (default). Follow `skills/_shared/output-guide.md`:
+`--output` semantics are owned by the lens contract (§2). This lens supports `github` and `session` (default). Follow `../../_shared/output-guide.md`:
 
 - **`session`** (default): reconcile (Phase 5), then present the draft-set findings + the map summaries + the dropped-duplicate list in chat. Route the doc via `/claudna:publish <file> --to session`. No repo writes.
 - **`github`**: Plan subagents author each draft finding as a doc (frontmatter + §4.1 body + the depth standard), then the orchestrator runs `/claudna:publish <file> --to github-issue --repo <repo>`. Map sweep severity → priority tag directly (`CRITICAL → priority:critical`, `HIGH → priority:high`, `MEDIUM → priority:medium`, `LOW → priority:low`) per output-guide §4.4. Publish owns validation, dedup, and labels.

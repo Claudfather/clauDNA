@@ -60,7 +60,7 @@ CI re-runs every gate; the maintainer reviews and merges. This skill never merge
 
 ### 5. Structured result (`--auto`)
 
-Emit the §10.C structured result per `skills/_shared/orchestration-guide.md` as the final output — nothing after it:
+Emit the §10.C structured result per `../_shared/orchestration-guide.md` as the final output — nothing after it:
 
 ```json
 {

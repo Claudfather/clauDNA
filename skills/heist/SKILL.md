@@ -93,7 +93,7 @@ Present target, counts (scanned/selected), actions (ADOPTED with paths, ENHANCED
 
 - **API-first** — Clone only when >30 interesting files. Threshold: shallow clone (~3-5s) beats sequential API reads.
 - **No plan mode** — Writes interleaved with user gates. Plan mode would block Write/Edit.
-- **Orchestration** — Per `_shared/orchestration-guide.md`: scratch dir, disk writes, summaries only.
+- **Orchestration** — Per `../_shared/orchestration-guide.md`: scratch dir, disk writes, summaries only.
 - **No shell operators** — Separate tool calls. No `&&`, `|`, `;`, `2>&1`, `2>/dev/null`.
 - **Self-contained adoptions** — Inline or remove foreign dependencies.
 - **Works on any repo** — Not just skill repos. Scouts find patterns in any codebase.

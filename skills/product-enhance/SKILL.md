@@ -13,7 +13,7 @@ argument-hint: "[--auto] [--output github|session] [focus-area]"
 
 Parse `$ARGUMENTS` at invocation:
 - `--auto`: Fully non-interactive. Implies `--output github`. Uses triage path, skips discovery/interview. See orchestration guide Section 10.
-- `--output github`: Write enhancement proposals as GitHub Issues. See output guide (`skills/_shared/output-guide.md`).
+- `--output github`: Write enhancement proposals as GitHub Issues. See output guide (`../_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
 - Remaining text is the focus area. If provided, use it as scope context in Step 1 instead of asking.
 
@@ -126,7 +126,7 @@ Compare Step 2 answers against Step 1B findings via **Explore subagents** (disk-
 
 ### Step 5: Generate Phased Design Docs
 
-Output lands in `documentation/planning/phases/<session_name>_<YYYY-MM-DD>/`, prefixed `01_`, `02_` by implementation order — Plan agents write the family to the session's scratch docs directory and the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/phases/<session_name>_<YYYY-MM-DD>/` (family mode; Section 3). `00_OVERVIEW.md`: context, dependency graph, parallel phases, total effort. Archive per Section 8; Plan agents per Section 9, reading from scratch research dir. Plan agents must also read `skills/_shared/planning-standard.md`.
+Output lands in `documentation/planning/phases/<session_name>_<YYYY-MM-DD>/`, prefixed `01_`, `02_` by implementation order — Plan agents write the family to the session's scratch docs directory and the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/phases/<session_name>_<YYYY-MM-DD>/` (family mode; Section 3). `00_OVERVIEW.md`: context, dependency graph, parallel phases, total effort. Archive per Section 8; Plan agents per Section 9, reading from scratch research dir. Plan agents must also read `../_shared/planning-standard.md`.
 
 Present a `Product Enhancement Summary`, then direct user to `/claudna:build`. **This skill produces plans, not code.**
 
@@ -134,7 +134,7 @@ Present a `Product Enhancement Summary`, then direct user to `/claudna:build`. *
 
 ### Step 5.5: Adversarial Review Pass
 
-Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. Run on each phase doc (`<NN>_*.md`) and `00_OVERVIEW.md` in the session's scratch docs directory, before the family is published to `documentation/planning/phases/<session>/`. Apply in all modes.
+Follow `../_shared/pre-handoff-checklist.md` for the full procedure. Run on each phase doc (`<NN>_*.md`) and `00_OVERVIEW.md` in the session's scratch docs directory, before the family is published to `documentation/planning/phases/<session>/`. Apply in all modes.
 
 ---
 
@@ -151,7 +151,7 @@ Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. Run on 
 
 This skill supports `--output github` and `--output session` in addition to the default `docs` target.
 
-Follow the output guide at `skills/_shared/output-guide.md`:
+Follow the output guide at `../_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Apply `enhancement` label to all issues. Map impact ranking to priority labels.
 - For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
 - For `docs` (default): follow the subagent workflow in the orchestration guide (publish step: `--dir documentation/planning/phases/<session_name>_<YYYY-MM-DD>/`)
@@ -167,7 +167,7 @@ When `--auto` is set (see orchestration guide Section 10):
 2. Run codebase reconnaissance (Step 1B) automatically with scope from `$ARGUMENTS`
 3. Auto-generate enhancement proposals from gap analysis (skip user selection)
 4. Create GitHub Issues for all proposals ranked High or Medium impact
-5. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+5. **Emit the structured-result shape** per `../_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
 ```json
 {

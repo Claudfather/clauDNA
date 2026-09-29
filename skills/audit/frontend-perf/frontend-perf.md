@@ -6,7 +6,7 @@ Audit frontend rendering performance by tracing render cycles, diagnosing fetch 
 
 ## Lens arguments (beyond contract §2)
 
-Shared argument semantics live in `skills/_shared/audit-lens-contract.md` §2. Lens-specific:
+Shared argument semantics live in `../../_shared/audit-lens-contract.md` §2. Lens-specific:
 
 - `[focus]` — the page or flow to audit. If provided, use it as the scope in Phase 1 instead of asking.
 - `--auto` — implies `--output github` and **requires** the page/flow in the arguments; this lens cannot auto-detect what to audit. See Autonomous Mode below.
@@ -70,7 +70,7 @@ Ask the user for a short session name (e.g., `explain-page-flicker`). Output lan
 
 **Remediation Docs (01_, 02_, etc.)** — Group related findings into single PRs. Each doc = exactly 1 PR containing: header (title, severity, effort, files), findings addressed, dependencies, root cause explanation with cascade chain, detailed implementation plan (file paths, line numbers, before/after code), verification checklist (DevTools + manual repro + build/test), and "What NOT To Do" section.
 
-**Subagent workflow:** Follow orchestration guide Section 9. Plan agents must also read `skills/_shared/planning-standard.md`. Quality requirements beyond the shared standard: explain render lifecycle per fix, draw before/after cascades, include DevTools verification.
+**Subagent workflow:** Follow orchestration guide Section 9. Plan agents must also read `../../_shared/planning-standard.md`. Quality requirements beyond the shared standard: explain render lifecycle per fix, draw before/after cascades, include DevTools verification.
 
 After generating docs: **"Plans are ready for review. Run `/claudna:build` on the session directory to execute them."**
 
@@ -78,7 +78,7 @@ After generating docs: **"Plans are ready for review. Run `/claudna:build` on th
 
 ## Phase 4.5: Adversarial Review Pass
 
-Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. Run on each phase doc (`<NN>_*.md`) and `00_PERF_AUDIT.md` in the session's scratch docs directory, before the family is published to `documentation/planning/performance/<session>/`.
+Follow `../../_shared/pre-handoff-checklist.md` for the full procedure. Run on each phase doc (`<NN>_*.md`) and `00_PERF_AUDIT.md` in the session's scratch docs directory, before the family is published to `documentation/planning/performance/<session>/`.
 
 ### Performance-specific concern areas
 
@@ -104,7 +104,7 @@ Prioritize these `concern_area` values:
 
 ## Output Targets
 
-Follow the output guide at `skills/_shared/output-guide.md`. Beyond the shared `--output github|session` surface (contract §2), this lens supports a `docs` target — the Phase 4 remediation plan docs:
+Follow the output guide at `../../_shared/output-guide.md`. Beyond the shared `--output github|session` surface (contract §2), this lens supports a `docs` target — the Phase 4 remediation plan docs:
 
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Apply `performance` label. Map severity levels to priority labels. Group issues by cascade chain where applicable.
 - For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
@@ -121,7 +121,7 @@ When `--auto` is set (see orchestration guide Section 10):
 2. Page/flow **must** be provided in the arguments (bail if missing — this lens can't auto-detect what to audit)
 3. Skip the user confirmation gate between scan and remediation
 4. Create GitHub Issues for all findings, grouped by cascade chain
-5. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+5. **Emit the structured-result shape** per `../../_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
 ```json
 {

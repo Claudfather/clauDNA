@@ -1,6 +1,6 @@
 # Migration Playbook
 
-Reference material for the `/claudna:audit data-model-redesign` lens — the staging discipline behind the protocol's Part 7. Plan agents read this alongside `skills/_shared/planning-standard.md` when authoring the migration stage docs; each stage (or coherent stage group) is one phase doc = one PR.
+Reference material for the `/claudna:audit data-model-redesign` lens — the staging discipline behind the protocol's Part 7. Plan agents read this alongside `../../_shared/planning-standard.md` when authoring the migration stage docs; each stage (or coherent stage group) is one phase doc = one PR.
 
 The shape is invariant whatever the stores involved: **never break the readers; make every step independently shippable and reversible; move the source of truth last.** The old model remains authoritative until cutover — every stage before it can be abandoned by flipping a switch.
 

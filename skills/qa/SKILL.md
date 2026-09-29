@@ -165,7 +165,7 @@ Runs on a real Playwright engine. Three support files in this directory carry th
 Parse `$ARGUMENTS` at invocation:
 - `--auto`: Fully non-interactive. Implies `--output github`. Crawl, screenshot, test, file issues, return summary.
 - `--deep`: Full interactive testing. Extends the interaction-testing step with: click every button/link and verify result, fill and submit forms, simulate chat conversations with sample queries, screenshot before/after each interaction, report broken flows. Uses Playwright for interaction testing (see `deep-crawl.md`).
-- `--output github`: Write findings as GitHub Issues (default). See output guide (`skills/_shared/output-guide.md`).
+- `--output github`: Write findings as GitHub Issues (default). See output guide (`../_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
 - `--url <base-url>`: Crawl a deployed URL (e.g., `--url https://app.example.com`).
 - `--local`: Spin up a local dev server from the project directory and crawl it.
@@ -229,7 +229,7 @@ When `--auto` is set:
 3. Implies `--output github`
 4. Must have `--url` or `--local` (cannot prompt for URL)
 5. Create GitHub Issues for all findings at Medium priority or above
-6. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+6. **Emit the structured-result shape** per `../_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
 ```json
 {
@@ -269,12 +269,12 @@ When `--auto` is set:
 - **Respect robots.txt.** If a deployed URL has `Disallow` rules, honor them unless the user explicitly overrides.
 - **Timeout handling.** If a page doesn't load within 30 seconds, log a finding (possible server issue) and continue to next route.
 - **Subagents for research.** Use Explore subagents for route discovery and codebase analysis. Use general-purpose subagents for disk writes. Keep orchestrator context lean.
-- `skills/_shared/orchestration-guide.md` §11 for shared reminders.
+- `../_shared/orchestration-guide.md` §11 for shared reminders.
 
 ---
 
 ## Output Targets (crawl mode)
 
-Follow the output guide at `skills/_shared/output-guide.md`:
+Follow the output guide at `../_shared/output-guide.md`:
 - For `github` (default): write each finding as a doc (frontmatter + Section 4 body skeleton) with `tags:` including `visual-crawl` + a category label, then delegate to `/claudna:publish <file> --to github-issue --repo <repo>` (publish dedups + labels).
 - For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)

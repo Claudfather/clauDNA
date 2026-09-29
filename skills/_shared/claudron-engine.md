@@ -1,6 +1,6 @@
 # Claudron Engine Contract
 
-The Claudron-specific engine behavior, layered on `skills/_shared/infra-cli-contract.md`. One place defines how clauDNA skills talk to the `claudron` CLI and what they do when it is degraded or absent. Referenced by the `/claudron` engine skill and by every consumer that reads or writes the shared vault — `/claudna:recall` (read) and `/claudna:capture` (write) on the engine, and `/claudna:publish --to vault`.
+The Claudron-specific engine behavior, layered on `../_shared/infra-cli-contract.md`. One place defines how clauDNA skills talk to the `claudron` CLI and what they do when it is degraded or absent. Referenced by the `/claudron` engine skill and by every consumer that reads or writes the shared vault — `/claudna:recall` (read) and `/claudna:capture` (write) on the engine, and `/claudna:publish --to vault`.
 
 `claudron` is a pre-1.0 external CLI. Two rules follow from that and govern everything below: **validate its envelope on every call** (never parse-and-guess an unrecognized shape), and **degrade loudly** (a fallback taken or an error hit is always visible, never silent).
 

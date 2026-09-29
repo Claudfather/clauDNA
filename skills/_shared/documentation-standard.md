@@ -1,6 +1,6 @@
 # Documentation Standard
 
-Shared reference for skills that read from or write to the two documentation planes — the per-project `documentation/` tree (§1–§9) and the plane doctrine covering both it and the shared-docs vault (§10). Skills reference this file at `skills/_shared/documentation-standard.md`.
+Shared reference for skills that read from or write to the two documentation planes — the per-project `documentation/` tree (§1–§9) and the plane doctrine covering both it and the shared-docs vault (§10). Skills reference this file at `../_shared/documentation-standard.md`.
 
 ---
 

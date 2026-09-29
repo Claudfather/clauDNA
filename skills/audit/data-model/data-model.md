@@ -32,7 +32,7 @@ If none match, warn the user this lens targets Python/Postgres/SQLAlchemy and of
 
 **Scratch directory:** `/tmp/data-model-audit-<YYYY-MM-DD_HHMMSS>/research/`
 
-Launch two `general-purpose` subagents in parallel (Agent tool, `subagent_type: "general-purpose"`). Each writes findings to scratch dir, returns 2-4 line summary. Orchestrator does NOT read full research files. (General-purpose because Explore lacks Write tool.) With no dispatch primitive available, scan the two areas inline and sequentially per `skills/_shared/orchestration-guide.md` §14.2, writing to the same scratch paths so aggregation is unchanged.
+Launch two `general-purpose` subagents in parallel (Agent tool, `subagent_type: "general-purpose"`). Each writes findings to scratch dir, returns 2-4 line summary. Orchestrator does NOT read full research files. (General-purpose because Explore lacks Write tool.) With no dispatch primitive available, scan the two areas inline and sequentially per `../../_shared/orchestration-guide.md` §14.2, writing to the same scratch paths so aggregation is unchanged.
 
 ### Subagent A: Schema Discovery
 
@@ -78,7 +78,7 @@ Print structured report: scope summary, code-to-schema map, ranked findings tabl
 
 This lens supports `--output github` and `--output session` (contract §2) in addition to the default `session` target — diagnostic lens, no file output by default.
 
-Follow the output guide at `skills/_shared/output-guide.md`:
+Follow the output guide at `../../_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Create one issue per ranked finding (Schema Gap, Structural Friction, Performance Anti-pattern, etc.). Label with `auto-audit` and the finding category.
 - For `session` (default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
 - For `docs`: author the full ranked findings report as a publishable doc in scratch named `00_DATA_MODEL_AUDIT.md` (master-class: no §4.1 skeleton required — publish Step 1b), then `/claudna:publish <file> --to docs --dir documentation/planning/data-model/<session_name>_<YYYY-MM-DD>/`
@@ -87,7 +87,7 @@ Follow the output guide at `skills/_shared/output-guide.md`:
 
 ## Notes
 
-- **Subagent pattern.** Disk-write pattern per `skills/_shared/orchestration-guide.md` Sections 2 & 6. Three subagents: two parallel (Step 2), one sequential (Step 3). Orchestrator coordinates only.
+- **Subagent pattern.** Disk-write pattern per `../../_shared/orchestration-guide.md` Sections 2 & 6. Three subagents: two parallel (Step 2), one sequential (Step 3). Orchestrator coordinates only.
 - **Pass focus area** from Step 1 into both Step 2 subagent prompts.
 - **Secrets masking.** Never include connection strings verbatim — file:line only, and scrub the findings file through the redactor (orchestration-guide §7) before handoff.
 - **User gates.** Confirmation required after Step 3 before fit analysis.

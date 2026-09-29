@@ -30,6 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   `AGENTS.md`'s gotcha said the opposite of what is true and is rewritten.
 
+
+### Changed
+- **`_shared` paths in skills are written relative to the file they appear in, so any host that loads `skills/` can follow them ([#336](https://github.com/Claudfather/clauDNA/issues/336), part 1 of 3).** 238 of the 245 `_shared/` paths in `skills/` were written from the repo root (`skills/_shared/x.md`) or bare (`_shared/x.md`). Those resolve only where a host reproduces this repo's layout and working directory, which is why a port to a non-Claude host needed 217 path rewrites before its skills could find their own references. `SKILL_CONTRACT.md` §1 now states the rule that every reference between a skill's own files already followed: a relative path resolves against the directory of the file it is in. That gives `../_shared/<path>` at a skill's top level and in `_shared/` itself, and `../../_shared/<path>` one directory down. `validate-skills.py` fails on any other spelling, and on a path that names nothing under `skills/_shared/` (§5.1).
+
+  **The rewrite was produced by a script, not by hand.** Running `python3 scripts/fix_shared_paths.py` on the commit before it reproduces it byte for byte. Two references were edited by hand first, because a relative path is the wrong thing in both places. `_shared/CLAUDE.md`'s heading names the directory rather than pointing at it. `init-project`'s CLAUDE.md template cites the documentation standard inside a file generated into a user's project, where no relative path can resolve.
+
+  **This tightens the contract.** A skill in flight that writes `skills/_shared/…` now fails `make check-skills`, and the script fixes it. `integration-test.py`'s `_shared` check is removed: it matched only the repo-root spelling, so after the rewrite it would have passed without checking anything. The validator's new check covers every file of a skill, not just `SKILL.md`.
+
 ### Fixed
 - **`release.sh` bumped one of the two manifests that carry the version, so the next release would have failed `make check`.** `.cursor-plugin/plugin.json` landed in [#315](https://github.com/Claudfather/clauDNA/pull/315) alongside a `validate_version_sync()` check enforcing that both manifests agree — but `release.sh` only ever wrote `.claude-plugin/plugin.json`. Reproduced before fixing: bumping the Claude manifest alone to `0.20.0` makes `validate-manifest.py` exit 1 with `version mismatch: .claude-plugin has '0.20.0', .cursor-plugin has '0.19.0'`.
 

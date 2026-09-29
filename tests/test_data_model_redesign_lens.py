@@ -208,10 +208,10 @@ def test_lens_preserves_shared_audit_surfaces():
     # The lens must ride the shared contracts, not fork them.
     text = LENS_MD.read_text()
     for ref in (
-        "skills/_shared/audit-lens-contract.md",
-        "skills/_shared/output-guide.md",
-        "skills/_shared/orchestration-guide.md",
-        "skills/_shared/planning-standard.md",
+        "_shared/audit-lens-contract.md",
+        "_shared/output-guide.md",
+        "_shared/orchestration-guide.md",
+        "_shared/planning-standard.md",
         "never the literal `scripts/redact.py`",  # §7-resolved redactor, not a hardcoded path
     ):
         assert ref in text, f"lens must reference shared surface {ref!r}"

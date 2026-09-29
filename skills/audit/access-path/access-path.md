@@ -30,7 +30,7 @@ Not every difference across access paths is a bug. A CLI having no auth is corre
 
 Follow these steps exactly in order.
 
-**Enter Plan Mode.** Call `EnterPlanMode` per `skills/_shared/audit-lens-contract.md` §6 — the discovery, analysis, and proposal steps below are read-only.
+**Enter Plan Mode.** Call `EnterPlanMode` per `../../_shared/audit-lens-contract.md` §6 — the discovery, analysis, and proposal steps below are read-only.
 
 Do NOT read CLAUDE.md or MEMORY.md — already in system prompt.
 
@@ -59,7 +59,7 @@ If fewer than 2 access paths found, tell the user: "This system appears to have 
 
 **Scratch directory:** `/tmp/access-path-audit-<YYYY-MM-DD_HHMMSS>/research/`
 
-Launch two `general-purpose` subagents in parallel (Agent tool, `subagent_type: "general-purpose"`). Each writes findings to scratch dir, returns 2-4 line summary. Orchestrator does NOT read full research files. With no dispatch primitive available, scan the two areas inline and sequentially per `skills/_shared/orchestration-guide.md` §14.2, writing to the same scratch paths so aggregation is unchanged.
+Launch two `general-purpose` subagents in parallel (Agent tool, `subagent_type: "general-purpose"`). Each writes findings to scratch dir, returns 2-4 line summary. Orchestrator does NOT read full research files. With no dispatch primitive available, scan the two areas inline and sequentially per `../../_shared/orchestration-guide.md` §14.2, writing to the same scratch paths so aggregation is unchanged.
 
 - **Subagent A: Access Path Inventory** — every access path, transport, entry point, auth, domain services called. Writes to `research/path-inventory.md`.
 - **Subagent B: Cross-Cutting Concern Mapping** — for each concern in `scan-categories.md`, maps enforcement across every access path. Writes to `research/concern-mapping.md`.
@@ -129,7 +129,7 @@ Present the findings and ask:
 
 Do NOT proceed to Phase 2 without explicit confirmation.
 
-**Exit Plan Mode.** Call `ExitPlanMode` per `skills/_shared/audit-lens-contract.md` §6 — doc generation past this point requires the Write tool.
+**Exit Plan Mode.** Call `ExitPlanMode` per `../../_shared/audit-lens-contract.md` §6 — doc generation past this point requires the Write tool.
 
 ---
 
@@ -186,7 +186,7 @@ Each doc represents **exactly 1 PR** and must include:
 
 #### Subagent Workflow
 
-Follow Section 9 of the orchestration guide (`skills/_shared/orchestration-guide.md`). Plan agents must also read `skills/_shared/planning-standard.md` for quality standards and phase doc structure. Scratch directory: `/tmp/access-path-audit-<YYYY-MM-DD_HHMMSS>/research/`.
+Follow Section 9 of the orchestration guide (`../../_shared/orchestration-guide.md`). Plan agents must also read `../../_shared/planning-standard.md` for quality standards and phase doc structure. Scratch directory: `/tmp/access-path-audit-<YYYY-MM-DD_HHMMSS>/research/`.
 
 ---
 
@@ -194,7 +194,7 @@ Follow Section 9 of the orchestration guide (`skills/_shared/orchestration-guide
 
 This lens supports `--output github`, `--output session` (the engine default, contract §2), and a `docs` target.
 
-Follow the output guide at `skills/_shared/output-guide.md`:
+Follow the output guide at `../../_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Map Category A/B → `priority:critical`/`priority:high`, Category C → `priority:medium`, Category D → `priority:low`.
 - For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
 - For `docs`: follow the subagent workflow in the orchestration guide (publish step: `--dir documentation/planning/access-paths/<session_name>_<YYYY-MM-DD>/`)
@@ -205,7 +205,7 @@ After creating issues, present the batch summary and return issue URLs for audit
 
 ## Phase 2.5: Adversarial Review Pass
 
-Follow `skills/_shared/pre-handoff-checklist.md` for the full procedure. Run on each remediation doc (`<NN>_*.md`) and `00_ACCESS_PATH_AUDIT.md` in the session's scratch docs directory, before the family is published to `documentation/planning/access-paths/<session>/`.
+Follow `../../_shared/pre-handoff-checklist.md` for the full procedure. Run on each remediation doc (`<NN>_*.md`) and `00_ACCESS_PATH_AUDIT.md` in the session's scratch docs directory, before the family is published to `documentation/planning/access-paths/<session>/`.
 
 ### Access-path-specific concern areas
 
@@ -251,7 +251,7 @@ Then tell the user:
 
 **"Plans are ready. Run `/claudna:build documentation/planning/access-paths/<session>/` to start building — it will handle challenge review, branching, implementation, and PRs for each phase doc."**
 
-**This lens produces plans, not code** — see the shared reminder in `skills/_shared/orchestration-guide.md` §11: build, branch, and PR steps are always `/claudna:build`'s job.
+**This lens produces plans, not code** — see the shared reminder in `../../_shared/orchestration-guide.md` §11: build, branch, and PR steps are always `/claudna:build`'s job.
 
 ---
 
@@ -269,7 +269,7 @@ Then tell the user:
 
 ## Notes
 
-- **Subagent pattern.** Disk-write pattern per `skills/_shared/orchestration-guide.md` Sections 2 & 6. Three subagents in Phase 1 (two parallel, one sequential). Phase 2 uses Plan agents per Section 9. Orchestrator coordinates only.
+- **Subagent pattern.** Disk-write pattern per `../../_shared/orchestration-guide.md` Sections 2 & 6. Three subagents in Phase 1 (two parallel, one sequential). Phase 2 uses Plan agents per Section 9. Orchestrator coordinates only.
 - **Pass focus area** from Step 1 into both Step 2 subagent prompts.
 - **Technology-agnostic.** The scan categories cover common patterns across Python, Node.js, Go, Ruby, and Java. The subagent prompts adapt to whatever stack is detected.
 - **User gates at every phase transition.** Scan → confirm → plan. Do not generate remediation docs without user confirmation.
@@ -285,7 +285,7 @@ When `--auto` is set, the run is fully non-interactive and implies `--output git
 3. Use the focus area from the engine's `[focus]` argument as scope. If none provided, scan full system.
 4. Create GitHub Issues for all Category A and B findings (CRITICAL and HIGH immediately, MEDIUM batched)
 5. Skip Category C (appropriate differences) and Category D at LOW severity
-6. **Emit the structured-result shape** per `skills/_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
+6. **Emit the structured-result shape** per `../../_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
 ```json
 {
