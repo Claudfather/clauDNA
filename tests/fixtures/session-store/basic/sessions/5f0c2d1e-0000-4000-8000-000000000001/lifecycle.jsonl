@@ -1,0 +1,11 @@
+{"data":{"actor":{"bot_id":"worker-1","bot_name":"Worker","entrypoint":"cli","fleet":"demo","kind":"bot","model":"claude-haiku"},"chain_id":"root-sid-0","origin":{"branch":"main","cwd":"/work/repo","head":"abc1234","repo":"example/repo"},"parent_sid":"parent-sid-1","source":"clear","transcript_path":"/t/5f0c.jsonl"},"kind":"session.opened","seg":null,"sid":"5f0c2d1e-0000-4000-8000-000000000001","ts":"2026-09-28T10:00:00.000Z","v":1}
+{"data":{"opened_by":"session_open","start":0},"kind":"segment.opened","seg":1,"sid":"5f0c2d1e-0000-4000-8000-000000000001","ts":"2026-09-28T10:00:01.000Z","v":1}
+{"data":{"end":4000,"sealed_by":"precompact","trigger":"auto"},"kind":"segment.sealed","seg":1,"sid":"5f0c2d1e-0000-4000-8000-000000000001","ts":"2026-09-28T10:10:00.000Z","v":1}
+{"data":{"end":4200,"sealed_by":"precompact","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","trigger":"auto"},"kind":"segment.sealed","seg":1,"sid":"5f0c2d1e-0000-4000-8000-000000000001","ts":"2026-09-28T10:11:00.000Z","v":1}
+{"data":{"job_id":"job-1"},"kind":"summary.requested","seg":1,"sid":"5f0c2d1e-0000-4000-8000-000000000001","ts":"2026-09-28T10:11:01.000Z","v":1}
+{"data":{"opened_by":"compact","start":4200},"kind":"segment.opened","seg":2,"sid":"5f0c2d1e-0000-4000-8000-000000000001","ts":"2026-09-28T10:11:05.000Z","v":1}
+{"data":{"artifact":"seg-001/summary.json","duration_ms":8123,"input_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","job_id":"job-1"},"kind":"summary.completed","seg":1,"sid":"5f0c2d1e-0000-4000-8000-000000000001","ts":"2026-09-28T10:11:30.000Z","v":1}
+{"data":{"child_sid":"child-sid-2"},"kind":"session.child_linked","seg":null,"sid":"5f0c2d1e-0000-4000-8000-000000000001","ts":"2026-09-28T10:20:00.000Z","v":1}
+{"data":{"end":9100,"sealed_by":"session_end","trigger":null},"kind":"segment.sealed","seg":2,"sid":"5f0c2d1e-0000-4000-8000-000000000001","ts":"2026-09-28T10:20:01.000Z","v":1}
+{"data":{"reason":"trivial"},"kind":"summary.skipped","seg":2,"sid":"5f0c2d1e-0000-4000-8000-000000000001","ts":"2026-09-28T10:20:02.000Z","v":1}
+{"data":{"reason":"clear"},"kind":"session.closed","seg":null,"sid":"5f0c2d1e-0000-4000-8000-000000000001","ts":"2026-09-28T10:20:03.000Z","v":1}

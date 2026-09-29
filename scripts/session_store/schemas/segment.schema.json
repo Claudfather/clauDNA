@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "claudna.segment/1",
+  "title": "seg-NNN/segment.json — projection of one segment",
+  "type": "object",
+  "required": [
+    "schema", "sid", "index", "status", "opened_at", "opened_by", "sealed_at", "sealed_by",
+    "transcript", "counts", "summary"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "claudna.segment/1" },
+    "sid": { "type": "string", "minLength": 1 },
+    "index": { "type": "integer", "minimum": 1 },
+    "status": { "enum": ["open", "sealed"] },
+    "opened_at": { "$ref": "#/$defs/ts_or_null" },
+    "opened_by": { "enum": ["session_open", "compact", "unknown"] },
+    "sealed_at": { "$ref": "#/$defs/ts_or_null" },
+    "sealed_by": { "enum": ["precompact", "compact", "session_end", null] },
+    "transcript": {
+      "type": "object",
+      "required": ["path", "range", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": ["string", "null"] },
+        "range": {
+          "type": "object",
+          "required": ["start", "end"],
+          "additionalProperties": false,
+          "properties": {
+            "start": { "type": ["integer", "null"], "minimum": 0 },
+            "end": { "type": ["integer", "null"], "minimum": 0 }
+          }
+        },
+        "sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "required": ["prompts", "skills", "failures", "checkpoints"],
+      "additionalProperties": false,
+      "properties": {
+        "prompts": { "type": "integer", "minimum": 0 },
+        "skills": { "type": "integer", "minimum": 0 },
+        "failures": { "type": "integer", "minimum": 0 },
+        "checkpoints": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["status", "job_id"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "enum": ["none", "pending", "done", "failed", "skipped"] },
+        "job_id": { "type": ["string", "null"] }
+      }
+    },
+    "projected_from": {
+      "type": "object",
+      "required": ["lines", "bytes", "skipped"],
+      "additionalProperties": false,
+      "properties": {
+        "lines": { "type": "integer", "minimum": 0 },
+        "bytes": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "ts_or_null": {
+      "type": ["string", "null"],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    }
+  }
+}

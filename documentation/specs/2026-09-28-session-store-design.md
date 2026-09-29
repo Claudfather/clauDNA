@@ -118,7 +118,7 @@ Identity hierarchy, each level stable across a different boundary:
 
 **Why cut at SessionStart(compact), not PreCompact:** PreCompact can fire without a compaction following (clauDNA's own `precompact-reflect.sh` blocks the first attempt by design). Sealing is safe to repeat; opening a segment is not.
 
-**The directory is the holder.** There is no stored counter. Under an exclusive `flock` on the session dir, `next = max(existing seg-NNN) + 1`, and the new segment exists the instant its `mkdir` succeeds (atomic). Only the highest-index segment can be open, so "which segment do I append to" is the same lookup: `current = max(existing seg-NNN)`. A crash between `mkdir` and the `segment.opened` event leaves an empty dir that is still the correct current segment; `rebuild` backfills the event. A stored counter could disagree with the directories after a crash; a derived one cannot. `session.json.segments.open` caches the answer for readers but is never consulted by writers.
+**The directory is the holder.** There is no stored counter. Under an exclusive `flock` on the session dir, `next = max(existing seg-NNN) + 1`, and the new segment exists the instant its `mkdir` succeeds (atomic). Only the highest-index segment can be open, so "which segment do I append to" is the same lookup: `current = max(existing seg-NNN)`. A crash between `mkdir` and the `segment.opened` event leaves an empty dir that is still the correct current segment; `rebuild` projects it as `opened_by: "unknown"` (logs are never rewritten). A stored counter could disagree with the directories after a crash; a derived one cannot. `session.json.segments.open` caches the answer for readers but is never consulted by writers.
 
 ### 4.3 Clear lineage
 
@@ -166,7 +166,7 @@ ${CLAUDNA_STATE_DIR:-~/.claudna}/
 
 ## 6. Data models
 
-Schemas ship as JSON Schema (draft 2020-12) in `schemas/session-store/`, one file per model below, with valid and invalid fixtures in `tests/fixtures/session-store/`. The field tables here are the human-readable spec; the schema files are normative.
+Schemas ship as JSON Schema (draft 2020-12) beside the code in `scripts/session_store/schemas/`, one file per model below, with a golden fixture (logs + expected projections) in `tests/fixtures/session-store/`. The field tables here are the human-readable spec; the schema files are normative.
 
 ### 6.1 Shared types
 
@@ -210,6 +210,7 @@ Every line in every log:
 | `summary.requested` | `{ job_id: string }` |
 | `summary.completed` | `{ job_id: string, artifact: "seg-NNN/summary.json", input_sha256: string, duration_ms: int }` |
 | `summary.failed` | `{ job_id: string, error: string (≤200), retryable: bool }` |
+| `summary.skipped` | `{ reason: "private"\|"disabled"\|"trivial"\|"headless" }` |
 | `session.closed` | `{ reason: "clear"\|"resume"\|"logout"\|"prompt_input_exit"\|"other" }` |
 
 **Activity kinds** (`seg-NNN/events.jsonl`):
@@ -242,8 +243,8 @@ Every line in every log:
   "opened_at": "…", "opened_by": "clear",
   "closed_at": null, "close_reason": null,
   "segments": { "count": 2, "open": 2 },
-  "summary": { "segments_done": 1, "segments_pending": 1, "segments_failed": 0 },
-  "projected_from": { "lines": 7, "bytes": 1432 }
+  "summary": { "segments_done": 1, "segments_pending": 1, "segments_failed": 0, "segments_skipped": 0 },
+  "projected_from": { "lines": 7, "bytes": 1432, "skipped": 0 }
 }
 ```
 
@@ -345,7 +346,7 @@ Written only by `session export --ack <consumer> --through <seg>`. The store nev
 ### 6.9 `links/<pid>.json` — clear handoff (ephemeral)
 
 ```json
-{ "schema": "claudna.clear-link/1", "pid": 4242, "sid": "533c…", "ts": "…" }
+{ "schema": "claudna.clear-link/1", "pid": 4242, "sid": "533c…", "chain_id": "533c…", "ts": "…" }
 ```
 
 Consumed and deleted by the next SessionStart(clear) from that pid; ignored after 60 s; swept at SessionStart.
@@ -422,9 +423,10 @@ Returns an envelope: `{ schema: "claudna.export/1", items: [{ sid, seg, session:
 
 ## 10. Implementation shape
 
-- **Language:** stdlib Python ≥ 3.11 (matches `scripts/`), a small package invoked by thin `plugin-hooks/*.sh` wrappers. No third-party runtime deps.
+- **Language and location:** stdlib Python ≥ 3.11, the package `scripts/session_store/` (runtime Python already ships from `scripts/`, invoked as `${CLAUDE_PLUGIN_ROOT}/scripts/…`), called by thin `plugin-hooks/*.sh` wrappers. No third-party runtime deps.
+- **Hosts:** the core (`paths`, `fsio`, `events`, `project`, `store`) is host-agnostic; only the hook adapter that maps a host's events onto store events is Claude Code-specific. The Cursor manifest ships no hooks, so on Cursor nothing is recorded — readers and harvest report "no session store on this host" rather than failing. A Cursor adapter can land later without touching the core.
 - **Modules:** `store` (paths, locking, atomic write, append), `events` (envelope + kind registry), `project` (log → projections), `boundaries` (hook → action table in §4.2), `summarize` (worker), `readers`, `export`. Each module owns one concern; the hook table is data, not branching.
-- **Validation:** JSON Schemas in `schemas/session-store/`; a stdlib-only structural validator in tests (no new dev dep), fixtures per model, and a projection round-trip test (log → projection → rebuild equals).
+- **Validation:** JSON Schemas in `scripts/session_store/schemas/`, checked by `schema.py` — a stdlib JSON Schema subset that raises on any keyword it doesn't implement, so a schema can't silently ask for an unchecked rule. Tests pin a golden fixture byte-for-byte, a rebuild round trip, and a drift gate between `event.schema.json`'s kind enum and `events.REGISTRY`. `python3 scripts/session_store check <sid>` runs the same validation on a live store.
 - **`telemetry-emit.sh`:** migrates onto `skill.invoked` events; the old path stays as a deprecated alias for one release.
 
 ## 11. Open questions

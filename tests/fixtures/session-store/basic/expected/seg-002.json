@@ -1,0 +1,33 @@
+{
+  "counts": {
+    "checkpoints": 1,
+    "failures": 0,
+    "prompts": 1,
+    "skills": 0
+  },
+  "index": 2,
+  "opened_at": "2026-09-28T10:11:05.000Z",
+  "opened_by": "compact",
+  "projected_from": {
+    "bytes": 300,
+    "lines": 2,
+    "skipped": 0
+  },
+  "schema": "claudna.segment/1",
+  "sealed_at": "2026-09-28T10:20:01.000Z",
+  "sealed_by": "session_end",
+  "sid": "5f0c2d1e-0000-4000-8000-000000000001",
+  "status": "sealed",
+  "summary": {
+    "job_id": null,
+    "status": "skipped"
+  },
+  "transcript": {
+    "path": "/t/5f0c.jsonl",
+    "range": {
+      "end": 9100,
+      "start": 4200
+    },
+    "sha256": null
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "claudna.session/1",
+  "title": "session.json — projection of lifecycle.jsonl",
+  "type": "object",
+  "required": [
+    "schema", "sid", "parent_sid", "chain_id", "children", "status", "private", "actor", "origin",
+    "transcript_path", "opened_at", "opened_by", "closed_at", "close_reason", "segments", "summary"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "claudna.session/1" },
+    "sid": { "type": "string", "minLength": 1 },
+    "parent_sid": { "type": ["string", "null"] },
+    "chain_id": { "type": "string", "minLength": 1 },
+    "children": { "type": "array", "items": { "type": "string" } },
+    "status": { "enum": ["open", "closed", "unknown"] },
+    "private": { "type": "boolean" },
+    "actor": { "$ref": "#/$defs/actor_or_null" },
+    "origin": { "$ref": "#/$defs/origin_or_null" },
+    "transcript_path": { "type": ["string", "null"] },
+    "opened_at": { "$ref": "#/$defs/ts_or_null" },
+    "opened_by": { "enum": ["startup", "clear", "resume", null] },
+    "closed_at": { "$ref": "#/$defs/ts_or_null" },
+    "close_reason": { "enum": ["clear", "resume", "logout", "prompt_input_exit", "other", null] },
+    "segments": {
+      "type": "object",
+      "required": ["count", "open"],
+      "additionalProperties": false,
+      "properties": {
+        "count": { "type": "integer", "minimum": 0 },
+        "open": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["segments_done", "segments_pending", "segments_failed", "segments_skipped"],
+      "additionalProperties": false,
+      "properties": {
+        "segments_done": { "type": "integer", "minimum": 0 },
+        "segments_pending": { "type": "integer", "minimum": 0 },
+        "segments_failed": { "type": "integer", "minimum": 0 },
+        "segments_skipped": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "projected_from": { "$ref": "#/$defs/projected_from" }
+  },
+  "$defs": {
+    "ts_or_null": {
+      "type": ["string", "null"],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    },
+    "actor_or_null": {
+      "type": ["object", "null"],
+      "required": ["kind", "fleet", "bot_id", "bot_name", "model", "entrypoint"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["interactive", "headless", "bot"] },
+        "fleet": { "type": ["string", "null"] },
+        "bot_id": { "type": ["string", "null"] },
+        "bot_name": { "type": ["string", "null"] },
+        "model": { "type": ["string", "null"] },
+        "entrypoint": { "type": ["string", "null"] }
+      }
+    },
+    "origin_or_null": {
+      "type": ["object", "null"],
+      "required": ["cwd", "repo", "branch", "head"],
+      "additionalProperties": false,
+      "properties": {
+        "cwd": { "type": "string" },
+        "repo": { "type": ["string", "null"] },
+        "branch": { "type": ["string", "null"] },
+        "head": { "type": ["string", "null"] }
+      }
+    },
+    "projected_from": {
+      "type": "object",
+      "required": ["lines", "bytes", "skipped"],
+      "additionalProperties": false,
+      "properties": {
+        "lines": { "type": "integer", "minimum": 0 },
+        "bytes": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

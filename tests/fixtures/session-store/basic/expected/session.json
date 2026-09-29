@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "bot_id": "worker-1",
+    "bot_name": "Worker",
+    "entrypoint": "cli",
+    "fleet": "demo",
+    "kind": "bot",
+    "model": "claude-haiku"
+  },
+  "chain_id": "root-sid-0",
+  "children": [
+    "child-sid-2"
+  ],
+  "close_reason": "clear",
+  "closed_at": "2026-09-28T10:20:03.000Z",
+  "opened_at": "2026-09-28T10:00:00.000Z",
+  "opened_by": "clear",
+  "origin": {
+    "branch": "main",
+    "cwd": "/work/repo",
+    "head": "abc1234",
+    "repo": "example/repo"
+  },
+  "parent_sid": "parent-sid-1",
+  "private": false,
+  "projected_from": {
+    "bytes": 2253,
+    "lines": 11,
+    "skipped": 0
+  },
+  "schema": "claudna.session/1",
+  "segments": {
+    "count": 2,
+    "open": null
+  },
+  "sid": "5f0c2d1e-0000-4000-8000-000000000001",
+  "status": "closed",
+  "summary": {
+    "segments_done": 1,
+    "segments_failed": 0,
+    "segments_pending": 0,
+    "segments_skipped": 1
+  },
+  "transcript_path": "/t/5f0c.jsonl"
+}
