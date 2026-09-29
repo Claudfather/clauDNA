@@ -63,7 +63,7 @@ Launch `general-purpose` subagents (they need Write; Explore cannot write) with 
 2. **Source-of-truth inventory** (Part 2) → `research/source-of-truth.md`
 3. **Path traces** (Part 3) → `research/path-traces.md`
 
-Per-lane requirements are the template's Part 1–3 sections; pass each lane its part plus the shared context block. Every claim cites `file:line`; anything unconfirmable from source is labeled `Unverified`. Each subagent scrubs its file in place through the redactor before returning — `python3 "<redactor>" <file>`, resolved per orchestration guide §7 (never the literal `scripts/redact.py`, which the audited repo won't contain).
+Per-lane requirements are the template's Part 1–3 sections; pass each lane its part plus the shared context block. Every claim cites `file:line`; anything unconfirmable from source is labeled `Unverified`. Each subagent scrubs its file in place through the redactor before returning — `python3 "<claudna-root>/scripts/redact.py" <file>`, with `<claudna-root>` per `../../_shared/claudna-root.md` (never the literal `scripts/redact.py`, which the audited repo won't contain).
 
 ---
 

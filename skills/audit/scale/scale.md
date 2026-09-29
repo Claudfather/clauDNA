@@ -158,7 +158,7 @@ Follow the output guide at `../../_shared/output-guide.md`:
 - For `session` (engine default): produce the report doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5).
 - For `docs`: the Phase 4 subagent workflow above.
 
-**Credential rule:** tenant credentials and connection strings surface in exactly this kind of audit. Never reproduce a secret value — file:line and variable name only, and scrub every research/findings file in place with the redactor (`python3 scripts/redact.py <file>`; resolve the path per `../../_shared/orchestration-guide.md` §7) before it leaves a subagent or is published.
+**Credential rule:** tenant credentials and connection strings surface in exactly this kind of audit. Never reproduce a secret value — file:line and variable name only, and scrub every research/findings file in place with the redactor (`python3 "<claudna-root>/scripts/redact.py" <file>`, with `<claudna-root>` per `../../_shared/claudna-root.md`; see `../../_shared/orchestration-guide.md` §7) before it leaves a subagent or is published.
 
 ---
 

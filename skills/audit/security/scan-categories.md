@@ -31,7 +31,7 @@ If none of these tools are installed, note: "No dependency scanner available. In
 
 ## B. Secret Detection
 
-Search for hardcoded secrets in the codebase. **Never surface a raw secret value — report file:line + variable name, and scrub the findings file through the redactor (`python3 scripts/redact.py <file>`; orchestration-guide §7) before it leaves the subagent.** Secret Detection is the exact producer of non-`sk-` matches, so hand-masking is not enough.
+Search for hardcoded secrets in the codebase. **Never surface a raw secret value — report file:line + variable name, and scrub the findings file through the redactor (`python3 "<claudna-root>/scripts/redact.py" <file>`, with `<claudna-root>` per `../../_shared/claudna-root.md`; orchestration-guide §7) before it leaves the subagent.** Secret Detection is the exact producer of non-`sk-` matches, so hand-masking is not enough.
 
 Use the Grep tool for each pattern below. For each match:
 - Report the file and line number

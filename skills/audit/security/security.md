@@ -90,7 +90,7 @@ Each doc represents **exactly 1 PR** and must include:
 
 Follow Section 9 of the orchestration guide (`../../_shared/orchestration-guide.md`). Plan agents must also read `../../_shared/planning-standard.md` for quality standards and phase doc structure. Scratch directory: `/tmp/security-audit-<YYYY-MM-DD_HHMMSS>/research/`.
 
-**Security-specific rule:** Never surface a raw secret value. Prose masking is not the mechanism — "show `sk-****`" leaked live tokens twice (a Telegram bot token, then a neon API key) because it relied on the model remembering to mask and only illustrated the `sk-` shape. Each subagent MUST scrub its research/findings file **in place** with the bundled redactor before handoff — `python3 scripts/redact.py <file>` (resolve the path per `../../_shared/orchestration-guide.md` §7 "Redacting credentials in CLI output"). It masks the known token shapes and `SECRET=value` assignments to `[REDACTED]` while sparing `file:line`, so keep reporting file:line + the variable name for readability; the redactor is the deterministic backstop, not a substitute for it.
+**Security-specific rule:** Never surface a raw secret value. Prose masking is not the mechanism — "show `sk-****`" leaked live tokens twice (a Telegram bot token, then a neon API key) because it relied on the model remembering to mask and only illustrated the `sk-` shape. Each subagent MUST scrub its research/findings file **in place** with the bundled redactor before handoff — `python3 "<claudna-root>/scripts/redact.py" <file>` (`<claudna-root>` per `../../_shared/claudna-root.md`; see `../../_shared/orchestration-guide.md` §7 "Redacting credentials in CLI output"). It masks the known token shapes and `SECRET=value` assignments to `[REDACTED]` while sparing `file:line`, so keep reporting file:line + the variable name for readability; the redactor is the deterministic backstop, not a substitute for it.
 
 ---
 
@@ -100,7 +100,7 @@ Follow `../../_shared/pre-handoff-checklist.md` for the full procedure. The adve
 
 ### Security-specific rules
 
-- The adversarial-review subagent inherits the secret-masking rule: critics MUST NOT reproduce secret values in their findings. And before the family is published, the orchestrator scrubs every doc in the session's scratch directory through the redactor (`python3 scripts/redact.py <scratch-dir>/*.md`; redactor path per orchestration-guide §7) — the mechanical gate that catches any raw value a scan or critic subagent quoted, independent of per-subagent memory.
+- The adversarial-review subagent inherits the secret-masking rule: critics MUST NOT reproduce secret values in their findings. And before the family is published, the orchestrator scrubs every doc in the session's scratch directory through the redactor (`python3 "<claudna-root>/scripts/redact.py" <scratch-dir>/*.md`, with `<claudna-root>` per `../../_shared/claudna-root.md`) — the mechanical gate that catches any raw value a scan or critic subagent quoted, independent of per-subagent memory.
 - Prioritize `concern_area` values: `security`, `data-integrity`, `error-handling`.
 - If the adversarial review surfaces a NEW security risk introduced by the remediation plan itself (e.g., "this auth change creates a session-fixation window"), elevate that finding's severity to CRITICAL regardless of the critic's default labeling.
 
@@ -177,7 +177,7 @@ When `--auto` is set (implies `--output github`; see the lens contract §4 and o
 4. Create GitHub Issues for all findings (CRITICAL and HIGH immediately, MEDIUM batched)
 5. Skip LOW/INFO findings unless particularly noteworthy
 6. Return structured summary for audit tracking
-7. **Security-specific:** Never include a raw secret value in issue bodies — scrub the doc with the redactor (`python3 scripts/redact.py <file>`; path per orchestration-guide §7) before publishing, and report file:line + variable name only.
+7. **Security-specific:** Never include a raw secret value in issue bodies — scrub the doc with the redactor (`python3 "<claudna-root>/scripts/redact.py" <file>`, with `<claudna-root>` per `../../_shared/claudna-root.md`) before publishing, and report file:line + variable name only.
 8. **Emit the structured-result shape** per `../../_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
 ```json
