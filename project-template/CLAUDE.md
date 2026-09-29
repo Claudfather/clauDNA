@@ -51,7 +51,7 @@ This file provides project-specific guidance for Claude Code.
 <!-- Optional: shared-docs seam. /claudna:init-project's seam step replaces this block with a
      real section when a shared knowledge root exists; to add it by hand, uncomment and set
      the path (first non-empty line = root path; append `(claudron vault)` only for an
-     engine-managed root). Contract: skills/_shared/documentation-standard.md §10.
+     engine-managed root). Contract: §10 of clauDNA's documentation standard (documentation-standard.md).
      Delete this block if the project doesn't use shared docs.
 
 ## Shared Documentation

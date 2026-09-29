@@ -85,7 +85,7 @@ Read skills/ironclad/lenses/<lens>.md
 Apply it to: <SOURCE_PATH>
 Write your result to: <scratch>/lenses/<lens>/result.md
 Operate non-interactively: do not enter plan mode, do not prompt for input.
-Emit structured markdown per ../_shared/contracts/lens-result-contract.md.
+Emit structured markdown per <claudna-root>/skills/_shared/contracts/lens-result-contract.md.
 ```
 
 - **Adversarial Review** (a skill): replace the first two lines with `Read skills/adversarial-review/SKILL.md` / `Apply the skill with --dispatch to: <SOURCE_PATH>`.

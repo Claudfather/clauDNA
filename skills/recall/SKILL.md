@@ -82,7 +82,7 @@ Runs regardless of which retrieval path ran — the harness's per-project auto-m
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/resolve_memory_dir.py"
    ```
 
-   (falls back to the highest-versioned `~/.claude/plugins/cache/Claudfather/claudna/*/scripts/resolve_memory_dir.py` when `${CLAUDE_PLUGIN_ROOT}` is unset). It prints the resolved directory; **exit 1 means no readable `MEMORY.md`** → skip silently (not every project has harness memory). Read `MEMORY.md` and any linked topic files from the directory it printed — do not rebuild that path yourself.
+   (If the command above still shows an unfilled variable, run `python3 "<claudna-root>/scripts/resolve_memory_dir.py"` instead, with `<claudna-root>` per `../_shared/claudna-root.md`.) It prints the resolved directory; **exit 1 means no readable `MEMORY.md`** → skip silently (not every project has harness memory). Read `MEMORY.md` and any linked topic files from the directory it printed — do not rebuild that path yourself.
 2. **Read the index:** `MEMORY.md` is a flat list of `- [Title](file.md) — hook` lines. Score each against the query terms (title + hook); on a bare recall, take the most-recently-updated few. Cap by `--limit`, like a tier.
 3. **With `--full`,** read the linked `memory/<file.md>` body for the top match and summarize it.
 4. **Render** under its own header — additive to the vault tiers, never a duplicate:

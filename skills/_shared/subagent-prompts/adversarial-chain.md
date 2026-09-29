@@ -18,7 +18,7 @@ Operate non-interactively per the skill's `--dispatch` mode rules:
 
 Spawn parallel critic subagents per the skill's Phase 3 dispatch procedure.
 
-Return ONLY a structured markdown document per `../../_shared/contracts/lens-result-contract.md`. Format:
+Return ONLY a structured markdown document per `<claudna-root>/skills/_shared/contracts/lens-result-contract.md`. Format:
 
 ---
 lens: adversarial-review

@@ -575,7 +575,7 @@ Apply the skill with --auto mode against the context bundle at:
   /tmp/build-<timestamp>/synthesis-bundle.md
 
 Return ONLY the structured-result JSON block per the skill's emission contract
-(canonical schema: ../_shared/contracts/synthesis-contract.md).
+(canonical schema: <claudna-root>/skills/_shared/contracts/synthesis-contract.md).
 Do NOT enter Plan Mode. Do NOT issue interactive user-input prompts.
 Do NOT write to any plan file — the orchestrator handles that.
 ```

@@ -18,8 +18,8 @@ from check_vault_address import run_check as run_vault_address_check
 from skill_checks import (
     SKIP_DIRS,
     STALE_PATH_RE,
+    check_host_portability,
     check_removed_name_mentions,
-    check_shared_paths,
     collect_skill_reference_errors,
     declares_claudron,
     find_resurrected_dirs,
@@ -175,11 +175,11 @@ def main() -> int:
             text = md_file.read_text()
             for target, msg in collect_skill_reference_errors(text, valid_names):
                 cross_skill_errors.append(({name, target}, name, f"{rel}: {msg}"))
-            # `_shared/` paths are relative to the file they sit in (#336). No
-            # cross-skill registration needed: a PR can only break one by
+            # Host portability, checks (a)-(d) of SKILL_CONTRACT §5.1 (#336).
+            # No cross-skill registration needed: a PR can only break one by
             # editing this skill or skills/_shared/, and any _shared/ change
             # makes get_touched_skills() fall back to full blocking validation.
-            errors.extend(check_shared_paths(text, md_file, SKILLS_DIR))
+            errors.extend(check_host_portability(text, md_file, SKILLS_DIR, skill_fm))
 
         if errors:
             all_errors[name] = errors
@@ -189,8 +189,8 @@ def main() -> int:
         if warnings:
             all_warnings[name] = warnings
 
-    # Lint _shared files for stale paths, `_shared/` paths not relative to the
-    # file (#336), and dangling skill references.
+    # Lint _shared files for stale paths, host portability (#336; no skill
+    # frontmatter applies here), and dangling skill references.
     # _shared reference errors join cross_skill_errors keyed on the TARGET
     # alone ("_shared/<file>" is never in the touched set, so referrer-keyed
     # errors there would always demote in CI).
@@ -202,7 +202,7 @@ def main() -> int:
             path_errors = [
                 f"stale hardcoded path: {line.strip()}" for line in text.splitlines() if STALE_PATH_RE.search(line)
             ]
-            path_errors += check_shared_paths(text, md_file, SKILLS_DIR)
+            path_errors += check_host_portability(text, md_file, SKILLS_DIR, None)
             if path_errors:
                 all_errors[shared_key] = path_errors
             for target, msg in collect_skill_reference_errors(text, valid_names):

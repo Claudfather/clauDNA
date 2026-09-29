@@ -17,7 +17,12 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from skill_checks import check_shared_paths, rewrite_shared_paths, shared_path_findings  # noqa: E402
+from skill_checks import (  # noqa: E402
+    _shared_path_spans,
+    check_shared_paths,
+    rewrite_shared_paths,
+    shared_path_findings,
+)
 
 
 @pytest.fixture
@@ -46,6 +51,8 @@ def _findings(skills: Path, rel: str, body: str) -> list:
         ("_shared/contracts/d.md", "See [the guide](../../_shared/guide.md#rules).\n"),
         ("demo/SKILL.md", "The `../_shared/` directory and `../_shared/contracts/`.\n"),
         ("demo/SKILL.md", "Not paths: foo_shared/x.md, my-_shared/x.md, the _shared dir.\n"),
+        ("demo/sub/deep.md", "Forwarded: Read <claudna-root>/skills/_shared/contracts/c.md first.\n"),
+        ("demo/SKILL.md", "Not a path: https://github.com/o/r/blob/main/skills/_shared/guide.md\n"),
     ],
 )
 def test_the_file_relative_spelling_passes(skills: Path, rel: str, body: str) -> None:
@@ -61,8 +68,10 @@ def test_the_file_relative_spelling_passes(skills: Path, rel: str, body: str) ->
         ("demo/sub/deep.md", "skills/_shared/contracts/c.md", "../../_shared/contracts/c.md"),
         ("_shared/contracts/d.md", "../_shared/guide.md", "../../_shared/guide.md"),
         ("demo/SKILL.md", "../../skills/_shared/guide.md", "../_shared/guide.md"),
-        ("demo/SKILL.md", "${CLAUDE_PLUGIN_ROOT}/skills/_shared/guide.md", "../_shared/guide.md"),
-        ("demo/SKILL.md", "~/.claude/skills/_shared/guide.md", "../_shared/guide.md"),
+        ("demo/SKILL.md", "${CLAUDE_PLUGIN_ROOT}/skills/_shared/guide.md", "<claudna-root>/skills/_shared/guide.md"),
+        ("demo/SKILL.md", "${CLAUDE_SKILL_DIR}/../_shared/guide.md", "<claudna-root>/skills/_shared/guide.md"),
+        ("demo/SKILL.md", "~/.claude/skills/_shared/guide.md", "<claudna-root>/skills/_shared/guide.md"),
+        ("demo/SKILL.md", "<claudna-root>/skills/_shared/missing.md", None),
         ("demo/SKILL.md", "../_shared/missing.md", None),
         ("demo/SKILL.md", "../_shared/../demo/SKILL.md", None),
     ],
@@ -93,6 +102,23 @@ def test_rewrite_fixes_what_it_can_and_leaves_the_rest_reported(skills: Path) ->
     assert shared_path_findings(new, md_file, skills) == [(2, "../_shared/missing.md", None)]
 
 
+def test_rewrite_never_makes_a_command_or_url_relative(skills: Path) -> None:
+    # A shell resolves a relative path against its working directory, so a
+    # root-anchored path in a command becomes the resolver form, never
+    # `../_shared/`; and a URL is not a path at all.
+    md_file = skills / "demo" / "SKILL.md"
+    body = (
+        "python3 ${CLAUDE_PLUGIN_ROOT}/skills/_shared/guide.md\n"
+        "See https://github.com/o/r/blob/main/skills/_shared/guide.md\n"
+    )
+    new, count = rewrite_shared_paths(body, md_file, skills)
+    assert count == 1
+    assert new == (
+        "python3 <claudna-root>/skills/_shared/guide.md\nSee https://github.com/o/r/blob/main/skills/_shared/guide.md\n"
+    )
+    assert shared_path_findings(new, md_file, skills) == []
+
+
 def test_the_script_rewrites_in_place_and_exits_1_on_what_it_cannot_fix(skills: Path) -> None:
     (skills / "demo" / "SKILL.md").write_text("Read `skills/_shared/guide.md`.\n")
     (skills / "demo" / "sub" / "deep.md").write_text("Read `../_shared/missing.md`.\n")
@@ -112,9 +138,11 @@ def test_the_script_rewrites_in_place_and_exits_1_on_what_it_cannot_fix(skills: 
 def test_every_shared_path_in_this_repo_is_file_relative() -> None:
     skills = REPO_ROOT / "skills"
     files = [p for p in sorted(skills.rglob("*.md")) if len(p.relative_to(skills).parts) > 1]
-    # Counted independently of the checker, so a checker that silently saw
-    # nothing cannot pass this test.
+    # Counted independently of the checker and compared with what the
+    # checker examined, so a checker that silently skipped paths cannot pass.
     seen = sum(len(re.findall(r"(?<![\w-])_shared/", p.read_text())) for p in files)
+    examined = sum(len(_shared_path_spans(line)) for p in files for line in p.read_text().split("\n"))
     assert seen > 0
+    assert examined == seen
     errors = [e for p in files for e in check_shared_paths(p.read_text(), p, skills)]
     assert errors == []
