@@ -3,6 +3,9 @@ name: publish
 user-invocable: true
 description: "Use when a finished markdown document — plan, audit or review findings, retro, decision, or knowledge page — needs to reach its destination: the shared-docs vault, the repo's documentation/ tree, a GitHub issue, a PR description, the chat session, or a Notion page. The single output sink: skills author content, publish delivers it. For a quick vault note rather than a finished document, use /claudna:claudron."
 argument-hint: "<source-file-or-dir> [--to vault|docs|github-issue|github-pr|session|notion] [--dir <path>] [--update <issue#|url>] [--repo <name>] [--dry-run]"
+requires:
+  - cli: claudron
+    reason: "Optional — `--to vault` routes the doc through `claudron capture` when the engine is present; without it, that one adapter degrades per the standard notice in skills/_shared/claudron-engine.md §3.1 and writes the frozen raw tree. Every other adapter is unaffected"
 ---
 
 # Publish
@@ -78,7 +81,7 @@ claudron capture --type <type> --title "<title>" --body "<body>" --tags "<tags>"
 
 **Provenance (capability-probed).** If the doc's frontmatter carries `source_url` / `source_type` (SCHEMA optional fields), map them onto `--source-url` / `--source-type` — but **only on a flags-capable engine**: `data.engine_version` present and ≥ **0.4.0** (the Claudron C2 release that added the flags; the same version probe `/claudna:capture` Step 1 uses, and the same floor its PreCompact defer keys on). An older / absent / unreadable version omits them (it would reject the flags, exit 2). Provenance is **never** folded into the body here: that trailing `Source:` workaround was capture's alone, and the github-pr adapter's `Source:` footer is an unrelated surface.
 
-**Fallback path — verdict present-no-vault or absent** (frozen behavior). Say so — "Claudron vault unavailable — writing the raw tree" — then write the doc to the raw-tree directory for its `type:`:
+**Fallback path — verdict present-no-vault or absent** (frozen behavior). Emit the standard degradation notice first (`skills/_shared/claudron-engine.md` §3.1 — quote the `/claudna:publish --to vault` row), then write the doc to the raw-tree directory for its `type:`:
 
 | Type | Destination |
 |------|-------------|
@@ -88,7 +91,7 @@ claudron capture --type <type> --title "<title>" --body "<body>" --tags "<tags>"
 | runbook | `shared/runbooks/` |
 | audit, review | `shared/planning/active/` |
 
-If the file already exists, compare and warn before overwriting (the raw adapter's dedup). After writing: (1) run `/claudna:index` on the destination to update INDEX.md; (2) report the path. In `--auto`, the fallback sets `artifacts.engine: "fallback"` and notes the degradation in `errors[]` (claudron-engine.md §3).
+If the file already exists, compare and warn before overwriting (the raw adapter's dedup). After writing: (1) run `/claudna:index` on the destination to update INDEX.md; (2) report the path. In `--auto`, the fallback sets `artifacts.engine: "fallback"` and puts the §3.1 notice verbatim in `errors[]` (claudron-engine.md §3) — the degradation is never inferred from `artifacts.engine` alone.
 
 **Plane-fit advisory** (either path): a `plan`/`audit`/`review` doc landing vault-ward gets a one-line note — "unusual plane for this type: work-in-flight planning usually belongs in the repo's `documentation/` tree (docs adapter)". Advisory only, never a block — fleet workflows legitimately share plans vault-side.
 

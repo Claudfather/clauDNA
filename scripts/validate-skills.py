@@ -19,8 +19,10 @@ from skill_checks import (
     STALE_PATH_RE,
     check_removed_name_mentions,
     collect_skill_reference_errors,
+    declares_claudron,
     find_resurrected_dirs,
     get_touched_skills,
+    invokes_claudron,
     load_removed_skills,
     parse_frontmatter,
     validate_skill_md,
@@ -125,6 +127,7 @@ def main() -> int:
 
         # Track duplicates by frontmatter name (separate from dir mismatch)
         skill_md = skill_dir / "SKILL.md"
+        parsed = None
         if skill_md.is_file():
             try:
                 parsed = parse_frontmatter(skill_md)
@@ -147,6 +150,25 @@ def main() -> int:
         # that deletes skills/<target>/ marks only <target> as touched, so
         # referrer-keyed errors would demote to warnings in CI — exactly the
         # deletion scenario this check exists to block.
+        # Claudron declaration, directory-wide: a depth/support file is as much
+        # the skill's body as SKILL.md is (verb engines put every invocation
+        # there), so scanning SKILL.md alone would let the dependency go
+        # undeclared for exactly the skills that shell out most. The
+        # frontmatter it must be declared in is still SKILL.md's.
+        skill_fm = parsed[0] if parsed else {}
+        if not declares_claudron(skill_fm):
+            for md_file in sorted(skill_dir.rglob("*.md")):
+                if md_file.name == "SKILL.md":
+                    continue  # covered by validate_skill_md
+                if invokes_claudron(md_file.read_text()):
+                    rel = md_file.relative_to(skill_dir)
+                    errors.append(
+                        f"{rel}: invokes the `claudron` CLI but SKILL.md's `requires:` does "
+                        "not declare it -- add `- cli: claudron` with a reason naming whether "
+                        "the dependency is hard or soft and which path needs it (see "
+                        "skills/_shared/claudron-engine.md §1)"
+                    )
+
         for md_file in sorted(skill_dir.rglob("*.md")):
             rel = md_file.relative_to(skill_dir)
             for target, msg in collect_skill_reference_errors(md_file.read_text(), valid_names):

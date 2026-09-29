@@ -145,7 +145,7 @@ Vault capture
 
 ## Fallback: no engine (frozen)
 
-When the ladder returns **present-no-vault** / **absent**, write to the raw tree instead — **frozen** compatibility behavior (claudron-engine.md §4); no new capability lands here. Say so first: *"Claudron vault unavailable — wrote to the raw tree; run `/claudna:index`."* Then:
+When the ladder returns **present-no-vault** / **absent**, write to the raw tree instead — **frozen** compatibility behavior (claudron-engine.md §4); no new capability lands here. Emit the standard degradation notice first (claudron-engine.md §3.1 — the `/claudna:capture` row), and in `--auto` put the same line in `errors[]`. Then:
 
 1. Resolve the docs root per documentation-standard §10 ("locating the root" — env override, else the CLAUDE.md `## Shared Documentation` section). If §10's annotation semantics mark the root engine-managed, there is no raw tree to write — do not write into it; surface §10's engine-managed-root message and stop.
 2. Extract/format the content as a frontmattered doc (`title`, `type`, `status: current`, `owner`, `created`, provenance in the body, `tags`). **For session mode, first run Step 1a** (the rubric + quality gate) to derive the fields — `type: knowledge`, the surviving fields as the body; **if nothing survives the gate, write nothing, even here**. Slug the title (lowercase, hyphenate, ≤40 chars on a word boundary, `-N` on collision).

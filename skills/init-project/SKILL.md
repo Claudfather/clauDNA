@@ -5,7 +5,7 @@ description: "Use when setting up a new project or adding standard Claude Code c
 allowed-tools: Read(*), Write(*), Edit(*), Glob(*), Grep(*), Bash(git *), Bash(ls *), Bash(mkdir *), Bash(printenv *), Bash(command -v *), Bash(claudron status *)
 requires:
   - cli: claudron
-    reason: "Optional — Step 6.5 vault detection only; every ladder branch degrades gracefully when absent (this is a soft dependency, not a functional requirement)"
+    reason: "Optional — Step 6.5 vault detection only; every ladder branch degrades when absent and announces it with the standard notice in skills/_shared/claudron-engine.md §3.1 (this is a soft dependency, not a functional requirement)"
 ---
 
 # Initialize Project
@@ -163,7 +163,7 @@ Cross-project knowledge lives here — see /claudna:recall.
 
 Detection is read-only (`claudron status` is safe to run). **Print-not-execute for anything mutating:** never run `claudron init`, `claudron migrate`, or any other writing claudron command — show the command and let the user run it.
 
-**(b) claudron present, no vault.** `claudron` is on PATH but no vault resolves (no env var, and `claudron status` exits non-zero with a stderr message — it never emits JSON on the no-vault path). Print the remedy — do not run it, and do **not** scaffold a raw tree (it would shadow the vault the user is about to create):
+**(b) claudron present, no vault.** `claudron` is on PATH but no vault resolves (no env var, and `claudron status` exits non-zero with a stderr message — it never emits JSON on the no-vault path). Emit the standard degradation notice (`skills/_shared/claudron-engine.md` §3.1 — the `/claudna:init-project` row, `present-no-vault` wording), then print the remedy — do not run it, and do **not** scaffold a raw tree (it would shadow the vault the user is about to create):
 
 ```
 claudron is installed but no vault is initialized. Run:
@@ -178,7 +178,7 @@ the CLAUDE.md section.
 
 Offer to re-run this step's detection once the user has initialized.
 
-**(c) No claudron.** Offer the minimal raw-tree scaffold. Ask where the shared root should live, defaulting to the **stable absolute `~/shared`** — never a cwd-relative sibling like `../shared`, which fragments the store per parent directory. If the user picks a path *inside this repo*, warn once before proceeding: shared docs are cross-project by doctrine (documentation-standard §10) — an in-repo root silently scopes them to this repo. On yes:
+**(c) No claudron.** Emit the standard degradation notice (`skills/_shared/claudron-engine.md` §3.1 — the `/claudna:init-project` row, `absent` wording) so the user knows a vault was looked for and not found, rather than inferring it from being offered a raw tree. Then offer the minimal raw-tree scaffold. Ask where the shared root should live, defaulting to the **stable absolute `~/shared`** — never a cwd-relative sibling like `../shared`, which fragments the store per parent directory. If the user picks a path *inside this repo*, warn once before proceeding: shared docs are cross-project by doctrine (documentation-standard §10) — an in-repo root silently scopes them to this repo. On yes:
 
 1. Create `<root>/knowledge/<repo-name>/`, `<root>/planning/active/`, and `<root>/decisions/` (`mkdir -p`).
 2. Invoke `/claudna:index <root> --recursive` to write the stub INDEX.md files — index is the sole INDEX.md writer; don't write them by hand.

@@ -556,6 +556,73 @@ def check_allowed_tools_usage(fm: dict, body: str) -> list[str]:
     return warnings
 
 
+#: Claudron CLI verbs, per skills/_shared/claudron-engine.md §2 and Claudron's
+#: own docs/CLI_CONTRACT.md. Used only to recognize an *invocation*; this list
+#: being incomplete makes the check miss a call, never invent one.
+CLAUDRON_CLI_VERBS = (
+    "capture",
+    "hooks",
+    "index",
+    "init",
+    "lookup",
+    "migrate",
+    "recall",
+    "status",
+    "sync",
+    "validate",
+)
+
+#: An invocation is `claudron <verb>` or the PATH probe. The lookbehind is the
+#: load-bearing part: it drops `/claudron lookup` and `/claudna:claudron status`,
+#: which are *skill* invocations. A skill that merely routes to the engine skill
+#: takes on no dependency of its own, so requiring a declaration there would be
+#: wrong — and would make the rule unsatisfiable for orientation skills that
+#: enumerate the catalog.
+_CLAUDRON_INVOCATION_RE = re.compile(
+    r"(?<![/\w:.-])claudron[ \t]+(?:" + "|".join(CLAUDRON_CLI_VERBS) + r")\b"
+    r"|command[ \t]+-v[ \t]+claudron\b"
+)
+
+
+def invokes_claudron(text: str) -> bool:
+    """True when *text* shells out to the `claudron` CLI (not the engine skill)."""
+    return _CLAUDRON_INVOCATION_RE.search(text) is not None
+
+
+def declares_claudron(fm: dict) -> bool:
+    """True when frontmatter declares the Claudron CLI in `requires:`."""
+    requires = fm.get("requires")
+    if not isinstance(requires, list):
+        return False
+    for entry in requires:
+        if not isinstance(entry, dict):
+            continue
+        cli = entry.get("cli")
+        if isinstance(cli, str) and re.match(r"^claudron\b", cli.strip()):
+            return True
+    return False
+
+
+def check_claudron_requires(fm: dict, body: str) -> list[str]:
+    """A skill that invokes the Claudron CLI must declare it in `requires:`.
+
+    Claudron is an optional external CLI and every consumer degrades when it is
+    absent (skills/_shared/claudron-engine.md §3). An undeclared dependency is
+    how that degradation becomes invisible: nothing in the skill's frontmatter
+    says the skill has a soft edge, so a reader — or a host installing skills
+    without Claudron — has no way to know a fallback path exists before hitting
+    it. Declaring it does not gate execution (the §1 detection ladder is the
+    only runtime gate); it makes the dependency reviewable.
+    """
+    if not invokes_claudron(body) or declares_claudron(fm):
+        return []
+    return [
+        "body invokes the `claudron` CLI but `requires:` does not declare it -- add "
+        "`- cli: claudron` with a reason naming whether the dependency is hard or "
+        "soft and which path needs it (see skills/_shared/claudron-engine.md §1)"
+    ]
+
+
 def check_no_raw_gh_commands(fm: dict, body: str) -> list[str]:
     """Skills must delegate GitHub output to /claudna:publish, not call `gh` directly.
 
@@ -681,6 +748,7 @@ def validate_skill_md(skill_md: Path, dir_name: str | None = None) -> list[str]:
     errors.extend(check_output_github_reference(fm, body))
     errors.extend(check_auto_no_ask_user(fm, body))
     errors.extend(check_structured_result_emission(fm, body))
+    errors.extend(check_claudron_requires(fm, body))
     if name not in RAW_GH_ALLOWED_SKILLS:
         errors.extend(check_no_raw_gh_commands(fm, body))
 
