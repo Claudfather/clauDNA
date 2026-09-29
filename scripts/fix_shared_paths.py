@@ -6,6 +6,10 @@ of the file it is written in, so `_shared` material is `../_shared/<path>` from
 a skill's top level and from `_shared/` itself, and `../../_shared/<path>` one
 directory further down. `validate-skills.py` fails on any other spelling; this
 script rewrites every such path that names something under `skills/_shared/`.
+A path anchored anywhere else (`${...}`, `~`, an absolute path) was written for
+a shell or another agent, so it becomes the resolver form,
+`<claudna-root>/skills/_shared/<path>`, never a relative one. URLs are not
+paths and are left alone.
 
 A path that names nothing there is reported, never guessed at, and the script
 exits 1 so it cannot be mistaken for a clean run. A second run changes nothing.

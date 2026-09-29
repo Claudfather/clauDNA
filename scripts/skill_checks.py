@@ -507,40 +507,80 @@ def check_skill_references(text: str, valid_names: set[str]) -> list[str]:
 # it is written in -- plain markdown semantics, and what every reference between
 # a skill's own files already does -- so a host that knows where it loaded a
 # file can follow the path without this repo's layout or working directory.
-# `_shared/` material is therefore spelled one way only: one "../" per directory
-# between the file and skills/, then "_shared/<path>" (SKILL_CONTRACT §1).
+# `_shared/` material is therefore spelled one of two ways (SKILL_CONTRACT §1):
+# one "../" per directory between the file and skills/, then "_shared/<path>";
+# or, in text that leaves its file before anyone reads it (a prompt forwarded to
+# another agent, a shell command), the resolver form below.
+CLAUDNA_ROOT = "<claudna-root>"
+_RESOLVER_PREFIX = CLAUDNA_ROOT + "/skills/"
+# The candidate list for <claudna-root> is defined between these markers, in
+# SKILL_CONTRACT.md §1.1 and in its run-time copy, skills/_shared/claudna-root.md.
+# Text inside them names ${CLAUDE_PLUGIN_ROOT} and the plugin cache on purpose.
+CLAUDNA_ROOT_BEGIN = "<!-- claudna-root:begin -->"
+CLAUDNA_ROOT_END = "<!-- claudna-root:end -->"
 _SHARED_SEGMENT_RE = re.compile(r"(?<![\w-])_shared/")
 # Whatever path text runs up to the segment is part of how the path is written
 # (`skills/`, `../`, `${CLAUDE_PLUGIN_ROOT}/skills/`, `~/.claude/skills/`).
 _SHARED_PREFIX_RE = re.compile(r"[\w.~${}/-]*$")
 _SHARED_TAIL_RE = re.compile(r"[\w./-]*")
+# A prefix of path segments only: the one kind the file-relative rule governs.
+_PLAIN_PREFIX_RE = re.compile(r"(?:[\w.-]+/)*")
 
 
-def _shared_path_spans(line: str) -> list[tuple[int, int, str]]:
-    """(start, end, tail) of every `_shared/` path in line, its prefix included."""
-    spans: list[tuple[int, int, str]] = []
+def _shared_path_spans(line: str) -> list[tuple[int, int, str, str]]:
+    """(start, end, tail, kind) of every `_shared/` path in line, prefix included.
+
+    kind is "plain" (path segments only), "resolver" (`<claudna-root>/skills/`),
+    "url" (inside a `scheme://` URL, which is not a path and is left alone), or
+    "other" (a `${...}`, `~` or absolute prefix).
+    """
+    spans: list[tuple[int, int, str, str]] = []
     for m in _SHARED_SEGMENT_RE.finditer(line):
         start = _SHARED_PREFIX_RE.search(line, 0, m.start()).start()
         if spans and start < spans[-1][1]:
             continue  # a second segment inside a path already taken
         tail = _SHARED_TAIL_RE.match(line, m.end()).group(0).rstrip(".")
-        spans.append((start, m.end() + len(tail), tail))
+        prefix = line[start : m.start()]
+        if start > 0 and line[start - 1] == ":" and prefix.startswith("//"):
+            kind = "url"
+        elif prefix == "/skills/" and line[:start].endswith(CLAUDNA_ROOT):
+            start -= len(CLAUDNA_ROOT)
+            kind = "resolver"
+        elif _PLAIN_PREFIX_RE.fullmatch(prefix):
+            kind = "plain"
+        else:
+            kind = "other"
+        spans.append((start, m.end() + len(tail), tail, kind))
     return spans
 
 
-def _shared_spelling(md_file: Path, skills_dir: Path, tail: str) -> str | None:
-    """The accepted spelling of `_shared/<tail>` from md_file, or None when
-    <tail> names nothing under skills/_shared/ (so there is nothing to spell)."""
+def _shared_target_exists(skills_dir: Path, tail: str) -> bool:
+    """Whether `_shared/<tail>` names a file or directory inside skills/_shared/."""
     shared_root = (skills_dir / "_shared").resolve()
     target = (shared_root / tail).resolve()
-    if not target.exists() or (target != shared_root and shared_root not in target.parents):
+    return target.exists() and (target == shared_root or shared_root in target.parents)
+
+
+def _shared_spelling(md_file: Path, skills_dir: Path, tail: str, kind: str) -> str | None:
+    """The accepted spelling of `_shared/<tail>` for a path of this kind in
+    md_file, or None when <tail> names nothing under skills/_shared/.
+
+    A plain prefix is a relative path, so its spelling is the file-relative
+    one. A resolver path keeps its form. Any other prefix was meant to anchor
+    the path somewhere absolute (a command, a forwarded prompt), so its
+    spelling is the resolver form: rewriting it to a relative path would hand
+    a shell or another agent a path relative to its own working directory.
+    """
+    if not _shared_target_exists(skills_dir, tail):
         return None
-    depth = len(md_file.relative_to(skills_dir).parts) - 1
-    return "../" * depth + "_shared/" + tail
+    if kind == "plain":
+        depth = len(md_file.relative_to(skills_dir).parts) - 1
+        return "../" * depth + "_shared/" + tail
+    return _RESOLVER_PREFIX + "_shared/" + tail
 
 
 def shared_path_findings(text: str, md_file: Path, skills_dir: Path) -> list[tuple[int, str, str | None]]:
-    """Every `_shared/` path in md_file's text not written relative to md_file.
+    """Every `_shared/` path in md_file's text that is not spelled as §1 requires.
 
     Returns (line number, path as written, accepted spelling) triples. The
     spelling is None when the path names nothing under skills/_shared/: there
@@ -548,21 +588,28 @@ def shared_path_findings(text: str, md_file: Path, skills_dir: Path) -> list[tup
     """
     findings: list[tuple[int, str, str | None]] = []
     for lineno, line in enumerate(text.split("\n"), 1):
-        for start, end, tail in _shared_path_spans(line):
+        for start, end, tail, kind in _shared_path_spans(line):
+            if kind == "url":
+                continue
             written = line[start:end]
-            spelling = _shared_spelling(md_file, skills_dir, tail)
+            spelling = _shared_spelling(md_file, skills_dir, tail, kind)
             if written != spelling:
                 findings.append((lineno, written, spelling))
     return findings
 
 
 def check_shared_paths(text: str, md_file: Path, skills_dir: Path) -> list[str]:
-    """String projection of shared_path_findings, for the validator."""
+    """Check (a): string projection of shared_path_findings, for the validator."""
     rel = md_file.relative_to(skills_dir)
     errors: list[str] = []
     for lineno, written, spelling in shared_path_findings(text, md_file, skills_dir):
         if spelling is None:
             errors.append(f"{rel}:{lineno}: `{written}` names nothing under skills/_shared/")
+        elif spelling.startswith(CLAUDNA_ROOT):
+            errors.append(
+                f"{rel}:{lineno}: `{written}` is anchored to a root no other host sets -- write `{spelling}` "
+                "(SKILL_CONTRACT §1; `python3 scripts/fix_shared_paths.py` rewrites these)"
+            )
         else:
             errors.append(
                 f"{rel}:{lineno}: `{written}` is not relative to this file -- write `{spelling}` "
@@ -574,22 +621,147 @@ def check_shared_paths(text: str, md_file: Path, skills_dir: Path) -> list[str]:
 def rewrite_shared_paths(text: str, md_file: Path, skills_dir: Path) -> tuple[str, int]:
     """Rewrite every `_shared/` path that has an accepted spelling to it.
 
-    Returns (new text, paths rewritten). Paths naming nothing under
-    skills/_shared/ are left as written, for shared_path_findings to report.
+    Returns (new text, paths rewritten). URLs are left alone, and so are paths
+    naming nothing under skills/_shared/, for shared_path_findings to report.
     """
     lines = text.split("\n")
     count = 0
     for i, line in enumerate(lines):
         pieces: list[str] = []
         pos = 0
-        for start, end, tail in _shared_path_spans(line):
-            spelling = _shared_spelling(md_file, skills_dir, tail)
+        for start, end, tail, kind in _shared_path_spans(line):
+            if kind == "url":
+                continue
+            spelling = _shared_spelling(md_file, skills_dir, tail, kind)
             if spelling is not None and line[start:end] != spelling:
                 pieces += [line[pos:start], spelling]
                 pos = end
                 count += 1
         lines[i] = "".join(pieces) + line[pos:]
     return "\n".join(lines), count
+
+
+_FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
+# Claude Code fills these in only in an expanded SKILL.md body, fenced blocks
+# included (measured on 2.1.281 and 2.1.284); in a file opened with Read they
+# stay literal, and neither is set in the shell.
+_PLUGIN_VAR_RE = re.compile(r"\$\{CLAUDE_(?:PLUGIN_ROOT|SKILL_DIR)\}")
+_PLUGIN_CACHE = "plugins/cache/Claudfather/claudna"
+# A bundled script run from the working directory, which is the user's project.
+_CWD_SCRIPT_RE = re.compile(r"(?<![\w/.-])(?:python3?|bash|sh)\s+[\"']?(?:\./)?scripts/[\w.-]+")
+
+
+def _definition_lines(lines: list[str]) -> set[int]:
+    """Indices of the lines between the <claudna-root> definition markers."""
+    inside: set[int] = set()
+    on = False
+    for i, line in enumerate(lines):
+        if CLAUDNA_ROOT_BEGIN in line:
+            on = True
+        elif CLAUDNA_ROOT_END in line:
+            on = False
+        elif on:
+            inside.add(i)
+    return inside
+
+
+def _fence_closers(lines: list[str]) -> dict[int, int]:
+    """For each line inside a fenced block, the index of the line closing it."""
+    closer: dict[int, int] = {}
+    opened: int | None = None
+    for i, line in enumerate(lines):
+        if _FENCE_RE.match(line):
+            if opened is None:
+                opened = i
+            else:
+                closer.update({j: i for j in range(opened + 1, i)})
+                opened = None
+    return closer
+
+
+def _has_resolver_fallback(lines: list[str], i: int, closer: dict[int, int]) -> bool:
+    """Whether <claudna-root> sits on line i or, for a line in a fenced block,
+    in the first paragraph after that block closes."""
+    if CLAUDNA_ROOT in lines[i]:
+        return True
+    if i not in closer:
+        return False
+    j = closer[i] + 1
+    while j < len(lines) and not lines[j].strip():
+        j += 1
+    while j < len(lines) and lines[j].strip() and not _FENCE_RE.match(lines[j]):
+        if CLAUDNA_ROOT in lines[j]:
+            return True
+        j += 1
+    return False
+
+
+def check_plugin_variables(text: str, md_file: Path, skills_dir: Path) -> list[str]:
+    """Check (b): ${CLAUDE_PLUGIN_ROOT} / ${CLAUDE_SKILL_DIR} only where Claude
+    Code fills them in, a SKILL.md body, and only beside the <claudna-root>
+    fallback that every other host needs."""
+    rel = md_file.relative_to(skills_dir)
+    lines = text.split("\n")
+    definition = _definition_lines(lines)
+    closer = _fence_closers(lines)
+    errors: list[str] = []
+    for i, line in enumerate(lines):
+        m = _PLUGIN_VAR_RE.search(line)
+        if not m or i in definition:
+            continue
+        if md_file.name != "SKILL.md":
+            errors.append(
+                f"{rel}:{i + 1}: `{m.group(0)}` is filled in only in a SKILL.md body; here it stays literal "
+                f"and the shell has it unset -- write `{CLAUDNA_ROOT}` (SKILL_CONTRACT §1.1)"
+            )
+        elif not _has_resolver_fallback(lines, i, closer):
+            errors.append(
+                f"{rel}:{i + 1}: `{m.group(0)}` has no `{CLAUDNA_ROOT}` fallback on its line or in the paragraph "
+                "after its code block -- no host but Claude Code fills it in (SKILL_CONTRACT §1.1)"
+            )
+    return errors
+
+
+def check_plugin_cache_paths(text: str, md_file: Path, skills_dir: Path, fm: dict | None) -> list[str]:
+    """Check (c): the plugin cache is the last <claudna-root> candidate, named
+    only in its definition and in skills that run on Claude Code alone."""
+    hosts = (fm or {}).get("hosts")
+    if isinstance(hosts, list) and hosts and set(hosts) <= {"claude-code"}:
+        return []
+    rel = md_file.relative_to(skills_dir)
+    lines = text.split("\n")
+    definition = _definition_lines(lines)
+    return [
+        f"{rel}:{i + 1}: a Claude Code plugin-cache path -- write `{CLAUDNA_ROOT}`, whose last candidate is that "
+        "cache; only a `hosts: [claude-code]` skill names the cache itself (SKILL_CONTRACT §1.1)"
+        for i, line in enumerate(lines)
+        if _PLUGIN_CACHE in line and i not in definition
+    ]
+
+
+def check_cwd_script_calls(text: str, md_file: Path, skills_dir: Path, fm: dict | None) -> list[str]:
+    """Check (d): a bundled script run from the working directory, outside a
+    skill that declares it runs from a clone of this repo."""
+    if (fm or {}).get("requires-context") == "repo-clone":
+        return []
+    rel = md_file.relative_to(skills_dir)
+    return [
+        f"{rel}:{i + 1}: `{m.group(0)}` runs from the working directory, which is the user's project, not "
+        f'this plugin -- write `python3 "{CLAUDNA_ROOT}/scripts/<name>"` (SKILL_CONTRACT §1.1)'
+        for i, line in enumerate(text.split("\n"))
+        for m in _CWD_SCRIPT_RE.finditer(line)
+    ]
+
+
+def check_host_portability(text: str, md_file: Path, skills_dir: Path, fm: dict | None) -> list[str]:
+    """Checks (a)-(d) of SKILL_CONTRACT §5.1 (#336) for one markdown file under
+    skills/. fm is the owning skill's frontmatter, or None for skills/_shared/."""
+    return (
+        check_shared_paths(text, md_file, skills_dir)
+        + check_plugin_variables(text, md_file, skills_dir)
+        + check_plugin_cache_paths(text, md_file, skills_dir, fm)
+        + check_cwd_script_calls(text, md_file, skills_dir, fm)
+    )
 
 
 def load_removed_skills(path: Path) -> list[str]:
