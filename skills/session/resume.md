@@ -10,7 +10,7 @@ Read `<cwd>/.claude/session.md`.
 
 If absent, check the legacy path: derive a slug from `git remote get-url origin` (extract `org/repo`, lowercase, replace `/` with `--`); fallback to lowercased dirname. Look for `~/.claude/notes/projects/<slug>/context-resume.md`. If found:
 
-- **With `--auto`:** Import silently. Copy content into `<cwd>/.claude/session.md` (assign the legacy file's `session_date` as the timestamp for every imported bullet — see the migration notes in `templates.md` in this skill directory). Delete the legacy file. Continue.
+- **With `--auto`:** Import silently. Copy content into `<cwd>/.claude/session.md` (assign the legacy file's `session_date` as the timestamp for every imported bullet — see the migration notes in [`templates.md`](./templates.md) in this skill directory). Delete the legacy file. Continue.
 - **Without `--auto`:** Ask once: "Found a legacy handoff at `<path>` (last touched <date>). Import it? [y/N]". On `y`: import as above. On `n`: leave the legacy file alone and proceed without it.
 
 If neither file exists, run step 2 (live scan), then skip to step 5. Present a brief greeting using the live-scan data only; there is no handoff history.

@@ -89,6 +89,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Neither fix closes the underlying class. A correct review-attribution tool for exactly the `reviewDecision` problem already exists, and the dead field still gets reached for, because the wrong field is one step and always answers while the right tool is several steps — each one independently forgettable. A doc fix cannot repair that gap by itself.
 
+- **`skills/session/templates.md` is reachable from `SKILL.md`, so the handoff format is no longer invisible to a host that follows links ([#339](https://github.com/Claudfather/clauDNA/issues/339)).** `make check` reported it as an orphan — "exists but is not referenced in SKILL.md" — and the warning was accurate in the way that matters: the file *is* in use (`handoff.md`, `checkpoint.md` and `resume.md` each said "use the format in `templates.md` in this skill directory"), but the entry point never named it, so anything that walks outward from `SKILL.md` rather than reading the whole directory never reaches the schema those three verbs write and read against.
+
+  Fixed at the entry point rather than by deleting the file: `SKILL.md`'s mode-dispatch section now names [`templates.md`](./skills/session/templates.md) as the one file that is *not* a verb depth, which the surrounding "read ONLY its depth file — never load another verb's depth" rule would otherwise have excluded by implication. The three prose mentions became markdown links, so they resolve as links and not just as prose. The `session: templates.md` orphan warning is gone from `integration-test.py` output.
+
 ## [0.19.0] - 2026-09-04
 
 **This release does not update anything by itself.** Claude Code loads plugins from a pinned local cache, so cutting a tag moves no installation: every existing install stays on the version it already resolved until something pulls this one — `claude plugin update` by hand, or an automated puller. If you run a fleet and have no puller enrolled, nothing has moved. Reading this release is not evidence that any bot is running the changes below.
