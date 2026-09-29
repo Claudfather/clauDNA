@@ -54,7 +54,7 @@ Combine reaped survivors (from step 3) + new items (from step 4). Dedupe by cont
 
 ### 7. Write `<cwd>/.claude/session.md`
 
-Ensure `<cwd>/.claude/` exists first (`mkdir -p <cwd>/.claude`). Use the format in `templates.md` in this skill directory. Write atomically: write to `<cwd>/.claude/session.md.tmp` then `mv` to `<cwd>/.claude/session.md`.
+Ensure `<cwd>/.claude/` exists first (`mkdir -p <cwd>/.claude`). Use the format in [`templates.md`](./templates.md) in this skill directory. Write atomically: write to `<cwd>/.claude/session.md.tmp` then `mv` to `<cwd>/.claude/session.md`.
 
 ### 8. Manage `.gitignore`
 

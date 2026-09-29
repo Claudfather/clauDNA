@@ -23,6 +23,8 @@ Arguments to dispatch (first token = verb, the rest belong to the verb): $ARGUME
 
 For the selected verb, read ONLY its depth file in this skill directory and follow it exactly — never load another verb's depth.
 
+[`templates.md`](./templates.md) is the one exception, because it is not a verb depth: it holds the handoff-file format that `handoff`, `checkpoint`, and `resume` all write and read against — the schema, the format rules the reaper parses, the v1 migration notes, and the stable surface promised to readers outside clauDNA. Load it alongside the verb's depth file whenever the verb touches `<cwd>/.claude/session.md`.
+
 **No verb token → deterministic inference only (F2, epic #165), rules checked in order — first match wins:**
 - Fresh session (little prior conversation) and `<cwd>/.claude/session.md` exists → `resume` (checked first: the read-only mode wins any tie).
 - The request contains an explicit wrap-up cue — one of: "wrap up", "wrapping up", "done for the day", "end of session", "handoff", "sign off", "calling it" → `handoff`.

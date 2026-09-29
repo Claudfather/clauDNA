@@ -7,7 +7,7 @@ Search the shared vault for existing notes via `claudron lookup`. Read-only. Fol
 ## Step 0: Gate on the vault verdict
 
 - **present-with-vault** → continue.
-- **present-no-vault** / **absent** → there is nothing to search. Report the verdict + remedy (`claudron init <path> --personal`, or install Claudron per SETUP_GUIDE) and stop. In `--auto`, emit the structured result with `outcome: "blocked"` and the remedy in `blocker_description`.
+- **present-no-vault** / **absent** → there is nothing to search. Emit the standard degradation notice (`claudron-engine.md` §3.1 — the `/claudna:claudron` row, whose `<fallback>` is "no fallback — reporting the verdict and stopping"), add the no-vault remedy `claudron init <path> --personal` where the verdict is `present-no-vault`, and stop. In `--auto`, emit the structured result with `outcome: "blocked"`, the notice in `blocker_description`, and the same line in `errors[]`.
 
 ## Step 1: Run the search
 

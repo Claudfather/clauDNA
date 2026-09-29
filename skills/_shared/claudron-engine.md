@@ -28,7 +28,9 @@ Verdict → action:
 - **present-no-vault** → remedy is `claudron init <path> --personal` (a positional path, not a flag). Never reported as "not installed."
 - **absent** → the engine is unavailable; consumers with a fallback take it (§3), `/claudron` itself fails loudly.
 
-**`requires:` is not this gate.** A consuming skill's `requires: [{cli: claudron}]` frontmatter is documentation, validated by `scripts/validate-skills.py` — Claude Code ignores it at runtime (it is not a recognized field: the description loads and the skill stays invocable regardless of whether `claudron` is installed). **This ladder is the only runtime gate.** A skill that shells to `claudron` runs it every time; it cannot lean on the frontmatter to keep itself from running when `claudron` is absent.
+**Every consumer declares the dependency.** A skill whose body invokes `claudron` carries `requires: [{cli: claudron…}]` in its frontmatter, with a `reason` that says whether the dependency is hard or soft and which path needs it. `scripts/validate-skills.py` enforces this (a body that invokes `claudron` with no declaration is a hard error), so the declared set and the invoking set cannot drift apart.
+
+**But `requires:` is not this gate.** A consuming skill's `requires: [{cli: claudron}]` frontmatter is documentation, validated by `scripts/validate-skills.py` — Claude Code ignores it at runtime (it is not a recognized field: the description loads and the skill stays invocable regardless of whether `claudron` is installed). **This ladder is the only runtime gate.** A skill that shells to `claudron` runs it every time; it cannot lean on the frontmatter to keep itself from running when `claudron` is absent.
 
 ## 2. The envelope — validate every call
 
@@ -75,8 +77,31 @@ The engine always stamps a new note `draft`; **consumers never set or promote `m
 Transient exit-3 conditions get a **bounded retry — 2 attempts, short backoff** (a deliberate widening of infra-cli-contract §7's single retry) — then degrade. (`capture` is an unlocked local write in v0.2.0, so there is no lock contention to retry — cross-machine serialization is git's job in `sync`.)
 
 **Degrade loudly** on exit 3 or an unrecognized envelope — whether the ladder returned a non-usable verdict *or* a usable verdict turned into a failure mid-call:
-- **Writing consumer** (`/claudna:capture`, `publish --to vault`): take the frozen raw-tree path (write + `/claudna:index`) and **say so** — "Claudron vault unavailable — wrote to the raw tree; run `/claudna:index`." The *vault* is never written unguarded; the raw tree is the compat holding pen, not a second vault door.
+- **Writing consumer** (`/claudna:capture`, `publish --to vault`): take the frozen raw-tree path (write + `/claudna:index`) and **say so**, using the standard notice below. The *vault* is never written unguarded; the raw tree is the compat holding pen, not a second vault door.
 - **Reading consumer** (`/claudron lookup`, `/claudron status`): nothing to fall back to — report the verdict + remedy (init pointer for no-vault; the git remedy for `SyncError`) and stop. `/claudna:recall` is the exception: its frozen fallback is the INDEX.md scan (§4).
+
+### 3.1 The standard degradation notice
+
+Every branch in every consumer that finds Claudron missing or unusable emits **this one line first**, before anything else it prints:
+
+> **`Claudron unavailable (<verdict>) — <fallback>. Install / configure: https://github.com/Claudfather/Claudron (clauDNA-side setup: SETUP_GUIDE §7 "Claudron Integration").`**
+
+`<verdict>` is the §1 ladder verdict the branch acted on — `absent` (the CLI is not on PATH) or `present-no-vault` (installed, unconfigured) — or `engine failure` when a usable verdict failed mid-call. `<fallback>` is the consumer's row below, and it names the path *actually taken*, never a generic "degraded":
+
+| Consumer | `<fallback>` |
+|---|---|
+| `/claudna:capture` | `wrote to the raw tree; run /claudna:index` |
+| `/claudna:publish --to vault` | `writing the raw tree; run /claudna:index` |
+| `/claudna:recall` | `scanning the raw tree's INDEX.md instead` |
+| `/claudna:index` | `treating the target as a raw tree, since engine-managed roots cannot be confirmed` |
+| `/claudna:init-project` (Step 6.5) | `offering a raw-tree scaffold instead of a vault` (absent), or `printing the vault-init remedy and writing nothing` (present-no-vault) |
+| `/claudna:claudron` (`lookup`, `status`) | `no fallback — reporting the verdict and stopping` |
+
+Consumers quote their row rather than wording it themselves. One shape is the point: a user who has seen the notice once recognizes it from any skill, and a literal prefix stays greppable across transcripts — which an improvised sentence per skill is not.
+
+**In `--auto`, the notice is not optional and not only prose.** The same line goes into `errors[]`, and writing consumers set `artifacts.engine: "fallback"`. **No silent fallback exists**: a branch that takes a fallback without emitting the notice is a defect, not a quiet success, and a run that prints nothing is indistinguishable from a run where the engine worked.
+
+One carve-out, and only one: **`/claudron status` prints the notice but leaves `errors[]` empty.** Reporting the verdict is that verb's entire purpose, so absence there is a successful result rather than a degradation — it carries the verdict in `artifacts.verdict` instead. Every other consumer in the table above is degrading when it prints the notice, and records it.
 
 **`--auto` result vocabulary** (the block itself is orchestration-guide.md's "Structured Result Shape"): writing consumers carry `artifacts.engine` — `"claudron"` on the engine path, `"fallback"` when degraded to the raw tree; reporting verbs (`status`) carry the ladder outcome in `artifacts.verdict` — `absent` / `present-no-vault` / `present-with-vault`. Any degradation lands in `errors[]`. Silence is the only forbidden outcome.
 

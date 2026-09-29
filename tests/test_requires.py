@@ -16,11 +16,20 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from skill_checks import (
+    check_claudron_requires,
     check_dependencies,
+    declares_claudron,
+    invokes_claudron,
     parse_frontmatter,
     validate_requires,
     validate_skill_md,
 )
+
+SKILLS_DIR = REPO_ROOT / "skills"
+
+#: The six consumers the Claudron declaration rule governs (#337). Every one of
+#: them either shells out to the CLI or branches on its presence.
+CLAUDRON_CONSUMERS = ("capture", "claudron", "index", "init-project", "publish", "recall")
 
 
 # --- validate_requires: valid inputs ---
@@ -259,3 +268,104 @@ class TestParseFrontmatterWithRequires:
         cli_names = [e["cli"] for e in fm["requires"]]
         assert "neon" in cli_names
         assert "psql" in cli_names
+
+
+# --- Claudron dependency declaration (#337) ---
+
+
+class TestInvokesClaudron:
+    """The detector must separate a CLI call from a reference to the engine skill."""
+
+    def test_detects_cli_verb(self):
+        assert invokes_claudron("Run `claudron capture --type note --json`.")
+
+    def test_detects_path_probe(self):
+        assert invokes_claudron("Check with `command -v claudron` first.")
+
+    def test_detects_every_documented_verb(self):
+        for verb in ("capture", "lookup", "recall", "status", "init", "sync"):
+            assert invokes_claudron(f"claudron {verb} --json"), verb
+
+    def test_ignores_engine_skill_invocation(self):
+        # `/claudron lookup` is the skill, not the CLI — claudron-engine.md uses
+        # this form throughout, and a router that mentions it borrows no dependency.
+        assert not invokes_claudron("`/claudron lookup` reports the verdict and stops.")
+
+    def test_ignores_namespaced_skill_reference(self):
+        assert not invokes_claudron("shared-vault knowledge is `/claudna:claudron <verb>`")
+
+    def test_ignores_namespaced_skill_reference_with_real_verb(self):
+        assert not invokes_claudron("to check health use /claudna:claudron status")
+
+    def test_ignores_prose_mentions(self):
+        assert not invokes_claudron("The `claudron` CLI is the door to the vault.")
+        assert not invokes_claudron("a root annotated `(claudron vault)` is engine-managed")
+        assert not invokes_claudron("install claudron or point the section at a raw tree")
+
+
+class TestDeclaresClaudron:
+    def test_bare_cli_entry(self):
+        assert declares_claudron({"requires": [{"cli": "claudron"}]})
+
+    def test_version_constrained_entry(self):
+        assert declares_claudron({"requires": [{"cli": "claudron>=0.2"}]})
+
+    def test_other_clis_do_not_count(self):
+        assert not declares_claudron({"requires": [{"cli": "gh>=2.0"}]})
+
+    def test_missing_requires(self):
+        assert not declares_claudron({})
+
+    def test_env_entry_is_not_a_cli_declaration(self):
+        assert not declares_claudron({"requires": [{"env": "CLAUDRON_VAULT_PATH"}]})
+
+
+class TestCheckClaudronRequires:
+    def test_invocation_without_declaration_errors(self):
+        errors = check_claudron_requires({}, "Run `claudron capture --json`.")
+        assert len(errors) == 1
+        assert "requires:" in errors[0]
+
+    def test_invocation_with_declaration_passes(self):
+        fm = {"requires": [{"cli": "claudron>=0.2", "reason": "vault writes"}]}
+        assert check_claudron_requires(fm, "Run `claudron capture --json`.") == []
+
+    def test_no_invocation_needs_no_declaration(self):
+        assert check_claudron_requires({}, "Route knowledge through /claudna:capture.") == []
+
+
+class TestClaudronConsumersDeclareTheDependency:
+    """Live backstop: the shipped skills, not a synthetic body."""
+
+    def test_every_invoking_skill_declares_claudron(self):
+        undeclared = []
+        for skill_dir in sorted(p for p in SKILLS_DIR.iterdir() if p.is_dir() and p.name != "_shared"):
+            skill_md = skill_dir / "SKILL.md"
+            if not skill_md.is_file():
+                continue
+            parsed = parse_frontmatter(skill_md)
+            if parsed is None:
+                continue
+            fm, _body = parsed
+            if declares_claudron(fm):
+                continue
+            for md in sorted(skill_dir.rglob("*.md")):
+                if invokes_claudron(md.read_text()):
+                    undeclared.append(str(md.relative_to(SKILLS_DIR)))
+        assert undeclared == [], f"undeclared Claudron invocations: {undeclared}"
+
+    def test_the_six_named_consumers_all_declare_it(self):
+        for name in CLAUDRON_CONSUMERS:
+            parsed = parse_frontmatter(SKILLS_DIR / name / "SKILL.md")
+            assert parsed is not None, name
+            assert declares_claudron(parsed[0]), f"{name} must declare the Claudron CLI"
+
+    def test_the_positive_control_finds_real_invocations(self):
+        # Without this, test_every_invoking_skill_declares_claudron would pass on
+        # a detector that matched nothing at all.
+        found = [
+            str(md.relative_to(SKILLS_DIR))
+            for md in sorted(SKILLS_DIR.rglob("*.md"))
+            if invokes_claudron(md.read_text())
+        ]
+        assert len(found) >= 4, f"detector found too few real invocations: {found}"

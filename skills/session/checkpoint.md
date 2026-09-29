@@ -22,7 +22,7 @@ Run `git status --porcelain` and `git branch --show-current` (parallel, separate
 
 ### 4. Write atomically
 
-Ensure `<cwd>/.claude/` exists (`mkdir -p <cwd>/.claude`). Use the format in `templates.md` in this skill directory. Write to `<cwd>/.claude/session.md.tmp`, then `mv` into place.
+Ensure `<cwd>/.claude/` exists (`mkdir -p <cwd>/.claude`). Use the format in [`templates.md`](./templates.md) in this skill directory. Write to `<cwd>/.claude/session.md.tmp`, then `mv` into place.
 
 ### 5. Confirm
 

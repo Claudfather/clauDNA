@@ -28,7 +28,7 @@ When `--dispatch` is passed (typically when invoked as a subagent from another s
 - **Do NOT call `EnterPlanMode`.** The caller has its own Plan Mode lifecycle.
 - **Do NOT call `AskUserQuestion`.** The caller is not a human; questions cannot be answered.
 - **Do NOT prompt for clarification.** If the plan is too ambiguous to review, exit `outcome: blocked` with a populated `blocker_description`.
-- Spawn parallel critic subagents per Phase 3.
+- Spawn parallel critic subagents per Phase 3 — or, where the host has no dispatch primitive, run them inline and sequentially per `skills/_shared/orchestration-guide.md` §14.
 - Aggregate critic findings into the structured markdown format.
 - Emit the markdown document (YAML frontmatter + body) as the final output and stop.
 
@@ -201,6 +201,8 @@ Launch these reviewers in parallel:
 Each reviewer writes findings to `/tmp/adversarial-review-<timestamp>/<reviewer>.md`.
 
 After all return, synthesize: merge overlapping findings, resolve contradictions, rank by severity.
+
+**No dispatch primitive** (`skills/_shared/orchestration-guide.md` §14.1) → run the reviewers inline per §14.2: one pass per angle in the table's order, each writing to the same `<reviewer>.md` path so synthesis is unchanged. Note honestly that the anti-groupthink guards below are weakened rather than preserved by this path — a reviewer that has already read its predecessors is the correlated-bias case those guards exist to catch, so trigger the 10th Man Rule regardless of the Blocker count and carry §14.3's independence line in the output.
 
 ### 10th Man Rule
 

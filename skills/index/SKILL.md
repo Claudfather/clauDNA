@@ -3,6 +3,9 @@ name: index
 user-invocable: true
 description: "Use after creating, promoting, or editing docs in a directory whose INDEX.md should be regenerated, when frontmatter needs validating against the documentation standard, or to audit knowledge-base health. The sole writer of INDEX.md files."
 argument-hint: "[directory-path] [--validate-only] [--recursive] [--fix] [--stale]"
+requires:
+  - cli: claudron
+    reason: "Optional — engine-managed-root detection in Step 1 only (a `(claudron vault)` root is never indexed); without it, index degrades per the standard notice in skills/_shared/claudron-engine.md §3.1 and treats the target as a raw tree"
 ---
 
 # Index
@@ -25,6 +28,8 @@ Parse `$ARGUMENTS` at invocation:
 ## Step 1: Discover Documents
 
 **Engine-managed roots are never indexed.** If the target is a root annotated `(claudron vault)` in CLAUDE.md's `## Shared Documentation` section, or came from the engine env var, stop and emit §10's engine-managed-root message (`skills/_shared/documentation-standard.md` §10, Annotation semantics — including its env-derived suffix). The engine owns vault indexing; an INDEX.md written there would be stale on arrival.
+
+**With Claudron absent, say so rather than assuming.** The annotation above is the only signal that survives without the CLI, so a root that *is* engine-managed but carries no annotation is indistinguishable from a raw tree. When `claudron` is not on PATH, emit the standard degradation notice (`skills/_shared/claudron-engine.md` §3.1 — the `/claudna:index` row) before indexing, and in `--auto` put the same line in `errors[]`. Indexing an unannotated engine-managed root is the failure this notice exists to make visible; it is never a silent assumption.
 
 Walk all `.md` files in the target directory (excluding `INDEX.md` itself).
 

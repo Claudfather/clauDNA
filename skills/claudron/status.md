@@ -20,21 +20,20 @@ Classify strictly by the **§1 verdict table** (absent / present-no-vault / pres
 
 ## Step 2: Report the verdict
 
-- **absent** →
+- **absent** → lead with the standard degradation notice verbatim (claudron-engine.md §3.1, the `/claudna:claudron` row), then the detail:
 
   ```
-  Claudron: not installed
-    The /claudron engine and vault features are unavailable.
-    Install:    see SETUP_GUIDE (Claudron integration)
-    Meanwhile:  /claudna:publish --to vault writes the raw tree.
+  Claudron unavailable (absent) — no fallback — reporting the verdict and stopping. Install / configure: https://github.com/Claudfather/Claudron (clauDNA-side setup: SETUP_GUIDE §7 "Claudron Integration").
+    Meanwhile:  /claudna:publish --to vault and /claudna:capture write the raw tree;
+                /claudna:recall scans its INDEX.md.
   ```
 
-- **present-no-vault** →
+- **present-no-vault** → the same notice with the verdict swapped, then the remedy:
 
   ```
-  Claudron: installed, no vault configured
+  Claudron unavailable (present-no-vault) — no fallback — reporting the verdict and stopping. Install / configure: https://github.com/Claudfather/Claudron (clauDNA-side setup: SETUP_GUIDE §7 "Claudron Integration").
     Create one:  claudron init <path> --personal
-    Or point at: export CLAUDRON_VAULT_PATH=<path>
+    Or point at: the vault-path variable named in documentation-standard.md §10
   ```
 
 - **present-with-vault** → parse `data` (envelope §2) and render:
