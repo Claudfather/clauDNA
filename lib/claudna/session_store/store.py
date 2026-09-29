@@ -18,9 +18,21 @@ from __future__ import annotations
 from pathlib import Path
 
 from . import events as ev
-from .fsio import DIR_MODE, append_jsonl, ensure_dir, exclusive_lock, read_json
-from .paths import SessionPaths, session_paths, state_root
-from .project import RebuildReport, by_segment, load_lifecycle, rebuild, refresh
+from .fsio import DIR_MODE, append_jsonl, ensure_dir, exclusive_lock
+from .paths import SessionPaths, session_paths, state_root, validate_root
+from .project import (
+    SESSION_SCHEMA,
+    RebuildReport,
+    by_segment,
+    fold_boundary,
+    load_lifecycle,
+    next_segment_index,
+    read_projection,
+    rebuild,
+    refresh,
+    segment_transcript_paths,
+    transcript_path_of,
+)
 
 
 class StoreError(RuntimeError):
@@ -62,14 +74,20 @@ class SessionHandle:
         A segment-scoped kind with ``seg=None`` goes to the current segment,
         resolved under the lock so a concurrent ``open_segment`` can't slip in.
         """
+        spec = ev.REGISTRY.get(kind)
+        if spec is None:
+            raise ev.EventError(f"unknown event kind: {kind}")
         with self._locked():
-            if seg is None and ev.REGISTRY[kind].seg:
-                seg = self.current_segment()
+            current = None
+            if spec.seg and (seg is None or spec.log == ev.ACTIVITY):
+                current = self.current_segment()  # one directory listing, reused below
                 if seg is None:
-                    raise StoreError(f"session {self.sid} has no segment for {kind}")
-            return self._append_locked(kind, data, seg=seg)
+                    if current is None:
+                        raise StoreError(f"session {self.sid} has no segment for {kind}")
+                    seg = current
+            return self._append_locked(kind, data, seg=seg, current=current)
 
-    def _append_locked(self, kind: str, data: dict, *, seg: int | None) -> dict:
+    def _append_locked(self, kind: str, data: dict, *, seg: int | None, current: int | None = None) -> dict:
         """Append and re-project; the caller holds the session lock.
 
         Any segment-scoped event requires its segment directory to exist (only
@@ -80,30 +98,37 @@ class SessionHandle:
         on, and the next PreCompact re-seals with a later end.
         """
         event = ev.make_event(kind, self.sid, data, seg=seg)
-        if seg is not None and not self.paths.segment(seg).dir.is_dir():
-            raise StoreError(f"segment {seg} does not exist for session {self.sid}")
         if ev.REGISTRY[kind].log == ev.ACTIVITY:
-            if seg != self.current_segment():
-                raise StoreError(f"segment {seg} of session {self.sid} is superseded; its log is frozen")
-            if self._is_closed():
+            current = current if current is not None else self.current_segment()
+            if seg != current:  # the current segment's directory exists by definition
+                state = "is superseded; its log is frozen" if self.paths.segment(seg).dir.is_dir() else "does not exist"
+                raise StoreError(f"segment {seg} of session {self.sid} {state}")
+            if self._current_session()["status"] == "closed":
                 raise StoreError(f"session {self.sid} is closed; its logs are frozen")
             log = self.paths.segment(seg).events
         else:
+            if seg is not None and not self.paths.segment(seg).dir.is_dir():
+                raise StoreError(f"segment {seg} does not exist for session {self.sid}")
             log = self.paths.lifecycle
-        bytes_before = log.stat().st_size if log.exists() else 0
+        bytes_before = _size(log)
         append_jsonl(log, event)
         refresh(self.paths, event, bytes_before=bytes_before)
         return event
 
-    def _is_closed(self) -> bool:
-        """Is the session closed? ``session.json`` answers when it's current; the log otherwise."""
-        projected = read_json(self.paths.session_json)
-        if isinstance(projected, dict) and projected.get("status") in ("open", "closed", "unknown"):
-            return projected["status"] == "closed"
-        status = None
-        for e in load_lifecycle(self.paths).events:
-            status = {"session.opened": "open", "session.closed": "closed"}.get(e["kind"], status)
-        return status == "closed"
+    def _current_session(self) -> dict:
+        """``session.json``, rebuilt first if it doesn't reflect the whole lifecycle log.
+
+        A stale ``session.json`` means a lifecycle refresh was lost (a killed
+        hook), so every projection derived from the lifecycle — including the
+        current segment's status and range — may be stale too. Rebuilding here
+        heals them once, instead of letting activity appends carry stale
+        segment fields forward or re-fold the log on every append.
+        """
+        projected = read_projection(self.paths.session_json, SESSION_SCHEMA, bytes_before=_size(self.paths.lifecycle))
+        if projected is None:
+            rebuild(self.paths)
+            projected = read_projection(self.paths.session_json, SESSION_SCHEMA)
+        return projected
 
     # ── lifecycle verbs (thin, named wrappers over append) ──────────────────
 
@@ -139,20 +164,28 @@ class SessionHandle:
           directories and every ``segment.opened`` in the log — so a segment
           deleted by retention never has its index (and its old lifecycle
           events) inherited by a new one;
-        * an unsealed predecessor is sealed first, at this segment's start
-          (never before its own), ``sealed_by`` ``"compact"`` or ``"resume"``
-          — a missed PreCompact or a lost SessionEnd can't leave two open.
+        * an unsealed predecessor is sealed first, ``sealed_by`` ``"compact"``
+          or ``"resume"`` — a missed PreCompact or a lost SessionEnd can't leave
+          two open. Its end is this segment's start when both share a
+          transcript; when a resume moved to a new transcript file, the new
+          start means nothing in the old file, so the end is the old
+          transcript's size (never before the predecessor's own start).
         """
         with self._locked():
-            buckets = by_segment(load_lifecycle(self.paths).events)
-            named = [i for i, events in buckets.items() if any(e["kind"] == "segment.opened" for e in events)]
+            lifecycle = load_lifecycle(self.paths).events
             previous = self.current_segment()
-            if previous is not None and not any(e["kind"] == "segment.sealed" for e in buckets[previous]):
-                sealed_by = "compact" if opened_by == "compact" else "resume"
-                end = max(start, _segment_start(buckets[previous]))
-                self._append_locked("segment.sealed", {"end": end, "sealed_by": sealed_by, "trigger": None},
-                                    seg=previous)
-            index = max([*self.paths.segment_indices(), *named], default=0) + 1
+            if previous is not None:
+                before = fold_boundary(by_segment(lifecycle)[previous])
+                if not before.sealed:
+                    old_path = segment_transcript_paths(lifecycle)[previous]
+                    same_file = old_path == transcript_path_of(lifecycle)
+                    end = start if same_file or not old_path else _size(Path(old_path))
+                    self._append_locked("segment.sealed", {
+                        "end": max(end, before.start or 0),
+                        "sealed_by": "compact" if opened_by == "compact" else "resume",
+                        "trigger": None,
+                    }, seg=previous)
+            index = next_segment_index(self.paths)
             self.paths.segment(index).dir.mkdir(mode=DIR_MODE)
             self._append_locked("segment.opened", {"opened_by": opened_by, "start": start}, seg=index)
             return index
@@ -179,7 +212,7 @@ class SessionHandle:
             target = index if index is not None else self.current_segment()
             if target is None:
                 raise StoreError(f"session {self.sid} has no segment to seal")
-            start = _segment_start(by_segment(load_lifecycle(self.paths).events)[target])
+            start = fold_boundary(by_segment(load_lifecycle(self.paths).events)[target]).start or 0
             if end < start:
                 raise StoreError(f"segment {target} starts at {start}; cannot seal it at {end}")
             return self._append_locked("segment.sealed", data, seg=target)
@@ -203,12 +236,15 @@ class SessionStore:
     """Entry point: resolves the store root once, hands out session handles."""
 
     def __init__(self, root: Path | None = None):
-        self.root = state_root() if root is None else root
+        self.root = state_root() if root is None else validate_root(root)
 
     def session(self, sid: str) -> SessionHandle:
         return SessionHandle(session_paths(sid, self.root))
 
 
-def _segment_start(boundary: list[dict]) -> int:
-    """A segment's start offset from its lifecycle events (0 if it never logged an open)."""
-    return next((e["data"]["start"] for e in boundary if e["kind"] == "segment.opened"), 0)
+def _size(path: Path) -> int:
+    """A log's size in bytes; 0 if it doesn't exist yet."""
+    try:
+        return path.stat().st_size
+    except FileNotFoundError:
+        return 0

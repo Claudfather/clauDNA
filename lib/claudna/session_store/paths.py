@@ -35,6 +35,10 @@ class InvalidSessionId(ValueError):
     """A session id that cannot safely become a directory name."""
 
 
+class InvalidStateDir(ValueError):
+    """A store root that isn't an absolute path."""
+
+
 def validate_sid(sid: str) -> str:
     """Return ``sid`` unchanged, or raise :class:`InvalidSessionId`."""
     if not isinstance(sid, str) or not _SID_RE.fullmatch(sid):
@@ -50,9 +54,19 @@ def state_root(env: dict[str, str] | None = None) -> Path:
     repository where it can be committed.
     """
     env = os.environ if env is None else env
-    root = Path(env.get(STATE_DIR_ENV) or DEFAULT_STATE_DIR).expanduser()
+    return validate_root(Path(env.get(STATE_DIR_ENV) or DEFAULT_STATE_DIR))
+
+
+def validate_root(root: Path) -> Path:
+    """Expand ``~`` and require an absolute path, however the root was supplied.
+
+    Relative roots are rejected — from ``$CLAUDNA_STATE_DIR``, ``--root``, or
+    code alike: hooks run in the user's project, so a relative root would put
+    the store, captured text included, inside a repository that can be committed.
+    """
+    root = Path(root).expanduser()
     if not root.is_absolute():
-        raise ValueError(f"{STATE_DIR_ENV} must be an absolute path, got {str(root)!r}")
+        raise InvalidStateDir(f"the session store root must be an absolute path, got {str(root)!r}")
     return root
 
 
@@ -70,8 +84,9 @@ def parse_seg_dirname(name: str) -> int | None:
     ``seg-0002`` or ``seg-02`` can never claim index 2 beside ``seg-002``.
     """
     m = _SEG_RE.fullmatch(name)
-    index = int(m.group(1)) if m else 0
-    return index if index >= 1 and seg_dirname(index) == name else None
+    if m and int(m[1]) >= 1 and seg_dirname(int(m[1])) == name:
+        return int(m[1])
+    return None
 
 
 @dataclass(frozen=True)
@@ -79,7 +94,6 @@ class SegmentPaths:
     """Files belonging to one segment directory."""
 
     dir: Path
-    index: int
 
     @property
     def events(self) -> Path:
@@ -114,7 +128,7 @@ class SessionPaths:
         return self.dir / ".lock"
 
     def segment(self, index: int) -> SegmentPaths:
-        return SegmentPaths(dir=self.dir / seg_dirname(index), index=index)
+        return SegmentPaths(dir=self.dir / seg_dirname(index))
 
     def segment_indices(self) -> list[int]:
         """Existing segment indexes, ascending. The directories are the truth."""

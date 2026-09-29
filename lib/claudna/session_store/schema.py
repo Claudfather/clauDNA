@@ -44,15 +44,32 @@ def load(name: str) -> dict:
 
 @functools.cache
 def _pattern(source: str) -> re.Pattern:
-    """Compile a schema ``pattern`` with JSON Schema (ECMAScript) semantics.
+    """Compile a schema ``pattern`` with JSON Schema (ECMAScript) semantics, for ``search``.
 
-    Python differs in two ways that matter here: ``$`` also matches before a
-    trailing newline (ECMAScript's ``$`` is end-of-string), and ``\\d``/``\\w``
-    match non-ASCII characters. An unescaped ``$`` becomes ``\\Z`` and the
-    pattern compiles with ``re.ASCII``. (``$`` inside a character class isn't
-    rewritten correctly; no store schema uses one.)
+    Python differs from ECMAScript in two ways that matter: ``$`` also matches
+    before a trailing newline, and ``\\d``/``\\w`` match non-ASCII characters.
+    So the pattern compiles with ``re.ASCII``, and every ``$`` anchor becomes
+    ``\\Z`` (end of input). The translation walks the pattern token by token —
+    escapes are copied whole and ``$`` inside a character class is literal — so
+    alternation, classes, and escaped backslashes keep their meaning.
     """
-    return re.compile(re.sub(r"(?<!\\)\$", r"\\Z", source), re.ASCII)
+    out: list[str] = []
+    i, in_class = 0, False
+    while i < len(source):
+        c = source[i]
+        if c == "\\":
+            out.append(source[i:i + 2])
+            i += 2
+            continue
+        if in_class:
+            in_class = c != "]"
+        elif c == "[":
+            in_class = True
+        elif c == "$":
+            c = "\\Z"
+        out.append(c)
+        i += 1
+    return re.compile("".join(out), re.ASCII)
 
 
 def is_instance(value: object, types: type | tuple[type, ...]) -> bool:

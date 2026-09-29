@@ -11,10 +11,11 @@ kind registry, and placement (right session, log, and segment), without writing
 anything. Lines from a newer envelope version or an unknown kind are skipped,
 exactly as readers skip them — an older ``check`` never fails on a newer log.
 
-``check`` fails only on what a writer can prevent: schema, registry, and
-placement violations, and bad or missing projections. Unparseable lines are
-crash debris — a torn write the store deliberately keeps as one skippable
-line, and that no ``rebuild`` can remove — so they are reported as warnings.
+``check`` fails on what a writer can prevent or a reader must not ignore:
+schema, registry, and placement violations, bad or missing projections, and
+corrupt lines. The one exception is a torn write — an unterminated fragment of
+a JSON object, which the store deliberately keeps as one skippable line and
+no ``rebuild`` can remove. That is crash debris, reported as a warning.
 
 Exit codes: 0 ok (warnings allowed) · 1 not found or check failed · 2 usage.
 """
@@ -30,15 +31,15 @@ from pathlib import Path
 from . import events as ev
 from . import schema
 from .fsio import read_json, read_jsonl
-from .paths import InvalidSessionId
+from .paths import InvalidSessionId, InvalidStateDir
 from .store import SessionHandle, SessionStore
 
 
 def _handle(args: argparse.Namespace) -> SessionHandle | None:
-    store = SessionStore(Path(args.root) if args.root else None)
     try:
+        store = SessionStore(Path(args.root) if args.root else None)
         handle = store.session(args.sid)
-    except InvalidSessionId as exc:
+    except (InvalidSessionId, InvalidStateDir) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return None
     if not handle.exists():
@@ -59,20 +60,23 @@ def check_session(handle: SessionHandle) -> CheckReport:
     """Every schema, registry, or placement violation in one session's files."""
     problems: list[str] = []
     warnings: list[str] = []
-    event_schema, session_schema, segment_schema = (schema.load(n) for n in ("event", "session", "segment"))
+    session_schema, segment_schema = schema.load("session"), schema.load("segment")
     indices = handle.paths.segment_indices()
     logs = [(handle.paths.lifecycle, ev.LIFECYCLE, None)] + [
         (handle.paths.segment(i).events, ev.ACTIVITY, i) for i in indices
     ]
     for log, log_kind, seg in logs:
         read = read_jsonl(log)
-        if read.skipped:
-            warnings.append(f"{log}: {read.skipped} unparseable line(s) (crash debris; readers skip them)")
+        torn, corrupt = _unparseable_lines(log)
+        if torn:
+            warnings.append(f"{log}: {torn} torn line(s) (crash debris; readers skip them)")
+        if corrupt:
+            problems.append(f"{log}: {corrupt} corrupt line(s) (not a JSON object, not a torn write)")
         for n, record in enumerate(read.records, 1):
             verdict = ev.classify(record)
             if verdict == "unknown":
                 continue  # newer envelope or kind: not ours to judge
-            envelope = schema.validate(record, event_schema)
+            envelope = ev.envelope_errors(record)
             problems.extend(f"{log} record {n}: {err}" for err in envelope)
             if envelope:
                 continue
@@ -91,6 +95,35 @@ def check_session(handle: SessionHandle) -> CheckReport:
             continue
         problems.extend(f"{path}: {err}" for err in schema.validate(obj, target_schema))
     return CheckReport(problems=problems, warnings=warnings)
+
+
+def _unparseable_lines(log: Path) -> tuple[int, int]:
+    """``(torn, corrupt)`` counts of lines readers skip as unparseable.
+
+    Torn: a fragment that starts like a JSON object but doesn't parse — what a
+    writer killed mid-append leaves. Corrupt: anything else that isn't a JSON
+    object (garbage, invalid UTF-8, ``[]``, ``5``) — no store writer produces those.
+    """
+    torn = corrupt = 0
+    try:
+        raw = log.read_bytes()
+    except FileNotFoundError:
+        return 0, 0
+    for line in raw.split(b"\n"):
+        if not line.strip():
+            continue
+        try:
+            if isinstance(json.loads(line.decode("utf-8")), dict):
+                continue
+            corrupt += 1
+        except UnicodeDecodeError:
+            corrupt += 1
+        except json.JSONDecodeError:
+            if line.lstrip().startswith(b"{"):
+                torn += 1
+            else:
+                corrupt += 1
+    return torn, corrupt
 
 
 def main(argv: list[str] | None = None) -> int:

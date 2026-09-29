@@ -73,6 +73,16 @@ def opened(store: SessionStore, sid: str = "sess-1"):
     return handle
 
 
+def prompt(handle, seg: int | None = None) -> dict:
+    """Append one minimal prompt.submitted (to the current segment when ``seg`` is None)."""
+    return handle.append("prompt.submitted", {"prompt_id": None, "chars": 1}, seg=seg)
+
+
+def reopen(handle, transcript_path: str = "/t.jsonl") -> dict:
+    """Record a resume of ``handle``'s session."""
+    return handle.open_session("resume", actor=ACTOR, origin=ORIGIN, transcript_path=transcript_path)
+
+
 def load(path: Path) -> dict:
     return json.loads(path.read_text())
 
@@ -263,7 +273,7 @@ class TestStore:
         assert (seg1["status"], seg1["sealed_by"], seg1["transcript"]["range"]) == \
             ("sealed", "compact", {"start": 0, "end": 50})
         h.close_session("other")  # SessionEnd lost its seal, then the session resumes
-        h.open_session("resume", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl")
+        reopen(h, "/t.jsonl")
         h.open_segment("session_open", 80)
         assert load(h.paths.segment(2).segment_json)["sealed_by"] == "resume"
         assert load(h.paths.session_json)["segments"]["open"] == 3
@@ -272,23 +282,67 @@ class TestStore:
         h = opened(store)
         h.open_segment("session_open", 0)
         h.seal_segment(10, "precompact", trigger="manual")  # a blocked compaction: sealed, still current
-        h.append("prompt.submitted", {"prompt_id": None, "chars": 1}, seg=1)
+        prompt(h, seg=1)
         h.seal_segment(30, "precompact", trigger="manual")  # the next PreCompact re-seals later
         h.open_segment("compact", 30)
         with pytest.raises(StoreError, match="superseded"):
-            h.append("prompt.submitted", {"prompt_id": None, "chars": 1}, seg=1)
+            prompt(h, seg=1)
         h.close_session("other")
         with pytest.raises(StoreError, match="closed"):
-            h.append("prompt.submitted", {"prompt_id": None, "chars": 1}, seg=2)
+            prompt(h, seg=2)
         assert load(h.paths.segment(1).segment_json)["counts"]["prompts"] == 1
+
+    def test_a_resume_onto_a_new_transcript_seals_the_predecessor_at_the_old_files_end(self, store, tmp_path):
+        old, new = tmp_path / "old.jsonl", tmp_path / "new.jsonl"
+        old.write_bytes(b"x" * 200)
+        new.write_bytes(b"")
+        h = store.session("sess-1")
+        h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path=str(old))
+        h.open_segment("session_open", 40)
+        reopen(h, str(new))  # SessionEnd was lost; the resume writes a fresh transcript
+        h.open_segment("session_open", 0)
+        seg1 = load(h.paths.segment(1).segment_json)
+        assert (seg1["transcript"]["path"], seg1["transcript"]["range"]) == (str(old), {"start": 40, "end": 200})
+
+    def test_unknown_kind_is_an_event_error(self, store):
+        with pytest.raises(ev.EventError, match="unknown event kind"):
+            opened(store).append("no.such.kind", {})
+
+    def test_a_tagged_but_malformed_projection_is_healed_not_trusted(self, store):
+        h = opened(store)
+        h.open_segment("session_open", 0)
+        h.paths.session_json.write_text(json.dumps({"schema": "claudna.session/1"}))
+        prompt(h)
+        assert schema.validate(load(h.paths.session_json), schema.load("session")) == []
+
+    def test_activity_after_a_lost_lifecycle_refresh_heals_the_segment_first(self, store):
+        h = opened(store)
+        h.open_segment("session_open", 0)
+        append_jsonl(h.paths.lifecycle, ev.make_event("segment.sealed", h.sid,
+                                                       {"end": 100, "sealed_by": "precompact", "trigger": "auto"}, seg=1))
+        prompt(h)  # a blocked compaction: sealed, still current
+        seg1 = load(h.paths.segment(1).segment_json)
+        assert (seg1["status"], seg1["counts"]["prompts"]) == ("sealed", 1)
+
+    def test_numbering_skips_indices_named_by_lines_readers_skip(self, store):
+        h = opened(store)
+        h.open_segment("session_open", 0)
+        future = {**ev.make_event("segment.opened", h.sid, {"opened_by": "compact", "start": 5}, seg=1), "v": 2, "seg": 5}
+        append_jsonl(h.paths.lifecycle, future)
+        append_jsonl(h.paths.lifecycle, {**future, "v": 1, "kind": "segment.teleported", "seg": 7})
+        assert h.open_segment("compact", 10) == 8
+
+    def test_explicit_roots_must_be_absolute(self):
+        with pytest.raises(ValueError, match="absolute"):
+            SessionStore(Path("relative/store"))
 
     def test_segment_scoped_appends_without_seg_go_to_the_current_segment(self, store):
         h = opened(store)
         with pytest.raises(StoreError):
-            h.append("prompt.submitted", {"prompt_id": None, "chars": 1})
+            prompt(h)
         h.open_segment("session_open", 0)
         h.open_segment("compact", 5)
-        assert h.append("prompt.submitted", {"prompt_id": None, "chars": 1})["seg"] == 2
+        assert prompt(h)["seg"] == 2
 
     def test_a_seal_cannot_end_before_its_segment_starts(self, store):
         h = opened(store)
@@ -302,7 +356,7 @@ class TestStore:
         h.open_segment("session_open", 0)
         h.seal_segment(10, "session_end")
         h.close_session("other")
-        h.open_session("resume", actor=ACTOR, origin=ORIGIN, transcript_path="/t2.jsonl")
+        reopen(h, "/t2.jsonl")
         h.open_segment("session_open", 0)
         assert load(h.paths.segment(1).segment_json)["transcript"]["path"] == "/t.jsonl"
         assert load(h.paths.segment(2).segment_json)["transcript"]["path"] == "/t2.jsonl"
@@ -315,7 +369,7 @@ class TestStore:
     def test_activity_requires_an_existing_segment(self, store):
         h = opened(store)
         with pytest.raises(StoreError):
-            h.append("prompt.submitted", {"prompt_id": None, "chars": 1}, seg=1)
+            prompt(h, seg=1)
 
     def test_seal_without_a_segment_is_an_error(self, store):
         with pytest.raises(StoreError):
@@ -350,7 +404,7 @@ class TestStore:
     def test_resume_reopens_a_closed_session(self, store):
         h = opened(store)
         h.close_session("other")
-        h.open_session("resume", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl")
+        reopen(h, "/t.jsonl")
         s = load(h.paths.session_json)
         assert (s["status"], s["closed_at"], s["opened_by"]) == ("open", None, "startup")
 
@@ -435,7 +489,7 @@ class TestStore:
         h.close_session("other")
         for i in (1, 2, 3):
             shutil.rmtree(h.paths.segment(i).dir)
-        h.open_session("resume", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl")
+        reopen(h, "/t.jsonl")
         new = h.open_segment("session_open", 400)
         seg = load(h.paths.segment(new).segment_json)
         assert new == 4 and seg["status"] == "open"
@@ -515,11 +569,11 @@ class TestProjection:
     def test_activity_fast_path_falls_back_when_the_projection_is_stale(self, store):
         h = opened(store)
         seg = h.open_segment("session_open", 0)
-        h.append("prompt.submitted", {"prompt_id": None, "chars": 1}, seg=seg)
+        prompt(h, seg=seg)
         # a second writer appended behind the projection's back
         append_jsonl(h.paths.segment(seg).events, ev.make_event("prompt.submitted", h.sid,
                                                                 {"prompt_id": None, "chars": 1}, seg=seg))
-        h.append("prompt.submitted", {"prompt_id": None, "chars": 1}, seg=seg)
+        prompt(h, seg=seg)
         assert load(h.paths.segment(seg).segment_json)["counts"]["prompts"] == 3
 
     def test_refresh_falls_back_to_rebuild_when_a_projection_is_damaged(self, store):
@@ -605,7 +659,12 @@ class TestSchemas:
         assert schema.validate("2026-09-28T17:04:05.123Z", ts) == []
         assert schema.validate("2026-09-28T17:04:05.123Z\n", ts) != []  # $ is end-of-string
         assert schema.validate("\u0662026-09-28T17:04:05.123Z", ts) != []  # \d is ASCII
-        assert schema.validate("x$", {"pattern": "\\$$"}) == []  # an escaped $ stays literal
+        assert schema.validate("xax", {"pattern": "a"}) == []  # unanchored patterns search
+        alternation = {"pattern": "^a$|^b$"}
+        assert schema.validate("b", alternation) == [] and schema.validate("b\n", alternation) != []
+        assert schema.validate("a\\", {"pattern": "^a\\\\$"}) == []  # escaped backslash, then the anchor
+        assert schema.validate("a$", {"pattern": "^a\\$$"}) == []  # escaped $ is literal
+        assert schema.validate("$", {"pattern": "^[$]$"}) == []  # $ in a class is literal
 
     def test_unsupported_keyword_raises_instead_of_silently_passing(self):
         with pytest.raises(schema.SchemaError):
@@ -691,6 +750,19 @@ class TestCli:
         run_cli("rebuild", FIXTURE_SID, "--root", str(root))
         result = run_cli("check", FIXTURE_SID, "--root", str(root))
         assert result.returncode == 0 and "warning:" in result.stdout and "crash debris" in result.stdout
+
+    @pytest.mark.parametrize("line", ["garbage", "[]", "5"])
+    def test_corrupt_lines_fail_check(self, tmp_path, line):
+        root = _copy_fixture(tmp_path)
+        run_cli("rebuild", FIXTURE_SID, "--root", str(root))
+        with session_paths(FIXTURE_SID, root).lifecycle.open("a") as fh:
+            fh.write(line + "\n")
+        result = run_cli("check", FIXTURE_SID, "--root", str(root))
+        assert result.returncode == 1 and "corrupt" in result.stdout
+
+    def test_relative_root_is_a_clean_error(self):
+        result = run_cli("check", "sess-1", "--root", "relative/store")
+        assert result.returncode == 1 and "absolute" in result.stderr and "Traceback" not in result.stderr
 
     def test_usage_error_exits_2(self):
         assert run_cli("frobnicate").returncode == 2
