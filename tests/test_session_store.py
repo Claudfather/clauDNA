@@ -766,3 +766,177 @@ class TestCli:
 
     def test_usage_error_exits_2(self):
         assert run_cli("frobnicate").returncode == 2
+
+
+# ── review follow-ups: a rejected call changes nothing; writers strict about keys ─
+
+
+class TestARejectedCallChangesNothing:
+    def test_a_rejected_open_segment_leaves_the_session_as_it_was(self, store):
+        for n, args in enumerate([("bogus", 5), ("compact", -5), ("compact", "5")]):
+            h = opened(store, f"s{n}")
+            h.open_segment("session_open", 0)
+            before = (h.paths.lifecycle.read_bytes(), h.paths.segment_indices())
+            with pytest.raises(ev.EventError):
+                h.open_segment(*args)
+            assert (h.paths.lifecycle.read_bytes(), h.paths.segment_indices()) == before, args
+
+    def test_a_rejected_first_open_segment_creates_no_directory(self, store):
+        h = opened(store)
+        with pytest.raises(ev.EventError):
+            h.open_segment("bogus", 0)
+        assert h.paths.segment_indices() == []
+
+
+class TestWritersAreStrictAboutDataKeys:
+    def test_a_key_the_registry_does_not_name_is_rejected(self):
+        with pytest.raises(ev.EventError, match="not a field"):
+            ev.make_event("prompt.submitted", "s1", {"prompt_id": None, "chars": 1, "prompt": "whole prompt"}, seg=1)
+
+    def test_readers_still_fold_an_event_that_carries_a_newer_field(self):
+        e = ev.make_event("prompt.submitted", "s1", {"prompt_id": None, "chars": 1}, seg=1)
+        e["data"]["future_field"] = 1
+        assert ev.classify(e) == "ok"
+
+    def test_a_failure_signature_is_capped(self):
+        e = ev.make_event("tool.failed", "s1", {"tool": "Bash", "signature": "x" * 50_000, "exit_code": 1,
+                                                "command": None, "error": None}, seg=1)
+        assert len(e["data"]["signature"]) == ev.REGISTRY["tool.failed"].caps["signature"]
+
+    def test_fork_is_a_session_source(self, store):
+        h = store.session("forked")
+        h.open_session("fork", actor=ACTOR, origin=ORIGIN, transcript_path="/f.jsonl", parent_sid="sess-1")
+        assert load(h.paths.session_json)["opened_by"] == "fork"
+
+
+class TestCheckSeesALostRefresh:
+    def test_a_projection_behind_its_log_warns_until_the_next_write_heals_it(self, store):
+        h = opened(store)
+        seg = h.open_segment("session_open", 0)
+        append_jsonl(h.paths.lifecycle, ev.make_event("segment.sealed", h.sid,  # a hook killed before its refresh
+                                                       {"end": 100, "sealed_by": "precompact", "trigger": "auto"}, seg=seg))
+        report = check_session(h)
+        assert report.problems == [] and any("refresh was lost" in w for w in report.warnings)
+        prompt(h)  # activity heals the stale lifecycle projections first
+        assert check_session(h).warnings == []
+        assert load(h.paths.segment(seg).segment_json)["status"] == "sealed"
+
+    def test_a_healthy_store_never_warns(self, store):
+        h = opened(store)
+        h.open_segment("session_open", 0)
+        prompt(h)
+        h.seal_segment(10, "session_end")
+        h.close_session("other")
+        assert check_session(h).warnings == []
+
+    def test_the_golden_fixture_checks_clean_after_a_rebuild(self, tmp_path):
+        root = _copy_fixture(tmp_path)
+        SessionStore(root).session(FIXTURE_SID).rebuild()
+        assert check_session(SessionStore(root).session(FIXTURE_SID)).warnings == []
+
+
+# ── pins for guarantees nothing else holds (each kills a surviving mutant) ────
+
+import contextlib  # noqa: E402
+import fcntl  # noqa: E402
+
+import claudna.session_store.store as store_module  # noqa: E402
+
+
+class TestPinsForUnheldGuarantees:
+    def test_the_lock_excludes_a_second_holder_until_it_is_released(self, tmp_path):
+        lock = tmp_path / ".lock"
+        with exclusive_lock(lock):
+            fd = os.open(lock, os.O_RDWR)
+            try:
+                with pytest.raises(BlockingIOError):
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            finally:
+                os.close(fd)
+        fd = os.open(lock, os.O_RDWR)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)  # released: this must not raise
+        finally:
+            os.close(fd)
+
+    def test_every_mutation_takes_the_session_lock(self, store, monkeypatch):
+        taken = []
+        real = store_module.exclusive_lock
+
+        def spy(path):
+            taken.append(path.name)
+            with real(path):
+                yield
+
+        monkeypatch.setattr(store_module, "exclusive_lock", contextlib.contextmanager(spy))
+        h = opened(store)
+        h.open_segment("session_open", 0)
+        prompt(h)
+        h.seal_segment(5, "precompact")
+        h.close_session("other")
+        h.rebuild()
+        assert taken == [h.paths.lock.name] * 6
+
+    def test_the_store_validates_the_session_id_before_it_builds_a_path(self, store):
+        for sid in ("../escape", "a/b", ".hidden", ""):
+            with pytest.raises(InvalidSessionId):
+                store.session(sid)
+
+    def test_the_activity_fast_path_output_equals_a_full_rebuild(self, store):
+        h = opened(store)
+        seg = h.open_segment("session_open", 0)
+        for i in range(3):
+            h.append("prompt.submitted", {"prompt_id": f"p{i}", "chars": i})
+        h.append("skill.invoked", {"skill": "claudna:ship", "args_chars": 0})
+        h.append("tool.failed", {"tool": "Bash", "signature": "s", "exit_code": 1, "command": None, "error": None})
+        path = h.paths.segment(seg).segment_json
+        incremental = path.read_text()  # no lifecycle event since: this is the fast path's own output
+        h.rebuild()
+        assert path.read_text() == incremental
+
+    def test_the_directory_form_needs_no_pythonpath_and_ignores_the_cwd(self, tmp_path):
+        root = _copy_fixture(tmp_path)
+        project = tmp_path / "project"
+        project.mkdir()
+        (project / "json.py").write_text("raise ImportError('the project shadowed the stdlib')\n")
+        env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+        run = subprocess.run([sys.executable, str(STORE_PKG), "rebuild", FIXTURE_SID, "--root", str(root)],
+                             capture_output=True, text=True, env=env, cwd=project)
+        assert run.returncode == 0, run.stderr
+
+    def test_log_appends_are_fsynced(self, tmp_path, monkeypatch):
+        synced = []
+        real = os.fsync
+        monkeypatch.setattr(os, "fsync", lambda fd: synced.append(fd) or real(fd))
+        append_jsonl(tmp_path / "l.jsonl", {"k": 1})
+        assert len(synced) == 1
+
+    def test_a_short_write_is_finished(self, tmp_path):
+        log = tmp_path / "l.jsonl"
+        real = os.write
+        with pytest.MonkeyPatch.context() as m:
+            m.setattr(os, "write", lambda fd, data: real(fd, bytes(data)[:4]))  # every write takes at most 4 bytes
+            append_jsonl(log, {"k": "v" * 50})
+        assert read_jsonl(log).records == [{"k": "v" * 50}]
+
+    def test_check_validates_projections_against_their_schemas(self, tmp_path):
+        root = _copy_fixture(tmp_path)
+        run_cli("rebuild", FIXTURE_SID, "--root", str(root))
+        seg = session_paths(FIXTURE_SID, root).segment(1).segment_json
+        doc = json.loads(seg.read_text())
+        doc["status"] = "half-open"
+        seg.write_text(json.dumps(doc))
+        result = run_cli("check", FIXTURE_SID, "--root", str(root))
+        assert result.returncode == 1 and "status" in result.stdout
+
+    def test_open_session_records_its_lineage_arguments(self, store):
+        h = store.session("child")
+        h.open_session("clear", actor=ACTOR, origin=ORIGIN, transcript_path=None, parent_sid="parent", chain_id="root")
+        s = load(h.paths.session_json)
+        assert (s["parent_sid"], s["chain_id"]) == ("parent", "root")
+
+    def test_seal_segment_records_the_content_hash(self, store):
+        h = opened(store)
+        h.open_segment("session_open", 0)
+        h.seal_segment(10, "precompact", sha256="ab" * 32)
+        assert load(h.paths.segment(1).segment_json)["transcript"]["sha256"] == "ab" * 32

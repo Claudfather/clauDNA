@@ -164,6 +164,8 @@ class SessionHandle:
           directories and every ``segment.opened`` in the log — so a segment
           deleted by retention never has its index (and its old lifecycle
           events) inherited by a new one;
+        * a rejected call changes nothing: arguments are validated before the
+          predecessor is sealed or a directory is made;
         * an unsealed predecessor is sealed first, ``sealed_by`` ``"compact"``
           or ``"resume"`` — a missed PreCompact or a lost SessionEnd can't leave
           two open. Its end is this segment's start when both share a
@@ -171,6 +173,7 @@ class SessionHandle:
           start means nothing in the old file, so the end is the old
           transcript's size (never before the predecessor's own start).
         """
+        ev.check_data("segment.opened", {"opened_by": opened_by, "start": start})  # before any side effect
         with self._locked():
             lifecycle = load_lifecycle(self.paths).events
             previous = self.current_segment()

@@ -32,7 +32,7 @@ Rules:
 1. **A fact is recorded once, by whoever observes it first-hand.** The plane's `bot-vitals.sh` already records every tool call (`tool_call`), so the store records **no generic tool-call event**. It records only what the plane lacks: `tool.failed` (vitals hooks PostToolUse, not failures — a gap today), `skill.invoked`, prompt metadata, and segment boundaries. Interactive sessions have no plane, which is why the store stands alone.
 2. **Neither side writes the other's storage.** clauDNA never touches `plane.db`; the plane never parses the store's files. Claudlobby consumes `session export` like Claudron does (a `consumers.json` entry) and joins on `sess_<sha256(sid)[:32]>`.
 3. **Claudlobby owns per-bot config; clauDNA reads it.** `CLAUDNA_STATE_DIR` (per bot, e.g. `$BOT_DIR/data/claudna`), `CLAUDNA_SESSION_SUMMARY`, and identity env (`FLEET_NAME`, `BOT_ID`).
-4. **Run siloed, then consolidate.** Claudlobby's `transcript-digest.sh` (a SessionEnd `claude -p` digest using capture's rubric) overlaps this spec's summarizer. For an observation period both run, siloed, on a small set of bots; one owner is then chosen on evidence (quality, cost, coverage including the skipped rows the plane's monitor needs). Tracked in [Claudlobby#1961](https://github.com/Claudfather/Claudlobby/issues/1961), which also covers the digest child's missing isolation.
+4. **Run siloed, then consolidate.** Claudlobby's `transcript-digest.sh` (a SessionEnd `claude -p` digest using capture's rubric) overlaps this spec's summarizer. For an observation period both run, siloed, on a small set of bots; one owner is then chosen on evidence (quality, cost, coverage including the skipped rows the plane's monitor needs). The comparison is **pre-registered before the observation period starts** — the session battery, the version pins of both paths, the metrics and their thresholds, and the stopping rule are written down first — so the result can't be read either way after the fact. Pre-registration is a phase 2 exit criterion. Tracked in [Claudlobby#1961](https://github.com/Claudfather/Claudlobby/issues/1961), which also covers the digest child's missing isolation.
 
 **Prior art, used as concept reference only:** other session-capture and "AI brain" projects — per-session dirs, failure logs, a detached `claude -p` summarizer, raw-inbox → wiki promotion. This design takes the *concepts* and rebuilds from first principles; nothing is ported. Their observed failure modes shape §7.2 and §12 (see §1.2).
 
@@ -89,7 +89,7 @@ Not yet verified (open, §11): that PreCompact's transcript byte offset lines up
 
 | Unit | Identity | Opened by | Closed by |
 |---|---|---|---|
-| **Session** | Claude Code `session_id` | SessionStart `startup` \| `clear` \| `resume` | SessionEnd (any reason) |
+| **Session** | Claude Code `session_id` | SessionStart `startup` \| `clear` \| `resume` \| `fork` | SessionEnd (any reason) |
 | **Segment** | `(session_id, index)`, index 1-based | session open; SessionStart `compact` | next compact; session close |
 
 A segment is a contiguous byte range of the session's transcript. A session with no compactions has exactly one segment. **The segment is the unit** — summaries, harvest cursors, export items, and vault evidence all address it by its canonical ref `<sid>:<seg>` (e.g. `3fbb…:2`).
@@ -109,6 +109,7 @@ Identity hierarchy, each level stable across a different boundary:
 |---|---|
 | SessionStart `startup` / `resume` | `session.opened` (resume: reopen existing dir, open a new segment); `segment.opened`. If the previous segment is unsealed (a lost SessionEnd), `open_segment` seals it first at the new start, `sealed_by: "resume"`. |
 | SessionStart `clear` | `session.opened` with `parent_sid` from the clear link (§4.3); `segment.opened` |
+| SessionStart `fork` | `session.opened` for the new session id (`--fork-session`, `/fork`, `/branch`; Claude Code before v2.1.214 reported these as `resume`); `segment.opened`. Lineage to the source session is a phase 3 canary. |
 | UserPromptSubmit | `prompt.submitted` (segment events) |
 | PostToolUse (Skill) | `skill.invoked` |
 | PostToolUseFailure | `tool.failed` (failing calls fire this event, not PostToolUse, and only it carries the error field) |
@@ -128,7 +129,7 @@ Worker identity across a chain of sessions is `(actor.fleet, actor.bot_id)`. Cle
 
 ### 4.4 Hook stacking — a new role, not a contested one
 
-#203 ruled that SessionEnd is Claudron's (`R-sync`) and "clauDNA adds no SessionEnd hook". The rule's purpose was that no role is duplicated. Claude Code fires every registered hook for an event, so co-registration is mechanically fine; what matters is roles. This spec adds a fifth role to Claudron's session-loop table rather than contesting one:
+#203 ruled that SessionEnd is Claudron's (`R-sync`) and "clauDNA adds no SessionEnd hook". The rule's purpose was that no role is duplicated. Claude Code fires every registered hook for an event, so co-registration is mechanically fine; what matters is roles. This spec adds a clauDNA-local role rather than contesting one of Claudron's. `R-record` is **not** a row in Claudron's session-loop table (`docs/CLI_CONTRACT.md`, "The four roles", held by a doc-parity gate): that table lists the roles that touch the knowledge layer, and `R-record` never does (invariant 1). So the table, its heading and its parity test stay as they are; what changes is clauDNA's own #203 rule (§11.7).
 
 | Role | Content class | Owner | Events |
 |---|---|---|---|
@@ -139,7 +140,7 @@ Worker identity across a chain of sessions is `(actor.fleet, actor.bot_id)`. Cle
 1. **Never touches the vault or git.** No `claudron` call, no sync, no capture from any store hook — so there is no race with Claudron's bounded `sync --push` at SessionEnd. Claudron reaches the store only by pulling through `session export`, on its own schedule.
 2. **Never prompts, never blocks, emits no stdout.** The store's PreCompact handler is separate from `precompact-reflect.sh` (which holds `R-capture-prompt`) and only records a seal.
 3. **Returns in < 100 ms.** Anything heavier (the summarizer) detaches. Claude Code does not reliably wait for SessionEnd hooks, so a slow hook is a lost one.
-4. **Silent in children.** Exits 0 immediately under `CLAUDNA_SESSION_CHILD=1` (and Claudlobby's child marker), so no `claude -p` child records into — or summarizes — its parent.
+4. **Silent in children.** Exits 0 immediately under `CLAUDNA_SESSION_CHILD=1` (and Claudlobby's child marker once one ships — `CLAUDLOBBY_HOOK_CHILD` is proposed in [Claudlobby#1961](https://github.com/Claudfather/Claudlobby/issues/1961); none exists today), so no `claude -p` child records into — or summarizes — its parent.
 
 ## 5. Layout
 
@@ -196,13 +197,13 @@ Every line in every log:
 | `kind` | string | `<noun>.<verb-past>`; the registry below is closed — unknown kinds are skipped, not errors |
 | `sid` | SessionId | |
 | `seg` | SegIndex \| null | null for session-scope events that aren't tied to a segment |
-| `data` | object | per-kind payload |
+| `data` | object | per-kind payload. Writers reject a key the registry doesn't name (so text caps, and later redaction, can't be bypassed); readers fold an extra key, so an older reader still reads a newer writer's log |
 
 **Lifecycle kinds** (`lifecycle.jsonl`):
 
 | kind | data |
 |---|---|
-| `session.opened` | `{ source: "startup"\|"clear"\|"resume", parent_sid: SessionId\|null, chain_id: SessionId, actor: Actor, origin: Origin, transcript_path: string\|null }` |
+| `session.opened` | `{ source: "startup"\|"clear"\|"resume"\|"fork", parent_sid: SessionId\|null, chain_id: SessionId, actor: Actor, origin: Origin, transcript_path: string\|null }` |
 | `session.child_linked` | `{ child_sid: SessionId }` |
 | `session.privacy_set` | `{ private: bool, by: "user"\|"policy" }` |
 | `segment.opened` | `{ opened_by: "session_open"\|"compact", start: int }` |
@@ -248,7 +249,7 @@ Every line in every log:
 }
 ```
 
-`status`: `open` → `closed`. `segments.open` is the open segment's index or `null`. `projected_from` is a watermark: `session.json` carries the lifecycle log's (lines, bytes, skipped), each `segment.json` its activity log's. Before re-folding, a write compares the watermark with the log's size before its append; a mismatch means an earlier refresh never ran (a killed hook), and the store rebuilds.
+`status`: `open` → `closed`. `segments.open` is the open segment's index or `null`. `projected_from` is a watermark: `session.json` carries the lifecycle log's (lines, bytes, skipped), each `segment.json` its activity log's. Before re-folding, a write compares the watermark with the log's size before its append; a mismatch means an earlier refresh never ran (a killed hook), and the store rebuilds. Every write checks `session.json` against the lifecycle log — activity appends included — so a lost lifecycle refresh is healed by the next write to either log; a lost activity refresh is healed by the next activity append. Until a write comes, `check` reports each projection whose watermark lags its log as a warning.
 
 ### 6.5 `segment.json` — projection
 
@@ -307,7 +308,7 @@ The one LLM-authored file. Written atomically by the summarizer; the matching `s
 }
 ```
 
-- **No durability flag.** Extraction classifies, it never filters; whether a fact matters is decided at harvest with the vault in view. Because segments persist until acked and summaries carry `prompt_version`, extraction is **replayable** — an improved prompt can be re-run over history.
+- **No durability flag.** Extraction classifies, it never filters; whether a fact matters is decided at harvest with the vault in view. Because segments persist until acked and summaries carry `prompt_version`, extraction is **replayable** — an improved prompt can be re-run over history, for as long as the transcript exists. Claude Code deletes transcripts after `cleanupPeriodDays` (30 by default, the same as §9's cap), so replay and summarizer retries are bounded by the transcript's life; `summary.skipped` gains a reason for a missing transcript when the summarizer ships.
 - **`asserted_by` weights, it doesn't gate.** A user-stated fact is trusted more than an agent's inference; neither is dropped.
 - **`open`** marks open threads (follow-ups with an optional `due`) that a later segment can resolve.
 - **`procedures`** are agent-executable how-tos. They are not vault material — they route back to clauDNA as skill-improvement proposals.
@@ -367,7 +368,7 @@ A pure function of `(segment range, prior rollup) → segment summary`, run out 
 
 ### 7.2 Harvest — from session store to vault
 
-Harvest is the librarian: it turns segment **blocks** into vault notes organized by **subject**. It is judgment (a `claude -p` pass), so it is clauDNA's; Claudron supplies mechanical pipes and never reads transcripts or store files ([Claudron#200](https://github.com/Claudfather/Claudron/issues/200)).
+Harvest is the librarian: it turns segment **blocks** into vault notes organized by **subject**. It is judgment (a `claude -p` pass), so it is clauDNA's; Claudron supplies mechanical pipes and never reads transcripts or store files ([Claudron#200](https://github.com/Claudfather/Claudron/issues/200)). **None of the pipes below ships yet:** Claudron 0.5.3 has no `subjects`, `resolve` or `revert-run` verb and no `--include-drafts`; #200 is an open plan. Until it lands, harvest writes through today's `claudron capture`.
 
 **Pipeline, per unharvested sealed segment:**
 
@@ -424,10 +425,10 @@ Returns an envelope: `{ schema: "claudna.export/1", items: [{ sid, seg, session:
 
 ## 10. Implementation shape
 
-- **Language and location:** stdlib Python ≥ 3.9 (stock macOS `/usr/bin/python3`; CI runs 3.12 — a 3.9 CI leg lands with the first hook, see §11), the package `lib/claudna/session_store/`, called by thin `plugin-hooks/*.sh` wrappers as `python3 -m claudna.session_store` with `PYTHONPATH="${CLAUDE_PLUGIN_ROOT}/lib"`. `lib/` is runtime only — stdlib-only imports, strictly downward layering inside a package, and a single `sys.path` shim at the entry point, each gated by `tests/test_runtime_layout.py` (rules: `lib/CLAUDE.md`). No third-party runtime deps.
+- **Language and location:** stdlib Python ≥ 3.9 (stock macOS `/usr/bin/python3`; CI runs 3.12 — a 3.9 CI leg lands with the first hook, see §11), the package `lib/claudna/session_store/`, called by thin `plugin-hooks/*.sh` wrappers in the directory form, `python3 "${CLAUDE_PLUGIN_ROOT}/lib/claudna/session_store" <verb>`. Not `python3 -m`: hooks run in the user's project, and `-m` puts the current directory first on `sys.path`, so a project's `json.py` would shadow the stdlib (`-P` fixes that only from 3.11, above the floor). The store is POSIX-only (`fcntl`). `lib/` is runtime only — stdlib-only imports, strictly downward layering inside a package, and a single `sys.path` shim at the entry point, each gated by `tests/test_runtime_layout.py` (rules: `lib/CLAUDE.md`). No third-party runtime deps.
 - **Hosts:** the core (`paths`, `fsio`, `events`, `project`, `store`) is host-agnostic; only the hook adapter that maps a host's events onto store events is Claude Code-specific. The Cursor manifest ships no hooks, so on Cursor nothing is recorded — readers and harvest report "no session store on this host" rather than failing. A Cursor adapter can land later without touching the core.
 - **Modules (phase 1):** `paths` (layout, id validation) · `fsio` (private dirs, atomic JSON, JSONL append/read, locks) · `schema` (stdlib JSON Schema subset) · `events` (kind registry) · `project` (log → projections, `rebuild`, `refresh`) · `store` (the write API) · `cli`. Later phases add `boundaries` (hook → action table in §4.2), `summarize` (worker), `readers`, `export`. Each module owns one concern; the hook table is data, not branching.
-- **Validation:** JSON Schemas in `lib/claudna/session_store/schemas/`, checked by `schema.py` — a stdlib JSON Schema subset that raises on any keyword it doesn't implement, so a schema can't silently ask for an unchecked rule. Tests pin a golden fixture byte-for-byte, a rebuild round trip, and incremental-equals-full refresh; drift gates keep the schemas and the registry in step (every kind fits the envelope's kind pattern, projection vocabularies match registry choices, one timestamp pattern everywhere, only supported keywords at every schema node). `python3 -m claudna.session_store check <sid>` runs the same validation on a live store, including placement (each event in the right session, log, and segment).
+- **Validation:** JSON Schemas in `lib/claudna/session_store/schemas/`, checked by `schema.py` — a stdlib JSON Schema subset that raises on any keyword it doesn't implement, so a schema can't silently ask for an unchecked rule. Tests pin a golden fixture byte-for-byte, a rebuild round trip, and incremental-equals-full refresh; drift gates keep the schemas and the registry in step (every kind fits the envelope's kind pattern, projection vocabularies match registry choices, one timestamp pattern everywhere, only supported keywords at every schema node). `check <sid>` runs the same validation on a live store, including placement (each event in the right session, log, and segment).
 - **`telemetry-emit.sh`:** migrates onto `skill.invoked` events; the old path stays as a deprecated alias for one release.
 
 ## 11. Open questions
@@ -440,7 +441,8 @@ Returns an envelope: `{ schema: "claudna.export/1", items: [{ sid, seg, session:
 6. **Claudron pull verb** — Claudron-side work; this spec defines only the door it calls.
 7. **#203 re-ratification** — §4.4 adds a SessionEnd hook, reversing #203's "clauDNA adds no SessionEnd hook" (whose only stated rationale was the role split). Update `SETUP_GUIDE.md` §7.4 with the hooks PR. Claudron's session-loop table needs no amendment: `R-record` owes the knowledge layer nothing.
 8. **Memory homes and tag registry** — Claudron schema work ([Claudron#200](https://github.com/Claudfather/Claudron/issues/200)); block `home` values track it.
-9. **Python floor for hooks** — the store runs unchanged on 3.9 (stock macOS). Phase 2 is the first time a hook depends on Python; it should add a 3.9 CI leg for `tests/test_session_store.py` and `tests/test_runtime_layout.py`, and `lib/CLAUDE.md` should name the floor.
+9. **Python floor for hooks** — the store runs unchanged on 3.9 (stock macOS). Phase 2 is the first time a hook depends on Python; it should add a 3.9 CI leg, and `lib/CLAUDE.md` should name the floor. The leg can't simply run the test suite: the pinned pytest needs ≥ 3.10, and the layout gate uses `sys.stdlib_module_names` (3.10+) — which also means the gate judges imports against the interpreter running it, not the floor (`tomllib` would pass). So the leg exercises the package under a bare 3.9 without pytest (import, the CLI on the golden fixture), and the layout gate gets a floor-aware stdlib list.
+11. **Hook cost on slow storage** — the append fsyncs, and on an SD card that dominates (a reviewer measured median 32 ms, p95 154 ms, worst 3.5 s per append on a loaded Raspberry Pi, where interpreter start plus import alone is ~100 ms). Before wiring, decide the fsync policy (activity counters are derivable; seals are what need durability) and give the SessionEnd entry an explicit `timeout` — SessionEnd hooks share a 1.5 s budget otherwise.
 10. **Skill contract and `lib/`** — `SKILL_CONTRACT.md` §1.1 and its validator know bundled scripts only as `scripts/<name>`. The first skill text that calls `lib/` (the `/claudna:session` readers, or `redact.py`'s move) extends the contract and the validator together.
 
 ## 12. Phasing
@@ -448,7 +450,7 @@ Returns an envelope: `{ schema: "claudna.export/1", items: [{ sid, seg, session:
 The loop closes first; everything else broadens a loop that already works.
 
 1. **Store core** — `store`, `events`, `project`, schemas + fixtures, `rebuild`. No hooks wired.
-2. **Thin vertical slice** — the minimum that proves the loop end to end: SessionStart / PreCompact / SessionEnd boundaries → segment summary with `journey` + `blocks` → harvest plan → one draft note written through Claudron → visible in the recall brief's Unverified block. Ugly is fine; closed is required. Includes the liveness line.
+2. **Thin vertical slice** — the minimum that proves the loop end to end: SessionStart / PreCompact / SessionEnd boundaries → segment summary with `journey` + `blocks` → harvest plan → one draft note written through Claudron (today's `claudron capture` until [Claudron#200](https://github.com/Claudfather/Claudron/issues/200)'s pipes land) → visible in the recall brief's Unverified block. Ugly is fine; closed is required. Includes the liveness line.
 3. **Boundaries, complete** — clear lineage, `chain_id`, child isolation, the unclosed-session flag and `session seal <sid>`. Canaries for §11.3–11.4.
 4. **Activity** — `prompt.submitted`, `skill.invoked`, `tool.failed`; migrate `telemetry-emit.sh`.
 5. **Harvest, complete** — risk tiers, inbox + ambiguous queues, evidence counting, `revert-run`, the promotion digest (`/claudna:capture --review`).

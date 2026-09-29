@@ -13,9 +13,12 @@ value ends up in a projection (``actor``, ``origin``, offsets, hashes), the
 registry constrains it with the projection schema's own fragment, so an event
 ``make_event`` accepts always projects to something ``check`` accepts.
 
-Writers are strict (:func:`make_event` raises on anything malformed). Readers
-are lenient (:func:`classify`): a line from a newer envelope major or an unknown
-kind is *skipped*, not an error, so an older reader never breaks on a newer log.
+Writers are strict (:func:`make_event` raises on anything malformed, including
+a ``data`` key the registry doesn't name — so caps, and later redaction, can't
+be bypassed by a field nobody checks). Readers are lenient (:func:`classify`):
+a line from a newer envelope major or an unknown kind is *skipped*, not an
+error, and an extra ``data`` key folds, so an older reader never breaks on a
+newer log.
 """
 
 from __future__ import annotations
@@ -81,7 +84,7 @@ REGISTRY: dict[str, KindSpec] = {
             "origin": _DICT,
             "transcript_path": _OPT_STR,
         },
-        choices={"source": ("startup", "clear", "resume")},
+        choices={"source": ("startup", "clear", "resume", "fork")},
         constraints={"actor": _SESSION_DEFS["actor_or_null"], "origin": _SESSION_DEFS["origin_or_null"]},
     ),
     "session.child_linked": KindSpec(log=LIFECYCLE, seg=False, fields={"child_sid": _STR}),
@@ -157,7 +160,8 @@ REGISTRY: dict[str, KindSpec] = {
             "command": _OPT_STR,
             "error": _OPT_STR,
         },
-        caps={"command": 300, "error": 800},
+        # signature is a normalized first error line; capped so it can't smuggle stderr in
+        caps={"signature": 200, "command": 300, "error": 800},
     ),
     "checkpoint.noted": KindSpec(log=ACTIVITY, seg=True, fields={"note": _STR}, caps={"note": 1000}),
 }
@@ -171,8 +175,12 @@ def now_ts() -> str:
 _EVENT_SCHEMA = schema.load("event")
 
 
-def data_errors(kind: str, data: object) -> list[str]:
-    """Problems with ``data`` for a *known* ``kind`` (empty list = valid)."""
+def data_errors(kind: str, data: object, *, strict: bool = False) -> list[str]:
+    """Problems with ``data`` for a *known* ``kind`` (empty list = valid).
+
+    ``strict`` (writers only) also rejects keys the registry doesn't name;
+    readers leave it off so a newer writer's extra field still folds.
+    """
     spec = REGISTRY[kind]
     if not isinstance(data, dict):
         return ["data must be an object"]
@@ -194,7 +202,22 @@ def data_errors(kind: str, data: object) -> list[str]:
     for key, fragment in spec.constraints.items():
         if key in data:
             errors.extend(schema.validate(data[key], fragment, path=f"data.{key}"))
+    if strict:
+        errors.extend(f"data.{key} is not a field of {kind}"
+                      for key in data if key not in spec.fields and key not in spec.optional)
     return errors
+
+
+def check_data(kind: str, data: dict) -> None:
+    """Raise :class:`EventError` unless ``data`` is what a writer may record for ``kind``.
+
+    For verbs with side effects before their append (``open_segment`` seals a
+    predecessor and makes a directory): validate first, so a rejected call
+    changes nothing.
+    """
+    problems = data_errors(kind, data, strict=True)
+    if problems:
+        raise EventError(f"{kind}: " + "; ".join(problems))
 
 
 def envelope_errors(obj: object) -> list[str]:
@@ -262,7 +285,7 @@ def make_event(kind: str, sid: str, data: dict, *, seg: int | None = None, ts: s
         raise EventError(f"{kind} is session-scope; seg must be None")
     event = {"v": ENVELOPE_VERSION, "ts": ts or now_ts(), "kind": kind, "sid": sid, "seg": seg,
              "data": cap_text(kind, data)}
-    problems = envelope_errors(event) + data_errors(kind, event["data"])
+    problems = envelope_errors(event) + data_errors(kind, event["data"], strict=True)
     if problems:
         raise EventError(f"{kind}: " + "; ".join(problems))
     return event

@@ -20,7 +20,7 @@
     "origin": { "$ref": "#/$defs/origin_or_null" },
     "transcript_path": { "type": ["string", "null"] },
     "opened_at": { "$ref": "#/$defs/ts_or_null" },
-    "opened_by": { "enum": ["startup", "clear", "resume", null] },
+    "opened_by": { "enum": ["startup", "clear", "resume", "fork", null] },
     "closed_at": { "$ref": "#/$defs/ts_or_null" },
     "close_reason": { "enum": ["clear", "resume", "logout", "prompt_input_exit", "other", null] },
     "segments": {

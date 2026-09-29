@@ -50,7 +50,7 @@ def _handle(args: argparse.Namespace) -> SessionHandle | None:
 
 @dataclasses.dataclass(frozen=True)
 class CheckReport:
-    """``problems`` fail a check; ``warnings`` (crash debris) are reported but don't."""
+    """``problems`` fail a check; ``warnings`` (crash debris, a lost refresh) are reported but don't."""
 
     problems: list[str]
     warnings: list[str]
@@ -65,8 +65,10 @@ def check_session(handle: SessionHandle) -> CheckReport:
     logs = [(handle.paths.lifecycle, ev.LIFECYCLE, None)] + [
         (handle.paths.segment(i).events, ev.ACTIVITY, i) for i in indices
     ]
+    sizes: dict[Path, int] = {}
     for log, log_kind, seg in logs:
         read = read_jsonl(log)
+        sizes[log] = read.bytes
         torn, corrupt = _unparseable_lines(log)
         if torn:
             warnings.append(f"{log}: {torn} torn line(s) (crash debris; readers skip them)")
@@ -85,15 +87,21 @@ def check_session(handle: SessionHandle) -> CheckReport:
                 continue
             problems.extend(f"{log} record {n}: {err}"
                             for err in ev.placement_errors(record, sid=handle.sid, log=log_kind, seg=seg))
-    targets = [(handle.paths.session_json, session_schema)] + [
-        (handle.paths.segment(i).segment_json, segment_schema) for i in indices
+    targets = [(handle.paths.session_json, session_schema, handle.paths.lifecycle)] + [
+        (handle.paths.segment(i).segment_json, segment_schema, handle.paths.segment(i).events) for i in indices
     ]
-    for path, target_schema in targets:
+    for path, target_schema, source in targets:
         obj = read_json(path)
         if obj is None:
             problems.append(f"{path}: missing or unparseable (run rebuild)")
             continue
-        problems.extend(f"{path}: {err}" for err in schema.validate(obj, target_schema))
+        errors = schema.validate(obj, target_schema)
+        problems.extend(f"{path}: {err}" for err in errors)
+        # A projection behind its log means a refresh was lost (a killed hook): the
+        # next write heals it, so it's a warning, not a failure.
+        if not errors and obj["projected_from"]["bytes"] != sizes[source]:
+            warnings.append(f"{path}: covers {obj['projected_from']['bytes']} of {sizes[source]} bytes of "
+                            f"{source.name} (a refresh was lost; the next write or a rebuild heals it)")
     return CheckReport(problems=problems, warnings=warnings)
 
 
