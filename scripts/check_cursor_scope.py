@@ -27,9 +27,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from skill_checks import cursor_should_exclude, parse_frontmatter
-
-SKIP_DIRS = {"_shared"}
+from skill_checks import SKIP_DIRS, cursor_should_exclude, parse_frontmatter
 
 
 def _declared_cursor_skills(cursor_plugin_dir: Path) -> tuple[set[str] | None, bool, str]:

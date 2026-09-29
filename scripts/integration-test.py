@@ -20,13 +20,12 @@ from pathlib import Path
 
 import yaml
 
+from skill_checks import SKIP_DIRS
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SKILLS_DIR = REPO_ROOT / "skills"
 AGENTS_DIR = REPO_ROOT / "agents"
 SHARED_DIR = SKILLS_DIR / "_shared"
-
-SKIP_DIRS = {"_shared"}
 
 # Skills where reference resolution is not meaningful — e.g., skills that list
 # external filesystem paths to search/delete rather than local supporting files.
