@@ -34,6 +34,29 @@ BODY_MIN = 200
 MEMORY_VALUES = {"none", "user", "project"}
 
 
+# --- agent memory-scope rule (advisory: broad grants on agents) -------------
+# An agent that can run shell (Bash in tools) acts on whatever it reads, and
+# production logs / query results are attacker-influenceable. User-scoped
+# (global) memory persists a followed injection across every project, not just
+# the session it appeared in. So a Bash-capable agent must use memory: project
+# or memory: none, never memory: user.
+
+def check_agent_memory_scope(fm: dict) -> list[str]:
+    """Reject user-scoped memory on an agent that can run shell.
+
+    Returns error strings (empty = clean).
+    """
+    tools = fm.get("tools")
+    has_bash = isinstance(tools, list) and "Bash" in tools
+    if has_bash and fm.get("memory") == "user":
+        return [
+            "memory: an agent with Bash must not use user-scoped memory "
+            "(a followed injection persists across every project); "
+            "use memory: project or memory: none"
+        ]
+    return []
+
+
 def validate_agent(agent_file: Path) -> list[str]:
     """Validate a single agent .md file against the agent contract."""
     errors: list[str] = []
@@ -96,6 +119,9 @@ def validate_agent(agent_file: Path) -> list[str]:
             errors.append(f"memory must be a string, got {type(memory).__name__}")
         elif memory not in MEMORY_VALUES:
             errors.append(f"memory {memory!r} is not a known value (allowed: {sorted(MEMORY_VALUES)})")
+
+    # memory-scope rule (advisory: broad grants on agents)
+    errors.extend(check_agent_memory_scope(fm))
 
     # tools rules
     tools = fm.get("tools")

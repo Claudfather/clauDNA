@@ -20,6 +20,7 @@ KNOWN_FIELDS = REQUIRED_FIELDS | {
     "user-invocable",
     "hosts",
     "requires-context",
+    "disable-model-invocation",
 }
 
 # clauDNA #340: hosts a skill is known to function on, and a special
@@ -913,6 +914,106 @@ def check_allowed_tools_usage(fm: dict, body: str) -> list[str]:
     return warnings
 
 
+
+# --- grant-scope rule (advisory: broad pre-approved command grants) ---------
+# A skill's allowed-tools must not pre-approve a whole command family with a
+# wildcard argument. A wildcard defeats prefix matching, so `Bash(python *)`
+# pre-approves arbitrary code, `Bash(curl *)` arbitrary network, `Bash(rm *)`
+# unbounded deletion, and `Bash(git *)` / `Bash(gh *)` the code-exec and
+# data-egress subcommands (git -c, git config, gh api, gh auth, gh gist, ...).
+# The rule rejects whole-family wildcards and the named dangerous git/gh
+# subcommands, and accepts concrete commands, read-only git/gh subcommands, and
+# ordinary build/test tools (ruff, pytest, eslint, make, ...).
+
+_GRANT_INTERPRETERS = {
+    "python", "python3", "python2", "node", "nodejs", "ruby", "perl",
+    "bash", "sh", "zsh", "deno", "bun", "rscript",
+}
+_GRANT_RUNNERS = {"npx", "npm", "pnpm", "yarn"}
+_GRANT_NETWORK = {"curl", "wget"}
+_GRANT_DESTRUCTIVE = {"rm"}
+_GRANT_VCS = {"git", "gh"}
+_GH_DENY_SUBCMDS = {"api", "auth", "gist", "extension", "alias"}
+_GIT_DENY_SUBCMDS = {"config"}
+_INTERP_INLINE_FLAGS = {"-c", "-e", "--eval", "-"}
+
+
+def _grant_scope_error(entry: str) -> str | None:
+    """Return an error string if this allowed-tools entry is an over-broad
+    command grant, else None. Only Bash(...) entries are examined."""
+    m = re.match(r"^Bash\((.*)\)$", entry.strip())
+    if not m:
+        return None
+    inner = m.group(1).strip()
+    if not inner:
+        return None
+    toks = inner.split()
+    cmd = toks[0]
+    rest = toks[1:]
+    whole_family = (not rest) or rest[0].startswith("*")
+
+    def reject(why: str) -> str:
+        return (
+            f"allowed-tools: {entry!r} pre-approves {why}; grant an exact command "
+            "or a read-only subcommand instead"
+        )
+
+    if cmd in _GRANT_INTERPRETERS:
+        if whole_family or rest[0] in _INTERP_INLINE_FLAGS or rest[0].startswith("-"):
+            return reject(f"arbitrary code via '{cmd}'")
+        return None  # concrete script path
+    if cmd in _GRANT_RUNNERS:
+        if whole_family:
+            return reject(f"arbitrary package execution via '{cmd}'")
+        if cmd == "pnpm" and rest[0] in ("exec", "dlx"):
+            return reject(f"arbitrary package execution via 'pnpm {rest[0]}'")
+        if cmd == "yarn" and rest[0] == "dlx":
+            return reject("arbitrary package execution via 'yarn dlx'")
+        if cmd == "npm" and rest[0] in ("exec", "x"):
+            return reject("arbitrary package execution via 'npm exec'")
+        return None  # named script (npm run test, npx tsc)
+    if cmd in _GRANT_NETWORK:
+        return reject(f"arbitrary network access via '{cmd}'")
+    if cmd in _GRANT_DESTRUCTIVE:
+        if whole_family:
+            return reject(f"unbounded deletion via '{cmd} *'")
+        return None  # bounded path (rm -rf /tmp/heist-*)
+    if cmd in _GRANT_VCS:
+        if whole_family:
+            return reject(f"the whole '{cmd}' command family")
+        if cmd == "git":
+            if "-c" in rest:
+                return reject("arbitrary code via 'git -c'")
+            sub = next((t for t in rest if not t.startswith("-")), "")
+            if sub in _GIT_DENY_SUBCMDS:
+                return reject(f"config mutation via 'git {sub}'")
+        elif cmd == "gh":
+            sub = next((t for t in rest if not t.startswith("-")), "")
+            if sub in _GH_DENY_SUBCMDS:
+                return reject(f"data egress / arbitrary API via 'gh {sub}'")
+        return None
+    return None
+
+
+def check_grant_scope(fm: dict) -> list[str]:
+    """Reject over-broad pre-approved command grants in allowed-tools.
+
+    Returns error strings (empty = clean). A skill that sets
+    disable-model-invocation: true is exempt -- only an explicit user invokes
+    it, so untrusted content cannot trigger it.
+    """
+    if "allowed-tools" not in fm:
+        return []
+    if fm.get("disable-model-invocation") is True:
+        return []
+    errors: list[str] = []
+    for entry in _parse_allowed_tools_entries(fm["allowed-tools"]):
+        err = _grant_scope_error(entry)
+        if err:
+            errors.append(err)
+    return errors
+
+
 #: Claudron CLI verbs, per skills/_shared/claudron-engine.md §2 and Claudron's
 #: own docs/CLI_CONTRACT.md. Used only to recognize an *invocation*; this list
 #: being incomplete makes the check miss a call, never invent one.
@@ -1075,6 +1176,9 @@ def validate_skill_md(skill_md: Path, dir_name: str | None = None) -> list[str]:
     if "allowed-tools" in fm:
         errors.extend(validate_allowed_tools(fm["allowed-tools"]))
 
+    # grant-scope rules (advisory: broad pre-approved command grants)
+    errors.extend(check_grant_scope(fm))
+
     # requires rules
     if "requires" in fm:
         errors.extend(validate_requires(fm["requires"]))
@@ -1088,6 +1192,11 @@ def validate_skill_md(skill_md: Path, dir_name: str | None = None) -> list[str]:
     user_invocable = fm.get("user-invocable")
     if user_invocable is not None and not isinstance(user_invocable, bool):
         errors.append(f"user-invocable must be a boolean, got {type(user_invocable).__name__}")
+
+    # disable-model-invocation rules
+    dmi = fm.get("disable-model-invocation")
+    if dmi is not None and not isinstance(dmi, bool):
+        errors.append(f"disable-model-invocation must be a boolean, got {type(dmi).__name__}")
 
     # hosts rules (#340)
     if "hosts" in fm:

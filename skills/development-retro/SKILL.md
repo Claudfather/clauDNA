@@ -3,7 +3,7 @@ name: development-retro
 user-invocable: true
 description: "Use when a PR has been merged, a development session is ending, or the user asks what else you noticed — surfaces journey-specific observations, systemic patterns, and friction points from the implementation process."
 argument-hint: "[--output github|session]"
-allowed-tools: Bash(git *), Bash(gh *), Read, Glob, Grep
+allowed-tools: Bash(git log *), Bash(git diff *), Bash(git status *), Read, Glob, Grep
 ---
 
 # Development Retro

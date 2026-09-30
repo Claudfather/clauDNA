@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- **Tightened tool grants across skills, agents, and the shipped settings, and made each tightening a validator rule.** A skill's `allowed-tools` no longer pre-approves a whole command family with a wildcard argument — interpreters (`python`, `node`, ...), package runners (`npx`, `pnpm`, `yarn`, `npm`), `curl`, and the broad `git *` / `gh *` — because a wildcard defeats the prefix matcher and pre-approves far more than the skill uses. Each affected skill (`build`, `qa`, `heist`, `session`, `development-retro`, `init-project`, `cleanup-legacy-install`, `skill-scaffold`) now grants the exact commands or read-only subcommands it actually runs; anything else prompts. `scripts/skill_checks.py::check_grant_scope` enforces this in `validate-skills.py`, with `disable-model-invocation: true` as the escape hatch for a user-only skill. A shell-capable agent (`tools:` includes `Bash`) may no longer use user-scoped memory — the `railway-ops`, `modal-ops`, and `vercel-ops` agents move to `memory: project` — enforced by `scripts/validate-agents.py::check_agent_memory_scope`. The project template and the repo's own `.claude/settings.json` ship with narrow allows plus explicit `deny` rules for the code-exec and data-egress verbs (`git config`, `git -c`, `gh auth token`, `gh gist`, `gh extension`, `gh alias`). New tests pin all three: `tests/test_grant_scope.py`, `tests/test_agent_memory_scope.py`, `tests/test_settings_grants.py`.
 
 ## [0.20.0] - 2026-09-29
 ### Added

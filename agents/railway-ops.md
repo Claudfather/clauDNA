@@ -2,7 +2,7 @@
 name: railway-ops
 description: "SRE agent for Railway infrastructure. Diagnoses production issues and analyzes deployments."
 background: true
-memory: user
+memory: project
 model: opus
 tools:
   - Bash

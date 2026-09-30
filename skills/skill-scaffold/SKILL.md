@@ -5,7 +5,7 @@ description: "Use when you want to scaffold a new clauDNA skill directory with c
 requires-context: repo-clone
 argument-hint: "[skill-name]"
 allowed-tools:
-  - Bash(python3 *)
+  - Bash(python3 scripts/validate-skills.py)
   - Bash(ls *)
   - Bash(mkdir *)
   - Read

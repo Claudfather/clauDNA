@@ -3,7 +3,7 @@ name: session
 user-invocable: true
 description: "Use at session boundaries — resume at the start of a new session (read the per-cwd handoff and brief on where to pick up), handoff at the end of a session (write it), checkpoint for a mid-session save without the full ceremony, or name to label the session. Replaces /session-handoff, /session-resume, /name-session."
 argument-hint: "[handoff|resume|name|checkpoint] [--auto]"
-allowed-tools: Bash(git *), Bash(gh *), Bash(ls *), Bash(wc *), Bash(date *), Bash(grep *), Bash(stat *), Bash(mv *), Bash(mkdir *), Read, Write, Edit, Glob
+allowed-tools: Bash(git status *), Bash(git branch *), Bash(git log *), Bash(git rev-parse *), Bash(git remote *), Bash(git stash *), Bash(git worktree *), Bash(git check-ignore *), Bash(gh pr *), Bash(ls *), Bash(wc *), Bash(date *), Bash(grep *), Bash(stat *), Bash(mv *), Bash(mkdir *), Read, Write, Edit, Glob
 ---
 
 # Session

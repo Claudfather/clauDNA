@@ -291,7 +291,7 @@ class TestValidateSkillMdBehavioral:
             "name: test-skill\n"
             'description: "Use when you want to verify a fully compliant skill passes validation."\n'
             'argument-hint: "[--auto] [--output github|session]"\n'
-            "allowed-tools: Bash(git *), Read\n"
+            "allowed-tools: Bash(git diff *), Read\n"
         )
         body = (
             "Run git commands. Read files. See output-guide.md for formatting. "

@@ -4,8 +4,10 @@ user-invocable: true
 description: "Use when you want to raid a GitHub repo for skills, config patterns, or novel approaches worth adopting into clauDNA. For browsing or installing published skills from the open ecosystem, use /claudna:find-skills."
 argument-hint: "[org/repo or GitHub URL]"
 allowed-tools:
-  - Bash(gh *)
-  - Bash(git *)
+  - Bash(gh repo view *)
+  - Bash(git clone *)
+  - Bash(git diff *)
+  - Bash(git log *)
   - Bash(rm -rf /tmp/heist-*)
   - Read
   - Write
