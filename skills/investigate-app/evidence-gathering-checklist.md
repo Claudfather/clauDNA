@@ -20,7 +20,7 @@ Reference for Steps 3-4 of `/claudna:investigate-app`. Each category is gathered
 
 ## C. Database State
 
-If the project keeps a database connection (`.env`, a libpq service, `~/.snowsql/config`), query it read-only. Never Read `.env` for the connection string. Write the SQL to a file with the Write tool first:
+If the project keeps a database connection (`.env`, a libpq service, `~/.snowsql/config`), query it read-only. Never Read `.env` for the connection string. Write the SQL to a file in `<scratch>` (`../_shared/orchestration-guide.md` §1) with the Write tool first:
 
 ```sql
 BEGIN TRANSACTION READ ONLY;

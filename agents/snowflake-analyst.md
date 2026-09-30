@@ -22,7 +22,7 @@ Answer data questions by writing and executing Snowflake queries. Think like a d
 
 ## Connection
 
-Use SnowSQL with key pair auth. The connection comes from `~/.snowsql/config`; never put a credential on the command line. Write every query to a file with the Write tool and pass the file, so the SQL is never parsed as shell:
+Use SnowSQL with key pair auth. The connection comes from `~/.snowsql/config`; never put a credential on the command line. Write every query to a file in a private directory made with `mktemp -d`, with the Write tool, and pass the file, so the SQL is never parsed as shell:
 ```bash
 snowsql -c default -f <sql-file>
 ```

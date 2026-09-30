@@ -1,6 +1,6 @@
 Invoked by /claudna:neon in query mode — do not load this file for any other verb. Pre-flight (psql check, connection discovery) has already run per SKILL.md, and it chose `<PSQL>`, how `psql` reaches the database: a libpq service, a URL handed to psql's environment by `env_from_file.py`, or plain `psql`.
 
-The connection string never appears in a command, in the session, or in any process's argv. Every statement goes in a file written with the Write tool and runs with `-f`, so SQL is never parsed as shell. `-X` skips the user's `.psqlrc`.
+The connection string never appears in a command, in the session, or in any process's argv. Every statement goes in a file in `<scratch>` (`../_shared/orchestration-guide.md` §1), written with the Write tool, and runs with `-f`, so SQL is never parsed as shell. `-X` skips the user's `.psqlrc`.
 
 ## Read-only guard
 
@@ -23,7 +23,7 @@ COMMIT;
 
 ## Running queries
 
-Write the query to `<sql-file>` with the Write tool, then run it:
+Write the query to `<sql-file>` in `<scratch>` with the Write tool, then run it:
 
 ```sql
 BEGIN TRANSACTION READ ONLY;
@@ -111,6 +111,6 @@ COMMIT;
 1. Confirm which environment the target is — production by default, dev only when a `DEV`-named variable or the user's wording says so
 2. **Always wrap production queries in `BEGIN TRANSACTION READ ONLY; ... COMMIT;`**, in the SQL file
 3. Gate mutating SQL per the read-only guard above before running anything
-4. Write the SQL to a file with the Write tool; run `<PSQL> -X -f <sql-file>`
+4. Write the SQL to a file in `<scratch>` with the Write tool; run `<PSQL> -X -f <sql-file>`
 5. Present results clearly (contract §6 report: status, target database, rows returned, any errors). psql's own errors can echo parts of a connection string; scrub output per the contract before quoting it
 6. Offer to refine or expand the query
