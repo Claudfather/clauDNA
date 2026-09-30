@@ -38,35 +38,21 @@ List all environments (production, staging, PR environments, etc.).
 
 ## Step 5: Environment Variables
 
+Its output holds the values, so send it to a file in a private directory (make one with `mktemp -d`; `<scratch>` below) and show only the names:
+
 ```bash
-railway variables list --json
+railway variables list --json > <scratch>/vars.json
 ```
 
-List variable **names only** — never display values. Note any common variables that appear unset.
-
-## Step 6: Resource Metrics (if available)
-
-Attempt to query Railway's GraphQL API for CPU and memory metrics of active services.
-
-First, read the Railway config to get the auth token:
 ```bash
-cat ~/.railway/config.json
+jq 'keys' <scratch>/vars.json
 ```
-Parse the JSON output to extract the value at `.user.token`. If the file doesn't exist or the token field is missing, skip this step and note: "GraphQL metrics unavailable -- token not found in ~/.railway/config.json"
 
-Next, get the project ID:
-```bash
-railway status --json
-```
-Parse the JSON output to extract the `projectId` value.
+Then `rm -r <scratch>`. Never display a value. Note any common variables that appear unset.
 
-Then, query the Railway GraphQL API using the extracted token and project ID (substitute the actual values into the command):
-```bash
-curl -s https://backboard.railway.com/graphql/v2 -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" -d "{\"query\": \"query { project(id: \\\"<PROJECT_ID>\\\") { services { edges { node { id name serviceInstances { edges { node { latestDeployment { id status } } } } } } } } }\"}"
-```
-Parse the JSON response to extract service names, deployment IDs, and statuses.
+## Step 6: Resource Metrics
 
-If the token is missing or any query fails, skip this step and note: "GraphQL metrics unavailable -- token not found in ~/.railway/config.json"
+The Railway CLI reports no CPU or memory figures, and reading them from the API would need the account's token. Do not read `~/.railway/config.json` or send its token: it covers every project on the account. Report metrics as "unavailable from the CLI; see the service's Metrics tab in the Railway dashboard".
 
 ## Step 7: Present Dashboard
 
