@@ -915,92 +915,171 @@ def check_allowed_tools_usage(fm: dict, body: str) -> list[str]:
 
 
 
-# --- grant-scope rule (advisory: broad pre-approved command grants) ---------
-# A skill's allowed-tools must not pre-approve a whole command family with a
-# wildcard argument. A wildcard defeats prefix matching, so `Bash(python *)`
-# pre-approves arbitrary code, `Bash(curl *)` arbitrary network, `Bash(rm *)`
-# unbounded deletion, and `Bash(git *)` / `Bash(gh *)` the code-exec and
-# data-egress subcommands (git -c, git config, gh api, gh auth, gh gist, ...).
-# The rule rejects whole-family wildcards and the named dangerous git/gh
-# subcommands, and accepts concrete commands, read-only git/gh subcommands, and
-# ordinary build/test tools (ruff, pytest, eslint, make, ...).
+# --- grant-scope rule (allowlist) -------------------------------------------
+# A skill's allowed-tools pre-approves commands with no prompt backstop, so this
+# is an ALLOWLIST: a Bash grant is rejected unless it matches a small set of safe
+# shapes. A denylist of command names cannot do the job -- it accepts every
+# spelling it does not enumerate (a bare Bash, an absolute-path or version-
+# suffixed interpreter, a package runner, a global-flag-first git/gh call).
+#
+# Accepted Bash shapes:
+#   * an exact command with no wildcard (author-fixed; cannot be extended by
+#     extended at call time), excluding commands that run project-defined code
+#     even when exact (npm ci, pytest, make, ...);
+#   * an interpreter running a FIXED script path, optionally with a trailing arg
+#     wildcard (the repo's own script, not a free-form command);
+#   * a safe git/gh/claudron SUBCOMMAND (git diff *, gh pr view *);
+#   * a curated set of read-only shell utilities (ls *, cat *, grep *).
+# Non-Bash tools (Read, Write, Edit, WebFetch, Agent, ...) are out of scope here.
+# disable-model-invocation: true exempts a skill, since only an explicit user
+# invokes it -- but that flag stops MODEL invocation of the skill, not content
+# read during a run the user themselves started.
 
+# Interpreters: allowed only to run a fixed script path, never bare / inline / glob.
 _GRANT_INTERPRETERS = {
-    "python", "python3", "python2", "node", "nodejs", "ruby", "perl",
+    "python", "python2", "python3", "node", "nodejs", "ruby", "perl",
     "bash", "sh", "zsh", "deno", "bun", "rscript",
 }
-_GRANT_RUNNERS = {"npx", "npm", "pnpm", "yarn"}
-_GRANT_NETWORK = {"curl", "wget"}
-_GRANT_DESTRUCTIVE = {"rm"}
-_GRANT_VCS = {"git", "gh"}
-_GH_DENY_SUBCMDS = {"api", "auth", "gist", "extension", "alias"}
-_GIT_DENY_SUBCMDS = {"config"}
 _INTERP_INLINE_FLAGS = {"-c", "-e", "--eval", "-"}
+
+# Rejected even as an exact grant: these run project-defined or free-form code,
+# reach the network, or read the environment in a single command. Test runners
+# and build tools run project-defined code (config, recipes), so no command that
+# runs code the working tree controls is pre-approved -- it prompts instead, and
+# the setup guide covers pre-approving these in the user's own settings.
+_GRANT_REJECT_ALWAYS = {
+    "npm", "pnpm", "yarn", "npx", "pip", "pip3", "uv", "uvx", "pipx",
+    "poetry", "bundle", "gem",
+    "make", "cmake", "ninja", "cargo", "go", "gradle", "mvn", "gcc", "cc",
+    "clang", "rustc", "javac",
+    "pytest", "tox", "nox", "jest", "vitest", "mocha", "ava", "cypress",
+    "playwright", "eslint", "prettier", "tsc", "black", "flake8", "isort",
+    "mypy", "ruff", "pylint", "bandit",
+    "curl", "wget", "nc", "ncat", "socat", "ssh", "scp", "sftp", "rsync",
+    "telnet", "ftp",
+    "env", "eval", "exec", "source", "xargs", "sudo", "doas", "nice",
+    "nohup", "timeout", "watch", "script",
+    "docker", "podman", "kubectl", "terraform", "ansible", "aws", "gcloud", "az",
+    "sed", "awk", "find",
+    "printenv", "chmod", "chown", "dd", "rm", "tar", "unzip", "zip", "chattr",
+    "php", "java", "pwsh", "powershell", "osascript", "groovy", "scala",
+    "elixir", "lua", "tclsh", "expect",
+}
+
+# Read-only / non-code-running utilities: safe to pre-approve with arguments.
+_GRANT_SAFE_UTILS = {
+    "ls", "cat", "head", "tail", "wc", "stat", "file", "du", "df", "tree",
+    "diff", "cmp", "grep", "egrep", "fgrep", "rg", "sort", "uniq", "cut",
+    "tr", "comm", "join", "paste", "column", "nl", "fold", "rev", "tac",
+    "mkdir", "rmdir", "mv", "cp", "touch", "date", "echo", "printf",
+    "basename", "dirname", "realpath", "readlink", "pwd", "whoami", "id",
+    "hostname", "uname", "which", "type", "command", "test", "true", "false",
+    "seq", "tee", "jq", "lsof",
+}
+
+# Safe git subcommands: history and worktree only; not config, clone, or a global flag.
+_GRANT_SAFE_GIT_SUB = {
+    "status", "diff", "log", "show", "add", "commit", "branch", "checkout",
+    "switch", "restore", "fetch", "rev-parse", "tag", "mv", "reset", "stash",
+    "worktree", "check-ignore", "describe", "blame", "shortlog", "rev-list",
+    "ls-files", "cat-file", "symbolic-ref", "name-rev", "merge-base",
+    "for-each-ref", "diff-tree",
+}
+_GRANT_GIT_FORCE_FLAGS = {"--force", "-f", "--force-with-lease"}
+
+# Safe gh subcommands: issues and pull requests only; not the api/auth/repo subcommands.
+_GRANT_SAFE_GH_SUB = {"pr", "issue", "label", "search", "browse"}
+
+# Safe claudron subcommands (read-only).
+_GRANT_SAFE_CLAUDRON_SUB = {"status", "doctor", "lookup", "recall"}
+
+
+def _reject_grant(entry: str, why: str) -> str:
+    return (
+        f"allowed-tools: {entry!r} pre-approves {why}; grant an exact command, a "
+        "fixed script path, a read-only git/gh subcommand, or a read-only "
+        "utility instead"
+    )
+
+
+def _grant_interpreter(entry: str, cmd: str, rest: list[str]) -> str | None:
+    if not rest:
+        return _reject_grant(entry, f"a bare '{cmd}' interpreter")
+    first = rest[0]
+    if first in _INTERP_INLINE_FLAGS or first.startswith("-"):
+        return _reject_grant(entry, f"an inline-code flag on '{cmd}'")
+    if "*" in first:
+        return _reject_grant(entry, f"'{cmd}' with a wildcard script path")
+    return None
+
+
+def _grant_git(entry: str, rest: list[str]) -> str | None:
+    if not rest:
+        return _reject_grant(entry, "the whole 'git' command family")
+    sub = rest[0]
+    if sub.startswith("-"):
+        return _reject_grant(entry, f"a git global flag {sub!r}")
+    if sub == "push":
+        if any(f in rest for f in _GRANT_GIT_FORCE_FLAGS):
+            return _reject_grant(entry, "a forced 'git push'")
+        return None
+    if sub in _GRANT_SAFE_GIT_SUB:
+        return None
+    return _reject_grant(entry, f"'git {sub}'")
+
+
+def _grant_sub(entry: str, cmd: str, rest: list[str], safe: set) -> str | None:
+    if not rest:
+        return _reject_grant(entry, f"the whole '{cmd}' command family")
+    sub = rest[0]
+    if sub.startswith("-"):
+        return _reject_grant(entry, f"a {cmd} global flag {sub!r}")
+    if sub in safe:
+        return None
+    return _reject_grant(entry, f"'{cmd} {sub}'")
 
 
 def _grant_scope_error(entry: str) -> str | None:
-    """Return an error string if this allowed-tools entry is an over-broad
-    command grant, else None. Only Bash(...) entries are examined."""
-    m = re.match(r"^Bash\((.*)\)$", entry.strip())
+    """Return an error string if this allowed-tools entry is an over-broad Bash
+    grant, else None. Only Bash(...) entries are examined; other tools are out of
+    scope for this rule."""
+    stripped = entry.strip()
+    if stripped == "Bash":
+        return _reject_grant(entry, "the whole shell")
+    m = re.match(r"^Bash\((.*)\)$", stripped)
     if not m:
         return None
     inner = m.group(1).strip()
-    if not inner:
-        return None
+    if not inner or inner.startswith("*"):
+        return _reject_grant(entry, "the whole shell")
     toks = inner.split()
     cmd = toks[0]
     rest = toks[1:]
-    whole_family = (not rest) or rest[0].startswith("*")
+    has_star = "*" in inner
 
-    def reject(why: str) -> str:
-        return (
-            f"allowed-tools: {entry!r} pre-approves {why}; grant an exact command "
-            "or a read-only subcommand instead"
-        )
-
+    if cmd == "git":
+        return _grant_git(entry, rest)
+    if cmd == "gh":
+        return _grant_sub(entry, "gh", rest, _GRANT_SAFE_GH_SUB)
+    if cmd == "claudron":
+        return _grant_sub(entry, "claudron", rest, _GRANT_SAFE_CLAUDRON_SUB)
     if cmd in _GRANT_INTERPRETERS:
-        if whole_family or rest[0] in _INTERP_INLINE_FLAGS or rest[0].startswith("-"):
-            return reject(f"arbitrary code via '{cmd}'")
-        return None  # concrete script path
-    if cmd in _GRANT_RUNNERS:
-        if whole_family:
-            return reject(f"arbitrary package execution via '{cmd}'")
-        if cmd == "pnpm" and rest[0] in ("exec", "dlx"):
-            return reject(f"arbitrary package execution via 'pnpm {rest[0]}'")
-        if cmd == "yarn" and rest[0] == "dlx":
-            return reject("arbitrary package execution via 'yarn dlx'")
-        if cmd == "npm" and rest[0] in ("exec", "x"):
-            return reject("arbitrary package execution via 'npm exec'")
-        return None  # named script (npm run test, npx tsc)
-    if cmd in _GRANT_NETWORK:
-        return reject(f"arbitrary network access via '{cmd}'")
-    if cmd in _GRANT_DESTRUCTIVE:
-        if whole_family:
-            return reject(f"unbounded deletion via '{cmd} *'")
-        return None  # bounded path (rm -rf /tmp/heist-*)
-    if cmd in _GRANT_VCS:
-        if whole_family:
-            return reject(f"the whole '{cmd}' command family")
-        if cmd == "git":
-            if "-c" in rest:
-                return reject("arbitrary code via 'git -c'")
-            sub = next((t for t in rest if not t.startswith("-")), "")
-            if sub in _GIT_DENY_SUBCMDS:
-                return reject(f"config mutation via 'git {sub}'")
-        elif cmd == "gh":
-            sub = next((t for t in rest if not t.startswith("-")), "")
-            if sub in _GH_DENY_SUBCMDS:
-                return reject(f"data egress / arbitrary API via 'gh {sub}'")
+        return _grant_interpreter(entry, cmd, rest)
+    if cmd in _GRANT_REJECT_ALWAYS:
+        return _reject_grant(entry, f"'{cmd}', which is not an allowed command")
+    if cmd in _GRANT_SAFE_UTILS:
         return None
+    if has_star:
+        return _reject_grant(entry, f"an unbounded wildcard grant of '{cmd}'")
     return None
 
 
 def check_grant_scope(fm: dict) -> list[str]:
     """Reject over-broad pre-approved command grants in allowed-tools.
 
-    Returns error strings (empty = clean). A skill that sets
-    disable-model-invocation: true is exempt -- only an explicit user invokes
-    it, so untrusted content cannot trigger it.
+    An allowlist: a Bash grant is rejected unless it is an exact command, an
+    interpreter running a fixed script, a safe git/gh/claudron subcommand, or a
+    read-only utility. A skill that sets disable-model-invocation: true is exempt.
     """
     if "allowed-tools" not in fm:
         return []
@@ -1009,6 +1088,37 @@ def check_grant_scope(fm: dict) -> list[str]:
     errors: list[str] = []
     for entry in _parse_allowed_tools_entries(fm["allowed-tools"]):
         err = _grant_scope_error(entry)
+        if err:
+            errors.append(err)
+    return errors
+
+
+def normalize_settings_grant(entry: str) -> str:
+    """Convert a settings.json permission entry to skill allowed-tools form so the
+    SAME allowlist predicate governs both surfaces (DRY).
+
+    Settings.json writes ``Bash(cmd:*)`` where ``:*`` means "any arguments";
+    skill allowed-tools writes ``Bash(cmd *)``. Everything else (a bare command,
+    ``Bash(*)``) is already common to both forms.
+    """
+    m = re.match(r"^Bash\((.*)\)$", entry.strip())
+    if not m:
+        return entry.strip()
+    inner = m.group(1)
+    if inner.endswith(":*"):
+        inner = inner[:-2].rstrip() + " *"
+    return f"Bash({inner})"
+
+
+def check_settings_grants(allow_entries: list) -> list[str]:
+    """Apply the grant-scope allowlist to a settings.json ``permissions.allow``
+    list. Returns error strings for any entry outside the allowlist, so a shipped
+    settings file cannot restore a broad pre-approval the skills just dropped."""
+    errors: list[str] = []
+    for entry in allow_entries:
+        if not isinstance(entry, str):
+            continue
+        err = _grant_scope_error(normalize_settings_grant(entry))
         if err:
             errors.append(err)
     return errors
@@ -1176,7 +1286,7 @@ def validate_skill_md(skill_md: Path, dir_name: str | None = None) -> list[str]:
     if "allowed-tools" in fm:
         errors.extend(validate_allowed_tools(fm["allowed-tools"]))
 
-    # grant-scope rules (advisory: broad pre-approved command grants)
+    # grant-scope allowlist
     errors.extend(check_grant_scope(fm))
 
     # requires rules

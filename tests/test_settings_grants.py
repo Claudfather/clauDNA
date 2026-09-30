@@ -1,25 +1,27 @@
-"""Pins the checked-in settings grants so a future edit cannot silently restore
-the broad pre-approvals.
+"""Pins the checked-in settings grants against the grant-scope allowlist.
 
-A committed .claude/settings.json applies to every collaborator's agent,
-including one working on an untrusted PR. `Bash(git:*)` pre-approves the
-code-exec / config-rewrite subcommands (git -c, git config); `Bash(gh:*)`
-pre-approves data egress (gh auth token, gh gist); `Bash(chmod:*)` is
-unbounded. The template and the repo's own settings ship with narrow read-only
-(template) or dev-subcommand (repo) allows plus explicit deny rules.
+A committed ``.claude/settings.json`` pre-approves commands for every agent that
+runs in the repo, so its ``permissions.allow`` list must stay within the same
+allowlist the skills use. The test drives the shared predicate
+(``skill_checks.check_settings_grants``) rather than pinning individual strings,
+so a future broad grant fails however it is spelled, and it checks the deny list
+is present.
 """
 
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+import skill_checks  # noqa: E402
 
 TEMPLATE = REPO_ROOT / "project-template" / ".claude" / "settings.json"
 REPO_SETTINGS = REPO_ROOT / ".claude" / "settings.json"
 
-BROAD_ALLOW_FORBIDDEN = {"Bash(git:*)", "Bash(gh:*)", "Bash(chmod:*)"}
 DENY_REQUIRED = {
     "Bash(gh gist:*)",
     "Bash(gh extension:*)",
@@ -29,39 +31,64 @@ DENY_REQUIRED = {
     "Bash(git -c:*)",
 }
 
+# One row per form that must be rejected if it appears in a shipped allow list.
+REJECTED_SETTINGS_GRANTS = [
+    "Bash(git:*)",
+    "Bash(gh:*)",
+    "Bash(chmod:*)",
+    "Bash(*)",
+    "Bash(curl:*)",
+    "Bash(wget:*)",
+    "Bash(python3:*)",
+    "Bash(node:*)",
+    "Bash(npm:*)",
+    "Bash(pip:*)",
+    "Bash(rm:*)",
+    "Bash(find:*)",
+    "Bash(env:*)",
+    "Bash(sudo:*)",
+    "Bash(gh api:*)",
+    "Bash(gh auth:*)",
+    "Bash(git clone:*)",
+    "Bash(git -c:*)",
+    "Bash(pytest:*)",
+    "Bash(make:*)",
+]
+
 
 def _perms(path: Path) -> dict:
-    data = json.loads(path.read_text())
-    return data.get("permissions", {})
+    return json.loads(path.read_text()).get("permissions", {})
 
 
-class TestTemplateSettings:
-    def test_no_broad_family_allow(self):
-        allow = set(_perms(TEMPLATE).get("allow", []))
-        assert not (allow & BROAD_ALLOW_FORBIDDEN), allow & BROAD_ALLOW_FORBIDDEN
+class TestShippedSettingsWithinAllowlist:
+    def test_template_allow_clean(self):
+        errs = skill_checks.check_settings_grants(_perms(TEMPLATE).get("allow", []))
+        assert errs == [], errs
 
-    def test_deny_list_covers_dangerous_verbs(self):
+    def test_repo_allow_clean(self):
+        errs = skill_checks.check_settings_grants(_perms(REPO_SETTINGS).get("allow", []))
+        assert errs == [], errs
+
+
+class TestPredicateRejectsTheClass:
+    def test_every_rejected_form_is_rejected(self):
+        missed = [g for g in REJECTED_SETTINGS_GRANTS if not skill_checks.check_settings_grants([g])]
+        assert missed == [], f"settings allowlist accepted: {missed}"
+
+
+class TestDenyAndJson:
+    def test_template_deny_covers_required(self):
         deny = set(_perms(TEMPLATE).get("deny", []))
-        missing = DENY_REQUIRED - deny
-        assert not missing, f"template deny missing: {missing}"
+        assert not (DENY_REQUIRED - deny), DENY_REQUIRED - deny
 
-    def test_still_grants_read_only_git(self):
-        # narrowing must not leave the template with no git at all
-        allow = set(_perms(TEMPLATE).get("allow", []))
-        assert any(a.startswith("Bash(git ") for a in allow)
-
-
-class TestRepoSettings:
-    def test_no_broad_family_allow(self):
-        allow = set(_perms(REPO_SETTINGS).get("allow", []))
-        assert not (allow & BROAD_ALLOW_FORBIDDEN), allow & BROAD_ALLOW_FORBIDDEN
-
-    def test_deny_list_covers_dangerous_verbs(self):
+    def test_repo_deny_covers_required(self):
         deny = set(_perms(REPO_SETTINGS).get("deny", []))
-        missing = DENY_REQUIRED - deny
-        assert not missing, f"repo deny missing: {missing}"
+        assert not (DENY_REQUIRED - deny), DENY_REQUIRED - deny
 
-    def test_valid_json(self):
-        # both files parse (a malformed settings.json disables all permissions)
+    def test_both_parse(self):
         json.loads(TEMPLATE.read_text())
         json.loads(REPO_SETTINGS.read_text())
+
+    def test_still_grants_read_only_git(self):
+        allow = set(_perms(TEMPLATE).get("allow", []))
+        assert any(a.startswith("Bash(git ") for a in allow)

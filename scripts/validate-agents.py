@@ -34,12 +34,12 @@ BODY_MIN = 200
 MEMORY_VALUES = {"none", "user", "project"}
 
 
-# --- agent memory-scope rule (advisory: broad grants on agents) -------------
-# An agent that can run shell (Bash in tools) acts on whatever it reads, and
-# production logs / query results are attacker-influenceable. User-scoped
-# (global) memory persists a followed injection across every project, not just
-# the session it appeared in. So a Bash-capable agent must use memory: project
-# or memory: none, never memory: user.
+# --- agent memory-scope rule --------------------------------------------------
+# An agent that can run shell (Bash in tools) acts on the content it reads, some
+# of which comes from outside the repo (logs, query results). User-scoped
+# (global) memory carries state into every project the user opens, not just the
+# session it was written in. So a Bash-capable agent uses memory: project or
+# memory: none, never memory: user.
 
 def check_agent_memory_scope(fm: dict) -> list[str]:
     """Reject user-scoped memory on an agent that can run shell.
@@ -51,7 +51,7 @@ def check_agent_memory_scope(fm: dict) -> list[str]:
     if has_bash and fm.get("memory") == "user":
         return [
             "memory: an agent with Bash must not use user-scoped memory "
-            "(a followed injection persists across every project); "
+            "(user-scoped memory carries into every project); "
             "use memory: project or memory: none"
         ]
     return []
@@ -120,7 +120,7 @@ def validate_agent(agent_file: Path) -> list[str]:
         elif memory not in MEMORY_VALUES:
             errors.append(f"memory {memory!r} is not a known value (allowed: {sorted(MEMORY_VALUES)})")
 
-    # memory-scope rule (advisory: broad grants on agents)
+    # memory-scope rule
     errors.extend(check_agent_memory_scope(fm))
 
     # tools rules

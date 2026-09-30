@@ -1,10 +1,9 @@
 """Tests for the agent memory-scope rule: an agent that can run shell must not
 use user-scoped (global) memory.
 
-An agent with Bash acts on whatever it reads; production logs and query results
-are attacker-influenceable. If such an agent also keeps user-scoped memory, a
-followed injection persists across every project the user opens, not just the
-session it appeared in. The rule requires memory: project or memory: none for
+An agent with Bash acts on the content it reads, some of which comes from
+outside the repo (logs, query results). User-scoped memory carries state into
+every project the user opens, not just the session it was written in. The rule requires memory: project or memory: none for
 any agent whose tools include Bash. Reviewer agents (memory: none + Bash) and
 data agents already on memory: project are unaffected.
 
@@ -39,7 +38,7 @@ class TestFlagged:
 
     def test_bash_plus_user_memory_without_background_still_rejected(self):
         # background makes it worse, but it is not the load-bearing part -- a
-        # foreground agent with shell and global memory persists an injection too.
+        # foreground agent with shell and global memory carries state across projects too.
         fm = {"memory": "user", "tools": ["Bash"]}
         assert scope(fm)
 
@@ -55,7 +54,7 @@ class TestAllowed:
         assert scope(fm) == []
 
     def test_user_memory_without_bash_ok(self):
-        # No shell to act on a followed injection; user memory alone is not the risk.
+        # No shell, so user memory alone is out of this rule's scope.
         fm = {"memory": "user", "tools": ["Read", "Grep", "Glob"]}
         assert scope(fm) == []
 

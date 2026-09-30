@@ -144,8 +144,15 @@ The minimum set (most skills need these):
       "Glob",
       "WebFetch",
       "WebSearch",
-      "Bash(git *)",
-      "Bash(gh *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git branch *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr list *)",
+      "Bash(gh issue view *)",
+      "Bash(gh issue list *)",
       "Bash(ls *)",
       "Bash(cat *)",
       "Bash(head *)",
@@ -153,15 +160,12 @@ The minimum set (most skills need these):
       "Bash(wc *)",
       "Bash(which *)",
       "Bash(pwd *)",
-      "Bash(find *)",
       "Bash(grep *)",
       "Bash(mkdir *)",
       "Bash(touch *)",
       "Bash(diff *)",
-      "Bash(chmod *)",
       "Bash(cp *)",
       "Bash(mv *)",
-      "Bash(curl *)",
       "Bash(lsof *)",
       "Bash(test *)"
     ]
@@ -179,6 +183,8 @@ Optional categories — add only the ones whose skills you actually use:
 | **Infrastructure CLIs** | `/claudna:railway`, `/claudna:vercel`, `/claudna:modal` | `Bash(railway *)`, `Bash(vercel *)`, `Bash(modal *)` |
 | **Browser Automation** | `/claudna:audit design`, `/claudna:qa` | `Bash(/Applications/Google*)`, `Bash("/Applications/Google*)`, `Bash(google-chrome*)`, `Bash(chromium*)` |
 | **Auto-skill-approval** | Bots / cron / non-interactive runs | See "Auto-skill-approval" expansion below |
+
+The clauDNA skills no longer pre-approve interpreters, package runners, or build/test tools — those run code the project defines, so a skill prompts before running one. The categories above are how *you* pre-approve them in your own settings if you accept that on your machine; prefer the narrowest form your workflow needs (an exact command or a read-only subcommand over a whole-family wildcard).
 
 #### Auto-skill-approval expansion
 
@@ -298,7 +304,7 @@ Drop a `settings.json` like this into the image / runner's `~/.claude/`:
     "claudna@Claudfather": true
   },
   "permissions": {
-    "allow": ["Read", "Write", "Edit", "Bash(git *)", "..."],
+    "allow": ["Read", "Write", "Edit", "Bash(git status *)", "Bash(git diff *)", "..."],
     "defaultMode": "acceptEdits"
   }
 }

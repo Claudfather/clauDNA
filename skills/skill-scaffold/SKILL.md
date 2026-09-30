@@ -27,9 +27,10 @@ If the user provided a skill name as an argument, use it. Otherwise prompt for t
 2. **One-line description** — must start with "Use when" and be 20-500 characters. This becomes the `description:` frontmatter field.
 3. **Tool requirements** — which tools does the skill need? Common patterns:
    - Read-only analysis: `Read, Grep, Glob`
-   - Code modification: `Read, Write, Edit, Grep, Glob, Bash(git *)`
-   - GitHub interaction: `Bash(gh *), Bash(git *), Read, Grep, Glob`
-   - Full orchestration: `Read, Write, Edit, Grep, Glob, Bash(git *), Bash(gh *), Agent`
+   - Code modification: `Read, Write, Edit, Grep, Glob, Bash(git status *), Bash(git diff *), Bash(git add *), Bash(git commit *)`
+   - GitHub interaction: `Bash(gh pr view *), Bash(gh issue view *), Bash(git status *), Bash(git diff *), Read, Grep, Glob`
+   - Full orchestration: `Read, Write, Edit, Grep, Glob, Bash(git status *), Bash(git diff *), Bash(gh pr view *), Agent`
+   - Grant the exact commands or read-only subcommands the skill runs; a whole-family wildcard (`Bash(git *)`, `Bash(python3 *)`) or a build/test tool is rejected by validation
    - None (uses only defaults): omit the field
 4. **Argument hint** — does the skill accept arguments? If yes, what format? (e.g. `[--flag] [positional]`)
 5. **Uses subagents?** — will the skill delegate to Agent/subagents for parallel work?

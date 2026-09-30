@@ -1,16 +1,24 @@
-"""Tests for the grant-scope rule: a skill's allowed-tools may not pre-approve a
-whole command family with a wildcard argument.
+"""Tests for the grant-scope rule.
 
-A wildcard argument defeats prefix matching, so `Bash(python *)` pre-approves
-arbitrary code, `Bash(curl *)` pre-approves arbitrary network, and `Bash(git *)`
-/ `Bash(gh *)` pre-approve the code-exec and data-egress subcommands (git -c,
-git config, gh api, gh auth token, gh gist, ...). The rule rejects the
-whole-family wildcards and the named dangerous git/gh subcommands, and accepts
-concrete commands, read-only git/gh subcommands, and ordinary build/test tools.
+A skill's ``allowed-tools`` pre-approves commands with no prompt backstop, so the
+rule must be an ALLOWLIST of accepted grant forms: anything not explicitly
+recognised as safe is rejected, however it is spelled. This is the correction to
+an earlier command-NAME denylist, which passed any spelling it did not enumerate
+(a bare ``Bash`` entry, an absolute-path or version-suffixed interpreter, a
+package runner, ``gh --repo x api``, and so on).
 
-Reached by module attribute (skill_checks.check_grant_scope) so a missing
-function fails these tests as assertion errors rather than a collection error
-that would silence the whole file.
+Accepted Bash forms:
+  * an exact command with no wildcard (author-fixed; cannot be extended at call time);
+  * an interpreter running a FIXED script path (optionally with a trailing arg
+    wildcard) -- the repo's own script, not a free-form command;
+  * a safe read/write git or gh SUBCOMMAND (``git diff *``, ``gh pr view *``);
+  * a curated set of read-only shell utilities (``ls *``, ``cat *``, ``grep *``).
+Everything else is rejected unless the skill sets
+``disable-model-invocation: true``.
+
+Reached by module attribute (``skill_checks.check_grant_scope``) so a missing
+function fails as an assertion error, not a collection error that would silence
+the file.
 """
 
 from __future__ import annotations
@@ -21,11 +29,186 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import skill_checks
+import skill_checks  # noqa: E402
 
 
 def scope(fm):
     return skill_checks.check_grant_scope(fm)
+
+
+def rejected(entry: str) -> bool:
+    return bool(scope({"allowed-tools": entry}))
+
+
+def accepted(entry: str) -> bool:
+    return scope({"allowed-tools": entry}) == []
+
+
+# --- forms that MUST be rejected (one row each) -----------------------------
+# Every spelling below is broader than the allowlist permits (a free-form
+# command, an unbounded wildcard, or an unsafe subcommand), yet each passed the
+# earlier name-denylist gate.
+
+REJECTED_FORMS = [
+    # a grant of the whole shell
+    "Bash",
+    "Bash(*)",
+    "Bash()",
+    # interpreters reached by path, wrapper, version suffix, or glob'd script
+    "Bash(/usr/bin/python3 *)",
+    "Bash(env python3 *)",
+    "Bash(./venv/bin/python *)",
+    "Bash(python3.11 *)",
+    "Bash(pypy3 *)",
+    "Bash(python3 scripts/*)",
+    "Bash(php *)",
+    "Bash(java *)",
+    "Bash(pwsh *)",
+    "Bash(osascript *)",
+    # interpreters with an inline-code flag, even bare
+    "Bash(python3 -c *)",
+    "Bash(node -e *)",
+    "Bash(python3)",
+    # package runners / installers (run project-defined code)
+    "Bash(npm run *)",
+    "Bash(npm install *)",
+    "Bash(npm ci)",
+    "Bash(pnpm run *)",
+    "Bash(yarn run *)",
+    "Bash(npx tsc *)",
+    "Bash(pip *)",
+    "Bash(pip install *)",
+    "Bash(uv *)",
+    "Bash(uvx *)",
+    "Bash(pipx *)",
+    # test / lint / build tools that load tree-controlled config or plugins
+    "Bash(pytest *)",
+    "Bash(eslint *)",
+    "Bash(prettier *)",
+    "Bash(tsc *)",
+    "Bash(make *)",
+    "Bash(cargo *)",
+    "Bash(go *)",
+    "Bash(black *)",
+    "Bash(ruff *)",
+    "Bash(mypy *)",
+    # arbitrary-exec launchers and code-capable text tools
+    "Bash(xargs *)",
+    "Bash(env *)",
+    "Bash(eval *)",
+    "Bash(sudo *)",
+    "Bash(ssh *)",
+    "Bash(docker *)",
+    "Bash(awk *)",
+    "Bash(sed *)",
+    "Bash(find *)",
+    "Bash(tar *)",
+    # secrets / unbounded deletion
+    "Bash(printenv *)",
+    "Bash(rm -rf *)",
+    "Bash(rm -rf /tmp/heist-*)",
+    "Bash(chmod *)",
+    # git: config / clone / force / leading global flag / unsafe subcommand
+    "Bash(git *)",
+    "Bash(git clone *)",
+    "Bash(git rebase *)",
+    "Bash(git bisect *)",
+    "Bash(git ls-remote *)",
+    "Bash(git submodule *)",
+    "Bash(git remote *)",
+    "Bash(git push --force *)",
+    "Bash(git -C . config *)",
+    "Bash(git --config-env=core.pager=x log)",
+    "Bash(git -c core.pager=x log)",
+    # gh: api / auth / repo / infra subcommands (not issues or PRs)
+    "Bash(gh *)",
+    "Bash(gh config *)",
+    "Bash(gh api *)",
+    "Bash(gh auth *)",
+    "Bash(gh secret *)",
+    "Bash(gh codespace *)",
+    "Bash(gh ssh-key *)",
+    "Bash(gh repo *)",
+    "Bash(gh release *)",
+    "Bash(gh workflow *)",
+    "Bash(gh run *)",
+    "Bash(gh --repo x api *)",
+]
+
+
+def test_every_rejected_form_is_rejected():
+    missed = [e for e in REJECTED_FORMS if not rejected(e)]
+    assert missed == [], f"allowlist accepted these over-broad grants: {missed}"
+
+
+# --- forms that MUST be accepted (legitimate narrow grants) -----------------
+
+ACCEPTED_FORMS = [
+    # exact command, no wildcard
+    "Bash(python3 scripts/validate-skills.py)",
+    "Bash(command -v python3)",
+    "Bash(claudron status)",
+    # interpreter running a FIXED script, trailing arg wildcard
+    "Bash(python3 scripts/validate-skills.py *)",
+    # safe git subcommands
+    "Bash(git status *)",
+    "Bash(git diff *)",
+    "Bash(git log *)",
+    "Bash(git show *)",
+    "Bash(git add *)",
+    "Bash(git commit *)",
+    "Bash(git checkout *)",
+    "Bash(git branch *)",
+    "Bash(git fetch *)",
+    "Bash(git rev-parse *)",
+    "Bash(git mv *)",
+    "Bash(git reset *)",
+    "Bash(git tag *)",
+    "Bash(git stash *)",
+    "Bash(git worktree *)",
+    "Bash(git check-ignore *)",
+    "Bash(git push *)",
+    # safe gh subcommands
+    "Bash(gh pr view *)",
+    "Bash(gh issue view *)",
+    "Bash(gh pr list *)",
+    "Bash(gh issue *)",
+    "Bash(gh label *)",
+    # read-only utilities
+    "Bash(ls *)",
+    "Bash(cat *)",
+    "Bash(grep *)",
+    "Bash(diff *)",
+    "Bash(wc *)",
+    "Bash(stat *)",
+    "Bash(which *)",
+    "Bash(test *)",
+    "Bash(lsof *)",
+    "Bash(mkdir *)",
+    "Bash(date *)",
+    "Bash(mv *)",
+    "Bash(cp *)",
+    # safe claudron subcommands
+    "Bash(claudron status *)",
+    "Bash(claudron doctor)",
+]
+
+
+def test_every_accepted_form_is_accepted():
+    wrongly = [e for e in ACCEPTED_FORMS if not accepted(e)]
+    assert wrongly == [], f"allowlist rejected these legitimate grants: {wrongly}"
+
+
+# --- non-Bash tools are out of this rule's scope (governs Bash only) --------
+
+class TestNonBashOutOfScope:
+    def test_plain_tools_clean(self):
+        fm = {"allowed-tools": ["Read", "Write", "Edit", "Glob", "Grep", "Task", "Agent"]}
+        assert scope(fm) == []
+
+    def test_wildcard_non_bash_clean(self):
+        fm = {"allowed-tools": ["Read(*)", "Write(*)", "Edit(*)", "WebFetch"]}
+        assert scope(fm) == []
 
 
 class TestNoGrants:
@@ -35,143 +218,36 @@ class TestNoGrants:
     def test_empty_allowed_tools_is_clean(self):
         assert scope({"allowed-tools": ""}) == []
 
-    def test_non_bash_tools_are_clean(self):
-        fm = {"allowed-tools": ["Read", "Write", "Edit", "Glob", "Grep", "Task", "Agent"]}
-        assert scope(fm) == []
+
+class TestGitPushForceRejectedButPushAllowed:
+    def test_plain_push_allowed(self):
+        assert accepted("Bash(git push *)")
+
+    def test_force_variants_rejected(self):
+        for f in ("--force", "-f", "--force-with-lease"):
+            assert rejected(f"Bash(git push {f} *)"), f
 
 
-class TestInterpreterFamilyWildcard:
-    def test_python_wildcard_rejected(self):
-        errs = scope({"allowed-tools": "Bash(python *)"})
-        assert len(errs) == 1
-        assert "python" in errs[0]
+class TestInterpreterFixedScript:
+    def test_fixed_script_exact(self):
+        assert accepted("Bash(python3 scripts/validate-skills.py)")
 
-    def test_python3_node_ruby_bash_sh_rejected(self):
-        for fam in ("python3", "node", "ruby", "perl", "bash", "sh", "deno", "bun"):
-            errs = scope({"allowed-tools": f"Bash({fam} *)"})
-            assert errs, f"{fam} * should be rejected"
-            assert fam in errs[0]
+    def test_fixed_script_trailing_wildcard(self):
+        assert accepted("Bash(python3 scripts/crawl_page.py *)")
+
+    def test_glob_in_script_path_rejected(self):
+        assert rejected("Bash(python3 scripts/*)")
 
     def test_bare_interpreter_rejected(self):
-        # `Bash(python)` with no argument still resolves to arbitrary python at
-        # the REPL / stdin; a bare family grant is a whole-family grant.
-        errs = scope({"allowed-tools": "Bash(python3)"})
-        assert errs
+        assert rejected("Bash(python3)")
 
-    def test_inline_code_flag_rejected(self):
-        for flag in ("-c", "-e"):
-            errs = scope({"allowed-tools": f"Bash(python3 {flag} *)"})
-            assert errs, f"python3 {flag} should be rejected"
-
-    def test_concrete_script_allowed(self):
-        # A fixed script path is an exact command, the advisory's accepted form.
-        assert scope({"allowed-tools": "Bash(python3 scripts/new-skill.py)"}) == []
-
-    def test_concrete_script_with_trailing_args_allowed(self):
-        assert scope({"allowed-tools": "Bash(python3 scripts/new-skill.py *)"}) == []
-
-
-class TestPackageRunnerWildcard:
-    def test_family_wildcards_rejected(self):
-        for fam in ("npx", "npm", "pnpm", "yarn"):
-            errs = scope({"allowed-tools": f"Bash({fam} *)"})
-            assert errs, f"{fam} * should be rejected"
-
-    def test_exec_and_dlx_forms_rejected(self):
-        for entry in ("pnpm exec *", "pnpm dlx *", "yarn dlx *", "npm exec *", "npm x *"):
-            errs = scope({"allowed-tools": f"Bash({entry})"})
-            assert errs, f"{entry} should be rejected (arbitrary-package execution)"
-
-    def test_named_script_allowed(self):
-        for entry in ("npm run test", "npm ci", "npm run build *"):
-            assert scope({"allowed-tools": f"Bash({entry})"}) == [], entry
-
-
-class TestNetworkClientPreapproval:
-    def test_curl_and_wget_rejected(self):
-        for fam in ("curl", "wget"):
-            errs = scope({"allowed-tools": f"Bash({fam} *)"})
-            assert errs, f"{fam} * should be rejected"
-
-    def test_curl_bare_rejected(self):
-        assert scope({"allowed-tools": "Bash(curl)"})
-
-
-class TestBroadVcs:
-    def test_git_family_wildcard_rejected(self):
-        errs = scope({"allowed-tools": "Bash(git *)"})
-        assert len(errs) == 1
-        assert "git" in errs[0]
-
-    def test_gh_family_wildcard_rejected(self):
-        errs = scope({"allowed-tools": "Bash(gh *)"})
-        assert len(errs) == 1
-        assert "gh" in errs[0]
-
-    def test_git_readonly_subcommands_allowed(self):
-        for entry in ("git status", "git diff *", "git log *", "git show *", "git add *", "git commit *"):
-            assert scope({"allowed-tools": f"Bash({entry})"}) == [], entry
-
-    def test_git_dash_c_rejected(self):
-        # git -c <k>=<v> runs an arbitrary command through core.pager / hooks.
-        errs = scope({"allowed-tools": "Bash(git -c *)"})
-        assert errs
-
-    def test_git_config_rejected(self):
-        errs = scope({"allowed-tools": "Bash(git config *)"})
-        assert errs
-
-    def test_gh_readonly_subcommands_allowed(self):
-        for entry in ("gh pr view *", "gh issue view *", "gh pr list *", "gh pr create *"):
-            assert scope({"allowed-tools": f"Bash({entry})"}) == [], entry
-
-    def test_gh_dangerous_subcommands_rejected(self):
-        for sub in ("api", "auth", "gist", "extension", "alias"):
-            errs = scope({"allowed-tools": f"Bash(gh {sub} *)"})
-            assert errs, f"gh {sub} should be rejected"
-
-
-class TestDestructiveWildcard:
-    def test_rm_family_wildcard_rejected(self):
-        assert scope({"allowed-tools": "Bash(rm *)"})
-
-    def test_rm_scoped_prefix_allowed(self):
-        # rm bounded to a fixed prefix (heist's temp dir) is not a whole-family grant.
-        assert scope({"allowed-tools": "Bash(rm -rf /tmp/heist-*)"}) == []
-
-
-class TestBuildToolsUntouched:
-    def test_linters_formatters_test_runners_allowed(self):
-        for fam in (
-            "ruff",
-            "black",
-            "isort",
-            "mypy",
-            "flake8",
-            "pytest",
-            "eslint",
-            "prettier",
-            "tsc",
-            "make",
-            "cargo",
-            "go",
-            "which",
-            "test",
-            "ls",
-            "mkdir",
-            "cat",
-            "lsof",
-            "stat",
-            "wc",
-            "date",
-        ):
-            assert scope({"allowed-tools": f"Bash({fam} *)"}) == [], fam
+    def test_inline_flag_rejected(self):
+        for flag in ("-c", "-e", "--eval"):
+            assert rejected(f"Bash(python3 {flag} *)"), flag
 
 
 class TestEscapeHatch:
     def test_disable_model_invocation_exempts(self):
-        # A skill only ever run by an explicit user (not model-invoked) may keep
-        # broad grants -- the advisory's second remediation path.
         fm = {"allowed-tools": "Bash(git *), Bash(python *)", "disable-model-invocation": True}
         assert scope(fm) == []
 
@@ -181,15 +257,13 @@ class TestEscapeHatch:
 
 
 class TestForms:
-    def test_list_form(self):
+    def test_list_form_counts_each(self):
         fm = {"allowed-tools": ["Bash(git *)", "Read", "Bash(curl *)"]}
-        errs = scope(fm)
-        assert len(errs) == 2
+        assert len(scope(fm)) == 2
 
-    def test_string_form_multiple(self):
+    def test_string_form_counts_each(self):
         fm = {"allowed-tools": "Bash(git *), Read, Bash(python *)"}
-        errs = scope(fm)
-        assert len(errs) == 2
+        assert len(scope(fm)) == 2
 
 
 class TestWiredIntoValidator:
@@ -213,7 +287,7 @@ class TestWiredIntoValidator:
             "---\n"
             "name: demo\n"
             'description: "Use when demonstrating the grant-scope rule end to end."\n'
-            "allowed-tools: Bash(git status), Bash(git diff *), Read\n"
+            "allowed-tools: Bash(git status *), Bash(git diff *), Read\n"
             "---\n\n" + ("body text with git status and git diff " * 20) + "\n"
         )
         errors = skill_checks.validate_skill_md(d / "SKILL.md", dir_name="demo")
