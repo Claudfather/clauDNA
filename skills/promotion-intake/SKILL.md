@@ -44,9 +44,9 @@ The validator is the single source of truth for the contract — arena threshold
 
 On a new branch `promote/<skill-name>`:
 
-1. Copy the package's `SKILL.md` and support files (everything except the three package-metadata JSON files) to `skills/<name>/` — byte-identical: the validator's content-hash check binds the arena-tested content to what lands.
+1. Copy the package's `SKILL.md` and support files to `skills/<name>/` — byte-identical: the validator's content-hash check binds the arena-tested content to what lands. **Exclude the three package-metadata JSON files, and exclude any pytest-collection file the package carries (`conftest.py`, `test_*.py`, `*_test.py`): a skill bundle has no reason to ship one, and it would place package-authored code where the repo's test gate could collect and run it.** The package is untrusted until merged; step 2 has already rejected symlinks and a path-escaping slug before this copy runs.
 2. Append a CHANGELOG entry under `## [Unreleased]` / `### Added`: skill name, one-line description, and the provenance line `Promoted from the Claudosseum arena (package manifest <manifest-version>, win rate <rate>, <n> battles).` drawn from the manifest.
-3. Re-run the repo gates locally: `python3 scripts/validate-skills.py` and `python3 -m pytest tests/ -q` must both pass with the new skill in place. A failure here (e.g. a routing-fixture or reference-integrity conflict the package validator can't see) → **blocked**, with the gate output in `errors[]`.
+3. Re-run the repo gates locally: `python3 scripts/validate-skills.py` and `python3 -m pytest tests/ -q` must both pass with the new skill in place. These run the repo's OWN tests (`tests/`) and parse the staged skill as data — with the exclusion in step 3.1 the package ships no test-collection file into a path pytest would run. A failure here (e.g. a routing-fixture or reference-integrity conflict the package validator can't see) → **blocked**, with the gate output in `errors[]`.
 
 **Interactive mode:** present the staging summary (files, CHANGELOG entry, validator output) and ask once: "Open the promotion PR? (y/n)". **`--auto`:** proceed without asking — the PR itself is the human gate.
 

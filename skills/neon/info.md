@@ -1,17 +1,12 @@
-Invoked by /claudna:neon in info mode — do not load this file for any other verb. Pre-flight has already run per SKILL.md; `<DB_URL>` is the discovered connection string, plus `<PROJECT_ID>` / `<ORG_ID>` / optional `<API_KEY>` when present. Everything here is read-only and never gates (contract §5).
+Invoked by /claudna:neon in info mode — do not load this file for any other verb. Pre-flight has already run per SKILL.md: it chose `<PSQL>`, how psql reaches the database, and `<NEON>`, the form neon commands run as, plus `<PROJECT_ID>` / `<ORG_ID>` when present. Everything here is read-only and never gates (contract §5).
 
 Quick database dashboard for Neon PostgreSQL: connection status, table inventory, database size, and branch overview at a glance. Run the steps below and present the output in a clean, formatted summary.
 
-## Step 1: Connection test
+## Step 1: Connection test and database overview
 
-```bash
-pg_isready -d "<DB_URL>"
-```
+Write this to `<sql-file>` with the Write tool:
 
-## Step 2: Database overview
-
-```bash
-psql "<DB_URL>" <<'EOF'
+```sql
 BEGIN TRANSACTION READ ONLY;
 
 -- Database size
@@ -32,26 +27,27 @@ ORDER BY pg_total_relation_size(relid) DESC;
 SELECT count(*) AS active_connections FROM pg_stat_activity WHERE state = 'active';
 
 COMMIT;
-EOF
 ```
 
-## Step 3: Branch overview (degrades, never blocks)
+Then run it:
+
+```bash
+<PSQL> -X -f <sql-file>
+```
+
+Exit status 2 means the connection failed: report `Connection: FAILED` and carry on with Step 2. psql's error can echo parts of the connection; scrub it per the contract before quoting it.
+
+## Step 2: Branch overview (degrades, never blocks)
 
 Requires `<PROJECT_ID>` and `<ORG_ID>` from discovery. If either is missing, skip this step.
 
-**With API key:**
 ```bash
-timeout 10 npx neon@6.2.3 branches list --project-id "<PROJECT_ID>" --org-id "<ORG_ID>" --api-key "<API_KEY>"
-```
-
-**Without API key:**
-```bash
-timeout 10 npx neon@6.2.3 branches list --project-id "<PROJECT_ID>" --org-id "<ORG_ID>"
+timeout 10 <NEON> branches list --project-id "<PROJECT_ID>" --org-id "<ORG_ID>"
 ```
 
 If the output contains "Awaiting authentication", skip and note "Branch listing: neon auth required".
 
-## Step 4: Present results (contract §6 report)
+## Step 3: Present results (contract §6 report)
 
 Format the output as a summary:
 
@@ -73,5 +69,5 @@ Format the output as a summary:
 | Name | State | Created |
 |------|-------|---------|
 | ...  | ...   | ...     |
-(or "neon auth required — run `npx neon@6.2.3 auth` to enable branch listing")
+(or "neon auth required — run `neon auth` to enable branch listing")
 ```

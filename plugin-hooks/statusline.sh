@@ -14,7 +14,8 @@ lines_removed=$(echo "$input" | jq -r '.cost.total_lines_removed // 0')
 # --- Git branch (smart display) ---
 branch=""
 if [ -n "$cwd" ]; then
-  raw_branch=$(git -C "$cwd" --no-optional-locks symbolic-ref --short HEAD 2>/dev/null)
+  # -c core.fsmonitor= : a repo .git/config must not run a command on a git read
+  raw_branch=$(git -C "$cwd" -c core.fsmonitor= --no-optional-locks symbolic-ref --short HEAD 2>/dev/null)
   if [ -n "$raw_branch" ]; then
     case "$raw_branch" in
       implement/*)

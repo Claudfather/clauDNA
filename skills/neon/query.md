@@ -1,28 +1,31 @@
-Invoked by /claudna:neon in query mode — do not load this file for any other verb. Pre-flight (psql check, connection discovery) has already run per SKILL.md; `<DB_URL>` below is the discovered connection string, inlined directly into every command.
+Invoked by /claudna:neon in query mode — do not load this file for any other verb. Pre-flight (psql check, connection discovery) has already run per SKILL.md, and it chose `<PSQL>`, how `psql` reaches the database: a libpq service, a URL handed to psql's environment by `env_from_file.py`, or plain `psql`.
+
+The connection string never appears in a command, in the session, or in any process's argv. Every statement goes in a file written with the Write tool and runs with `-f`, so SQL is never parsed as shell. `-X` skips the user's `.psqlrc`.
 
 ## Read-only guard
 
-- The discovered URL counts as **production** unless it came from a `DEV`-named variable or the user explicitly targeted the dev database.
-- **CRITICAL: All production queries MUST be wrapped in a read-only transaction:**
+- The target counts as **production** unless it came from a `DEV`-named variable or the user explicitly targeted the dev database.
+- **CRITICAL: All production queries MUST be wrapped in a read-only transaction**, inside the SQL file:
+
+```sql
+BEGIN TRANSACTION READ ONLY;
+-- your SQL here
+COMMIT;
+```
 
 ```bash
-psql "<DB_URL>" -c "BEGIN TRANSACTION READ ONLY; YOUR SQL HERE; COMMIT;"
+<PSQL> -X -f <sql-file>
 ```
 
 - **Mutating SQL (INSERT / UPDATE / DELETE / DDL) is destructive even inside this verb** (contract §5): before running it, present the §6 boxed summary (target database, environment, the exact statement) and ask "Ready to run? (y/n)" — do not proceed without an explicit yes.
 - Production never runs mutating SQL — it stays read-only-wrapped, no exceptions. If the user wants to mutate, point at a development connection or a disposable Neon branch (`/claudna:neon branch`) instead.
-- Development database (read-write allowed, after the gate above for mutations):
-
-```bash
-psql "<DB_URL>" -c "YOUR SQL HERE;"
-```
+- Development database (read-write allowed, after the gate above for mutations): the same command, with the statement in the file unwrapped.
 
 ## Running queries
 
-For multi-line or complex queries, use a heredoc:
+Write the query to `<sql-file>` with the Write tool, then run it:
 
-```bash
-psql "<DB_URL>" <<'EOF'
+```sql
 BEGIN TRANSACTION READ ONLY;
 
 SELECT
@@ -34,7 +37,10 @@ ORDER BY n_live_tup DESC
 LIMIT 10;
 
 COMMIT;
-EOF
+```
+
+```bash
+<PSQL> -X -f <sql-file>
 ```
 
 ## Output formats
@@ -47,65 +53,64 @@ EOF
 
 Examples:
 ```bash
-psql "<DB_URL>" --csv -c "BEGIN TRANSACTION READ ONLY; SELECT * FROM <YOUR_TABLE> WHERE is_current = true LIMIT 10; COMMIT;"
+<PSQL> -X --csv -f <sql-file>
 ```
 ```bash
-psql "<DB_URL>" -x -c "BEGIN TRANSACTION READ ONLY; SELECT * FROM <YOUR_TABLE> WHERE is_current = true LIMIT 1; COMMIT;"
+<PSQL> -X -x -f <sql-file>
 ```
 
 ## Common explorations
 
-**IMPORTANT: psql meta-commands (`\dt`, `\d+`, etc.) do NOT work with the `-c` flag when using a connection URL. Use heredoc or SQL equivalents instead.**
+Each block below is the content of `<sql-file>`; run it with `<PSQL> -X -f <sql-file>`. psql meta-commands (`\dt+`, `\d+ tablename`) work in a file too.
 
 **List all tables with sizes:**
-```bash
-psql "<DB_URL>" -c "BEGIN TRANSACTION READ ONLY;
+```sql
+BEGIN TRANSACTION READ ONLY;
 SELECT
     relname AS table_name,
     n_live_tup AS row_count,
     pg_size_pretty(pg_total_relation_size(relid)) AS total_size
 FROM pg_stat_user_tables
 ORDER BY pg_total_relation_size(relid) DESC;
-COMMIT;"
+COMMIT;
 ```
 
 **Describe a table (columns, types, nullability):**
-```bash
-psql "<DB_URL>" -c "BEGIN TRANSACTION READ ONLY;
+```sql
+BEGIN TRANSACTION READ ONLY;
 SELECT column_name, data_type, is_nullable, column_default
 FROM information_schema.columns
 WHERE table_schema = 'public' AND table_name = '<YOUR_TABLE>'
 ORDER BY ordinal_position;
-COMMIT;"
+COMMIT;
 ```
 
 **List indexes on a table:**
-```bash
-psql "<DB_URL>" -c "BEGIN TRANSACTION READ ONLY;
+```sql
+BEGIN TRANSACTION READ ONLY;
 SELECT indexname, indexdef
 FROM pg_indexes
 WHERE tablename = '<YOUR_TABLE>';
-COMMIT;"
+COMMIT;
 ```
 
 **Sample data from a table:**
-```bash
-psql "<DB_URL>" -c "BEGIN TRANSACTION READ ONLY; SELECT * FROM <YOUR_TABLE> WHERE is_current = true LIMIT 5; COMMIT;"
+```sql
+BEGIN TRANSACTION READ ONLY;
+SELECT * FROM <YOUR_TABLE> WHERE is_current = true LIMIT 5;
+COMMIT;
 ```
 
-**If you need psql meta-commands** (`\dt+`, `\d+ tablename`, etc.), use heredoc:
-```bash
-psql "<DB_URL>" <<'EOF'
+**psql meta-commands:**
+```sql
 \dt+
-EOF
 ```
 
 ## Flow
 
-1. Confirm which environment the discovered URL targets — production by default, dev only when a `DEV`-named variable or the user's wording says so
-2. **Always wrap production queries in `BEGIN TRANSACTION READ ONLY; ... COMMIT;`**
+1. Confirm which environment the target is — production by default, dev only when a `DEV`-named variable or the user's wording says so
+2. **Always wrap production queries in `BEGIN TRANSACTION READ ONLY; ... COMMIT;`**, in the SQL file
 3. Gate mutating SQL per the read-only guard above before running anything
-4. Use SQL equivalents for schema inspection (not `\dt`, `\d+`) — meta-commands don't work with `-c` + URL
-5. Run the `psql` command with the URL inlined directly
-6. Present results clearly (contract §6 report: status, target database, rows returned, any errors)
-7. Offer to refine or expand the query
+4. Write the SQL to a file with the Write tool; run `<PSQL> -X -f <sql-file>`
+5. Present results clearly (contract §6 report: status, target database, rows returned, any errors). psql's own errors can echo parts of a connection string; scrub output per the contract before quoting it
+6. Offer to refine or expand the query

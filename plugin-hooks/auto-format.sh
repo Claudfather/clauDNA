@@ -67,20 +67,26 @@ case "$FILE_PATH" in
     *.py)
         # Python: use ruff if available
         if command -v ruff &> /dev/null; then
-            ruff format "$FILE_PATH" 2>/dev/null
-            ruff check --fix "$FILE_PATH" 2>/dev/null
+            # --isolated: ignore repo config (a pyproject/ruff.toml can point at
+            # local plugins); -- so a path is never read as an option.
+            ruff format --isolated -- "$FILE_PATH" 2>/dev/null
+            ruff check --fix --isolated -- "$FILE_PATH" 2>/dev/null
         fi
         ;;
     *.js|*.jsx|*.ts|*.tsx|*.json|*.md)
         # JavaScript/TypeScript/JSON/Markdown: use prettier if available
         if command -v prettier &> /dev/null; then
-            prettier --write "$FILE_PATH" 2>/dev/null
+            # --no-config: do not load repo config, which is how prettier plugins
+            # (repo code) get loaded; -- so a path is never read as an option.
+            prettier --write --no-config -- "$FILE_PATH" 2>/dev/null
         fi
         ;;
     *.sql)
         # SQL: use sqlfluff if available
         if command -v sqlfluff &> /dev/null; then
-            sqlfluff fix "$FILE_PATH" 2>/dev/null
+            # --templater raw: no templating, so a repo .sqlfluff templater cannot
+            # run repo code; -- so a path is never read as an option.
+            sqlfluff fix --templater raw -- "$FILE_PATH" 2>/dev/null
         fi
         ;;
 esac
