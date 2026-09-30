@@ -59,6 +59,8 @@ If `data.conventions` is non-null, render it under a `## Vault conventions` head
 
 **Filter terminal-status notes** (parity with the fallback, which already excludes them at Step 3): the engine's project tier returns notes regardless of `status`, so drop any whose `status` is `stale` / `superseded` / `completed` / `archived` before rendering — a superseded decision shown as current is exactly what an orientation briefing must not do. `--include-stale` keeps them; `ratified` / `current` are live constraints and are always kept.
 
+**Drafts are never trusted.** Pull every note whose `maturity` is `draft` out of both tiers before rendering them (this includes everything the session store's harvest writes). Drafts are unreviewed machine or agent output: they go in their own **Unverified** block after the tiers, capped at 3, most recent first, each line ending with `(draft — unverified)`. Never cite a draft as fact, and never let one outrank or override a trusted note. When you act on one, check it against the code or the user first. If more than 3 exist, add one line: `… N more drafts awaiting review` — promoting or discarding them is a person's call, never yours. (Once Claudron's recall separates drafts itself — [Claudron#200](https://github.com/Claudfather/Claudron/issues/200) — render its block instead of splitting here.)
+
 Render each note as one line:
 ```
 - **<title>** (<type>[, <maturity>]) — <summary> `<path>`
@@ -67,6 +69,7 @@ Omit `, <maturity>` when it is empty. Label each tier so the source is unambiguo
 ```
 ### This project — most recent
 ### Fleet — most relevant to "<query>"
+### Unverified — drafts, not yet reviewed
 ```
 Skip a tier's header entirely when its split is empty — never print a heading with nothing under it. On a **bare** recall (no query), title the fleet header `### Fleet — related to <project>` rather than interpolating an empty `"<query>"`.
 

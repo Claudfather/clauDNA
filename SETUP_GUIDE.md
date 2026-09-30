@@ -260,13 +260,13 @@ If you enable sandbox, you may also want these filesystem extensions. The skills
 
 ### 3.4 Plugin-provided hooks (no action required)
 
-The PreToolUse permission-expansion hook, the PostToolUse auto-format hook, the Notification hook, and the PreCompact capture hook all ship with the plugin and auto-wire on enable. You don't need to add anything to `settings.json` for them. To verify they're firing, run `/plugin list` and confirm `claudna` is enabled, then trigger a `Write` to a `.py` file and watch `ruff` run.
+The PreToolUse permission-expansion hook, the PostToolUse auto-format hook, the Notification hook, the PreCompact capture hook, and the session store hook (SessionStart / PreCompact / SessionEnd, §3.7) all ship with the plugin and auto-wire on enable. You don't need to add anything to `settings.json` for them. To verify they're firing, run `/plugin list` and confirm `claudna` is enabled, then trigger a `Write` to a `.py` file and watch `ruff` run.
 
 ### 3.5 PreCompact capture hook
 
 The plugin ships a `PreCompact` hook that automatically triggers `/claudna:capture` before context compaction, so session learnings get captured before they're lost.
 
-**How it works:** On the first compaction attempt in a session (manual `/compact` or auto-compaction), the hook blocks compaction and instructs Claude to run `/claudna:capture` (a bare capture distills the session). After capture completes, Claude retries `/compact` and the hook allows it through. A per-session marker file prevents the hook from blocking more than once per session.
+**How it works:** On the first compaction attempt in a session (manual `/compact` or auto-compaction), the hook blocks compaction and instructs Claude to run `/claudna:capture` (a bare capture distills the session). After capture completes, Claude retries `/compact` and the hook allows it through. When it blocks, the hook leaves a marker in `~/.claudna/hooks/`; the retry finds it, removes it and goes through. So the hook blocks the first attempt of **each** compaction, not once per session.
 
 **Opt-out:** Set `CLAUDNA_PRECOMPACT_REFLECT=0` in your environment to disable the hook entirely (the env var keeps its historical name; the rename lands with #203). Compaction will proceed without a capture step.
 
@@ -284,6 +284,36 @@ Every interactive session opens with a short context briefing injected by `plugi
 - **Disable it** with `CLAUDNA_SESSION_BRIEFING=0` (same pattern as `CLAUDNA_PRECOMPACT_REFLECT`).
 - **Bots / CI / `claude -p`:** there is no reliable in-hook headless signal, so the env var *is* the headless mechanism — set `CLAUDNA_SESSION_BRIEFING=0` in your bot environment (the §4.4 Dockerfile recipe includes it). The hook is harmless if left on (it only adds context and degrades silently), but headless runs don't need the token cost.
 - Every network read is timeout-wrapped; missing `gh`, auth failures, and rate limits silently drop the PR section. The hook always exits 0 — invariants enforced in `tests/test_session_start_hook.py`.
+- When the session store has harvested (§3.7), the briefing adds one `Memory:` line with the last run's result, so a harvest that stopped working gets noticed.
+
+### 3.7 Session store (recording on by default; summaries and harvest opt-in)
+
+`plugin-hooks/session-store.sh` records each session's boundaries in `~/.claudna/sessions/<session-id>/`: when it opened and closed, and where each compaction cut it into segments (byte ranges of Claude Code's own transcript). It keeps no copy of the transcript. The design is `documentation/specs/2026-09-28-session-store-design.md`.
+
+**Summaries and harvest are opt-in** until Claudron's own recall keeps drafts apart ([Claudron#200](https://github.com/Claudfather/Claudron/issues/200)): set `CLAUDNA_HARVEST=1`. A session records that choice when it opens, together with its vault (`CLAUDRON_VAULT_PATH`, if set), so a harvest started by another session can't change either. Recording boundaries costs nothing and stays on.
+
+In an opted-in interactive session, a detached worker summarizes each segment after it is sealed (at session end, and after a compaction has happened). The worker makes one `claude -p` call with Haiku, with no tools and no settings, and sends it only the user and assistant prose, redacted; a segment re-sealed while the worker runs takes up to 3 calls. It writes `seg-NNN/summary.json`, the segment's story plus typed knowledge blocks, redacted again. When [Claudron](https://github.com/Claudfather/Claudron) is installed, a detached **harvest** at SessionStart writes those blocks into the session's own vault as `maturity: draft` notes through `claudron capture --vault`, each title prefixed `(unverified)`. Sessions outside a git repo are not harvested. `/claudna:recall` shows drafts in a separate **Unverified** block, and a person promotes or discards them.
+
+**Background spend:** with `CLAUDNA_HARVEST=1`, each summarized segment is one Haiku call on your account, about $0.02, in the background. Nothing is spent without the opt-in. The summarizer runs with `--setting-sources ""`, so it doesn't load an `apiKeyHelper` from your settings. The child then authenticates with whatever else Claude Code finds (a stored login, or `ANTHROPIC_API_KEY`), which may be a different account. With nothing else, the call fails, is retried at most 3 times, and is then reported on the `Memory:` line. This hasn't been checked yet on a machine whose only credential is a helper.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `CLAUDNA_SESSION_STORE=0` | on | Turns the whole hook off: nothing is recorded. |
+| `CLAUDNA_HARVEST=1` | off | Opts a session into summaries and harvest (recorded when it opens). Drafts only ever land through Claudron. |
+| `CLAUDNA_SESSION_SUMMARY` | follows `CLAUDNA_HARVEST` in interactive sessions (`cli`, `claude-vscode`, `claude-desktop`); off for every other entrypoint and Claudlobby bots | `1` turns summaries on everywhere, `0` off everywhere. Each summary is one Haiku call (about $0.02, 15–40 s, in the background). |
+| `CLAUDNA_SUMMARY_MODEL` | `haiku` | The model the summarizer asks for. |
+| `CLAUDNA_HARVEST_INTERVAL_H` | `6` | Minimum hours between harvest runs. |
+| `CLAUDNA_UNCLOSED_AFTER_H` | `24` | How long a session whose `claude` process is gone may sit open before the sweep closes it as `abandoned`. Never under 1. |
+| `CLAUDNA_STATE_DIR` | `~/.claudna` | Where all clauDNA state lives: the store, hook markers, logs. It must be an absolute path. A relative one keeps no state instead of writing into your project. |
+
+- **What it never does:** it never writes to the vault except through `claudron`, never writes to git (it reads the branch and HEAD once, at SessionStart), never prints into your session, and never blocks. It always exits 0.
+- **Sessions that never ended:** a crash or a kill skips SessionEnd and leaves a session open. About every 6 hours, a SessionStart starts a detached sweep. It closes up to 5 sessions that have sat idle for `CLAUDNA_UNCLOSED_AFTER_H` and whose `claude` process is gone, and marks them `abandoned`. Their last segment is summarized as usual if the session opted in. A session that recorded no process id is never closed automatically. `python3 "<plugin>/lib/claudna/session_store" sweep --dry-run` lists the candidates, and `seal <session-id>` closes one by hand.
+- **`/clear` lineage:** the session a `/clear` starts records the one it cleared (`parent_sid`), and every session in that chain shares one `chain_id`.
+- **Keeping one session out:** `python3 "<plugin>/lib/claudna/session_store" private <session-id>` marks a session private: it is never summarized or harvested. `--off` clears the mark.
+- **Privacy:** prompts aren't recorded yet. When prompt events arrive, they carry counts only unless you opt in with `CLAUDNA_CAPTURE_PROMPTS=1`. Free text the store keeps, and everything the summarizer sees, goes through the credential redactor first. Directories are `0700` and files `0600`.
+- **When something breaks:** `~/.claudna/hooks/errors.log` holds one JSON line per failure. `session-store.stderr`, `summarizer.stderr` and `harvest.stderr` next to it catch anything Python couldn't log itself. `python3 "<plugin>/lib/claudna/session_store" check <session-id>` validates a session's files.
+- **Removal:** uninstalling the plugin leaves `~/.claudna/` in place, so session history survives a reinstall. Delete that directory to remove it.
+- **Upgrading from 0.21.x:** earlier versions kept hook state in `${XDG_STATE_HOME:-~/.local/state}/claudna/`. Nothing reads it any more. Its `permissions.log` holds whole command lines, so delete that directory by hand.
 
 ## 4. Headless / CI / Docker Provisioning
 
@@ -607,9 +637,9 @@ Claudron ships its own hook pack (`claudron hooks install` writes SessionStart /
 
 | Event | clauDNA | Claudron | Together |
 |---|---|---|---|
-| **SessionStart** | continuity briefing (branch / handoff / open PRs) | `sync --pull` + a vault recall brief | **Both** inject — different content (your session vs the vault's knowledge), both short. Opt out of clauDNA's with `CLAUDNA_SESSION_BRIEFING=0`. |
-| **PreCompact** | blocks once → run `/claudna:capture` (distills the session before compaction) | prompts capture too — but **defers** when clauDNA is installed | **One** prompt: clauDNA's. Claudron detects clauDNA (by plugin dir) and stays silent, so the event isn't double-prompted. Opt out of clauDNA's with `CLAUDNA_PRECOMPACT_REFLECT=0` (§3.5). |
-| **SessionEnd** | *(none)* | `sync --push` | **Claudron's** — clauDNA adds no SessionEnd hook. |
+| **SessionStart** | continuity briefing (branch / handoff / open PRs); the session store opens a session and a segment, and may start a detached harvest (§3.7) | `sync --pull` + a vault recall brief | **Both** inject: different content (your session vs the vault's knowledge), both short. The store hook prints nothing. Opt out of clauDNA's briefing with `CLAUDNA_SESSION_BRIEFING=0`. |
+| **PreCompact** | blocks once → run `/claudna:capture` (distills the session before compaction); the session store seals the segment | prompts capture too, but **defers** when clauDNA is installed | **One** prompt: clauDNA's. Claudron detects clauDNA (by plugin dir) and stays silent, so the event isn't double-prompted. The store's seal never prompts. Opt out of clauDNA's prompt with `CLAUDNA_PRECOMPACT_REFLECT=0` (§3.5). |
+| **SessionEnd** | the session store seals the last segment and closes the session (5 s timeout) | `sync --push` | **Both**, different roles. clauDNA's hook only records (`R-record`): it never touches the vault or git, so it can't race Claudron's push. #203's earlier "clauDNA adds no SessionEnd hook" was reversed on 2026-09-30 for exactly this role. |
 
 So capture-at-compaction is clauDNA's (`/claudna:capture`, which falls back to the raw tree without the engine); the vault's git sync at session start/end is Claudron's. The PreCompact defer ships in Claudron via [Claudfather/Claudron#45](https://github.com/Claudfather/Claudron/pull/45); on an older Claudron both prompt once on a compaction — harmless, since it's the same capture and the engine dedups. One edge: if clauDNA is *installed but disabled*, Claudron defers but clauDNA is silent, so that session gets no capture prompt — re-enable clauDNA (or unset Claudron's hook to take the prompt back).
 

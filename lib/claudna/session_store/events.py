@@ -84,8 +84,16 @@ REGISTRY: dict[str, KindSpec] = {
             "origin": _DICT,
             "transcript_path": _OPT_STR,
         },
+        # claude_pid: the owning Claude Code process ($CLAUDE_PID), so a nested child reusing the id is
+        # told apart. harvest: this session's own consumer choice and vault, so a harvest another
+        # session starts files it where *this* session would have (#373 review, B2).
+        optional={"claude_pid": _OPT_INT, "harvest": _DICT},
         choices={"source": ("startup", "clear", "resume", "fork")},
-        constraints={"actor": _SESSION_DEFS["actor_or_null"], "origin": _SESSION_DEFS["origin_or_null"]},
+        constraints={"actor": _SESSION_DEFS["actor_or_null"], "origin": _SESSION_DEFS["origin_or_null"],
+                     "claude_pid": {"type": ["integer", "null"], "minimum": 1},
+                     "harvest": {"type": "object", "required": ["enabled", "vault"], "additionalProperties": False,
+                                 "properties": {"enabled": {"type": "boolean"},
+                                                "vault": {"type": ["string", "null"], "minLength": 1}}}},
     ),
     "session.child_linked": KindSpec(log=LIFECYCLE, seg=False, fields={"child_sid": _STR}),
     "session.privacy_set": KindSpec(
@@ -98,7 +106,8 @@ REGISTRY: dict[str, KindSpec] = {
         log=LIFECYCLE,
         seg=False,
         fields={"reason": _STR},
-        choices={"reason": ("clear", "resume", "logout", "prompt_input_exit", "other")},
+        # ``abandoned`` is the store's own (unclosed.py): a session whose SessionEnd never ran.
+        choices={"reason": ("clear", "resume", "logout", "prompt_input_exit", "other", "abandoned")},
     ),
     # ── lifecycle.jsonl: segment boundaries and summary jobs ────────────────
     "segment.opened": KindSpec(
@@ -115,7 +124,8 @@ REGISTRY: dict[str, KindSpec] = {
         optional={"sha256": _OPT_STR},
         choices={
             # "compact"/"resume": open_segment sealing an unsealed predecessor (missed PreCompact / lost SessionEnd)
-            "sealed_by": ("precompact", "compact", "session_end", "resume"),
+            # "abandoned": unclosed.py sealing a session whose SessionEnd never ran
+            "sealed_by": ("precompact", "compact", "session_end", "resume", "abandoned"),
             "trigger": ("manual", "auto", None),
         },
         constraints={"end": _NON_NEGATIVE, "sha256": _SHA256},
@@ -137,7 +147,8 @@ REGISTRY: dict[str, KindSpec] = {
         log=LIFECYCLE,
         seg=True,
         fields={"reason": _STR},
-        choices={"reason": ("private", "disabled", "trivial", "headless")},
+        # no_transcript: Claude Code deleted it (cleanupPeriodDays) or never wrote it
+        choices={"reason": ("private", "disabled", "trivial", "headless", "no_transcript")},
     ),
     # ── seg-NNN/events.jsonl: in-segment activity ───────────────────────────
     "prompt.submitted": KindSpec(
@@ -165,6 +176,11 @@ REGISTRY: dict[str, KindSpec] = {
     ),
     "checkpoint.noted": KindSpec(log=ACTIVITY, seg=True, fields={"note": _STR}, caps={"note": 1000}),
 }
+
+#: Close reasons only the store itself writes (``unclosed.py``). A SessionEnd payload can't claim them.
+STORE_CLOSE_REASONS = ("abandoned",)
+#: The close reasons a SessionEnd payload may carry.
+HOOK_CLOSE_REASONS = tuple(r for r in REGISTRY["session.closed"].choices["reason"] if r not in STORE_CLOSE_REASONS)
 
 def now_ts() -> str:
     """Current UTC time as ``YYYY-MM-DDTHH:MM:SS.mmmZ``."""
@@ -263,18 +279,30 @@ def placement_errors(obj: dict, *, sid: str, log: str, seg: int | None) -> list[
 
 
 def cap_text(kind: str, data: dict) -> dict:
-    """Return a copy of ``data`` with free-text fields truncated to their caps."""
+    """Return a copy of ``data`` with free-text fields redacted, then truncated to their caps.
+
+    Every capped field is free text, and free text is where a credential
+    leaks: redacting here, where writers already pass, means no adapter can
+    forget it (spec P4).
+    """
     out = dict(data)
-    for key, cap in REGISTRY[kind].caps.items():
-        if isinstance(out.get(key), str) and len(out[key]) > cap:
-            out[key] = out[key][: cap - 1] + "…"
+    caps = REGISTRY[kind].caps
+    if not caps:
+        return out
+    from claudna.redact import redact_text  # compiles its patterns: only kinds with free text pay for it
+
+    for key, cap in caps.items():
+        if isinstance(out.get(key), str):
+            out[key] = redact_text(out[key])
+            if len(out[key]) > cap:
+                out[key] = out[key][: cap - 1] + "…"
     return out
 
 
 def make_event(kind: str, sid: str, data: dict, *, seg: int | None = None, ts: str | None = None) -> dict:
     """Build a valid envelope, or raise :class:`EventError`.
 
-    Free text is capped first (:func:`cap_text`), so callers never have to.
+    Free text is redacted and capped first (:func:`cap_text`), so callers never have to.
     """
     if kind not in REGISTRY:
         raise EventError(f"unknown event kind: {kind}")

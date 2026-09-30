@@ -22,6 +22,8 @@ from pathlib import Path
 from .schema import is_instance
 
 STATE_DIR_ENV = "CLAUDNA_STATE_DIR"
+#: Set in every process clauDNA spawns (summarizer, its claude -p): nothing under it records.
+CHILD_ENV = "CLAUDNA_SESSION_CHILD"
 DEFAULT_STATE_DIR = "~/.claudna"
 
 #: Opaque, but safe as a single path component: no separators, no leading dot.
@@ -103,6 +105,10 @@ class SegmentPaths:
     def segment_json(self) -> Path:
         return self.dir / "segment.json"
 
+    @property
+    def summary(self) -> Path:
+        return self.dir / "summary.json"
+
 
 @dataclass(frozen=True)
 class SessionPaths:
@@ -124,6 +130,10 @@ class SessionPaths:
         return self.dir / "session.json"
 
     @property
+    def consumers(self) -> Path:
+        return self.dir / "consumers.json"
+
+    @property
     def lock(self) -> Path:
         return self.dir / ".lock"
 
@@ -136,6 +146,14 @@ class SessionPaths:
             return []
         found = (parse_seg_dirname(p.name) for p in self.dir.iterdir() if p.is_dir())
         return sorted(i for i in found if i is not None)
+
+
+def session_ids(root: Path) -> list[str]:
+    """Every valid session id under ``root``, sorted. Anything else in ``sessions/`` is ignored."""
+    sessions = root / "sessions"
+    if not sessions.is_dir():
+        return []
+    return sorted(p.name for p in sessions.iterdir() if p.is_dir() and _SID_RE.fullmatch(p.name))
 
 
 def session_paths(sid: str, root: Path | None = None) -> SessionPaths:

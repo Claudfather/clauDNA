@@ -39,6 +39,14 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/plugin-hooks/precompact-reflect.sh"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/plugin-hooks/session-store.sh PreCompact"
+          }
+        ]
       }
     ],
     "Notification": [
@@ -58,6 +66,25 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/plugin-hooks/session-start.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/plugin-hooks/session-store.sh SessionStart"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/plugin-hooks/session-store.sh SessionEnd",
+            "timeout": 5
           }
         ]
       }

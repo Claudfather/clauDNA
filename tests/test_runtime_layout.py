@@ -34,11 +34,17 @@ SESSION_STORE_LAYERS = {
     "schema": 0,
     "paths": 1,
     "fsio": 1,
+    "transcript": 1,
+    "lineage": 2,
     "events": 2,
     "project": 3,
     "store": 4,
-    "cli": 5,
-    "__main__": 6,
+    "summarize": 5,
+    "unclosed": 5,
+    "harvest": 6,
+    "boundaries": 7,
+    "cli": 8,
+    "__main__": 9,
 }
 
 
@@ -102,9 +108,30 @@ def test_there_is_something_to_scan():
 # ── the rules ────────────────────────────────────────────────────────────────
 
 
+def stdlib_names() -> frozenset[str]:
+    """Top-level stdlib module names. ``sys.stdlib_module_names`` is 3.10+; the
+    runtime floor is 3.9 (spec §10), so fall back to listing the stdlib dir."""
+    names = getattr(sys, "stdlib_module_names", None)
+    if names is not None:
+        return frozenset(names)
+    import sysconfig
+
+    found = set(sys.builtin_module_names)
+    for base in {Path(sysconfig.get_paths()[key]) for key in ("stdlib", "platstdlib")}:
+        for folder in (base, base / "lib-dynload"):
+            if folder.is_dir():
+                found.update(e.name.split(".")[0] for e in folder.iterdir() if e.name != "site-packages")
+    return frozenset(found)
+
+
+def test_the_stdlib_list_knows_the_basics():
+    assert {"json", "os", "subprocess", "fcntl", "hashlib"} <= stdlib_names()
+    assert "yaml" not in stdlib_names() and "pytest" not in stdlib_names()
+
+
 @pytest.mark.parametrize("path", lib_modules(), ids=lambda p: dotted(p))
 def test_runtime_imports_are_stdlib_or_claudna(path):
-    stdlib = sys.stdlib_module_names
+    stdlib = stdlib_names()
     bad = [(name, line) for name, line in imports_of(path.read_text(), dotted(path))
            if name.split(".")[0] not in stdlib and name.split(".")[0] != PACKAGE]
     assert not bad, f"{path}: non-stdlib runtime imports {bad}"
