@@ -101,3 +101,35 @@ class TestLegitimateCommandsStillApprove:
     def test_fd_dup_form_approves(self, tmp_path):
         # `>&`: another fd-duplication spelling.
         assert approves(tmp_path, "git status >& /tmp/out")
+
+
+class TestTheLogIsPerUserAndPrivate:
+    """The log holds whole command lines. It lives in the user's own state
+    directory, readable by the user alone, never at a fixed path in /tmp."""
+
+    @staticmethod
+    def _run(tmp_path: Path, extra_env: dict | None = None) -> subprocess.CompletedProcess:
+        claude = tmp_path / ".claude"
+        claude.mkdir(exist_ok=True)
+        (claude / "settings.json").write_text(json.dumps({"permissions": {"allow": ALLOW}}))
+        payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "git status"}})
+        env = {"HOME": str(tmp_path), "PATH": "/usr/bin:/bin", **(extra_env or {})}
+        return subprocess.run(
+            ["bash", str(HOOK)], input=payload, capture_output=True, text=True, cwd=tmp_path, env=env, timeout=10
+        )
+
+    def test_the_log_is_in_the_users_state_dir_and_readable_by_the_user_alone(self, tmp_path):
+        proc = self._run(tmp_path)
+        assert '"permissionDecision":"allow"' in proc.stdout, proc.stdout + proc.stderr
+        log = tmp_path / ".local" / "state" / "claudna" / "permissions.log"
+        assert log.is_file(), proc.stderr
+        assert log.stat().st_mode & 0o077 == 0, oct(log.stat().st_mode)
+        assert "git status" in log.read_text()
+
+    def test_xdg_state_home_decides_where_it_goes(self, tmp_path):
+        state = tmp_path / "state"
+        self._run(tmp_path, {"XDG_STATE_HOME": str(state)})
+        assert (state / "claudna" / "permissions.log").is_file()
+
+    def test_the_hook_names_no_path_in_tmp(self):
+        assert "/tmp" not in HOOK.read_text()
