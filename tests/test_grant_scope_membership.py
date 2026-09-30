@@ -65,12 +65,24 @@ REFUSE_GH_VERBS = [
     # gh pr <write>
     "gh pr create *", "gh pr edit *", "gh pr merge *", "gh pr close *",
     "gh pr comment *", "gh pr review *", "gh pr ready *", "gh pr reopen *",
-    "gh pr lock *", "gh pr unlock *", "gh pr checkout *",
+    "gh pr lock *", "gh pr unlock *", "gh pr checkout *", "gh pr revert *",
+    "gh pr update-branch *",
     # gh issue <write>
     "gh issue create *", "gh issue edit *", "gh issue close *",
     "gh issue comment *", "gh issue delete *", "gh issue reopen *",
     "gh issue lock *", "gh issue unlock *", "gh issue pin *",
     "gh issue unpin *", "gh issue transfer *", "gh issue develop *",
+]
+
+# claudron doctor: only the exact read form is granted. `--fix` writes, and a
+# prefix rule also matches the flags that follow it (vera #360 round 5).
+ACCEPT_CLAUDRON_DOCTOR = "Bash(claudron doctor --json)"
+REFUSE_CLAUDRON_DOCTOR = [
+    "Bash(claudron doctor *)",
+    "Bash(claudron doctor --json *)",
+    "Bash(claudron doctor --fix)",
+    "Bash(claudron doctor --json --fix)",
+    "Bash(claudron doctor --json --vault *)",
 ]
 
 # Every READ verb a skill needs must stay allowed (the set must not be narrowed).
@@ -109,8 +121,15 @@ def test_gh_read_verbs_allowed():
 def test_command_refused_except_lookup():
     assert refused("Bash(command git status)")
     assert refused("Bash(command *)")
+    assert refused("Bash(command -p *)")
     assert accepted("Bash(command -v python3)")
     assert accepted("Bash(command -v *)")
+
+
+def test_claudron_doctor_only_the_exact_json_form():
+    assert accepted(ACCEPT_CLAUDRON_DOCTOR)
+    missed = [e for e in REFUSE_CLAUDRON_DOCTOR if not refused(e)]
+    assert missed == [], f"claudron doctor grant accepted: {missed}"
 
 
 def test_read_only_positive_controls_still_pass():

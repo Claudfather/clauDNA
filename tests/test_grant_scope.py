@@ -208,7 +208,7 @@ ACCEPTED_FORMS = [
     "Bash(cp *)",
     # safe claudron subcommands
     "Bash(claudron status *)",
-    "Bash(claudron doctor)",
+    "Bash(claudron doctor --json)",
 ]
 
 
