@@ -53,18 +53,19 @@ gh release view --repo Claudfather/clauDNA --json tagName -q '.tagName' 2>/dev/n
 
 ### 3. Verify hooks
 
-Read `$PLUGIN_ROOT/plugin-hooks/hooks.json`. Verify **all six wired hooks** and that each referenced script exists on disk:
+Read `$PLUGIN_ROOT/plugin-hooks/hooks.json`. Verify **all wired hooks** and that each referenced script exists on disk:
 
 | Hook | Event | Matcher |
 |------|-------|---------|
 | session-start | SessionStart | startup\|clear |
 | pretooluse-permissions | PreToolUse | Bash |
 | auto-format | PostToolUse | Write\|Edit |
-| telemetry-emit | PostToolUse | Skill |
 | precompact-reflect | PreCompact | *(any)* |
 | notify | Notification | *(any)* |
+| session-store | SessionStart, PreCompact, SessionEnd | *(any)* |
+| session-store (async) | UserPromptSubmit, PostToolUseFailure; PostToolUse | *(any)*; Skill |
 
-- **PASS** — all six present in JSON, all scripts exist. **WARN** — entries or scripts missing (list them). **FAIL** — hooks.json missing/unparseable. `statusline.sh` is opt-in, informational only.
+- **PASS** — all present in JSON, all scripts exist. **WARN** — entries or scripts missing (list them). **FAIL** — hooks.json missing/unparseable. `statusline.sh` is opt-in, informational only.
 
 ### 4. Scan skills
 

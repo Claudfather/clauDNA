@@ -112,7 +112,7 @@ Identity hierarchy, each level stable across a different boundary:
 | SessionStart `fork` | `session.opened` for the new session id (`--fork-session`, `/fork`, `/branch`; Claude Code before v2.1.214 reported these as `resume`); `segment.opened`. Lineage to the source session is a phase 3 canary. |
 | UserPromptSubmit | `prompt.submitted` (segment events) |
 | PostToolUse (Skill) | `skill.invoked` |
-| PostToolUseFailure | `tool.failed` (failing calls fire this event, not PostToolUse, and only it carries the error field) |
+| PostToolUseFailure | `tool.failed` (failing calls fire this event, not PostToolUse, and only it carries the error field); `tool.interrupted` when `is_interrupt` (the user pressed Esc). The three activity hooks run `async` (phase 4). |
 | PreCompact | `segment.sealed` — record end offset; start summarizer on that range. Idempotent: a second PreCompact (first was blocked) re-seals with the later offset. |
 | SessionStart `compact` | `segment.opened` for index N+1, start = last seal offset. If no seal exists (missed PreCompact), `open_segment` seals first at the new start, `sealed_by: "compact"`. |
 | SessionEnd | `segment.sealed` (final); `session.closed`; start summarizer; on `reason=clear` write the clear link. |
@@ -230,8 +230,9 @@ Every line in every log:
 | kind | data |
 |---|---|
 | `prompt.submitted` | `{ prompt_id: string\|null, chars: int, text: Text (≤500, off by default) }` |
-| `skill.invoked` | `{ skill: string, args_chars: int }` |
-| `tool.failed` | `{ tool: string, signature: string, exit_code: int\|null, command: Text (≤300), error: Text (≤800) }` — `signature` is a stable grouping key (tool + normalized first error line), computed at write time so readers group without re-parsing |
+| `skill.invoked` | `{ skill: string, args_chars: int, ok?: bool\|null, duration_ms?: int\|null, prompt_id?, tool_use_id? }` |
+| `tool.failed` | `{ tool: string, signature: string (≤200), exit_code: int\|null, duration_ms?, prompt_id?, tool_use_id? }`. `signature` is a stable grouping key (tool + the first real error line, normalized and redacted), computed at write time so readers group without re-parsing. **No copy of the command or its stderr** (phase 4 decision): `tool_use_id` points at the call in the transcript, which holds both. |
+| `tool.interrupted` | `{ tool: string, duration_ms?, prompt_id?, tool_use_id? }`. The user stopped the call: counted as `interrupts`, never as a failure. |
 | `checkpoint.noted` | `{ note: Text (≤1000) }` — from `/claudna:session checkpoint` |
 
 ### 6.3 Why two logs
@@ -470,7 +471,7 @@ The loop closes first; everything else broadens a loop that already works.
 1. **Store core** — `store`, `events`, `project`, schemas + fixtures, `rebuild`. No hooks wired.
 2. **Thin vertical slice** (shipped 2026-09-30) — the minimum that proves the loop end to end: SessionStart / PreCompact / SessionEnd boundaries → segment summary with `journey` + `blocks` → harvest (one capture per block; the plan model waits on Claudron#200) → one draft note written through Claudron (today's `claudron capture` until [Claudron#200](https://github.com/Claudfather/Claudron/issues/200)'s pipes land) → visible in the recall brief's Unverified block. Ugly is fine; closed is required. Includes the liveness line.
 3. **Boundaries, complete** — clear lineage, `chain_id`, child isolation (done early, in #373), unclosed sessions closed as `abandoned` by `session seal <sid>` and a detached `session sweep`. Canaries for §11.3–11.4. Plan: `documentation/plans/2026-09-30-session-store-phase-3.md`.
-4. **Activity** — `prompt.submitted`, `skill.invoked`, `tool.failed`; migrate `telemetry-emit.sh`.
+4. **Activity** — `prompt.submitted`, `skill.invoked`, `tool.failed`, `tool.interrupted`; `telemetry-emit.sh` migrated into the store (`telemetry.py`). Plan: `documentation/plans/2026-09-30-session-store-phase-4.md`.
 5. **Harvest, complete** — risk tiers, inbox + ambiguous queues, evidence counting, `revert-run`, the promotion digest (`/claudna:capture --review`).
 6. **Readers + export** — `list`, `show`, `timeline`, `failures`; the export envelope and acks; retention sweep.
 7. **Ops log** — `~/.claudna/runs/` and per-session ops records, mirroring `.claudron/`.

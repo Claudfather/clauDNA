@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **The session store records activity (phase 4).** Each segment's `events.jsonl` gets one line per prompt (`prompt.submitted`: its length, with the text only under `CLAUDNA_CAPTURE_PROMPTS=1`), per Skill call (`skill.invoked`: the real `ok` and `duration_ms`), per failing tool call (`tool.failed`), and per call the user stopped with Esc (`tool.interrupted`, never counted as a failure). `segment.json` counts all four, and `interrupts` is new and optional, so 0.22 projections still validate. The three hooks (UserPromptSubmit, PostToolUse on `Skill`, PostToolUseFailure) are `async`, so no prompt waits on the store; one that lands after SessionEnd records and logs nothing. Tool events **point into the transcript instead of copying it**: `tool.failed` keeps the tool, the exit code, a normalized and redacted one-line signature for grouping, and `tool_use_id`/`prompt_id`, and its `command`/`error` fields are gone. The nested-child guard covers activity unchanged.
+
+### Changed
+- **Skill telemetry moves into the session store, with real values.** The Claudosseum `skill_invocation` line is now written by the store's PostToolUse hook (`telemetry.py`). It keeps the same opt-in (`CLAUDNA_TELEMETRY=1`), path and shape, and works with the store off. `data.success` and `data.duration_ms` now come from Claude Code instead of a grep of the output and `null`, and `data.session_id` is the real session id instead of a shell pid. Pruning (30 days) moved to the background sweep. `plugin-hooks/telemetry-emit.sh` is a no-op for this release and will be removed in the next. SETUP_GUIDE §8 now documents the line as it really is.
 
 ## [0.22.0] - 2026-09-30
 ### Added

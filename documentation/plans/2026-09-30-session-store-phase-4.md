@@ -1,6 +1,6 @@
 # Session store, phase 4: activity — design notes
 
-**Status:** prep, 2026-09-30. Written locally after phase 3 (#383) merged. It lands as its own PR.
+**Status:** built, 2026-09-30, after phase 3 (#383). The owner's answers are recorded under "Decisions" at the end, and they override the proposals above where the two differ.
 **Spec:** `documentation/specs/2026-09-28-session-store-design.md` §4.2 (hook → store action), §6.2 (activity kinds), §6.5 (`segment.json` counts), P4 (metadata by default), §11 item 2 (prompt text, decided), §12 item 4.
 
 Phase 4 records what happens *inside* a segment:
@@ -91,11 +91,9 @@ P4 says free text (prompts, stderr) is off unless opted in. `tool.failed.command
   - **interactive** timing on a plain machine, to confirm an async UserPromptSubmit adds nothing a person can feel;
   - `PostToolUseFailure` for a **Skill** that fails, and for an MCP tool, to see what their `error` looks like.
 
-## Open questions for the owner
+## Decisions (owner, 2026-09-30)
 
-1. **Is `tool.failed` free text off by default?** Proposed: yes. `command` and `error` only with `CLAUDNA_CAPTURE_TOOL_ERRORS=1`, and signatures always on.
-2. **Is the telemetry contract migrated, and fixed?** Proposed: the store writes the Claudosseum line and `telemetry-emit.sh` retires after a one-release shim. Within that, choose:
-   - keep `success`, `duration_ms` and `session_id` byte-compatible (the heuristic, `null` and a pid);
-   - or switch them to the payload's real values, which Claudosseum would need to know about.
-3. **Interrupts:** don't record them (proposed), or count them as their own `tool.interrupted` kind?
-4. **`prompt_id` on tool events:** add it (proposed; additive), or leave the registry as the spec has it?
+1. **`tool.failed` free text: none, by design, not by opt-in.** From first principles, the value of a failure record is the *pattern*: the same error across sessions, the command that always fails first. A person or the summarizer can turn a pattern into a procedure. The full text of any one failure already sits in Claude Code's transcript. So the store keeps a **pointer, not a copy**: the signature (always on, normalized and redacted), the exit code, and `tool_use_id`, which names the call in the transcript. A reader that needs the text resolves it there and redacts it on display. `command` and `error` are gone from the registry, and there's no `CLAUDNA_CAPTURE_TOOL_ERRORS`. This is the same reasoning as prompt text (§11 item 2).
+2. **Telemetry: migrated, with the real values.** Claudosseum is barely in use, so correcting the contract costs little: `success`, `duration_ms` and `session_id` now come from the payload, and Claudosseum is told. `telemetry-emit.sh` is a no-op shim for one release.
+3. **Interrupts: their own kind.** From the user's side, pressing Esc is intent, not failure. Counting it as a failure would make "top failing commands" noisy. But it is a signal worth keeping, because it marks where the agent went off track. So `tool.interrupted` is recorded without text and counted as `interrupts`, separately from `failures`.
+4. **`prompt_id` on tool events:** added, as are `tool_use_id` and `duration_ms`.
