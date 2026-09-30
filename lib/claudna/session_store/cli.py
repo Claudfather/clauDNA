@@ -45,6 +45,7 @@ import dataclasses
 import json
 import os
 import sys
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -317,6 +318,11 @@ def main(argv: list[str] | None = None) -> int:
     dig.add_argument("--json", action="store_true")
     dig.add_argument("--done", metavar="ITEM", help="take an item (a note path or a held fact's key) off the digest")
     dig.add_argument("--outcome", choices=("promoted", "discarded", "kept"), default="kept")
+    rns = sub.add_parser("runs", help="the ops log: the store's background runs, newest first", parents=[rooted])
+    rns.add_argument("--kind", choices=("summarize", "harvest", "sweep"))
+    rns.add_argument("--since", help="7d, 12h, 2w, or an ISO date")
+    rns.add_argument("--limit", type=int, default=50)
+    rns.add_argument("--json", action="store_true")
     harv = sub.add_parser("harvest", help="write summarized blocks to the vault as drafts (via claudron)",
                           parents=[rooted])
     harv.add_argument("--force", action="store_true", help="run even if the last run is recent")
@@ -333,7 +339,14 @@ def main(argv: list[str] | None = None) -> int:
         store = _store(args)
         if store is None:
             return 1
-        print(json.dumps(harvest.harvest(store, force=args.force).as_dict()))
+        from . import ops
+
+        started = time.time()
+        report = harvest.harvest(store, force=args.force).as_dict()
+        ops.record(store.root, "harvest", started=started, outcome=report.get("status") or "done",
+                   detail={k: report.get(k) for k in ("created", "known", "held_back", "rejected", "retried",
+                                                      "gave_up", "segments", "errors")})
+        print(json.dumps(report))
         return 0
     if args.verb in ("list", "show", "timeline", "failures"):
         return _read(args)
@@ -347,13 +360,36 @@ def main(argv: list[str] | None = None) -> int:
         # The sweep acts for every session, so no session's summary override applies to the others:
         # each abandoned session is summarized only by its own recorded opt-in (the #373 B2 rule).
         own = {k: v for k, v in env.items() if k != SUMMARY_ENV}
+        from . import ops
+
+        started = time.time()
         report = unclosed.sweep(store, env, dry_run=args.dry_run,
                                 close=lambda h, pid: boundaries.abandon_session(h, own, owner_pid=pid)).as_dict()
         if not args.dry_run:  # retention (spec §9) rides the same detached, debounced worker
             from . import retention
 
             report["retention"] = retention.sweep(store, env).as_dict()
+            retired = report["retention"]["retired"]
+            errors = report["errors"] + report["retention"]["errors"]
+            ops.record(store.root, "sweep", started=started, outcome="error" if errors else "done",
+                       sessions=report["closed"] + [r.split("/", 1)[0] for r in retired],
+                       detail={"closed": len(report["closed"]), "retired": len(retired), "errors": errors[:5]})
         print(json.dumps(report))
+        return 0
+    if args.verb == "runs":
+        store = _store(args)
+        if store is None:
+            return 1
+        from . import ops, readers
+
+        found = ops.runs(store.root, kind=args.kind, since=readers.since_cutoff(args.since), limit=args.limit)
+        if args.json:
+            print(json.dumps(found, indent=2))
+        else:
+            for r in found:
+                who = f"  {len(r['sessions'])} session(s)" if r["sessions"] else ""
+                print(f"{r['started_at']}  {r['kind']:9} {r['duration_ms']:>7} ms  {r['outcome']}{who}")
+            print("no runs" if not found else "")
         return 0
     if args.verb == "export":
         return _export(args)
@@ -394,7 +430,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.verb == "summarize":
         from . import summarize  # off the hook path: it pulls in hashlib, uuid and subprocess
 
-        print(summarize.summarize(handle, args.seg))
+        from . import ops
+
+        started = time.time()
+        outcome = summarize.summarize(handle, args.seg)
+        ops.record(handle.paths.root, "summarize", started=started, outcome=outcome, sessions=[handle.sid],
+                   detail={"seg": args.seg})
+        print(outcome)
         return 0
     if args.verb == "rebuild":
         report = handle.rebuild()

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **The session store can be read (phase 6).**
+  - `session_store list|show|timeline|failures`, also as `/claudna:session` verbs: sessions newest first, one session with its lineage and segments, a merged event timeline, and tool failures grouped by signature across sessions. They're read-only: an untrusted projection is folded from its log, never written.
+  - Each session gets a deterministic rollup, `sessions/<sid>/summary.json` (spec §6.7), refreshed after every segment summary.
+  - `session_store export --consumer <name>` is the door Claudron reads through (`claudna.export/1`), with `--ack` to move a consumer's cursor.
+  - **Retention:** the background sweep retires a segment once every registered consumer acked it and it is 7 days old, or once it is 30 days old. It logs `segment.retired` first and keeps what the segment summarized in the rollup.
+- **The promotion digest (phase 5, clauDNA side).**
+  - Harvest keeps a ledger of every draft it writes, with a claim key, and counts how many sessions asserted each claim.
+  - `session_store digest` lists up to 5 drafts, most-reinforced first, plus held person facts. SessionStart shows a `Memory, to review:` line, and `/claudna:capture --review` lets a person promote (`claudron promote`), discard or skip each one.
+  - Subject resolution, risk tiers, the queues and `revert-run` still wait on Claudron#200.
+- **The ops log (phase 7).** Every background run (summarizer, harvest, sweep) leaves one record in `~/.claudna/runs/runs.jsonl`, and `session_store runs` reads it.
 - **The session store records activity (phase 4).** Each segment's `events.jsonl` gets one line per prompt (`prompt.submitted`: its length, with the text only under `CLAUDNA_CAPTURE_PROMPTS=1`), per Skill call (`skill.invoked`: the real `ok` and `duration_ms`), per failing tool call (`tool.failed`), and per call the user stopped with Esc (`tool.interrupted`, never counted as a failure). `segment.json` counts all four, and `interrupts` is new and optional, so 0.22 projections still validate. The three hooks (UserPromptSubmit, PostToolUse on `Skill`, PostToolUseFailure) are `async`, so no prompt waits on the store; one that lands after SessionEnd records and logs nothing. Tool events **point into the transcript instead of copying it**: `tool.failed` keeps the tool, the exit code, a normalized and redacted one-line signature for grouping, and `tool_use_id`/`prompt_id`, and its `command`/`error` fields are gone. The nested-child guard covers activity unchanged.
 
 ### Changed

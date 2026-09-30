@@ -436,10 +436,10 @@ Returns an envelope: `{ schema: "claudna.export/1", items: [{ sid, seg, session:
 
 ## 9. Retention
 
-- A segment is deletable once every registered consumer has acked it, or once it passes the hard cap (default 30 days), whichever comes first.
+- A segment is deletable once every registered consumer has acked it, or once it passes the hard cap (default 30 days), whichever comes first. **As built (phase 6):** an acked segment also waits a 7-day floor (`CLAUDNA_RETAIN_ACKED_DAYS`), because harvest acks at once and would otherwise erase recent history. The rollup keeps what a retired segment summarized.
 - **An index is never reused.** `open_segment` numbers one past every index the session has ever named (directories *and* `segment.opened` events), so a new segment can't inherit a deleted one's lifecycle events, and export watermarks (`through_seg`) stay monotonic. When retention ships (phase 6) it records each deletion as a `segment.retired` lifecycle event before removing the directory, so a deletion is visible in the log rather than inferred from a missing directory.
 - Sessions with no registered consumers use the age cap alone.
-- Sweeping runs at SessionStart (bounded to a few ms of `stat` calls), never at SessionEnd.
+- Sweeping is started by SessionStart (one marker `stat`), and runs detached and debounced (at most every 6 hours) in the unclosed-session sweep. Never at SessionEnd.
 - Private sessions are swept on the same rules; they are never exported.
 
 ## 10. Implementation shape
@@ -472,6 +472,6 @@ The loop closes first; everything else broadens a loop that already works.
 2. **Thin vertical slice** (shipped 2026-09-30) — the minimum that proves the loop end to end: SessionStart / PreCompact / SessionEnd boundaries → segment summary with `journey` + `blocks` → harvest (one capture per block; the plan model waits on Claudron#200) → one draft note written through Claudron (today's `claudron capture` until [Claudron#200](https://github.com/Claudfather/Claudron/issues/200)'s pipes land) → visible in the recall brief's Unverified block. Ugly is fine; closed is required. Includes the liveness line.
 3. **Boundaries, complete** — clear lineage, `chain_id`, child isolation (done early, in #373), unclosed sessions closed as `abandoned` by `session seal <sid>` and a detached `session sweep`. Canaries for §11.3–11.4. Plan: `documentation/plans/2026-09-30-session-store-phase-3.md`.
 4. **Activity** — `prompt.submitted`, `skill.invoked`, `tool.failed`, `tool.interrupted`; `telemetry-emit.sh` migrated into the store (`telemetry.py`). Plan: `documentation/plans/2026-09-30-session-store-phase-4.md`.
-5. **Harvest, complete** — risk tiers, inbox + ambiguous queues, evidence counting, `revert-run`, the promotion digest (`/claudna:capture --review`).
-6. **Readers + export** — `list`, `show`, `timeline`, `failures`; the export envelope and acks; retention sweep.
-7. **Ops log** — `~/.claudna/runs/` and per-session ops records, mirroring `.claudron/`.
+5. **Harvest, complete** — risk tiers, inbox + ambiguous queues, evidence counting, `revert-run`, the promotion digest (`/claudna:capture --review`). **Built, the clauDNA side:** the harvest ledger, evidence counting and the promotion digest. Still blocked on Claudron#200: subjects, the plan model, section writes, `revert-run`, risk tiers and the queues. Plan: `documentation/plans/2026-09-30-session-store-phases-5-7.md`.
+6. **Readers + export** — `list`, `show`, `timeline`, `failures`; the export envelope and acks; retention sweep. **Built**, with the §6.7 rollup.
+7. **Ops log** — `~/.claudna/runs/` and per-session ops records, mirroring `.claudron/`. **Built:** `runs/runs.jsonl`, one record per background run. Per-session history is the lifecycle log.
