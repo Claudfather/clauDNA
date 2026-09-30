@@ -208,6 +208,19 @@ def test_a_local_settings_file_tracked_in_git_does_not_choose_the_directory(tmp_
     assert resolve_memory_dir(cwd, home) == memory
 
 
+def test_a_tracked_local_settings_file_in_a_repository_subdirectory_does_not_count(tmp_path):
+    """The file sits below the repository root: the `.git` that says it is tracked is above it."""
+    home, cwd, memory = _fleet_bot_layout(tmp_path)
+    _git(cwd, "init", "-q")
+    package = cwd / "packages" / "app"
+    chosen = _memory_dir(tmp_path / "chosen-by-a-subdirectory")
+    _write_settings(package, "settings.local.json", {"autoMemoryDirectory": str(chosen)})
+    _git(cwd, "add", "packages/app/.claude/settings.local.json")
+    (package / "src").mkdir()
+
+    assert resolve_memory_dir(package / "src", home) == memory
+
+
 def test_an_untracked_local_settings_file_in_a_git_checkout_still_counts(tmp_path):
     """The user's own `settings.local.json` in a checkout keeps choosing the directory."""
     home, cwd, memory = _fleet_bot_layout(tmp_path)
