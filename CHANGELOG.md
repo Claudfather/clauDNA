@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- **`scripts/redact.py` masks current credential shapes ([#356](https://github.com/Claudfather/clauDNA/issues/356)).** It missed several formats in use today. The rules that change:
+  - Vendor prefixes for current formats: `github_pat_`, `sk_live_`/`rk_test_`, `whsec_`, `sk-proj-`/`sk-ant-`/`sk-or-`, `npm_`, `hf_`, `gsk_`, `glpat-`, `ASIA`, `xox?-` and `xapp-`.
+  - Telegram tokens inside a bot URL.
+  - Secret-named assignments whose keyword sits anywhere in the name (`SECRET_KEY`, `GITHUB_PAT`, `DB_PASS`), keeping the name; `tokenizer` and `max_tokens` still pass.
+  - Auth headers, `--access-token`/`--api-token`, `-u user:password`, URL passwords with an empty user, and PEM private-key blocks.
+  - The high-entropy backstop now ends a run at `_` and `-`.
+  - In place, each file is handled on its own: one that fails is reported, the rest are still redacted, and the exit status is non-zero. A file that is not UTF-8 is redacted with its other bytes kept, and a symlink is refused rather than written through.
+  - Coverage is stated as the tested list (`tests/test_redact.py`, one case per shape) in the script and in `orchestration-guide.md`.
 - **`github-activity-report`**: the reference line for `crawl.sh` said to copy the script into a working directory and run it, which contradicted the crawl step. It now says, as the step does, to run the bundled script from the skill's own directory, never a copy.
 
 ## [0.21.1] - 2026-09-30

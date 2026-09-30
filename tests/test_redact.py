@@ -284,6 +284,12 @@ class TestCurrentShapes:
         assert value not in out, out
         assert MASK in out
 
+    def test_backstop_catches_a_run_after_an_underscore(self):
+        # No known prefix: only the backstop can catch it, and `_` must end a run.
+        run = "Zx9Kq2Wm7Pn4Rt6Vb1Yc3Df5Gh8Jk0Ll2Mn4"  # FAKE
+        out = redact_text("export VENDOR_SESSION=unknownvendor_" + run)
+        assert run not in out and MASK in out
+
     def test_keeps_the_name_of_a_masked_assignment(self):
         out = redact_text("SECRET_KEY=" + "Fk3" * 8)
         assert out.startswith("SECRET_KEY=") and MASK in out
