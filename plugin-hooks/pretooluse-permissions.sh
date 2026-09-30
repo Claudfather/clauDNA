@@ -86,11 +86,15 @@ JQ_RESULT="$(
     ($input.tool_input.command // "") as $cmd |
     if $tool != "Bash" or $cmd == "" then "exit 0"
     else
-      [.[1:] | .[].permissions.allow? // [] | .[] |
-       select(. == "Bash" or startswith("Bash("))] as $raw |
-      ([$raw[] | select(. == "Bash")] | length > 0) as $has_bare |
-      [$raw[] | select(. != "Bash") |
-       ltrimstr("Bash(") | rtrimstr(")")] | unique as $specs |
+      (.[1].permissions.allow? // []) as $user |
+      ((.[2].permissions.allow? // []) + (.[3].permissions.allow? // [])) as $proj |
+      ([$user[] | select(. == "Bash")] | length > 0) as $has_bare |
+      ([$user[] | select(startswith("Bash(")) |
+        ltrimstr("Bash(") | rtrimstr(")")]) as $user_specs |
+      ([$proj[] | select(startswith("Bash(")) |
+        ltrimstr("Bash(") | rtrimstr(")") |
+        select((contains("*") or contains("?") or contains("[")) | not)]) as $proj_specs |
+      (($user_specs + $proj_specs) | unique) as $specs |
       "COMMAND=" + ($cmd | @sh) +
       "\nHAS_BARE=" + (if $has_bare then "true" else "false" end) +
       "\nSPECS=(" + ([$specs[] | @sh] | join(" ")) + ")"
@@ -218,6 +222,22 @@ matches_any() {
     return 1
 }
 
+# ─── Write-redirection guard ──────────────────────────────────────────
+# A prefix rule like `Bash(git *)` glob-matches the whole sub-command, so
+# `git log > ~/.bashrc` matches `git *` and would auto-approve a write to a
+# path the rule never meant to cover. A redirection is not a split point, so
+# it rides inside the sub-command. Force a prompt on any output redirection to
+# a file, even on a prefix match. fd-duplications (2>&1, >&2) and the std
+# devices are not writable files a rule needs to cover, and stay auto-approvable.
+has_write_redirection() {
+    local s
+    s="$(printf '%s' "$1" | sed -E '
+        s/[0-9]*[<>]&[0-9-]+//g
+        s/[0-9]*>>?[[:space:]]*\/dev\/(null|stdout|stderr)\>//g
+    ')"
+    [[ "$s" == *'>'* ]]
+}
+
 # ─── Main logic ───────────────────────────────────────────────────────
 
 SPLIT_OUTPUT=$(split_commands "$COMMAND") || {
@@ -237,6 +257,10 @@ if [[ ${#SUBCMDS[@]} -eq 0 ]]; then
 fi
 
 for sub in "${SUBCMDS[@]}"; do
+    if has_write_redirection "$sub"; then
+        log "PASS: $COMMAND (write redirection, prompt kept: $sub)"
+        exit 0
+    fi
     if ! matches_any "$sub" "${SPECS[@]}"; then
         log "PASS: $COMMAND (no match for: $sub)"
         exit 0
