@@ -26,15 +26,28 @@ def main() -> int:
     The in-place file form is the pipe-free invocation the review + subagent
     chains use: they already write findings to disk, so ``python3 redact.py
     <file>`` scrubs credentials without a shell pipe (orchestration-guide §7).
+
+    Each file is handled on its own: one that cannot be read or written is
+    reported and the rest are still redacted, and the exit status is non-zero
+    if any failed. A file that is not valid UTF-8 is still redacted, its other
+    bytes kept as they were. A symlink is refused rather than written through.
     """
     paths = sys.argv[1:]
-    if paths:
-        for path in paths:
-            target = Path(path)
-            target.write_text(redact_text(target.read_text()))
+    if not paths:
+        sys.stdout.write(redact_text(sys.stdin.read()))
         return 0
-    sys.stdout.write(redact_text(sys.stdin.read()))
-    return 0
+    failed = 0
+    for path in paths:
+        target = Path(path)
+        try:
+            if target.is_symlink():
+                raise OSError("a symlink; not writing through it")
+            text = target.read_text(encoding="utf-8", errors="surrogateescape")
+            target.write_text(redact_text(text), encoding="utf-8", errors="surrogateescape")
+        except OSError as exc:
+            failed += 1
+            print(f"redact.py: {path}: not redacted ({exc.strerror or exc})", file=sys.stderr)
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
