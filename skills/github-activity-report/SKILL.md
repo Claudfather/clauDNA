@@ -11,7 +11,7 @@ requires:
 
 Pulls accurate per-org or per-user GitHub activity stats over a chosen time window. Avoids the GitHub search API's 1,000-result pagination cap by iterating each repo's `pulls` and `commits` endpoints directly.
 
-**Reference:** `crawl.sh` — the per-repo crawl script. Copy it into a working directory and run.
+**Reference:** `crawl.sh` — the per-repo crawl script. Run the bundled script from this skill's own directory, never a copy.
 
 ---
 
