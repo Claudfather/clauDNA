@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Callable, Mapping
 
 from . import events as ev
+from . import harvest
 from .paths import CHILD_ENV, InvalidSessionId
 from .fsio import ensure_dir, file_size
 from .project import SessionFacts, load_lifecycle, session_facts, summary_gate
@@ -71,25 +72,29 @@ def actor_from_env(env: Mapping[str, str]) -> dict:
 
 
 def origin_from_cwd(cwd: str) -> dict:
-    """Where the session runs: its cwd, plus the git branch and HEAD when there is one.
+    """Where the session runs: its cwd, plus the repo's root name, branch and HEAD when there is one.
+
+    ``repo`` is the name of the repository's top-level directory — what
+    ``/claudna:capture`` scopes repo-specific findings to (``--project``).
 
     One bounded ``git`` call; fsmonitor is disabled because a repository's own
     config could otherwise name a command for git to run.
     """
     import subprocess  # only an opening SessionStart needs it; the other hooks skip the import
 
-    branch = head = None
+    repo = branch = head = None
     try:
         out = subprocess.run(
-            ["git", "-c", "core.fsmonitor=", "rev-parse", "HEAD", "--abbrev-ref", "HEAD"],
+            ["git", "-c", "core.fsmonitor=", "rev-parse", "--show-toplevel", "HEAD", "--abbrev-ref", "HEAD"],
             cwd=cwd, capture_output=True, text=True, timeout=1, check=True,
-        ).stdout.split()
-        if len(out) == 2:  # the sha, then the branch (--abbrev-ref applies to later args only)
-            head = out[0]
-            branch = None if out[1] == "HEAD" else out[1]  # "HEAD" means detached
+        ).stdout.splitlines()
+        if len(out) == 3:  # the top level, the sha, then the branch (--abbrev-ref applies to later args only)
+            repo = os.path.basename(out[0]) or None
+            head = out[1]
+            branch = None if out[2] == "HEAD" else out[2]  # "HEAD" means detached
     except (OSError, subprocess.SubprocessError):
         pass
-    return {"cwd": cwd, "repo": None, "branch": branch, "head": head}
+    return {"cwd": cwd, "repo": repo, "branch": branch, "head": head}
 
 
 # ── actions ──────────────────────────────────────────────────────────────────
@@ -107,26 +112,35 @@ def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str])
                         origin=origin_from_cwd(payload.get("cwd") or os.getcwd()),
                         transcript_path=transcript)
     handle.open_segment("session_open", file_size(transcript))
+    if harvest.is_due(handle.paths.root, env):  # spec §7.2: harvest runs at SessionStart, detached
+        spawn_harvest(handle.paths.root, env)
     return f"session opened ({source})"
 
 
-def spawn_summarizer(handle: SessionHandle, index: int, env: Mapping[str, str]) -> None:
-    """Start ``session_store summarize <sid> <index>`` detached, and return at once.
+def spawn_worker(root: Path, args: list[str], env: Mapping[str, str], *, log: str) -> None:
+    """Start ``session_store <args> --root <root>`` detached, and return at once.
 
     Its own session (``start_new_session``), so a group kill of the hook's tree
     doesn't reap it; ``CLAUDNA_SESSION_CHILD=1``, so nothing it starts records
-    into the store; its stderr goes to ``<root>/hooks/summarizer.stderr``.
+    into the store; its stderr goes to ``<root>/hooks/<log>``.
     """
     import subprocess
 
-    root = handle.paths.root
     package = Path(__file__).resolve().parent
-    with open(ensure_dir(root / "hooks") / "summarizer.stderr", "ab") as err:
+    with open(ensure_dir(root / "hooks") / log, "ab") as err:
         subprocess.Popen(
-            [sys.executable, "-S", str(package), "summarize", handle.sid, str(index), "--root", str(root)],
+            [sys.executable, "-S", str(package), *args, "--root", str(root)],
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=err,
             env={**env, CHILD_ENV: "1"}, start_new_session=True, close_fds=True,
         )
+
+
+def spawn_summarizer(handle: SessionHandle, index: int, env: Mapping[str, str]) -> None:
+    spawn_worker(handle.paths.root, ["summarize", handle.sid, str(index)], env, log="summarizer.stderr")
+
+
+def spawn_harvest(root: Path, env: Mapping[str, str]) -> None:
+    spawn_worker(root, ["harvest"], env, log="harvest.stderr")
 
 
 def _seal(handle: SessionHandle, payload: dict, facts: SessionFacts, env: Mapping[str, str], *,

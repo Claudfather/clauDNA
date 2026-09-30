@@ -27,6 +27,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Literal
 
+from claudna.redact import redact_text
+
 from . import schema
 
 ENVELOPE_VERSION = 1
@@ -264,18 +266,25 @@ def placement_errors(obj: dict, *, sid: str, log: str, seg: int | None) -> list[
 
 
 def cap_text(kind: str, data: dict) -> dict:
-    """Return a copy of ``data`` with free-text fields truncated to their caps."""
+    """Return a copy of ``data`` with free-text fields redacted, then truncated to their caps.
+
+    Every capped field is free text, and free text is where a credential
+    leaks: redacting here, where writers already pass, means no adapter can
+    forget it (spec P4).
+    """
     out = dict(data)
     for key, cap in REGISTRY[kind].caps.items():
-        if isinstance(out.get(key), str) and len(out[key]) > cap:
-            out[key] = out[key][: cap - 1] + "…"
+        if isinstance(out.get(key), str):
+            out[key] = redact_text(out[key])
+            if len(out[key]) > cap:
+                out[key] = out[key][: cap - 1] + "…"
     return out
 
 
 def make_event(kind: str, sid: str, data: dict, *, seg: int | None = None, ts: str | None = None) -> dict:
     """Build a valid envelope, or raise :class:`EventError`.
 
-    Free text is capped first (:func:`cap_text`), so callers never have to.
+    Free text is redacted and capped first (:func:`cap_text`), so callers never have to.
     """
     if kind not in REGISTRY:
         raise EventError(f"unknown event kind: {kind}")

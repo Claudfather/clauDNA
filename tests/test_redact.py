@@ -39,6 +39,8 @@ FAKE = {
     "aws_access_key_id": "AKIA" + "QRST1234UVWX5678",
     "slack_bot_token": "xoxb-" + "0000000000" + "-" + "aB3" * 8,
     "google_api_key": "AIza" + "gK9" * 11 + "gk",
+    "stripe_live_key": "sk" + "_live_" + "51Hab" * 4,
+    "bearer_token": "Bearer " + "eyJhbGci" + "Oi" * 8,
 }
 
 # Lines that MUST survive verbatim — over-redaction breaks review output.
@@ -50,6 +52,7 @@ BENIGN = [
     "Rename SomeVeryLongDescriptiveComponentName to a shorter identifier.",
     "https://ep-cool-lab-12345678.us-east-2.aws.neon.tech/neondb",  # URL, no user:pass@
     "neonctl branches list --project-id proj_12345 --org-id org_67890 --json",  # no credential flag
+    "A Bearer of good news arrived; the bearer bond matured.",  # the word, not a token
 ]
 
 

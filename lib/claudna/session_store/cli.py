@@ -4,6 +4,7 @@
     python3 -m claudna.session_store check   <sid> [--root DIR]
     python3 lib/claudna/session_store hook <event>     (hook payload on stdin)
     python3 lib/claudna/session_store summarize <sid> <seg> [--root DIR]
+    python3 lib/claudna/session_store harvest [--force] [--root DIR]
 
 (with ``lib/`` on ``PYTHONPATH``; ``python3 lib/claudna/session_store …`` also works)
 
@@ -21,6 +22,10 @@ no ``rebuild`` can remove. That is crash debris, reported as a warning.
 
 ``summarize`` is the detached worker a seal starts (:mod:`summarize`); it prints
 what it did and exits 0 unless the session or segment doesn't exist.
+
+``harvest`` writes summarized segments' knowledge blocks to the vault as
+drafts, through ``claudron capture`` (:mod:`harvest`); it prints the run report
+as JSON. SessionStart starts it detached when one is due.
 
 ``hook`` is what the hook wrappers call: it applies one Claude Code hook event
 to the store (:mod:`boundaries`) and always exits 0, because a failing hook must
@@ -197,6 +202,9 @@ def main(argv: list[str] | None = None) -> int:
         if verb == "summarize":
             p.add_argument("seg", type=int)
         p.add_argument("--root", help="store root (default: $CLAUDNA_STATE_DIR or ~/.claudna)")
+    harv = sub.add_parser("harvest", help="write summarized blocks to the vault as drafts (via claudron)")
+    harv.add_argument("--force", action="store_true", help="run even if the last run is recent")
+    harv.add_argument("--root", help="store root (default: $CLAUDNA_STATE_DIR or ~/.claudna)")
     hook = sub.add_parser("hook", help="apply one Claude Code hook event (payload on stdin); always exits 0")
     hook.add_argument("event")
     args = parser.parse_args(argv)
@@ -204,6 +212,16 @@ def main(argv: list[str] | None = None) -> int:
         run_hook(args.event, sys.stdin.read())
         return 0
 
+    if args.verb == "harvest":
+        from . import harvest
+
+        try:
+            store = SessionStore(Path(args.root) if args.root else None)
+        except InvalidStateDir as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        print(json.dumps(harvest.harvest(store, force=args.force).__dict__))
+        return 0
     handle = _handle(args)
     if handle is None:
         return 1

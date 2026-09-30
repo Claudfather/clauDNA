@@ -86,6 +86,8 @@ def _bundled_scripts() -> set[str]:
 
 def _plugin(root: Path) -> Path:
     shutil.copytree(REPO_ROOT / "scripts", root / "scripts", ignore=shutil.ignore_patterns("__pycache__"))
+    # The plugin ships lib/ too: scripts/redact.py is a CLI over lib/claudna/redact.py.
+    shutil.copytree(REPO_ROOT / "lib", root / "lib", ignore=shutil.ignore_patterns("__pycache__"))
     (root / "skills" / "recall").mkdir(parents=True)
     return root
 

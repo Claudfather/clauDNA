@@ -48,6 +48,8 @@ def spawned(monkeypatch) -> list[tuple[str, int]]:
     """Tests never start a real summarizer: each spawn is recorded instead."""
     calls: list[tuple[str, int]] = []
     monkeypatch.setattr(boundaries, "spawn_summarizer", lambda handle, index, env: calls.append((handle.sid, index)))
+    monkeypatch.setattr(boundaries, "spawn_harvest", lambda root, env: pytest.fail("unexpected harvest spawn"))
+    monkeypatch.setattr(boundaries.harvest, "is_due", lambda root, env: False)  # whatever this machine has installed
     return calls
 
 
@@ -107,6 +109,15 @@ class TestBoundaries:
         fire(store, "SessionEnd", transcript, env=env, reason="other")
         last = json.loads(store.session(SID).paths.lifecycle.read_text().splitlines()[-2])
         assert spawned == [] and (last["kind"], last["data"]) == ("summary.skipped", {"reason": reason})
+
+    def test_a_session_start_starts_a_harvest_when_one_is_due(self, store, transcript, monkeypatch):
+        harvests = []
+        monkeypatch.setattr(boundaries.harvest, "is_due", lambda root, env: True)
+        monkeypatch.setattr(boundaries, "spawn_harvest", lambda root, env: harvests.append(root))
+        fire(store, "SessionStart", transcript, source="startup")
+        fire(store, "PreCompact", transcript, trigger="auto")
+        fire(store, "SessionStart", transcript, source="compact")  # a compaction never starts one
+        assert harvests == [store.root]
 
     def test_a_blocked_compaction_reseals_later(self, store, transcript):
         fire(store, "SessionStart", transcript, source="startup")
@@ -190,7 +201,7 @@ class TestActorAndOrigin:
         subprocess.run([*git, "init", "-q", "-b", "trunk"], check=True)
         subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "c"], check=True)
         origin = boundaries.origin_from_cwd(str(repo))
-        assert origin["branch"] == "trunk" and len(origin["head"]) == 40
+        assert (origin["repo"], origin["branch"], len(origin["head"])) == ("repo", "trunk", 40)
 
     def test_the_origin_outside_a_repo_has_no_branch(self, tmp_path):
         assert boundaries.origin_from_cwd(str(tmp_path)) == {"cwd": str(tmp_path), "repo": None,
@@ -236,7 +247,8 @@ class TestRunHook:
 
 
 def run_wrapper(tmp_path: Path, event: str, payload: dict, extra_env: dict | None = None, cwd: Path | None = None):
-    env = {"HOME": str(tmp_path / "home"), "PATH": os.environ["PATH"], **CLI_ENV, **(extra_env or {})}
+    env = {"HOME": str(tmp_path / "home"), "PATH": os.environ["PATH"], "CLAUDNA_HARVEST": "0", **CLI_ENV,
+           **(extra_env or {})}
     return subprocess.run(["bash", str(WRAPPER), event], input=json.dumps(payload), capture_output=True,
                           text=True, env=env, cwd=cwd or tmp_path, timeout=20)
 

@@ -263,3 +263,17 @@ class TestRunClaude:
         with pytest.raises(summarize.SummarizerError) as exc:
             summarize.run_claude("s", "d", {}, "haiku", {"CLAUDNA_CLAUDE_BIN": str(fake), "PATH": os.environ["PATH"]})
         assert exc.value.retryable and "rate limited" in str(exc.value)
+
+
+class TestRedaction:
+    def test_credentials_in_the_dialogue_never_reach_the_model(self, store, tmp_path):
+        path = tmp_path / "t.jsonl"
+        write_transcript(path, [record("user", "deploy with GITHUB_TOKEN=" + "ghp" + "_" + "aB3" * 12),
+                                record("assistant", [{"type": "text", "text": "done"}])])
+        h = store.session("sess-r")
+        h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path=str(path))
+        h.open_segment("session_open", 0)
+        h.seal_segment(path.stat().st_size, "precompact")
+        runner = FakeRunner()
+        summarize.summarize(h, 1, env={}, runner=runner)
+        assert "aB3aB3" not in runner.calls[0]["dialogue"] and "[REDACTED]" in runner.calls[0]["dialogue"]

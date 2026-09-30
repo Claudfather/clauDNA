@@ -37,6 +37,8 @@ import uuid
 from pathlib import Path
 from typing import Callable, Mapping
 
+from claudna.redact import redact_text
+
 from . import schema
 from .fsio import atomic_write_json, exclusive_lock, read_json
 from .paths import CHILD_ENV
@@ -125,7 +127,7 @@ def summarize(handle: SessionHandle, index: int, *, env: Mapping[str, str] = os.
         if not any(t.role == "user" for t in turns):
             return _skip(handle, index, "trivial")
 
-        dialogue = render(turns, limit=INPUT_LIMIT)
+        dialogue = redact_text(render(turns, limit=INPUT_LIMIT))  # credentials never reach the model
         sha = hashlib.sha256(f"{PROMPT_VERSION}\n{dialogue}".encode()).hexdigest()
         job_id = str(uuid.uuid4())
         handle.append("summary.requested", {"job_id": job_id}, seg=index)

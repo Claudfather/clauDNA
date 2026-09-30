@@ -38,10 +38,11 @@ SESSION_STORE_LAYERS = {
     "events": 2,
     "project": 3,
     "store": 4,
-    "boundaries": 5,
     "summarize": 5,
-    "cli": 6,
-    "__main__": 7,
+    "harvest": 5,
+    "boundaries": 6,
+    "cli": 7,
+    "__main__": 8,
 }
 
 
