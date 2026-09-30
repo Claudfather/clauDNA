@@ -29,6 +29,7 @@ script, which the grant-scope allowlist accepts) and treats any non-zero exit as
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 
@@ -70,6 +71,30 @@ def classify(assoc: str | None) -> tuple[str, int]:
     return (f"UNTRUSTED {assoc}", 2)
 
 
+# Variables that make gh spawn, or pipe its output through, another program, or
+# force the TTY behavior that triggers the pager. A BLANK GH_PAGER disables the
+# pager outright (gh's documented behavior) and is the load-bearing one: with a
+# pager, gh pipes its output through the named program, and THAT program's stdout
+# becomes what this gate would read as the verdict. So the gate must decide the
+# environment gh runs in, not inherit whatever named a program — there is no
+# `--gh` argument, but the environment is a second way to choose the program.
+_GH_PROGRAM_ENV = (
+    "PAGER", "GH_FORCE_TTY", "GH_BROWSER", "BROWSER",
+    "GH_EDITOR", "EDITOR", "VISUAL",
+)
+
+
+def _gh_env() -> dict:
+    """os.environ with the pager disabled and every program-spawning variable
+    removed, so gh runs `api` and prints its own output — never a program the
+    environment named. Auth variables (GH_TOKEN, GH_CONFIG_DIR, ...) are kept."""
+    env = dict(os.environ)
+    env["GH_PAGER"] = ""
+    for var in _GH_PROGRAM_ENV:
+        env.pop(var, None)
+    return env
+
+
 def read_assoc(path: str, gh: str = "gh") -> tuple[str | None, str | None]:
     # `gh` is resolved from PATH ("gh") and is NOT a CLI argument: a caller (or
     # an injection that controls this gate's argv) must not be able to name an
@@ -80,7 +105,7 @@ def read_assoc(path: str, gh: str = "gh") -> tuple[str | None, str | None]:
     try:
         proc = subprocess.run(
             [gh, "api", path, "--jq", ".author_association"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True, text=True, timeout=30, env=_gh_env(),
         )
     except FileNotFoundError:
         return (None, f"gh not found: {gh!r}")

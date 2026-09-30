@@ -161,3 +161,56 @@ class TestNoArbitraryProgramViaGh:
             capture_output=True, text=True, env={"PATH": "/usr/bin:/bin"},
         )
         assert "--gh" not in r.stdout
+
+
+class TestGhEnvironmentCannotForgeTheVerdict:
+    """vera #361: with GH_PAGER/GH_FORCE_TTY set, gh pipes its output through the
+    named program, and that program's stdout becomes what the gate reads — a forged
+    verdict even with no `--gh` argument. The gate must run gh with a sanitized
+    environment: no pager program, no TTY forcing, no program-spawning variable."""
+
+    def test_read_assoc_runs_gh_with_a_sanitized_env(self, monkeypatch):
+        # a hostile environment: every program-spawning / pager / tty variable set
+        for var in ("GH_PAGER", "PAGER", "GH_FORCE_TTY", "GH_BROWSER",
+                    "BROWSER", "GH_EDITOR", "EDITOR", "VISUAL"):
+            monkeypatch.setenv(var, "/evil/forge")
+        captured = {}
+
+        def fake_run(argv, **kw):
+            captured["env"] = kw.get("env")
+
+            class R:
+                returncode = 0
+                stdout = "MEMBER"
+                stderr = ""
+            return R()
+
+        monkeypatch.setattr(cp.subprocess, "run", fake_run)
+        cp.read_assoc("repos/o/r/issues/1")
+        env = captured["env"]
+        # env=None would mean gh inherits the hostile environment (the bug)
+        assert env is not None, "gh was run with the inherited (unsanitized) environment"
+        assert env.get("GH_PAGER") == "", "the pager was not disabled for gh"
+        for var in ("PAGER", "GH_FORCE_TTY", "GH_BROWSER", "BROWSER",
+                    "GH_EDITOR", "EDITOR", "VISUAL"):
+            assert var not in env, f"{var} was not stripped from gh's environment"
+
+    def test_gh_env_disables_pager_and_strips_program_vars(self, monkeypatch):
+        for var in ("GH_PAGER", "PAGER", "GH_FORCE_TTY", "GH_BROWSER",
+                    "BROWSER", "GH_EDITOR", "EDITOR", "VISUAL"):
+            monkeypatch.setenv(var, "/evil")
+        env = cp._gh_env()
+        assert env["GH_PAGER"] == "", "pager not disabled"
+        for var in ("PAGER", "GH_FORCE_TTY", "GH_BROWSER", "BROWSER",
+                    "GH_EDITOR", "EDITOR", "VISUAL"):
+            assert var not in env, f"{var} not stripped"
+
+    def test_gh_env_keeps_auth_variables(self, monkeypatch):
+        # auth must survive the sanitization, or the gate cannot read anything
+        monkeypatch.setenv("GH_TOKEN", "t")
+        monkeypatch.setenv("GH_CONFIG_DIR", "/c")
+        monkeypatch.setenv("PATH", "/usr/bin")
+        env = cp._gh_env()
+        assert env.get("GH_TOKEN") == "t"
+        assert env.get("GH_CONFIG_DIR") == "/c"
+        assert env.get("PATH") == "/usr/bin"
