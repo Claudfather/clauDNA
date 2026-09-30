@@ -998,8 +998,11 @@ _GRANT_SAFE_GH_VERBS = {
     "issue": {"view", "list", "status"},
 }
 
-# Safe claudron subcommands (read-only).
-_GRANT_SAFE_CLAUDRON_SUB = {"status", "doctor", "lookup", "recall"}
+# Safe claudron subcommands (read-only, any arguments). `doctor` is not one of
+# them: `--fix` writes, and a prefix rule also matches the flags that follow
+# it, so the one doctor grant is the exact `claudron doctor --json`.
+_GRANT_SAFE_CLAUDRON_DOCTOR = "claudron doctor --json"
+_GRANT_SAFE_CLAUDRON_SUB = {"status", "lookup", "recall"}
 
 
 def _reject_grant(entry: str, why: str) -> str:
@@ -1086,6 +1089,8 @@ def _grant_scope_error(entry: str) -> str | None:
     if cmd == "gh":
         return _grant_gh(entry, rest)
     if cmd == "claudron":
+        if inner == _GRANT_SAFE_CLAUDRON_DOCTOR:
+            return None
         return _grant_sub(entry, "claudron", rest, _GRANT_SAFE_CLAUDRON_SUB)
     if cmd == "command":
         # `command` runs any program, bypassing functions/aliases; only
