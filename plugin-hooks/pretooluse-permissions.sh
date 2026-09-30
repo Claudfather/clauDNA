@@ -67,6 +67,17 @@ approve() {
     exit 0
 }
 
+# A hook "deny" overrides a settings allow rule and a skill's allowed-tools, so it
+# is the one way to close a leak that rides inside an already-granted command.
+deny() {
+    local reason="${1:-blocked by policy}"
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$reason"
+    log "DENY: $COMMAND ($reason)"
+    exit 0
+}
+
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # ─── Require jq ───────────────────────────────────────────────────────
 
 command -v jq &>/dev/null || exit 0
@@ -103,6 +114,35 @@ JQ_RESULT="$(
 )" || exit 0
 
 eval "$JQ_RESULT"
+
+# ─── gh read-guard → deny before any approve ──────────────────────────
+# A pre-approved `gh` READ verb can move an environment-resident token off the box,
+# or reach a host other than github.com, through its own flags: `--jq env.X` prints
+# a secret, `-R host/owner/repo` and a URL positional send the request (and any
+# --search text) to a named host, `--web` opens one. This denies exactly those
+# shapes and nothing else — the fleet's `--json`/`--jq '.field'` reads pass through.
+# It runs before the bare-Bash and allow-pattern approvals, because a hook "deny"
+# is the only decision that overrides an allow grant. Zero-fork prefilter: python3
+# is spawned only for a command that names `gh` alongside one of the trigger flags.
+case "$COMMAND" in
+    *gh*)
+        case "$COMMAND" in
+            *--jq*|*--template*|*--repo*|*--web*|*" -q"*|*" -t"*|*" -R"*|*" -w"*|*"://"*)
+                if command -v python3 &>/dev/null; then
+                    # errexit-safe: the decider exits 10 to deny, and an
+                    # assignment that inherits that would end the hook here.
+                    if GH_GUARD_REASON="$(python3 "$HOOK_DIR/gh-guard-decide.py" "$COMMAND" 2>/dev/null)"; then
+                        : # exit 0 → allow this shape; fall through to normal matching
+                    elif [[ $? -eq 10 ]]; then
+                        deny "$GH_GUARD_REASON"
+                    fi
+                else
+                    log "PASS: $COMMAND (gh guard skipped, no python3)"
+                fi
+                ;;
+        esac
+        ;;
+esac
 
 # ─── Bare "Bash" in allow list → approve all ──────────────────────────
 
