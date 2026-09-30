@@ -41,7 +41,7 @@ check-changelog:
 	bash scripts/check-changelog.sh
 
 lint:
-	python3 -m ruff check scripts/ tests/
+	python3 -m ruff check lib/ scripts/ tests/
 
 test:
 	python3 -m pytest tests/

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "claudna.event/1",
+  "title": "Session store event envelope",
+  "description": "One line of lifecycle.jsonl or seg-NNN/events.jsonl. This schema owns the envelope; which kinds exist and what their data carries is owned by session_store.events.REGISTRY.",
+  "type": "object",
+  "required": [
+    "v",
+    "ts",
+    "kind",
+    "sid",
+    "seg",
+    "data"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "v": {
+      "type": "integer",
+      "const": 1
+    },
+    "ts": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    },
+    "kind": {
+      "type": "string",
+      "pattern": "^[a-z]+(_[a-z]+)*\\.[a-z]+(_[a-z]+)*$"
+    },
+    "sid": {
+      "type": "string",
+      "minLength": 1
+    },
+    "seg": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "data": {
+      "type": "object"
+    }
+  }
+}
