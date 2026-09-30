@@ -63,8 +63,8 @@ _WRAPPERS = {
     "!",
     "{",
 }
-_SEPARATOR_CHARS = set(";&|()\n")
-_PUNCT = ";()<>|&\n"
+_SEPARATOR_CHARS = set(";&|()`\n")
+_PUNCT = ";()<>|&`\n"
 
 
 def _code_only(expr: str) -> str | None:
@@ -133,6 +133,9 @@ def _host_of(value: str) -> str | None:
     m = re.match(r"[a-zA-Z][a-zA-Z0-9+.\-]*://([^/]+)", v)
     if m:
         return m.group(1).split("@")[-1]  # drop any user-info
+    m = re.match(r"[^@/\s]+@([^:/\s]+):", v)  # scp-style: git@HOST:owner/repo
+    if m:
+        return m.group(1)
     parts = v.split("/")
     while parts and parts[-1] == "":
         parts.pop()
@@ -142,7 +145,7 @@ def _host_of(value: str) -> str | None:
 
 
 def _looks_like_repo_url(token: str) -> bool:
-    return bool(re.match(r"[a-zA-Z][a-zA-Z0-9+.\-]*://", token))
+    return bool(re.match(r"[a-zA-Z][a-zA-Z0-9+.\-]*://|[^@/\s]+@[^:/\s]+:", token))
 
 
 def _foreign(host: str | None, allowed: set[str]) -> bool:
@@ -151,72 +154,27 @@ def _foreign(host: str | None, allowed: set[str]) -> bool:
     return host.split(":")[0].lower() not in allowed
 
 
-def _quote_mask(line: str) -> list[bool]:
-    """One bool per character: True where the character is outside single/double quotes."""
-    mask: list[bool] = []
-    q = None
-    esc = False
-    for ch in line:
-        if esc:
-            mask.append(q is None)
-            esc = False
-        elif ch == "\\" and q != "'":
-            mask.append(q is None)
-            esc = True
-        elif q is None:
-            mask.append(ch not in "'\"")
-            if ch in "'\"":
-                q = ch
-        else:
-            mask.append(False)
-            if ch == q:
-                q = None
-    return mask
-
-
-_HEREDOC = re.compile(
-    r"(?<!<)<<(-?)\s*(?:'([^']+)'|\"([^\"]+)\"|\\?([A-Za-z_][A-Za-z0-9_]*))"
-)
-
-
-def _strip_heredocs(command: str) -> str:
-    """Heredoc bodies are data. Drop the lines between an unquoted ``<<WORD`` and its
-    terminator, so an apostrophe or a flag-like word in the body cannot blind the guard."""
-    lines = command.split("\n")
-    out: list[str] = []
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        out.append(line)
-        i += 1
-        mask = _quote_mask(line)
-        for m in _HEREDOC.finditer(line):
-            if not mask[m.start()]:
-                continue
-            delim = m.group(2) or m.group(3) or m.group(4)
-            dash = m.group(1) == "-"
-            while i < len(lines):
-                body = lines[i]
-                i += 1
-                if (body.lstrip("\t") if dash else body) == delim:
-                    break
-    return "\n".join(out)
-
-
 def _tokens(command: str) -> list[str]:
-    command = re.sub(
-        r"\\\r?\n", "", command
-    )  # bash removes a backslash-newline continuation
-    command = _strip_heredocs(command)
+    # bash removes a backslash-newline continuation before it splits words
+    command = re.sub(r"\\\r?\n", "", command)
+    # A heredoc body is NOT skipped. Deciding where a body starts from the text alone is a
+    # second shell parser: a `<<WORD` inside a comment, after a backslash, in a quoted string
+    # or in `$((a << b))` is not a heredoc, and dropping the lines after it hides a real `gh`
+    # call. Measured on 11,222 recorded gh lines (1,863 with a heredoc marker): no denial
+    # without it. The cost is one shape: prose in a real heredoc body that starts a line with
+    # a gh call and a denied flag is denied (use --body-file).
     try:
         lx = shlex.shlex(command, posix=True, punctuation_chars=_PUNCT)
         lx.whitespace_split = True
         lx.whitespace = " \t\r"
+        # shlex treats `#` as a comment and swallows the newline that ends it, which would
+        # join the next line onto this command and hide its `gh`.
+        lx.commenters = ""
         return list(lx)
     except ValueError:
         # Quoting we cannot follow: a lenient split that still sees the flags, so a
         # doubt is inspected, not skipped.
-        return [t.strip("'\"") for t in re.findall(r"[;()&|\n]|[^\s;()&|]+", command)]
+        return [t.strip("'\"") for t in re.findall(r"[;()&|`\n]|[^\s;()&|`]+", command)]
 
 
 def _is_separator(tok: str) -> bool:
@@ -240,9 +198,13 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
     out: list[list[str]] = []
     for seg in segments:
         i = 0
+        host_env = None  # a GH_HOST=<host> prefix names the host this gh call talks to
         while i < len(seg):
             t = seg[i]
-            if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", t):
+            m = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)=(.*)", t)
+            if m:
+                if m.group(1) == "GH_HOST":
+                    host_env = m.group(2)
                 i += 1
                 continue
             base = t.lstrip("\\")
@@ -255,7 +217,8 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
                 continue
             break
         if i < len(seg) and seg[i].lstrip("\\").rsplit("/", 1)[-1] == "gh":
-            out.append(seg[i + 1 :])
+            args = seg[i + 1 :]
+            out.append(args + ["--hostname", host_env] if host_env else args)
     return out
 
 

@@ -62,8 +62,6 @@ def test_other_spellings_of_the_denied_shapes_are_denied(cmd):
         # GitHub's own hosts
         "gh api https://api.github.com/repos/o/r/issues/1",
         "gh gist view https://gist.github.com/abc123",
-        # prose in a heredoc body is data
-        "BODY=$(cat <<'EOF'\nsee (gh pr list --jq env.X) and (gh pr list -R evil.example/o/r)\nEOF\n)\ngh issue comment 1 -R o/r -b \"$BODY\"",
     ],
 )
 def test_ordinary_reads_the_head_denies_are_allowed(cmd):
@@ -117,7 +115,9 @@ def test_the_hook_forwards_a_short_flag_after_a_tab(tmp_path, flag):
 
 
 @pytest.mark.parametrize("flag,value", [("-q", "env.X"), ("-R", "evil.example/o/r")])
-def test_the_hook_forwards_a_short_flag_after_a_line_continuation(tmp_path, flag, value):
+def test_the_hook_forwards_a_short_flag_after_a_line_continuation(
+    tmp_path, flag, value
+):
     cmd = f"gh pr list --json number \\\n{flag} {value}"
     assert _hook(tmp_path, cmd) == "deny", repr(cmd)
 
@@ -133,3 +133,14 @@ def test_a_trailing_slash_repo_is_not_read_as_a_host():
 def test_a_foreign_host_with_a_trailing_slash_still_denies():
     assert verdict("gh pr list -R evil.example/o/r/ --search x") == "deny"
     assert verdict("gh pr list -R host/owner/repo/") == "deny"
+
+
+def test_a_heredoc_body_is_not_skipped():
+    """Deciding where a heredoc body starts from the text alone is a second shell parser, and a
+    marker in a comment, after a backslash, in a quoted string or in $((a << b)) is not a heredoc:
+    dropping the lines after it hides a real gh call (tests/test_gh_guard_v3_additions.py). The
+    trade: prose in a real heredoc body that starts a line with a gh call and a denied flag is
+    denied. Measured on 11,222 recorded gh lines, 1,863 of them with a heredoc marker: no denial
+    either way."""
+    cmd = "BODY=$(cat <<'EOF'\nsee (gh pr list --jq env.X)\ngh pr list -R evil.example/o/r\nEOF\n)\ngh issue comment 1 -R o/r -b \"$BODY\""
+    assert verdict(cmd) == "deny"

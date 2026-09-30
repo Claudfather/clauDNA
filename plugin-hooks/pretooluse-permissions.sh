@@ -126,10 +126,14 @@ eval "$JQ_RESULT"
 # It runs before the bare-Bash and allow-pattern approvals, because a hook "deny"
 # is the only decision that overrides an allow grant. Zero-fork prefilter: python3
 # is spawned only for a command that names `gh` alongside one of the trigger flags.
-case "$COMMAND" in
+# The shell removes quotes and backslashes before gh runs, so a flag spelled --j"q" or
+# -\q is the flag. The prefilter reads the command without them; the decider gets the
+# real text. One expansion, no fork.
+NOQ=${COMMAND//[\"\'\\]/}
+case "$NOQ" in
     *gh*)
-        case "$COMMAND" in
-            *--jq*|*--template*|*--repo*|*--web*|*--hostname*|*[[:space:]]-q*|*[[:space:]]-t*|*[[:space:]]-R*|*[[:space:]]-w*|*"://"*)
+        case "$NOQ" in
+            *--jq*|*--template*|*--repo*|*--web*|*--hostname*|*[[:space:]]-q*|*[[:space:]]-t*|*[[:space:]]-R*|*[[:space:]]-w*|*"://"*|*@*:*)
                 if command -v python3 &>/dev/null; then
                     # errexit-safe: the decider exits 10 to deny, and an
                     # assignment that inherits that would end the hook here.
