@@ -85,7 +85,7 @@ JQ_RESULT="$(
         ltrimstr("Bash(") | rtrimstr(")")]) as $user_specs |
       ([$proj[] | select(startswith("Bash(")) |
         ltrimstr("Bash(") | rtrimstr(")") |
-        select(contains("*") | not)]) as $proj_specs |
+        select((contains("*") or contains("?") or contains("[")) | not)]) as $proj_specs |
       (($user_specs + $proj_specs) | unique) as $specs |
       "COMMAND=" + ($cmd | @sh) +
       "\nHAS_BARE=" + (if $has_bare then "true" else "false" end) +

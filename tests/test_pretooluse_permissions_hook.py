@@ -190,3 +190,31 @@ class TestProjectSuppliedSpecsAreRestricted:
         assert approves_split(
             tmp_path, "git status", user_allow=["Bash(git *)"], project_allow=[]
         )
+
+
+class TestProjectSpecsRejectEveryGlobMetachar:
+    """ravi #364: bash `case` globs `?` and `[...]` too, so a project spec must be
+    rejected for ANY glob metacharacter, not just `*`. The hook only DECIDES
+    approve/deny — it never runs the command — and these assert it does NOT
+    auto-approve a command a project-supplied glob would have matched."""
+
+    def test_project_question_glob_dropped(self, tmp_path):
+        # `ls ?` globs `ls x`; if the project spec survived, `ls x` would approve.
+        assert not approves_split(tmp_path, "ls x", user_allow=[], project_allow=["Bash(ls ?)"])
+
+    def test_project_bracket_glob_dropped(self, tmp_path):
+        assert not approves_split(tmp_path, "ls x", user_allow=[], project_allow=["Bash(ls [xy])"])
+
+    def test_project_rm_question_glob_dropped(self, tmp_path):
+        # ravi's motivating case: `rm -rf ?` globs a single-char target such as
+        # `rm -rf .`. The hook is a permission decider and executes nothing; this
+        # asserts the project grant is rejected, so such a command would prompt.
+        assert not approves_split(tmp_path, "rm -rf .", user_allow=[], project_allow=["Bash(rm -rf ?)"])
+
+    def test_project_exact_literal_still_approves(self, tmp_path):
+        # a glob-free (exact) project spec is still honoured
+        assert approves_split(tmp_path, "make test", user_allow=[], project_allow=["Bash(make test)"])
+
+    def test_user_glob_still_honoured(self, tmp_path):
+        # the filter is project-only; the user's own glob is their choice
+        assert approves_split(tmp_path, "ls x", user_allow=["Bash(ls ?)"], project_allow=[])
