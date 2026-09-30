@@ -8,7 +8,7 @@
   },
   "homepage": "https://github.com/Claudfather/clauDNA",
   "repository": "https://github.com/Claudfather/clauDNA",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "hooks": "./plugin-hooks/hooks.json",
   "keywords": [
     "skills",

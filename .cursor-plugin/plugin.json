@@ -9,7 +9,7 @@
   },
   "homepage": "https://github.com/Claudfather/clauDNA",
   "repository": "https://github.com/Claudfather/clauDNA",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "logo": "assets/logo.svg",
   "keywords": [
     "skills",

@@ -229,3 +229,7 @@ Working in a Cursor Cloud Agent? `.cursor/environment.json` installs the pinned 
 | [SKILL_AUTHORING_GUIDE.md](./documentation/guides/SKILL_AUTHORING_GUIDE.md) | How to write, test, and submit a skill — patterns, examples, anti-patterns |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | Contribution workflow — bug reports, PRs, testing requirements |
 | [CHANGELOG.md](./CHANGELOG.md) | All notable changes |
+
+## License
+
+Licensed under the [Apache License, Version 2.0](./LICENSE). See [NOTICE](./NOTICE) for the copyright notice that travels with it.
