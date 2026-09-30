@@ -39,6 +39,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Mapping
 
+from . import digest, rollup
 from . import events as ev
 from claudna.redact import redact_strings
 
@@ -77,8 +78,8 @@ class CaptureError(RuntimeError):
 _ACTIONS = ("created", "updated", "suggest_update", "suggest_supersede", "rejected")
 
 
-def run_claudron_capture(finding: dict, cwd: str | None, env: Mapping[str, str], vault: str | None = None) -> str:
-    """One ``claudron capture --stdin --json``; returns ``data.action``.
+def run_claudron_capture(finding: dict, cwd: str | None, env: Mapping[str, str], vault: str | None = None) -> dict:
+    """One ``claudron capture --stdin --json``; returns ``{"action", "path"}`` from ``data``.
 
     The vault is the *session's*, never the harvest process's: ``--vault`` when
     the session recorded one, else a walk-up from the session's ``cwd`` — with
@@ -109,7 +110,8 @@ def run_claudron_capture(finding: dict, cwd: str | None, env: Mapping[str, str],
             (proc.returncode != 0 and action != "rejected") or (not envelope.get("ok") and action != "rejected"):
         errors = envelope.get("errors")
         raise CaptureError(f"claudron capture exited {proc.returncode}: {str(errors or data)[:150]}")
-    return action
+    path = data.get("path")
+    return {"action": action, "path": path if isinstance(path, str) and path else None}
 
 
 def claudron_bin(env: Mapping[str, str]) -> str:
@@ -299,8 +301,11 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
         wanted = [f for _, f in findings if f is not None]
         if report.captures and report.captures + len(wanted) > MAX_CAPTURES:
             return  # out of budget: the whole segment waits for the next run (a first one always fits)
-        for finding in wanted:
-            action = capture(finding, origin.get("cwd"), env, vault)
+        for block, finding in ((b, f) for b, f in findings if f is not None):
+            answer = capture(finding, origin.get("cwd"), env, vault)
+            action = answer["action"]
+            digest.record_capture(store.root, sid=sid, seg=index, key=rollup.dedup_key("blocks", block), block=block,
+                                  title=finding["title"], action=action, path=answer["path"], vault=vault)
             if action in ("created", "updated"):
                 report.created += 1
             elif action == "rejected":
@@ -309,7 +314,7 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
                 report.known += 1
         for block, _ in (pair for pair in findings if pair[1] is None):
             append_jsonl(held_log, {"ts": ev.now_ts(), "sid": sid, "seg": index, "reason": "person",
-                                    "block": block}, durable=False)
+                                    "key": rollup.dedup_key("blocks", block), "block": block}, durable=False)
             report.held_back += 1
         report.segments += 1
         handle.ack(CONSUMER, index)
@@ -365,6 +370,7 @@ def harvest(store: SessionStore, *, env: Mapping[str, str] = os.environ,
             report.idle = report.segments == 0 and not report.errors
             atomic_write_json(store.root / LAST_RUN, report.as_dict())
             (home / "liveness.txt").write_text(liveness_line(report) + "\n")
+            digest.write_review_line(store.root)  # the digest's own SessionStart line (phase 5)
     return report
 
 

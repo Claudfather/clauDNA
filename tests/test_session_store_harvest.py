@@ -52,7 +52,8 @@ class FakeCapture:
             raise harvest.CaptureError("claudron capture exited 3: vault not found")
         self.findings.append((finding, cwd))
         self.vaults = [*getattr(self, "vaults", []), vault]
-        return self.answers.pop(0) if self.answers else "created"
+        action = self.answers.pop(0) if self.answers else "created"
+        return {"action": action, "path": f"knowledge/note-{len(self.findings)}.md"}
 
 
 def summarized_session(store, sid: str, blocks_per_segment: list[list[dict]], *, repo="webapp", done=True,
@@ -352,7 +353,7 @@ class TestRunClaudronCapture:
     def test_the_finding_goes_on_stdin_as_json_never_as_an_argument(self, tmp_path):
         env = self.make(tmp_path)
         finding = {"type": "knowledge", "title": "t", "body": "has $(rm -rf) and `quotes`", "tags": []}
-        assert REAL_CAPTURE(finding, str(tmp_path), env) == "created"
+        assert REAL_CAPTURE(finding, str(tmp_path), env)["action"] == "created"
         seen = json.loads((tmp_path / "log").read_text())
         assert seen["argv"] == ["capture", "--stdin", "--json"] and seen["finding"] == finding
         assert seen["cwd"] == str(tmp_path)

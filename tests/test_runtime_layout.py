@@ -38,6 +38,7 @@ SESSION_STORE_LAYERS = {
     "lineage": 2,
     "events": 2,
     "project": 3,
+    "digest": 3,
     "store": 4,
     "rollup": 4,
     "activity": 1,

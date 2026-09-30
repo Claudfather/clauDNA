@@ -311,6 +311,12 @@ def main(argv: list[str] | None = None) -> int:
     exp.add_argument("--ack", action="store_true", help="record that the consumer took --sid through --through")
     exp.add_argument("--sid")
     exp.add_argument("--through", type=int)
+    dig = sub.add_parser("digest", help="drafts and held person facts awaiting a person's review",
+                         parents=[rooted])
+    dig.add_argument("--limit", type=int, default=5)
+    dig.add_argument("--json", action="store_true")
+    dig.add_argument("--done", metavar="ITEM", help="take an item (a note path or a held fact's key) off the digest")
+    dig.add_argument("--outcome", choices=("promoted", "discarded", "kept"), default="kept")
     harv = sub.add_parser("harvest", help="write summarized blocks to the vault as drafts (via claudron)",
                           parents=[rooted])
     harv.add_argument("--force", action="store_true", help="run even if the last run is recent")
@@ -351,6 +357,25 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.verb == "export":
         return _export(args)
+    if args.verb == "digest":
+        from . import digest
+
+        store = _store(args)
+        if store is None:
+            return 1
+        if args.done:
+            digest.mark_reviewed(store.root, args.done, outcome=args.outcome)
+            print(json.dumps({"item": args.done, "outcome": args.outcome}))
+            return 0
+        found = [i.as_dict() for i in digest.items(store.root, limit=args.limit)]
+        if args.json:
+            print(json.dumps(found, indent=2))
+        else:
+            for n, i in enumerate(found, 1):
+                seen = f"{i['sessions']} session(s)" + (", user-asserted" if i["asserted_by"] == "user" else "")
+                print(f"{n}. [{i['kind']}] {i['title']}  ({seen})\n   {i['claim'] or ''}\n   item: {i['item']}")
+            print("nothing to review" if not found else "")
+        return 0
     handle = _handle(args)
     if handle is None:
         return 1
