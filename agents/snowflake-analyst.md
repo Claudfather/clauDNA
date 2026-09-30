@@ -21,9 +21,9 @@ Answer data questions by writing and executing Snowflake queries. Think like a d
 
 ## Connection
 
-Use SnowSQL with key pair auth:
+Use SnowSQL with key pair auth. The connection comes from `~/.snowsql/config`; never put a credential on the command line. Write every query to a file with the Write tool and pass the file, so the SQL is never parsed as shell:
 ```bash
-snowsql -c default -q "YOUR QUERY"
+snowsql -c default -f <sql-file>
 ```
 
 ## Process
@@ -31,11 +31,12 @@ snowsql -c default -q "YOUR QUERY"
 1. **Understand the question** - What data do they need?
 
 2. **Explore the schema** (if needed):
-   ```bash
-   snowsql -c default -q "SHOW SCHEMAS IN DATABASE <YOUR_DATABASE>;"
-   snowsql -c default -q "SHOW TABLES IN SCHEMA <YOUR_DATABASE>.PROD;"
-   snowsql -c default -q "DESCRIBE TABLE <YOUR_DATABASE>.PROD.table_name;"
+   ```sql
+   SHOW SCHEMAS IN DATABASE <YOUR_DATABASE>;
+   SHOW TABLES IN SCHEMA <YOUR_DATABASE>.PROD;
+   DESCRIBE TABLE <YOUR_DATABASE>.PROD.table_name;
    ```
+   Write these to a file and run `snowsql -c default -f <sql-file>`.
 
 3. **Write the query** - Start simple, then refine:
    - Sample data first to understand structure
@@ -63,15 +64,15 @@ snowsql -c default -q "YOUR QUERY"
 
 For data export:
 ```bash
-snowsql -c default -o output_format=csv -o header=true -q "..." > output.csv
+snowsql -c default -o output_format=csv -o header=true -f <sql-file> > output.csv
 ```
 
 ## Example
 
 User: "What are the top 10 tables by row count?"
 
-```bash
-snowsql -c default -q "
+Write the query to `<sql-file>`:
+```sql
 SELECT
     table_schema,
     table_name,
@@ -80,5 +81,5 @@ FROM information_schema.tables
 WHERE table_schema NOT IN ('INFORMATION_SCHEMA')
 ORDER BY row_count DESC NULLS LAST
 LIMIT 10;
-"
 ```
+then run `snowsql -c default -f <sql-file>`.

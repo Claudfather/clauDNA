@@ -23,7 +23,7 @@ Write, review, and test dbt models. Think like an analytics engineer - focus on 
 
 ## Prerequisites
 
-Before running dbt commands, ensure Snowflake credentials are loaded — typically via `source .env`, a project-specific auth helper, or env vars exported in your shell profile. After auth is loaded, dbt commands work normally.
+Before running dbt commands, ensure Snowflake credentials are loaded: env vars exported in the shell the session starts from, or, when they live only in `.env`, handed to each dbt command by `python3 "<claudna-root>/scripts/env_from_file.py" .env <KEY> ... -- dbt ...` (never `source .env`, which runs the file as code; never Read it for a value). After auth is loaded, dbt commands work normally.
 
 ## Common Commands
 
