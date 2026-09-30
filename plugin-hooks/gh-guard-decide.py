@@ -6,8 +6,10 @@ other than github.com, through its own arguments — no write verb needed:
 
   - a ``--jq`` / ``-q`` / ``--template`` / ``-t`` expression that reads the process
     environment (jq's ``env`` builtin or ``$ENV``) prints a secret into the output;
-  - ``-R`` / ``--repo`` / ``--hostname`` naming a host other than github.com, or a
-    positional URL that names one, sends the request (and any ``--search`` text) there;
+  - ``-R`` / ``--repo`` / ``--hostname`` naming a host other than github.com, a
+    positional URL that names one, or a ``HOST/OWNER/REPO`` positional of a verb that
+    takes a repository (``gh repo view|clone|fork ...``), sends the request (and any
+    ``--search`` text) there;
   - ``--web`` / ``-w`` opens a URL at that host.
 
 Two calls of one granted read verb thus suffice to carry an environment-resident token
@@ -18,7 +20,8 @@ Standalone stdlib (the ``vault-git-decide.py`` / ``mention-rewrite.py`` preceden
 refuses only the shapes above; every other ``gh`` call — including the fleet's own
 ``--json`` / ``--jq '.field'`` reads — is allowed. It reads the *unexpanded* command
 text, so a value the shell assembles at run time (a variable, a ``$'...'`` form) is
-invisible to it; those are the hook's approver's to gate, not the decider's.
+invisible to it; those are the hook's approver's to gate, not the decider's (the approver
+does not approve a gh command in which an expansion can form or change an option word).
 """
 
 from __future__ import annotations
@@ -154,6 +157,85 @@ def _foreign(host: str | None, allowed: set[str]) -> bool:
     return host.split(":")[0].lower() not in allowed
 
 
+# The verbs whose first positional argument is a repository, ``[HOST/]OWNER/REPO``
+# (`gh help reference`, gh 2.92), with the options of each that take a value, so the
+# positional is found where pflag finds it: ``gh repo view -b a/b/c OWNER/REPO`` names
+# its repository last, and ``gh repo clone OWNER/REPO a/b/c`` clones into a directory.
+_REPO_CREATE = {"-d", "--description", "-g", "--gitignore", "-h", "--homepage", "-l",
+                "--license", "-r", "--remote", "-s", "--source", "-t", "--team", "-p",
+                "--template"}
+_SKILL_INSTALL = {"--agent", "--dir", "--pin", "--scope"}
+_REPO_POSITIONAL: dict[tuple[str, str], set[str]] = {
+    ("repo", "view"): {"-b", "--branch", "-q", "--jq", "--json", "-t", "--template"},
+    ("repo", "clone"): {"-u", "--upstream-remote-name"},
+    ("repo", "fork"): {"--fork-name", "--org", "--remote-name"},
+    ("repo", "create"): _REPO_CREATE,
+    ("repo", "new"): _REPO_CREATE,
+    ("repo", "edit"): {"--add-topic", "--default-branch", "-d", "--description", "-h",
+                       "--homepage", "--remove-topic", "--squash-merge-commit-message",
+                       "--visibility"},
+    ("repo", "delete"): set(),
+    ("repo", "archive"): set(),
+    ("repo", "unarchive"): set(),
+    ("repo", "set-default"): set(),
+    ("repo", "sync"): {"-b", "--branch", "-s", "--source"},
+    ("label", "clone"): set(),
+    **{(g, "install"): {"--pin"} for g in ("extension", "extensions", "ext")},
+    **{(g, v): _SKILL_INSTALL for g in ("skill", "skills") for v in ("install", "add")},
+    **{(g, v): set() for g in ("skill", "skills") for v in ("preview", "show")},
+}
+
+
+def _takes_next(opt: str, value_opts: set[str]) -> bool:
+    """Whether ``opt`` takes the next argument as its value (pflag: in a single-dash
+    cluster, the first shorthand that takes a value takes the rest of the token)."""
+    if opt.startswith("--"):
+        return "=" not in opt and opt in value_opts
+    for k, ch in enumerate(opt[1:], start=1):
+        if "-" + ch in value_opts:
+            return k == len(opt) - 1
+    return False
+
+
+# A word that is only parameter expansions (``$X``, ``"${X}"``, ``$1``): unquoted and empty,
+# it is no word at all, so the words after it move up a place.
+_ONLY_PARAMS = re.compile(r"(?:\$(?:\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*|[0-9@*#?!$-]))+")
+
+
+def _repo_positional(args: list[str]) -> tuple[str, bool] | None:
+    """The repository positional of a verb that takes one, and whether a parameter-only
+    word sat in front of it; ``None`` when there is none. Options and their values are
+    skipped; after ``--`` every word is positional (``gh repo clone -- HOST/O/R``)."""
+    pos: list[str] = []
+    value_opts: set[str] = set()
+    after_param = dashdash = False
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if not dashdash and a == "--":
+            dashdash = True
+        elif not dashdash and a.startswith("-") and len(a) > 1:
+            i += 2 if _takes_next(a, value_opts) else 1
+            continue
+        elif _ONLY_PARAMS.fullmatch(a):
+            after_param = True
+        else:
+            pos.append(a)
+            if len(pos) == 2:
+                if (pos[0], pos[1]) not in _REPO_POSITIONAL:
+                    return None
+                value_opts = _REPO_POSITIONAL[(pos[0], pos[1])]
+            elif len(pos) == 3:
+                return a, after_param
+        i += 1
+    return None
+
+
+def _host_shaped(host: str) -> bool:
+    """A name that can only be a host: dotted, with a port, bracketed, or localhost."""
+    return "." in host or ":" in host or host.startswith("[") or host.lower() == "localhost"
+
+
 def _strip_comment(line: str) -> str:
     """Drop a ``#`` comment the way bash does: only where a word starts, outside quotes.
 
@@ -200,6 +282,11 @@ def _readings(command: str) -> list[list[str]]:
     the lines between in the whole-text reading only; each line read alone still shows them.
     A heredoc body is not skipped: deciding where one starts from the text alone is a second
     shell parser. Every reading only adds denials, so a doubt is inspected, not skipped.
+
+    The trade: prose in a heredoc body that holds a gh call with a denied flag is denied. In
+    recorded traffic that is a markdown code span, since a backtick starts a command for this
+    reading, and not a line that starts with the call (which is denied too). Write such prose
+    with the file tools and pass it with --body-file.
     """
     # bash removes a backslash-newline continuation before it splits words
     command = re.sub(r"\\\r?\n", "", command)
@@ -279,6 +366,16 @@ def _expand_clusters(args: list[str]) -> list[str]:
 
 def _inspect_gh_args(args: list[str], allowed: set[str]) -> str | None:
     """Return a deny reason for one gh invocation's argument list, or ``None``."""
+    # a HOST/OWNER/REPO positional names its host the way -R does (a URL or an scp form
+    # is read below, for every verb; a local path, and --from-local, name no host)
+    # A parameter-only word in front of it may be the repository itself (its value comes
+    # from the environment), so a word after one counts only when it names a host outright.
+    found = _repo_positional(args)
+    if found and "--from-local" not in args:
+        repo, after_param = found
+        host = None if repo.startswith((".", "/", "~")) or _looks_like_repo_url(repo) else _host_of(repo)
+        if _foreign(host, allowed) and (not after_param or _host_shaped(host)):
+            return "gh names a repository on a host other than github.com"
     args = _expand_clusters(args)
     words: list[str] = []
     for a in args:
