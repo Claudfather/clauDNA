@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **`github-activity-report`**: the reference line for `crawl.sh` said to copy the script into a working directory and run it, which contradicted the crawl step. It now says, as the step does, to run the bundled script from the skill's own directory, never a copy.
 
 ## [0.21.1] - 2026-09-30
 ### Changed
