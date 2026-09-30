@@ -1,9 +1,9 @@
 """Text a command carries arrives by file.
 
-A title, a body, a message, a search term or a SQL statement is written to a
-file with the Write tool, and the command reads that file: `--body-file`,
-`-F body=@<file>`, `--input <file>`, `psql -f`, a JSON job file for a bundled
-script, or `"$(cat <file>)"` where a flag takes the text itself.
+A title, a body, a message or a search term is written to a file with the
+Write tool, and the command reads that file: `--body-file`, `-F body=@<file>`,
+`--input <file>`, a JSON job file for a bundled script, or `"$(cat <file>)"`
+where a flag takes the text itself.
 
 These tests read every skill and agent file and fail on a command that carries
 such text any other way. Each failure names the file and line. The lint's own
@@ -27,7 +27,7 @@ _PLACEHOLDER = r"<[^<>\n]+>"
 _QUOTED_VALUE = r'"(?!\$\(cat )[^"]*' + _PLACEHOLDER + r'[^"]*"' r"|'[^'\n]*" + _PLACEHOLDER + r"[^'\n]*'"
 _TEXT_VALUE = r"(?:" + _QUOTED_VALUE + r"|" + _PLACEHOLDER + r")"
 _FLAG = (
-    r"(?:--(?:body|title|message|notes|(?:add-|remove-)?label|tags|search|grep|query|description|comment)"
+    r"(?:--(?:body|title|message|notes|(?:add-|remove-)?label|tags|search|grep|query|description|comment|source-url|source-type)"
     r"|(?<![\w-])-m)"
 )
 # A bare placeholder after a flag that opens an inline code span documents a
@@ -124,8 +124,8 @@ def test_posting_commands_name_the_file_they_read():
 
 
 def test_program_text_carries_no_placeholders():
-    # `python3 -c "..."` with a value substituted into the program: pass the
-    # value as an argument or in a JSON file, never inside the program.
+    # `python3 -c "..."` whose program holds a placeholder: pass the value as an
+    # argument or in a JSON file, never inside the program.
     pattern = re.compile(r'python3? -c "((?:[^"\\]|\\.)*)"', re.DOTALL)
     hits = []
     for path in FILES:
@@ -135,7 +135,7 @@ def test_program_text_carries_no_placeholders():
             if re.search(r"<[A-Za-z][^>\n]*>|\b[A-Z]+_(?:URL|NAME|FILE|PATH)\b", program):
                 line = text.count("\n", 0, m.start()) + 1
                 hits.append(f"{path.relative_to(REPO)}:{line}")
-    assert not hits, "a value is substituted into program text:\n" + "\n".join(hits)
+    assert not hits, "pass the value as an argument or in a JSON file:\n" + "\n".join(hits)
 
 
 @pytest.mark.parametrize(
@@ -155,6 +155,7 @@ def test_program_text_carries_no_placeholders():
         pytest.param('gh issue edit 1 --add-label "<tag>"', id="add-label"),
         pytest.param('Build the query: `--query "<terms>"`.', id="quoted-in-a-span"),
         pytest.param("claudron lookup <terms...> --json", id="text-argument"),
+        pytest.param("claudron capture --stdin --source-url <url> --json", id="source-url"),
     ],
 )
 def test_the_lint_flags_each_shape(sample):

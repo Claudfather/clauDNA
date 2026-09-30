@@ -144,6 +144,7 @@ def test_links_records_every_url_it_is_given(tmp_path):
         f"{base}/a\nb",
         f"{base}/`x`/$(y)?q='\"",
         f"http://127.0.0.1:{garbage.getsockname()[1]}/x",
+        "http://127.0.0.1:99999999999999999999/x",
     ]
     try:
         path = _job(tmp_path, "job-001.json", {"urls": urls, "output": "research/links.json"})
@@ -154,4 +155,4 @@ def test_links_records_every_url_it_is_given(tmp_path):
     results = json.loads((tmp_path / "research" / "links.json").read_text())
     assert set(results) == set(urls)
     assert results[urls[0]] == 200
-    assert all(str(results[urls[i]]).startswith("error") for i in (1, 2, 4))
+    assert all(str(results[urls[i]]).startswith("error") for i in (1, 2, 4, 5))
