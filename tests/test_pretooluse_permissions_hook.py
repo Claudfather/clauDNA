@@ -94,10 +94,99 @@ class TestLegitimateCommandsStillApprove:
         # `2>&1`: the `&` is fd-duplication, not a separator.
         assert approves(tmp_path, "git status 2>&1")
 
-    def test_redirect_both_streams_approves(self, tmp_path):
-        # `&>file`: the `&` starts a redirect, not a background.
-        assert approves(tmp_path, "git status &> /tmp/out")
+    def test_fd_dup_stdout_to_stderr_approves(self, tmp_path):
+        # `>&2` duplicates stdout onto fd 2 — an fd-dup, not a file write, and the
+        # `&` is not a separator (#258). A file target (`&> file`, `>& file`) is a
+        # write and is prompted — see TestWriteRedirectionKeepsThePrompt.
+        assert approves(tmp_path, "git status >&2")
 
-    def test_fd_dup_form_approves(self, tmp_path):
-        # `>&`: another fd-duplication spelling.
-        assert approves(tmp_path, "git status >& /tmp/out")
+    def test_fd_dup_explicit_form_approves(self, tmp_path):
+        assert approves(tmp_path, "git status 1>&2")
+
+
+# ─── redirections and project-supplied specs ──────────────────────────
+
+def approves_split(tmp_path, command, *, user_allow, project_allow):
+    """Approve `command` with DISTINCT user (HOME) and project (cwd) allow lists,
+    so a rule's SOURCE (user vs repo) can be tested. The hook reads
+    ~/.claude/settings.json (user) and ./.claude/settings.json (project)."""
+    home = tmp_path / "home"
+    work = tmp_path / "work"
+    (home / ".claude").mkdir(parents=True, exist_ok=True)
+    (work / ".claude").mkdir(parents=True, exist_ok=True)
+    (home / ".claude" / "settings.json").write_text(
+        json.dumps({"permissions": {"allow": user_allow}})
+    )
+    (work / ".claude" / "settings.json").write_text(
+        json.dumps({"permissions": {"allow": project_allow}})
+    )
+    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+    env = {"HOME": str(home), "PATH": "/usr/bin:/bin"}
+    proc = subprocess.run(
+        ["bash", str(HOOK)], input=payload, capture_output=True, text=True,
+        cwd=work, env=env, timeout=10,
+    )
+    return '"permissionDecision":"allow"' in proc.stdout
+
+
+class TestWriteRedirectionKeepsThePrompt:
+    """A prefix rule must not auto-approve a redirected write to an arbitrary
+    file — the sub-command carries the redirection, and `Bash(git *)` globs it."""
+
+    def test_redirect_to_dotfile_prompts(self, tmp_path):
+        assert not approves(tmp_path, "git log > /tmp/pwn-startup")
+
+    def test_append_redirect_prompts(self, tmp_path):
+        assert not approves(tmp_path, "echo evil >> /tmp/pwn-startup")
+
+    def test_both_streams_to_file_prompts(self, tmp_path):
+        assert not approves(tmp_path, "git log &> /tmp/pwn")
+
+    def test_redirect_both_shorthand_to_file_prompts(self, tmp_path):
+        assert not approves(tmp_path, "git log >& /tmp/pwn")
+
+    def test_fd_dup_still_approves(self, tmp_path):
+        # 2>&1 is fd-duplication, not a file write — must stay auto-approvable.
+        assert approves(tmp_path, "git status 2>&1")
+
+    def test_dev_null_still_approves(self, tmp_path):
+        assert approves(tmp_path, "git status 2>/dev/null")
+
+    def test_plain_allowed_command_still_approves(self, tmp_path):
+        assert approves(tmp_path, "git status")
+
+
+class TestProjectSuppliedSpecsAreRestricted:
+    """A repository's own settings must not be able to grant the whole shell or
+    a wildcard family; only the user's settings can. Exact project specs stand."""
+
+    def test_project_bare_bash_does_not_approve(self, tmp_path):
+        assert not approves_split(
+            tmp_path, "rm -rf /tmp/pwn", user_allow=[], project_allow=["Bash"]
+        )
+
+    def test_project_wildcard_all_does_not_approve(self, tmp_path):
+        assert not approves_split(
+            tmp_path, "rm -rf /tmp/pwn", user_allow=[], project_allow=["Bash(*)"]
+        )
+
+    def test_project_wildcard_family_does_not_approve(self, tmp_path):
+        assert not approves_split(
+            tmp_path, "rm -rf /tmp/pwn", user_allow=[], project_allow=["Bash(rm *)"]
+        )
+
+    def test_project_exact_spec_still_approves(self, tmp_path):
+        # an exact (wildcard-free) project grant is author-fixed and honoured
+        assert approves_split(
+            tmp_path, "make test", user_allow=[], project_allow=["Bash(make test)"]
+        )
+
+    def test_user_bare_bash_still_approves(self, tmp_path):
+        assert approves_split(
+            tmp_path, "rm -rf /tmp/pwn", user_allow=["Bash"], project_allow=[]
+        )
+
+    def test_user_wildcard_still_approves(self, tmp_path):
+        assert approves_split(
+            tmp_path, "git status", user_allow=["Bash(git *)"], project_allow=[]
+        )
