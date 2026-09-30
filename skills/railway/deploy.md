@@ -48,8 +48,10 @@ Do NOT proceed until the user explicitly confirms. If they say no, stop and ask 
 
 **CI mode (streams build logs inline):**
 ```bash
-railway up --ci -m "<descriptive deploy message>"
+railway up --ci -m "$(cat <message-file>)"
 ```
+
+Write the message to `<message-file>` with the Write tool first. It often comes from a commit message, which is text you did not write: inside the command the shell would read its backticks and `$(...)`.
 
 Always use `-m` with a meaningful message. Derive it from:
 - The most recent commit message, OR

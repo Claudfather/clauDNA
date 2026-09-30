@@ -60,7 +60,7 @@ def test_no_heredoc_is_read_inside_a_command_substitution():
 def test_bodies_titles_and_messages_are_passed_by_file():
     # A value in double quotes that holds a placeholder is text written into the
     # command. `"$(cat <file>)"` is the allowed form: its output is not parsed.
-    pattern = re.compile(r'(?:--body|--title|--message|--notes|(?<![\w-])-m)\s+"(?!\$\(cat )[^"\n]*<[^>"\n]+>[^"\n]*"')
+    pattern = re.compile(r'(?:--body|--title|--message|--notes|--label|--tags|(?<![\w-])-m)\s+"(?!\$\(cat )[^"\n]*<[^>"\n]+>[^"\n]*"')
     hits = _hits(pattern)
     assert not hits, "pass the text by file:\n" + "\n".join(hits)
 

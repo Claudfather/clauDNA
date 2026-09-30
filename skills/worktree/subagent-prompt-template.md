@@ -32,6 +32,6 @@ For Python: use `./venv/bin/python` and `./venv/bin/pytest` directly — never `
 1. Run tests to verify your changes work
 2. Commit your changes with a descriptive message
 3. Push the branch: git push -u origin <branch-name>
-4. Create a PR: gh pr create --base main --title "<title>" --body "<body>"
+4. Create a PR: write the title and the body to two files with the Write tool, then run gh pr create --base main --title "$(cat <title-file>)" --body-file <body-file>. Never put the title or body into the command itself.
 5. Report back: the PR URL and a summary of what was done
 ```

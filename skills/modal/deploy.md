@@ -33,7 +33,7 @@ git status --porcelain
 
 **Local syntax check (optional but recommended):**
 ```bash
-python -c "import ast; ast.parse(open('<app-file>').read())"
+python3 -c 'import ast, sys; ast.parse(open(sys.argv[1]).read())' '<app-file>'
 ```
 If the syntax check fails, warn the user before proceeding.
 

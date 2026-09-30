@@ -74,10 +74,10 @@ This plane has two backends — a Claudron vault (engine) and a raw tree (fallba
 
 ```bash
 # provenance (flags-capable engine only — see below): add --source-url <url> --source-type <url|file|inline>
-claudron capture --type <type> --title "<title>" --body "<body>" --tags "<tags>" --project <repo> --json
+claudron capture --stdin --json < <finding-file>
 ```
 
-`--project` comes from the doc's `repos:` / `--repo` (omit if unscoped); for a long body pass the finding as JSON via `--stdin` (`/claudna:capture` Step 4). Validate the envelope (claudron-engine.md §2) and branch on `data.action`: `created` → report `data.path`; `suggest_update` / `suggest_supersede` → surface `data.reason` and the existing note to the caller (the engine's index-backed dedup replaces the raw adapter's file-compare); `rejected` (exit 1) → surface the validation errors. An engine failure *during* capture (exit 3 or an unrecognized envelope) degrades to the fallback path below, per claudron-engine.md §3 — say so. Do **not** run `/claudna:index` — the vault is engine-indexed (documentation-standard §10). Maturity is never set here; the engine stamps `draft`.
+Write the finding as JSON to `<finding-file>` with the Write tool first (`type`, `title`, `body`, `tags`, `project`; `/claudna:capture` Step 4): the title and body never go on the command line, where the shell would read their backticks and `$(...)`. `project` comes from the doc's `repos:` / `--repo` (omit if unscoped). Validate the envelope (claudron-engine.md §2) and branch on `data.action`: `created` → report `data.path`; `suggest_update` / `suggest_supersede` → surface `data.reason` and the existing note to the caller (the engine's index-backed dedup replaces the raw adapter's file-compare); `rejected` (exit 1) → surface the validation errors. An engine failure *during* capture (exit 3 or an unrecognized envelope) degrades to the fallback path below, per claudron-engine.md §3 — say so. Do **not** run `/claudna:index` — the vault is engine-indexed (documentation-standard §10). Maturity is never set here; the engine stamps `draft`.
 
 **Provenance (capability-probed).** If the doc's frontmatter carries `source_url` / `source_type` (SCHEMA optional fields), map them onto `--source-url` / `--source-type` — but **only on a flags-capable engine**: `data.engine_version` present and ≥ **0.4.0** (the Claudron C2 release that added the flags; the same version probe `/claudna:capture` Step 1 uses, and the same floor its PreCompact defer keys on). An older / absent / unreadable version omits them (it would reject the flags, exit 2). Provenance is **never** folded into the body here: that trailing `Source:` workaround was capture's alone, and the github-pr adapter's `Source:` footer is an unrelated surface.
 
@@ -174,10 +174,12 @@ Then create the issue:
 ```bash
 gh issue create \
   --repo <owner>/<repo> \
-  --title "<title from frontmatter>" \
-  --body "<markdown body after frontmatter>" \
-  --label "<tags from frontmatter, comma-separated>"
+  --title "$(cat <title-file>)" \
+  --body-file <body-file> \
+  --label "$(cat <labels-file>)"
 ```
+
+Write the title, the markdown body after the frontmatter, and the comma-separated labels to those three files with the Write tool first. Text in them never goes into the command itself: the output of `$(cat ...)` is not read as shell, the text written in its place would be.
 
 Labels come from `tags:` — skills express severity/priority as tags (`priority:critical`, `security`, `auto-audit`, …); publish maps `tags` → `--label` and creates any missing labels. The `--repo` flag is required; if `repos:` is set in frontmatter with exactly one repo, infer from that.
 

@@ -187,8 +187,8 @@ If neither `--url` nor `--local` is specified, ask the user.
 1. **Setup.** Scratch dir: `/tmp/qa-crawl-<YYYY-MM-DD_HHMMSS>/`. Create subdirectories: `screenshots/`, `research/`, `console-logs/`. Detect Chrome/Chromium: `which chromium`, `which google-chrome`, `which chromium-browser` in parallel.
 
 2. **Determine base URL.**
-   - **If `--url <base-url>`:** Use directly. Verify reachable with `curl -sI <base-url>`.
-   - **If `--local`:** Read `package.json` for start/dev scripts and port; check if already running (`lsof -i :<port>`, `curl -s http://localhost:<port>`); if not, start it in background; poll with curl (max 30s); base URL = `http://localhost:<port>`.
+   - **If `--url <base-url>`:** Use directly. Verify reachable with `curl -sI <base-url>`. That is the base URL you were given; a route found on the site never goes on a command line (`deep-crawl.md`, the bundled runner).
+   - **If `--local`:** Read `package.json` for start/dev scripts and port (use the port only if it is all digits; `package.json` is the project's text, not yours); check if already running (`lsof -i :<port>`, `curl -s http://localhost:<port>`); if not, start it in background; poll with curl (max 30s); base URL = `http://localhost:<port>`.
    - **If neither:** Ask the user (skip in `--auto` — error out).
 
 3. **Route discovery.** Launch **Explore subagents** in parallel — one scans for file-based routes (Next.js App/Pages Router, React Router, `routes/`/`views/`), one checks `sitemap.xml`/`robots.txt`/homepage `<a href>` links. Merge into a deduplicated list. Present to user for confirmation (skip in `--auto`).

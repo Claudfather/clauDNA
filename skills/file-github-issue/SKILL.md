@@ -162,16 +162,18 @@ Max file size: the Contents API hard-limits at 100MB. For files over ~1MB the AP
 1. Write the substituted body to a tmpfile. BSD `mktemp` on macOS requires `XXXXXX` at the **end** of the template — no `.md` suffix; `gh --body-file` doesn't care about extension:
    ```sh
    TMPFILE=$(mktemp "${TMPDIR:-/tmp}/claudna:file-github-issue.XXXXXX")
+   TITLEFILE=$(mktemp "${TMPDIR:-/tmp}/claudna:file-github-issue-title.XXXXXX")
    ```
+   Write the title into `$TITLEFILE` the same way. The title never goes into the command itself.
 2. File the issue with the effective label set from step 3:
    ```sh
    gh issue create \
      --repo <repo-slug> \
-     --title "<title>" \
+     --title "$(cat "$TITLEFILE")" \
      --body-file "$TMPFILE" \
      [--label <effective-label-1>] [--label <effective-label-2>] ...
    ```
-3. Delete the tmpfile: `rm "$TMPFILE"`.
+3. Delete the tmpfiles: `rm "$TMPFILE" "$TITLEFILE"`.
 4. Print the issue URL (from `gh` stdout) and the attachment URL(s). If any labels were dropped in step 3, repeat the warning:
    > ⚠ Filed without labels (target repo missing: `<comma-separated>`). Create them in the repo to enable labeling next time.
 
