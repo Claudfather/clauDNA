@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import os
 import time
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 from .fsio import append_jsonl, cap_log, ensure_dir, read_jsonl, utc_seconds
 
@@ -45,6 +47,23 @@ def record(root: Path, kind: str, *, started: float, outcome: str, sessions: lis
     except OSError:
         return None
     return rec
+
+
+@contextmanager
+def run(root: Path, kind: str) -> Iterator[dict]:
+    """Record one run of ``kind`` however it ends: the body fills in ``outcome``, ``sessions`` and ``detail``.
+
+    A body that raises is recorded as ``error: <exception type>`` and the exception propagates.
+    """
+    started, rec = time.time(), {"outcome": "done", "sessions": [], "detail": {}}
+    try:
+        yield rec
+    except BaseException as exc:
+        rec["outcome"] = f"error: {type(exc).__name__}"
+        raise
+    finally:
+        record(root, kind, started=started, outcome=str(rec["outcome"]), sessions=rec["sessions"],
+               detail=rec["detail"])
 
 
 def runs(root: Path, *, kind: str | None = None, since: str | None = None, limit: int = 50) -> list[dict]:

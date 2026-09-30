@@ -8,16 +8,16 @@ as data (:data:`RULES`):
 |---|---|
 | ``title``, ``intent``, ``outcome`` | the latest segment's |
 | ``arc``, ``done``, ``blocks``, ``procedures`` | union, deduplicated on normalized text, keeping ``from_seg`` |
-
-Blocks deduplicate on ``home`` + subject + claim.
 | ``in_progress``, ``next`` | the latest segment's only |
 
-A segment that retention retired (phase 6) no longer has its ``summary.json``,
-but what it contributed is kept: items whose ``from_seg`` is no longer on disk
-carry over from the previous rollup, so a session's knowledge outlives its
-segment directories. A ``done`` summary whose range doesn't end at its
-segment's last seal is stale (a re-seal is being summarized) and is left out
-until the new one lands.
+Blocks deduplicate on ``home`` + subject + claim.
+
+A segment that retention retired keeps its summary in
+``sessions/<sid>/summaries/seg-NNN.json`` (retention moves it there), so the
+rollup stays a pure function of the summaries on disk: a lost or corrupt
+rollup is always rebuilt whole. A ``done`` summary whose range no longer ends
+at its segment's last seal is stale (a re-seal is being summarized) and is
+left out until the new one lands.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from pathlib import Path
 from . import schema
 from .fsio import atomic_write_json, exclusive_lock, read_json
 from .paths import SessionPaths
-from .project import by_segment, fold_boundary, load_lifecycle
+from .project import load_lifecycle, segment_states
 
 ROLLUP_SCHEMA = "claudna.session-summary/2"
 
@@ -70,64 +70,39 @@ def _get(doc: dict, path: tuple[str, ...]):
     return doc
 
 
-def done_summaries(paths: SessionPaths, lifecycle: list[dict] | None = None) -> dict[int, dict]:
-    """``index -> summary`` for each segment whose summary is done, valid, and covers its last seal."""
+def summaries(paths: SessionPaths, lifecycle: list[dict] | None = None) -> dict[int, dict]:
+    """``index -> summary``: each live segment's current ``done`` summary, and each retired one's archive."""
     lifecycle = load_lifecycle(paths).events if lifecycle is None else lifecycle
+    out = {s.index: s.doc for s in segment_states(paths, lifecycle) if s.summary == "done"}
     full = schema.load("segment-summary")
-    out: dict[int, dict] = {}
-    for index, events in sorted(by_segment(lifecycle).items()):
-        boundary = fold_boundary(events)
-        if boundary.summary["status"] != "done" or not boundary.last_seal:
-            continue
-        summary = read_json(paths.segment(index).summary)
-        if not isinstance(summary, dict) or schema.validate(summary, full):
-            continue
-        if summary["input"]["range"]["end"] != boundary.last_seal["data"]["end"]:
-            continue  # stale: the segment was re-sealed after this summary
-        out[index] = summary
+    archive = paths.dir / "summaries"
+    for path in sorted(archive.glob("seg-*.json")) if archive.is_dir() else []:
+        doc = read_json(path)
+        if isinstance(doc, dict) and not schema.validate(doc, full) and doc["index"] not in out:
+            out[doc["index"]] = doc
     return out
 
 
-def compute(sid: str, summaries: dict[int, dict], previous: dict | None = None,
-            on_disk: set[int] | None = None) -> dict | None:
-    """The rollup document for ``summaries`` (``index -> segment summary``), or ``None`` with nothing to roll up.
-
-    ``previous`` (the last rollup) and ``on_disk`` (segment indices still
-    present) carry over what retired segments contributed.
-    """
-    kept: dict[str, list[dict]] = {}
-    retired = set()
-    if isinstance(previous, dict) and on_disk is not None:
-        for field, (_, rule) in RULES.items():
-            if rule == UNION:
-                items = (previous.get("fields") or {}).get(field) or []
-                kept[field] = [i for i in items if isinstance(i, dict) and i.get("from_seg") not in on_disk]
-        retired = {s for s in previous.get("segments", []) if s not in on_disk}
-    if not summaries and not any(kept.values()):
+def compute(sid: str, by_index: dict[int, dict]) -> dict | None:
+    """The rollup document for ``by_index`` (``index -> segment summary``), or ``None`` with nothing to roll up."""
+    if not by_index:
         return None
-    order = sorted(summaries)
+    order = sorted(by_index)
     fields: dict[str, object] = {}
     for field, (path, rule) in RULES.items():
         if rule == LATEST:
-            fields[field] = _get(summaries[order[-1]], path) if order else (previous or {}).get("fields", {}).get(field)
+            fields[field] = _get(by_index[order[-1]], path)
             continue
         seen: set[str] = set()
         merged: list[dict] = []
-        for item in kept.get(field, []):
-            key = dedup_key(field, item)
-            if key not in seen:
-                seen.add(key)
-                merged.append(item)
         for index in order:
-            for item in _get(summaries[index], path) or []:
+            for item in _get(by_index[index], path) or []:
                 key = dedup_key(field, item)
                 if key not in seen:
                     seen.add(key)
                     merged.append({**item, "from_seg": index})
         fields[field] = merged
-    segments = sorted(set(order) | retired)
-    return {"schema": ROLLUP_SCHEMA, "sid": sid, "through_seg": max(segments), "segments": segments,
-            "fields": fields}
+    return {"schema": ROLLUP_SCHEMA, "sid": sid, "through_seg": order[-1], "segments": order, "fields": fields}
 
 
 def rollup_path(paths: SessionPaths) -> Path:
@@ -143,9 +118,7 @@ def refresh(paths: SessionPaths, lifecycle: list[dict] | None = None) -> dict | 
     if not paths.dir.is_dir():
         return None
     with exclusive_lock(paths.dir / ".rollup.lock"):
-        previous = read_json(rollup_path(paths))
-        doc = compute(paths.sid, done_summaries(paths, lifecycle), previous if isinstance(previous, dict) else None,
-                      set(paths.segment_indices()))
+        doc = compute(paths.sid, summaries(paths, lifecycle))
         if doc is not None:
             atomic_write_json(rollup_path(paths), doc)
     return doc

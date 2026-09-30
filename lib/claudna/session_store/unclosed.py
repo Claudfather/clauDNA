@@ -30,7 +30,6 @@ for a walk over the whole store.
 
 from __future__ import annotations
 
-import math
 import os
 import time
 from dataclasses import asdict, dataclass, field
@@ -38,7 +37,7 @@ from pathlib import Path
 from typing import Callable, Mapping
 
 from . import lineage
-from .fsio import ensure_dir, exclusive_lock, read_json
+from .fsio import ensure_dir, env_number, exclusive_lock, read_json
 from .project import load_lifecycle, session_facts, transcript_path_of
 from .store import SessionHandle, SessionStore, StoreError
 
@@ -50,14 +49,12 @@ CLOSE_REASON = "abandoned"
 
 
 def after_s(env: Mapping[str, str]) -> float:
-    """The idle age past which a dead session counts as unclosed, in seconds."""
-    try:
-        hours = float(env.get(AFTER_ENV) or DEFAULT_AFTER_H)
-    except ValueError:
-        hours = DEFAULT_AFTER_H
-    if not math.isfinite(hours):  # "nan" would pass every idle test; "inf" would never
-        hours = DEFAULT_AFTER_H
-    return max(hours, 1.0) * 3600  # never under an hour: a slow machine's live session isn't abandoned
+    """The idle age past which a dead session counts as unclosed, in seconds.
+
+    Never under an hour (a slow machine's live session isn't abandoned); an
+    unparseable or non-finite value ("nan" would pass every idle test) is the default.
+    """
+    return env_number(env, AFTER_ENV, DEFAULT_AFTER_H, minimum=1.0) * 3600
 
 
 def pid_alive(pid: int) -> bool:

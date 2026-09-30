@@ -25,9 +25,7 @@ from __future__ import annotations
 
 import re
 
-from . import schema
-from .fsio import read_json
-from .project import by_segment, fold_boundary, load_lifecycle, session_facts, session_status
+from .project import load_lifecycle, segment_states, session_doc, session_facts
 from .store import SessionStore
 
 EXPORT_SCHEMA = "claudna.export/1"
@@ -42,46 +40,32 @@ def check_consumer(name: str) -> str:
     return name
 
 
-def _session_subset(doc: dict | None, sid: str) -> dict:
-    doc = doc if isinstance(doc, dict) else {}
-    return {k: doc.get(k) for k in SESSION_FIELDS} | {"sid": sid}
-
-
 def export(store: SessionStore, consumer: str, *, since_seg: int | None = None, limit: int = 100) -> dict:
     """The envelope of everything ``consumer`` hasn't taken yet, up to ``limit`` items."""
     check_consumer(consumer)
-    full = schema.load("segment-summary")
     items: list[dict] = []
     nxt: dict[str, int] = {}
     for sid in store.session_ids():
         if len(items) >= limit:
             break
         handle = store.session(sid)
-        lifecycle = load_lifecycle(handle.paths).events
-        if not lifecycle or session_facts(lifecycle).private:
-            continue
-        closed = session_status(lifecycle)[0] == "closed"
-        indices = handle.paths.segment_indices()
         start = max(handle.cursor(consumer), since_seg or 0)
-        buckets = by_segment(lifecycle)
-        through = start
-        session_doc = None
-        for index in (i for i in indices if i > start):
-            boundary = fold_boundary(buckets.get(index, []))
-            final = boundary.sealed and (closed or index < indices[-1])
-            status = boundary.summary["status"]
-            if not final or status not in ("done", "skipped"):
-                break
-            if status == "done":
-                summary = read_json(handle.paths.segment(index).summary)
-                if not isinstance(summary, dict) or schema.validate(summary, full):
-                    break  # unreadable: hold here rather than skip it
-                if len(items) >= limit:
-                    break
-                if session_doc is None:
-                    session_doc = _session_subset(read_json(handle.paths.session_json), sid)
-                items.append({"sid": sid, "seg": index, "session": session_doc, "summary": summary})
-            through = index
+        indices = handle.paths.segment_indices()
+        if not indices or indices[-1] <= start:
+            continue  # nothing past the cursor: no log read
+        lifecycle = load_lifecycle(handle.paths)
+        if not lifecycle.events or session_facts(lifecycle.events).private:
+            continue
+        through, subset = start, None
+        for state in (s for s in segment_states(handle.paths, lifecycle.events) if s.index > start):
+            if not state.final or state.summary not in ("done", "skipped") or len(items) >= limit:
+                break  # still in flight, stale or unreadable: the session's cursor holds here
+            if state.summary == "done":
+                if subset is None:
+                    doc = session_doc(handle.paths, lifecycle)
+                    subset = {k: doc.get(k) for k in SESSION_FIELDS}
+                items.append({"sid": sid, "seg": state.index, "session": subset, "summary": state.doc})
+            through = state.index
         if through > start:
             nxt[sid] = through
     return {"schema": EXPORT_SCHEMA, "consumer": consumer, "items": items, "next": nxt}

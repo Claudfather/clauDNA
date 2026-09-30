@@ -16,7 +16,7 @@ These are the three phases the spec lists after activity, built in one pass beca
   - `in_progress` and `next` are the latest segment's only.
   - A stale `done` summary (the segment was re-sealed since) is left out.
   - The summarizer refreshes the rollup after every `summary.completed`, under its own lock, so two workers can't write it out of order.
-  - **Addition:** what a retired segment contributed carries over from the previous rollup, so knowledge outlives its segment directory. §6.7 predates retention and didn't say.
+  - **Addition:** retention moves a retired segment's summary to `sessions/<sid>/summaries/seg-NNN.json`, and the rollup reads those too, so knowledge outlives its segment directory and the rollup stays a pure function of the files on disk. §6.7 predates retention and didn't say.
 - **Readers (§8)**, `readers.py`: `list`, `show`, `timeline`, `failures [--group]`, as `session_store` verbs and as `/claudna:session` verbs (`history.md`).
   - They're read-only. A projection that is missing or fails its schema is folded from its log in memory and never written.
   - `failures --group` folds by signature across sessions and carries the newest occurrence's `tool_use_id`, so the full error can be read in the transcript. The store keeps a pointer, not a copy (phase 4).
@@ -26,7 +26,7 @@ These are the three phases the spec lists after activity, built in one pass beca
   - Private sessions are never exported. Acks go through `SessionHandle.ack`, so there's one writer and a cursor never moves back.
 - **Retention (§9)**, `retention.py`, run by the detached sweep (at most every 6 hours, bounded per run):
   - A final segment is retired once every *registered* consumer (anyone who has acked the session) acked it, or past `CLAUDNA_RETAIN_DAYS` (30).
-  - Retiring refreshes the rollup, appends `segment.retired {reason: acked|age}`, removes the directory, and rebuilds the session's projections. `session.json.segments.retired` counts retirements.
+  - Retiring archives the summary, appends `segment.retired {reason: acked|age}` and removes the directory; then, once per session per run, it refreshes the rollup and rebuilds the projections. `session.json.segments.retired` counts retirements.
   - **Deviation from §9: a floor for acked segments,** `CLAUDNA_RETAIN_ACKED_DAYS` (7). §9 retires an acked segment at once. Harvest acks as soon as it captures, so without a floor a harvested segment would disappear minutes after its session ended, taking `timeline` and `show` with it. The age cap is unchanged.
 
 ## Phase 5: harvest, complete, the clauDNA side

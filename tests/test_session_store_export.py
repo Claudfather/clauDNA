@@ -17,12 +17,11 @@ import json
 import time
 
 import pytest
-from conftest import ACTOR, ORIGIN
-from test_session_store_readers import BLOCK_A, summary
+from conftest import ACTOR, ORIGIN, complete_segment, segment_summary
+from test_session_store_readers import BLOCK_A
 
-from claudna.session_store import export, retention, rollup
+from claudna.session_store import export, fsio, retention, rollup
 from claudna.session_store.cli import check_session, main
-from claudna.session_store.fsio import atomic_write_json
 
 DAY = 86400
 
@@ -37,9 +36,7 @@ def session_with(store, sid, statuses, *, close=True, private=False):
         h.open_segment("session_open" if i == 1 else "compact", (i - 1) * 100)
         h.seal_segment(i * 100, "precompact")
         if status == "done":
-            atomic_write_json(h.paths.segment(i).summary, summary(sid, i, title=f"t{i}", blocks=[BLOCK_A], end=i * 100))
-            h.append("summary.completed", {"job_id": f"j{i}", "artifact": f"seg-{i:03d}/summary.json",
-                                           "input_sha256": "0" * 64, "duration_ms": 1}, seg=i)
+            complete_segment(h, i, segment_summary(sid, i, [BLOCK_A], title=f"t{i}", end=i * 100))
         elif status == "skipped":
             h.append("summary.skipped", {"reason": "trivial"}, seg=i)
         elif status == "pending":
@@ -142,9 +139,9 @@ class TestRetention:
         session_with(store, "s1", ["done", "done", "done"])
         assert len(retention.sweep(store, {}, now=self.later(31), limit=2).retired) == 2
 
-    @pytest.mark.parametrize("value", ["nan", "-1", "junk"])
+    @pytest.mark.parametrize("value", ["nan", "inf", "-1", "junk"])
     def test_bad_settings_fall_back(self, value):
-        assert retention._days({retention.CAP_ENV: value}, retention.CAP_ENV, 30.0) == 30.0
+        assert fsio.env_number({retention.CAP_ENV: value}, retention.CAP_ENV, 30.0) == 30.0
 
     def test_the_sweep_verb_runs_retention(self, store, capsys, monkeypatch):
         session_with(store, "s1", ["done"])

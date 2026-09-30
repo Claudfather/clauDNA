@@ -30,7 +30,6 @@ The ``claudron`` call is behind ``capture`` so tests never touch a vault.
 
 from __future__ import annotations
 
-import calendar
 import json
 import os
 import shutil
@@ -39,12 +38,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Mapping
 
-from . import digest, rollup
-from . import events as ev
+from . import digest
 from claudna.redact import redact_strings
 
 from . import schema
-from .fsio import append_jsonl, atomic_write_json, ensure_dir, exclusive_lock, read_json, utc_seconds
+from .fsio import atomic_write_json, ensure_dir, epoch_of, exclusive_lock, read_json, utc_seconds
 from .project import by_segment, load_lifecycle, session_facts
 from .store import SessionStore
 
@@ -211,11 +209,6 @@ class RunReport:
         return {**self.__dict__, "started_at": self.started_at}
 
 
-def _epoch(ts: str) -> float:
-    """An envelope timestamp (UTC, ``…Z``) as epoch seconds — ``timegm``, never ``mktime``: no local DST."""
-    return calendar.timegm(time.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S"))
-
-
 def _stranded(events: list[dict], now: float) -> str | None:
     """Does a final segment's summary need another attempt (``"retry"``), or has it had its last (``"give up"``)?
 
@@ -238,13 +231,13 @@ def _stranded(events: list[dict], now: float) -> str | None:
         return None
     if last["kind"] == "summary.failed" and not last["data"]["retryable"]:
         return "give up"
-    if last["kind"] in ("segment.sealed", "summary.requested") and now - _epoch(last["ts"]) < STALE_PENDING_S:
+    if last["kind"] in ("segment.sealed", "summary.requested") and now - epoch_of(last["ts"]) < STALE_PENDING_S:
         return None  # a worker may still be on it
     return "give up" if attempts >= MAX_ATTEMPTS else "retry"
 
 
 def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: Callable[..., str],
-                     env: Mapping[str, str], held_log: Path, resummarize: Callable[..., str]) -> None:
+                     env: Mapping[str, str], resummarize: Callable[..., str]) -> None:
     handle = store.session(sid)
     through = handle.cursor(CONSUMER)
     if through >= max(handle.paths.segment_indices(), default=0):
@@ -304,8 +297,8 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
         for block, finding in ((b, f) for b, f in findings if f is not None):
             answer = capture(finding, origin.get("cwd"), env, vault)
             action = answer["action"]
-            digest.record_capture(store.root, sid=sid, seg=index, key=rollup.dedup_key("blocks", block), block=block,
-                                  title=finding["title"], action=action, path=answer["path"], vault=vault)
+            digest.record_capture(store.root, sid=sid, seg=index, block=block, title=finding["title"],
+                                  action=action, path=answer["path"], vault=vault)
             if action in ("created", "updated"):
                 report.created += 1
             elif action == "rejected":
@@ -313,8 +306,7 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
             else:
                 report.known += 1
         for block, _ in (pair for pair in findings if pair[1] is None):
-            append_jsonl(held_log, {"ts": ev.now_ts(), "sid": sid, "seg": index, "reason": "person",
-                                    "key": rollup.dedup_key("blocks", block), "block": block}, durable=False)
+            digest.record_held(store.root, sid=sid, seg=index, block=block)
             report.held_back += 1
         report.segments += 1
         handle.ack(CONSUMER, index)
@@ -357,7 +349,7 @@ def harvest(store: SessionStore, *, env: Mapping[str, str] = os.environ,
         try:
             for sid in store.session_ids():
                 try:
-                    _harvest_session(store, sid, report, capture, env, home / "held.jsonl", resummarize)
+                    _harvest_session(store, sid, report, capture, env, resummarize)
                 except CaptureError as exc:
                     report.status = "error"
                     report.errors.append(f"{sid}: {exc}")

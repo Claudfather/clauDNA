@@ -25,11 +25,12 @@ writes, risk tiers, the inbox and ambiguous queues, and ``revert-run``.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from .fsio import append_jsonl, ensure_dir, read_jsonl
 from .events import now_ts
+from .fsio import append_jsonl, ensure_dir, read_jsonl
+from .rollup import dedup_key
 
 DIGEST_SIZE = 5
 
@@ -38,29 +39,25 @@ def home(root: Path) -> Path:
     return root / "harvest"
 
 
-def record_capture(root: Path, *, sid: str, seg: int, key: str, block: dict, title: str, action: str,
+def claim_key(block: dict) -> str:
+    """What makes two blocks "the same claim": home + subject + claim, normalized (the rollup's rule)."""
+    return dedup_key("blocks", block)
+
+
+def record_capture(root: Path, *, sid: str, seg: int, block: dict, title: str, action: str,
                    path: str | None, vault: str | None) -> None:
     """One ledger line for one ``claudron capture`` answer."""
     append_jsonl(ensure_dir(home(root)) / "ledger.jsonl", {
-        "ts": now_ts(), "sid": sid, "seg": seg, "key": key, "title": title, "claim": block.get("claim"),
+        "ts": now_ts(), "sid": sid, "seg": seg, "key": claim_key(block), "title": title, "claim": block.get("claim"),
         "asserted_by": block.get("asserted_by"), "action": action, "path": path, "vault": vault,
     }, durable=False)
 
 
-def evidence(root: Path) -> dict[str, set[str]]:
-    """``claim key -> the sessions that asserted it`` (captures and held person facts alike)."""
-    out: dict[str, set[str]] = {}
-    for rec in read_jsonl(home(root) / "ledger.jsonl").records:
-        if isinstance(rec.get("key"), str) and isinstance(rec.get("sid"), str):
-            out.setdefault(rec["key"], set()).add(rec["sid"])
-    for rec in read_jsonl(home(root) / "held.jsonl").records:
-        if isinstance(rec.get("key"), str) and isinstance(rec.get("sid"), str):
-            out.setdefault(rec["key"], set()).add(rec["sid"])
-    return out
-
-
-def _reviewed(root: Path) -> set[str]:
-    return {r["item"] for r in read_jsonl(home(root) / "reviewed.jsonl").records if isinstance(r.get("item"), str)}
+def record_held(root: Path, *, sid: str, seg: int, block: dict, reason: str = "person") -> None:
+    """One ``held.jsonl`` line for a block harvest keeps back for a person (an other-person fact)."""
+    append_jsonl(ensure_dir(home(root)) / "held.jsonl", {
+        "ts": now_ts(), "sid": sid, "seg": seg, "reason": reason, "key": claim_key(block), "block": block,
+    }, durable=False)
 
 
 @dataclass(frozen=True)
@@ -75,35 +72,54 @@ class Item:
     last_ts: str
 
     def as_dict(self) -> dict:
-        return {k: getattr(self, k) for k in self.__dataclass_fields__}
+        return asdict(self)
 
 
-def items(root: Path, *, limit: int = DIGEST_SIZE) -> list[Item]:
+def _records(root: Path) -> tuple[list[dict], list[dict], set[str]]:
+    """``(ledger, held, reviewed items)``, each file read once."""
+    h = home(root)
+    reviewed = {r["item"] for r in read_jsonl(h / "reviewed.jsonl").records if isinstance(r.get("item"), str)}
+    return read_jsonl(h / "ledger.jsonl").records, read_jsonl(h / "held.jsonl").records, reviewed
+
+
+def evidence(root: Path, ledger: list[dict] | None = None, held: list[dict] | None = None) -> dict[str, set[str]]:
+    """``claim key -> the sessions that asserted it`` (captures and held person facts alike)."""
+    if ledger is None or held is None:
+        ledger, held, _ = _records(root)
+    out: dict[str, set[str]] = {}
+    for rec in [*ledger, *held]:
+        if isinstance(rec.get("key"), str) and isinstance(rec.get("sid"), str):
+            out.setdefault(rec["key"], set()).add(rec["sid"])
+    return out
+
+
+def items(root: Path, *, limit: int | None = DIGEST_SIZE) -> list[Item]:
     """The digest: unreviewed drafts, most-reinforced first, then held person facts."""
-    seen = evidence(root)
-    done = _reviewed(root)
-    drafts: dict[str, Item] = {}
-    for rec in read_jsonl(home(root) / "ledger.jsonl").records:
+    ledger, held, done = _records(root)
+    seen = evidence(root, ledger, held)
+    drafts: dict[str, dict] = {}
+    for rec in ledger:
         path = rec.get("path")
         if rec.get("action") not in ("created", "updated") or not isinstance(path, str) or path in done:
             continue
-        sessions = len(seen.get(rec.get("key"), ()))
-        prior = drafts.get(path)
-        user = rec.get("asserted_by") == "user" or bool(prior and prior.asserted_by == "user")
-        drafts[path] = Item("draft", path, rec.get("title") or path, rec.get("claim"), rec.get("vault"),
-                            max(sessions, prior.sessions if prior else 0), "user" if user else rec.get("asserted_by"),
-                            max(rec.get("ts") or "", prior.last_ts if prior else ""))
-    newest = sorted(drafts.values(), key=lambda i: i.last_ts, reverse=True)  # stable: the tiebreak below
-    ranked = sorted(newest, key=lambda i: (-i.sessions, i.asserted_by != "user"))
+        d = drafts.setdefault(path, {"title": rec.get("title") or path, "claim": rec.get("claim"),
+                                     "vault": rec.get("vault"), "sessions": 0, "user": False, "last_ts": ""})
+        d["sessions"] = max(d["sessions"], len(seen.get(rec.get("key"), ())))
+        d["user"] = d["user"] or rec.get("asserted_by") == "user"
+        d["last_ts"] = max(d["last_ts"], rec.get("ts") or "")
+    newest = sorted(drafts.items(), key=lambda kv: kv[1]["last_ts"], reverse=True)  # stable: the tiebreak below
+    ranked = [Item("draft", path, d["title"], d["claim"], d["vault"], d["sessions"],
+                   "user" if d["user"] else "agent", d["last_ts"])
+              for path, d in sorted(newest, key=lambda kv: (-kv[1]["sessions"], not kv[1]["user"]))]
     people: dict[str, Item] = {}
-    for rec in read_jsonl(home(root) / "held.jsonl").records:
+    for rec in held:
         key, block = rec.get("key"), rec.get("block") if isinstance(rec.get("block"), dict) else {}
-        if not isinstance(key, str) or key in done:
-            continue
-        people[key] = Item("person", key, (block.get("subject_hint") or {}).get("name") or "person fact",
-                           block.get("claim"), None, len(seen.get(key, ())), block.get("asserted_by"),
-                           rec.get("ts") or "")
-    return (ranked + sorted(people.values(), key=lambda i: i.last_ts, reverse=True))[:limit]
+        if isinstance(key, str) and key not in done:
+            people[key] = Item("person", key, (block.get("subject_hint") or {}).get("name") or "person fact",
+                               block.get("claim"), None, len(seen.get(key, ())), block.get("asserted_by"),
+                               rec.get("ts") or "")
+    found = ranked + sorted(people.values(), key=lambda i: i.last_ts, reverse=True)
+    return found if limit is None else found[:limit]
 
 
 def mark_reviewed(root: Path, item: str, *, outcome: str) -> None:
@@ -117,15 +133,14 @@ def mark_reviewed(root: Path, item: str, *, outcome: str) -> None:
 
 def review_line(root: Path) -> str:
     """SessionStart's line about the digest, or ``""`` when there's nothing to review."""
-    pending = items(root, limit=10**6)
+    pending = items(root, limit=None)
+    drafts = [i for i in pending if i.kind == "draft"]
     if not pending:
         return ""
-    drafts = sum(1 for i in pending if i.kind == "draft")
-    people = len(pending) - drafts
-    reinforced = sum(1 for i in pending if i.kind == "draft" and i.sessions >= 2)
-    parts = [f"{drafts} draft(s)" + (f", {reinforced} seen in 2+ sessions" if reinforced else "")]
-    if people:
-        parts.append(f"{people} person fact(s)")
+    reinforced = sum(1 for i in drafts if i.sessions >= 2)
+    parts = [f"{len(drafts)} draft(s)" + (f", {reinforced} seen in 2+ sessions" if reinforced else "")]
+    if len(pending) > len(drafts):
+        parts.append(f"{len(pending) - len(drafts)} person fact(s)")
     return f"to review: {'; '.join(parts)} (/claudna:capture --review)"
 
 

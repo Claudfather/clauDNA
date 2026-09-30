@@ -129,6 +129,10 @@ class SessionPaths:
     def session_json(self) -> Path:
         return self.dir / "session.json"
 
+    def archived_summary(self, index: int) -> Path:
+        """Where a retired segment's summary is kept (retention, phase 6): the rollup reads it from here."""
+        return self.dir / "summaries" / f"{seg_dirname(index)}.json"
+
     @property
     def consumers(self) -> Path:
         return self.dir / "consumers.json"

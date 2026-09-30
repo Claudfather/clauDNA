@@ -20,6 +20,8 @@ from __future__ import annotations
 import contextlib
 import fcntl
 import json
+import calendar
+import math
 import os
 import time
 import tempfile
@@ -29,6 +31,24 @@ from pathlib import Path
 
 DIR_MODE = 0o700
 FILE_MODE = 0o600
+
+
+def epoch_of(ts: str) -> float:
+    """An envelope timestamp (UTC, ``…Z``) as epoch seconds: ``timegm``, never ``mktime``, so no local DST."""
+    return calendar.timegm(time.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S"))
+
+
+def env_number(env, name: str, default: float, *, minimum: float = 0.0) -> float:
+    """A float setting from ``env``, never below ``minimum``.
+
+    Unset, unparseable, negative or non-finite is the default: a typo must never
+    become 0 (a retention cap of 0 days would retire everything at once).
+    """
+    try:
+        value = float(env.get(name) or default)
+    except ValueError:
+        return default
+    return max(value, minimum) if math.isfinite(value) and value >= 0 else default
 
 
 def utc_seconds(epoch: float | None = None) -> str:

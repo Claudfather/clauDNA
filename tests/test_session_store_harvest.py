@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 
 import pytest
-from conftest import ACTOR, ORIGIN
+from conftest import ACTOR, ORIGIN, segment_summary
 
 from claudna.session_store import harvest
 from claudna.session_store.fsio import atomic_write_json, exclusive_lock
@@ -78,15 +78,7 @@ def summarized_session(store, sid: str, blocks_per_segment: list[list[dict]], *,
 
 def artifact(sid: str, index: int, blocks: list[dict], *, start: int = 0, end: int = 1) -> dict:
     """A schema-valid seg-NNN/summary.json carrying ``blocks``, summarizing ``[start, end)``."""
-    return {
-        "schema": "claudna.segment-summary/1", "sid": sid, "index": index,
-        "input": {"transcript_path": "/t.jsonl", "range": {"start": start, "end": end}, "sha256": "0" * 64,
-                  "turns": 1},
-        "producer": {"model": "haiku", "prompt_version": "segment-summary/1", "duration_ms": 1, "cost_usd": None},
-        "journey": {"title": "t", "intent": "i", "outcome": "shipped", "arc": [], "done": [], "in_progress": [],
-                    "next": []},
-        "blocks": blocks, "procedures": [],
-    }
+    return segment_summary(sid, index, blocks, start=start, end=end)
 
 
 def cursor(handle) -> int:

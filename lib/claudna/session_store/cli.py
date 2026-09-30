@@ -45,7 +45,6 @@ import dataclasses
 import json
 import os
 import sys
-import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -341,11 +340,11 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         from . import ops
 
-        started = time.time()
-        report = harvest.harvest(store, force=args.force).as_dict()
-        ops.record(store.root, "harvest", started=started, outcome=report.get("status") or "done",
-                   detail={k: report.get(k) for k in ("created", "known", "held_back", "rejected", "retried",
-                                                      "gave_up", "segments", "errors")})
+        with ops.run(store.root, "harvest") as rec:
+            report = harvest.harvest(store, force=args.force).as_dict()
+            rec["outcome"] = report.get("status") or "done"
+            rec["detail"] = {k: report.get(k) for k in ("created", "known", "held_back", "rejected", "retried",
+                                                        "gave_up", "segments", "errors")}
         print(json.dumps(report))
         return 0
     if args.verb in ("list", "show", "timeline", "failures"):
@@ -362,18 +361,23 @@ def main(argv: list[str] | None = None) -> int:
         own = {k: v for k, v in env.items() if k != SUMMARY_ENV}
         from . import ops
 
-        started = time.time()
-        report = unclosed.sweep(store, env, dry_run=args.dry_run,
-                                close=lambda h, pid: boundaries.abandon_session(h, own, owner_pid=pid)).as_dict()
-        if not args.dry_run:  # retention (spec §9) rides the same detached, debounced worker
+        def close(h, pid):
+            return boundaries.abandon_session(h, own, owner_pid=pid)
+
+        if args.dry_run:
+            report = unclosed.sweep(store, env, dry_run=True, close=close).as_dict()
+        else:
             from . import retention
 
-            report["retention"] = retention.sweep(store, env).as_dict()
-            retired = report["retention"]["retired"]
-            errors = report["errors"] + report["retention"]["errors"]
-            ops.record(store.root, "sweep", started=started, outcome="error" if errors else "done",
-                       sessions=report["closed"] + [r.split("/", 1)[0] for r in retired],
-                       detail={"closed": len(report["closed"]), "retired": len(retired), "errors": errors[:5]})
+            with ops.run(store.root, "sweep") as rec:
+                report = unclosed.sweep(store, env, close=close).as_dict()
+                # retention (spec §9) rides the same detached, debounced worker
+                report["retention"] = retention.sweep(store, env).as_dict()
+                retired = report["retention"]["retired"]
+                errors = report["errors"] + report["retention"]["errors"]
+                rec.update(outcome="error" if errors else "done",
+                           sessions=report["closed"] + [r.split("/", 1)[0] for r in retired],
+                           detail={"closed": len(report["closed"]), "retired": len(retired), "errors": errors[:5]})
         print(json.dumps(report))
         return 0
     if args.verb == "runs":
@@ -428,14 +432,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{args.sid}: {'not ' if args.off else ''}private")
         return 0
     if args.verb == "summarize":
-        from . import summarize  # off the hook path: it pulls in hashlib, uuid and subprocess
+        from . import ops, summarize  # off the hook path: summarize pulls in hashlib, uuid and subprocess
 
-        from . import ops
-
-        started = time.time()
-        outcome = summarize.summarize(handle, args.seg)
-        ops.record(handle.paths.root, "summarize", started=started, outcome=outcome, sessions=[handle.sid],
-                   detail={"seg": args.seg})
+        with ops.run(handle.paths.root, "summarize") as rec:
+            rec.update(sessions=[handle.sid], detail={"seg": args.seg})
+            outcome = rec["outcome"] = summarize.summarize(handle, args.seg)
         print(outcome)
         return 0
     if args.verb == "rebuild":

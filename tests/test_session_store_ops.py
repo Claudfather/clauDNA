@@ -43,6 +43,18 @@ class TestRecord:
         (tmp_path / "runs").write_text("not a directory")
         assert ops.record(tmp_path, "sweep", started=0.0, outcome="done") is None
 
+    def test_run_records_a_body_that_raises(self, tmp_path):
+        with pytest.raises(RuntimeError), ops.run(tmp_path, "harvest") as rec:
+            rec["sessions"] = ["s1"]
+            raise RuntimeError("boom")
+        (found,) = ops.runs(tmp_path)
+        assert (found["outcome"], found["sessions"]) == ("error: RuntimeError", ["s1"])
+
+    def test_run_records_what_the_body_filled_in(self, tmp_path):
+        with ops.run(tmp_path, "sweep") as rec:
+            rec.update(outcome="done", detail={"closed": 2})
+        assert ops.runs(tmp_path)[0]["detail"] == {"closed": 2}
+
     def test_an_unknown_kind_is_a_programming_error(self, tmp_path):
         with pytest.raises(ValueError):
             ops.record(tmp_path, "rebuild", started=0.0, outcome="x")

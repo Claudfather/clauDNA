@@ -16,14 +16,12 @@ What these guard:
 from __future__ import annotations
 
 import json
-import shutil
 
 import pytest
-from conftest import ACTOR, ORIGIN
+from conftest import ACTOR, ORIGIN, complete_segment, segment_summary
 
-from claudna.session_store import readers, rollup
+from claudna.session_store import readers, retention, rollup
 from claudna.session_store.cli import main
-from claudna.session_store.fsio import atomic_write_json
 
 BLOCK_A = {"home": "entity", "subject_hint": {"name": "staging DB", "kind": "service", "aliases": []},
            "claim": "The staging DB resets nightly.", "asserted_by": "user", "tags": []}
@@ -31,15 +29,8 @@ BLOCK_B = {"home": "entity", "subject_hint": {"name": "CI", "kind": "service", "
            "claim": "CI runs on Python 3.9 too.", "asserted_by": "agent", "tags": []}
 
 
-def summary(sid, index, *, title, blocks, end, done=(), next_=(), outcome="shipped"):
-    return {
-        "schema": "claudna.segment-summary/1", "sid": sid, "index": index,
-        "input": {"transcript_path": "/t.jsonl", "range": {"start": 0, "end": end}, "sha256": "0" * 64, "turns": 1},
-        "producer": {"model": "haiku", "prompt_version": "segment-summary/1", "duration_ms": 1, "cost_usd": None},
-        "journey": {"title": title, "intent": "i", "outcome": outcome, "arc": [{"step": "s", "result": "r"}],
-                    "done": [{"text": t} for t in done], "in_progress": [], "next": [{"text": t} for t in next_]},
-        "blocks": list(blocks), "procedures": [],
-    }
+def summary(sid, index, *, title, blocks, end, **kw):
+    return segment_summary(sid, index, blocks, title=title, end=end, **kw)
 
 
 def session_with(store, sid, segments, *, repo="webapp", bot=None, close=True):
@@ -51,9 +42,7 @@ def session_with(store, sid, segments, *, repo="webapp", bot=None, close=True):
         h.open_segment("session_open" if i == 1 else "compact", (i - 1) * 100)
         h.seal_segment(i * 100, "precompact")
         if kw is not None:
-            atomic_write_json(h.paths.segment(i).summary, summary(sid, i, end=i * 100, **kw))
-            h.append("summary.completed", {"job_id": f"j{i}", "artifact": f"seg-{i:03d}/summary.json",
-                                           "input_sha256": "0" * 64, "duration_ms": 1}, seg=i)
+            complete_segment(h, i, summary(sid, i, end=i * 100, **kw))
     if close:
         h.close_session("other")
     return h
@@ -87,9 +76,9 @@ class TestRollup:
 
     def test_a_retired_segments_contribution_survives(self, store):
         h = session_with(store, "s1", [{"title": "a", "blocks": [BLOCK_A]}, {"title": "b", "blocks": [BLOCK_B]}])
-        rollup.refresh(h.paths)
-        shutil.rmtree(h.paths.segment(1).dir)  # what retention does, after recording segment.retired
-        doc = rollup.refresh(h.paths)
+        retention.retire(h, [(1, "acked")])  # archives seg-001's summary, then removes its directory
+        assert not h.paths.segment(1).dir.exists() and h.paths.archived_summary(1).is_file()
+        doc = json.loads(rollup.rollup_path(h.paths).read_text())
         assert [b["claim"] for b in doc["fields"]["blocks"]] == [BLOCK_A["claim"], BLOCK_B["claim"]]
         assert doc["segments"] == [1, 2]
 

@@ -15,21 +15,10 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
-from .fsio import read_json, read_jsonl
+from .fsio import read_json
 from .paths import SessionPaths
-from .project import (
-    SEGMENT_SCHEMA,
-    SESSION_SCHEMA,
-    by_segment,
-    load_activity,
-    load_lifecycle,
-    project_segment,
-    project_session,
-    read_projection,
-    segment_transcript_paths,
-    transcript_path_of,
-)
-from .rollup import rollup_path
+from .project import load_activity, load_lifecycle, segment_docs, session_doc
+from .rollup import ROLLUP_SCHEMA, rollup_path
 from .store import SessionStore
 
 _SINCE = re.compile(r"^(\d+)([hdw])$")
@@ -49,31 +38,9 @@ def since_cutoff(since: str | None, *, now: float | None = None) -> str | None:
     return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + f"{moment.microsecond // 1000:03d}Z"
 
 
-def _segments(paths: SessionPaths, lifecycle) -> list[dict]:
-    buckets, transcripts = by_segment(lifecycle.events), segment_transcript_paths(lifecycle.events)
-    out = []
-    for index in paths.segment_indices():
-        doc = read_projection(paths.segment(index).segment_json, SEGMENT_SCHEMA)
-        if doc is None:
-            doc = project_segment(paths.sid, index, buckets.get(index, []), load_activity(paths, index),
-                                  transcript_path=transcripts[index])
-        out.append(doc)
-    return out
-
-
-def session_doc(paths: SessionPaths) -> dict:
-    """``session.json``, or the same document folded from the log when the file can't be trusted."""
-    doc = read_projection(paths.session_json, SESSION_SCHEMA)
-    if doc is not None:
-        return doc
-    lifecycle = load_lifecycle(paths)
-    return project_session(paths.sid, lifecycle, _segments(paths, lifecycle),
-                           transcript_path=transcript_path_of(lifecycle.events))
-
-
 def _rollup(paths: SessionPaths) -> dict | None:
     doc = read_json(rollup_path(paths))
-    return doc if isinstance(doc, dict) and doc.get("schema") == "claudna.session-summary/2" else None
+    return doc if isinstance(doc, dict) and doc.get("schema") == ROLLUP_SCHEMA else None
 
 
 def list_sessions(store: SessionStore, *, since: str | None = None, repo: str | None = None,
@@ -83,6 +50,8 @@ def list_sessions(store: SessionStore, *, since: str | None = None, repo: str | 
     rows = []
     for sid in store.session_ids():
         paths = store.session(sid).paths
+        if cutoff and _older_than(paths.lifecycle, cutoff):
+            continue  # its log hasn't changed since before the cutoff, so it opened before it too
         doc = session_doc(paths)
         actor, origin = doc.get("actor") or {}, doc.get("origin") or {}
         if cutoff and (doc.get("opened_at") or "") < cutoff:
@@ -112,7 +81,8 @@ def show(store: SessionStore, sid: str) -> dict:
         raise LookupError(f"no session {sid}")
     paths = handle.paths
     lifecycle = load_lifecycle(paths)
-    return {"session": session_doc(paths), "segments": _segments(paths, lifecycle), "rollup": _rollup(paths)}
+    return {"session": session_doc(paths, lifecycle), "segments": segment_docs(paths, lifecycle),
+            "rollup": _rollup(paths)}
 
 
 def timeline(store: SessionStore, sid: str) -> list[dict]:
@@ -129,15 +99,24 @@ def timeline(store: SessionStore, sid: str) -> list[dict]:
             for _, _, _, log, e in merged]
 
 
-def _failures(store: SessionStore, sids: Iterable[str]) -> list[dict]:
+def _failures(store: SessionStore, sids: Iterable[str], cutoff: str | None) -> list[dict]:
     out = []
     for sid in sids:
         paths = store.session(sid).paths
         for index in paths.segment_indices():
-            for e in read_jsonl(paths.segment(index).events).records:
-                if isinstance(e, dict) and e.get("kind") == "tool.failed" and isinstance(e.get("data"), dict):
-                    out.append({"sid": sid, "seg": index, "ts": e.get("ts"), **e["data"]})
+            events = paths.segment(index).events
+            if cutoff and _older_than(events, cutoff):
+                continue  # untouched since before the cutoff: nothing in it can pass (one stat, no read)
+            out += [{"sid": sid, "seg": index, "ts": e["ts"], **e["data"]}
+                    for e in load_activity(paths, index).events if e["kind"] == "tool.failed"]
     return out
+
+
+def _older_than(path, cutoff: str) -> bool:
+    try:
+        return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(path.stat().st_mtime)) < cutoff[:19]
+    except OSError:
+        return True
 
 
 def failures(store: SessionStore, sid: str | None = None, *, group: bool = False,
@@ -151,7 +130,7 @@ def failures(store: SessionStore, sid: str | None = None, *, group: bool = False
     if sid is not None and not store.session(sid).exists():
         raise LookupError(f"no session {sid}")
     cutoff = since_cutoff(since)
-    rows = [r for r in _failures(store, [sid] if sid else store.session_ids())
+    rows = [r for r in _failures(store, [sid] if sid else store.session_ids(), cutoff)
             if not cutoff or (r["ts"] or "") >= cutoff]
     rows.sort(key=lambda r: r["ts"] or "", reverse=True)
     if not group:
@@ -176,6 +155,10 @@ def failures(store: SessionStore, sid: str | None = None, *, group: bool = False
 
 def _short(ts: str | None) -> str:
     return (ts or "")[:16].replace("T", " ") or "-"
+
+
+def _seg(index: int | None) -> str:
+    return f"seg-{index:03d}" if index else "-      "
 
 
 def _compact(data: dict) -> str:
@@ -206,8 +189,8 @@ def render(verb: str, data, *, group: bool = False) -> list[str]:
             lines += [f"  - {b.get('claim')}" for b in f.get("blocks", [])[:10]]
         return lines
     if verb == "timeline":
-        return [f"{_short(e['ts'])}  seg-{e['seg']:03d}  {e['kind']:18} {_compact(e['data'])}" if e["seg"] else
-                f"{_short(e['ts'])}  -        {e['kind']:18} {_compact(e['data'])}" for e in data] or ["no events"]
+        return [f"{_short(e['ts'])}  {_seg(e['seg'])}  {e['kind']:18} {_compact(e['data'])}" for e in data] \
+            or ["no events"]
     if verb == "failures":
         if not data:
             return ["no failures"]

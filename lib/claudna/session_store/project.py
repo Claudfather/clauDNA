@@ -394,3 +394,66 @@ def _refresh_activity(paths: SessionPaths, event: dict, *, bytes_before: int) ->
     projected["projected_from"] = {"lines": pf["lines"] + 1, "bytes": paths.segment(seg).events.stat().st_size,
                                    "skipped": pf["skipped"]}
     atomic_write_json(paths.segment(seg).segment_json, projected)
+
+
+# ── shared reads for the phase 6 consumers (readers, export, retention, rollup) ──
+
+
+@dataclass(frozen=True)
+class SegmentState:
+    """One segment as every consumer judges it: final or not, and where its summary stands.
+
+    ``summary`` is ``done`` only for a valid summary that covers the last seal;
+    ``stale`` is a done summary the segment has since outgrown (it was re-sealed),
+    and ``unreadable`` a done one whose file is missing or invalid. Otherwise
+    it is the lifecycle status (``none``/``pending``/``failed``/``skipped``).
+    """
+
+    index: int
+    final: bool  #: sealed, and superseded or in a closed session: it can't change any more
+    summary: str
+    doc: dict | None  #: the summary itself, when ``done``
+    sealed_at: str | None
+
+
+def segment_states(paths: SessionPaths, lifecycle: list[dict]) -> list[SegmentState]:
+    """Every existing segment's :class:`SegmentState`, in index order — the one place this rule lives."""
+    indices = paths.segment_indices()
+    closed = session_status(lifecycle)[0] == "closed"
+    buckets = by_segment(lifecycle)
+    full = schema.load("segment-summary")
+    out = []
+    for index in indices:
+        boundary = fold_boundary(buckets.get(index, []))
+        seal = boundary.last_seal
+        status, doc = boundary.summary["status"], None
+        if status == "done":
+            doc = read_json(paths.segment(index).summary)
+            if not isinstance(doc, dict) or schema.validate(doc, full):
+                status, doc = "unreadable", None
+            elif seal is None or doc["input"]["range"]["end"] != seal["data"]["end"]:
+                status, doc = "stale", None
+        out.append(SegmentState(index, seal is not None and (closed or index < indices[-1]), status, doc,
+                                seal["ts"] if seal else None))
+    return out
+
+
+def segment_docs(paths: SessionPaths, lifecycle: Log) -> list[dict]:
+    """Each segment's ``segment.json``, or the same document folded from its logs when the file can't be trusted."""
+    buckets, transcripts = by_segment(lifecycle.events), segment_transcript_paths(lifecycle.events)
+    out = []
+    for index in paths.segment_indices():
+        doc = read_projection(paths.segment(index).segment_json, SEGMENT_SCHEMA)
+        out.append(doc if doc is not None else project_segment(
+            paths.sid, index, buckets.get(index, []), load_activity(paths, index), transcript_path=transcripts[index]))
+    return out
+
+
+def session_doc(paths: SessionPaths, lifecycle: Log | None = None) -> dict:
+    """``session.json``, or the same document folded from the log when the file can't be trusted. Writes nothing."""
+    doc = read_projection(paths.session_json, SESSION_SCHEMA)
+    if doc is not None:
+        return doc
+    lifecycle = load_lifecycle(paths) if lifecycle is None else lifecycle
+    return project_session(paths.sid, lifecycle, segment_docs(paths, lifecycle),
+                           transcript_path=transcript_path_of(lifecycle.events))
