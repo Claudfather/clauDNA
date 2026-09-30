@@ -270,3 +270,27 @@ class TestOptOutStillWins:
             capture_output=True, text=True, cwd=tmp_path, env=env, timeout=15,
         )
         assert proc.returncode == 0 and proc.stdout.strip() == ""
+
+
+class TestTheMarkerIsPerUser:
+    """The marker that lets the second /compact through lives in the user's own
+    state directory and is created exclusively, never in the shared TMPDIR."""
+
+    def test_a_marker_in_tmpdir_does_not_suppress_the_prompt(self, tmp_path):
+        sid = "sess-planted-1"
+        (tmp_path / "tmpd").mkdir(exist_ok=True)
+        (tmp_path / "tmpd" / f"claudna-reflected-{sid}").write_text("")
+        code, out = run_hook(tmp_path, user_settings=ENGINE_HOOK, engine_version=None, session_id=sid)
+        assert prompts(out), (code, out)
+
+    def test_the_marker_is_kept_in_the_users_state_dir(self, tmp_path):
+        sid = "sess-state-1"
+        code, out = run_hook(tmp_path, user_settings=ENGINE_HOOK, engine_version=None, session_id=sid)
+        assert prompts(out), (code, out)
+        state = tmp_path / "home" / ".local" / "state" / "claudna"
+        marker = state / f"reflected-{sid}"
+        assert marker.is_file()
+        assert state.stat().st_mode & 0o077 == 0, oct(state.stat().st_mode)
+        # The next call lets the compaction through and removes the marker.
+        code, out = run_hook(tmp_path, user_settings=ENGINE_HOOK, engine_version=None, session_id=sid)
+        assert code == 0 and out.strip() == "" and not marker.exists()

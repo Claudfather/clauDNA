@@ -76,7 +76,7 @@ Wait for a reply. Use it as the Page/URL value.
 
 **4c. Dupe and related-issue search.** Run once, against the target repo (re-run if target repo changes during Step 5 edits). Use 2–3 salient keywords from the user prose and screenshot (the draft title doesn't exist yet — it's produced in 4d):
 
-Write the keywords to `<keywords-file>` with the Write tool, then:
+Write the keywords to `<keywords-file>`, a file in `<scratch>` (`../_shared/orchestration-guide.md` §1), with the Write tool, then:
 
 ```sh
 gh issue list --repo <repo-slug> --search="$(cat <keywords-file>)" --state all --limit 10 --json number,title,state

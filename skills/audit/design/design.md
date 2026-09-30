@@ -18,7 +18,7 @@ Tool note: the standalone predecessor pre-approved its browser-automation comman
 
 ### Step 1: Scope & Context Gathering
 
-Ask: (1) deployed URL, (2) focus area, (3) anything to skip, (4) front-end stack. If a deployed URL or focus area was provided as the focus argument, use it and skip asking for it. Scratch dir: `/tmp/audit-design-<YYYY-MM-DD_HHMMSS>/research/`.
+Ask: (1) deployed URL, (2) focus area, (3) anything to skip, (4) front-end stack. If a deployed URL or focus area was provided as the focus argument, use it and skip asking for it. Scratch dir: `<scratch>/research/`, with `<scratch>` a private directory made by `mktemp -d "${TMPDIR:-/tmp}/audit-design.XXXXXX"`.
 
 Parallel: **A.** Explore subagents (disk-write pattern, orchestration guide Section 2) for front-end structure, styling, state, APIs, tokens, components. **B.** Begin Step 2.
 

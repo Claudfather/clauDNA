@@ -159,7 +159,7 @@ documentation/planning/tech_debt/<session_name>_<YYYY-MM-DD>/
 └── ...
 ```
 
-Plan agents write the family to the session's scratch docs directory (`/tmp/tech-debt-<YYYY-MM-DD_HHMMSS>/docs/`); the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/tech_debt/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide, Section 3).
+Plan agents write the family to the session's scratch docs directory (`<scratch>/docs/`, with `<scratch>` the private directory made by `mktemp -d "${TMPDIR:-/tmp}/audit-tech-debt.XXXXXX"`); the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/tech_debt/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide, Section 3).
 
 > **Archive convention:** See orchestration guide, Section 8.
 
@@ -195,7 +195,7 @@ Each plan document represents **exactly 1 PR** and must include:
 
 #### C. Subagent Workflow
 
-Follow Section 9 of the orchestration guide (`../../_shared/orchestration-guide.md`). Plan agents must also read `../../_shared/planning-standard.md` for quality standards and phase doc structure. Scratch directory: `/tmp/tech-debt-<YYYY-MM-DD_HHMMSS>/research/`.
+Follow Section 9 of the orchestration guide (`../../_shared/orchestration-guide.md`). Plan agents must also read `../../_shared/planning-standard.md` for quality standards and phase doc structure. Scratch directory: `<scratch>/research/`.
 
 ---
 

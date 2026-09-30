@@ -4,7 +4,7 @@ Quick database dashboard for Neon PostgreSQL: connection status, table inventory
 
 ## Step 1: Connection test and database overview
 
-Write this to `<sql-file>` with the Write tool:
+Write this to `<sql-file>`, a file in `<scratch>` (`../_shared/orchestration-guide.md` §1), with the Write tool:
 
 ```sql
 BEGIN TRANSACTION READ ONLY;

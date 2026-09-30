@@ -1,6 +1,6 @@
 # Evidence Gathering Checklist
 
-Reference for Steps 3-4 of `/claudna:investigate-app`. Each category is gathered by a parallel Explore subagent that writes research to `/tmp/investigate-app-<timestamp>/research/<signal-slug>.md` and returns only a 2-4 line summary.
+Reference for Steps 3-4 of `/claudna:investigate-app`. Each category is gathered by a parallel Explore subagent that writes research to `<scratch>/research/<signal-slug>.md` and returns only a 2-4 line summary.
 
 ## A. Platform Logs
 
@@ -20,7 +20,7 @@ Reference for Steps 3-4 of `/claudna:investigate-app`. Each category is gathered
 
 ## C. Database State
 
-If the project keeps a database connection (`.env`, a libpq service, `~/.snowsql/config`), query it read-only. Never Read `.env` for the connection string. Write the SQL to a file with the Write tool first:
+If the project keeps a database connection (`.env`, a libpq service, `~/.snowsql/config`), query it read-only. Never Read `.env` for the connection string. Write the SQL to a file in `<scratch>` (`../_shared/orchestration-guide.md` §1) with the Write tool first:
 
 ```sql
 BEGIN TRANSACTION READ ONLY;

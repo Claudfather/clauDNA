@@ -7,9 +7,10 @@
 #   SCOPE          GitHub org login OR username (personal scope)
 #   SINCE_DATE     YYYY-MM-DD (window start, inclusive)
 #   UNTIL_DATE     YYYY-MM-DD (window end, inclusive)
+#   OUT            output dir: the private directory (mktemp -d) the calling
+#                  skill made, holding repos.txt
 #
 # Optional:
-#   OUT            output dir (default: /tmp/gh-activity-stats)
 #   SCOPE_TYPE     "org" or "user" (default: org). Affects which API path lists repos.
 #                  Repos must already be listed in $OUT/repos.txt — this script does not
 #                  list repos itself; the calling skill writes that file.
@@ -19,8 +20,8 @@ set -u
 : "${SCOPE:?SCOPE is required (org login or username)}"
 : "${SINCE_DATE:?SINCE_DATE is required (YYYY-MM-DD)}"
 : "${UNTIL_DATE:?UNTIL_DATE is required (YYYY-MM-DD)}"
+: "${OUT:?OUT is required: the private directory (mktemp -d) holding repos.txt}"
 
-OUT="${OUT:-/tmp/gh-activity-stats}"
 SINCE="${SINCE_DATE}T00:00:00Z"
 UNTIL="${UNTIL_DATE}T23:59:59Z"
 

@@ -28,6 +28,7 @@ class TestPrecompactSessionIdIsPathSafe:
         marker_dir.mkdir(exist_ok=True)
         env = {
             "PATH": "/usr/bin:/bin",
+            "HOME": str(tmp_path / "home"),  # the marker lives in the user's state dir
             "TMPDIR": str(marker_dir),
             # Ensure jq is used for extraction where present; also clear any
             # ambient session id so only the payload drives the path.

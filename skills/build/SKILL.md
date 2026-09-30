@@ -528,7 +528,7 @@ Read `challenge-round-questions.md` for the question matrix and `red-flags-and-r
 
 Per design §5.5.2 and the canonical Autonomous Mode reference earlier in this skill, replace the interactive challenge round with a machine synthesis pass that delegates to `/claudna:weigh-development-paths --auto`. The producer/consumer schema between the two skills is canonical at `../_shared/contracts/synthesis-contract.md`.
 
-1. **Create scratch directory.** Use the Write tool to create a file at `/tmp/build-<YYYY-MM-DD_HHMMSS>/synthesis-bundle.md`. The Write tool creates parent directories automatically.
+1. **Create scratch directory.** Make it with `mktemp -d "${TMPDIR:-/tmp}/build.XXXXXX"` (`<scratch>` below), then use the Write tool to create `<scratch>/synthesis-bundle.md`.
 
 2. **Extract open junctions.** Read the plan body and identify every decision that is genuinely open, from three possible sources:
    - **Adversarial findings** — search for `## Adversarial Review Findings`; collect each finding where the checkbox is `- [ ]` (unchecked). Each has `severity`, `concern_area`, `summary`, `recommendation`.
@@ -563,7 +563,7 @@ Per design §5.5.2 and the canonical Autonomous Mode reference earlier in this s
 Read the skill body at <claudna-root>/skills/weigh-development-paths/SKILL.md.
 
 Apply the skill with --auto mode against the context bundle at:
-  /tmp/build-<timestamp>/synthesis-bundle.md
+  <scratch>/synthesis-bundle.md
 
 Return ONLY the structured-result JSON block per the skill's emission contract
 (canonical schema: <claudna-root>/skills/_shared/contracts/synthesis-contract.md).

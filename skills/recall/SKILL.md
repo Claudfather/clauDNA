@@ -31,7 +31,7 @@ Run the detection ladder (`../_shared/claudron-engine.md` §1) before anything e
 
 ## Step 1: Recall from the engine
 
-Build the relevance query: write the positional terms, joined by spaces, to `<terms-file>` with the Write tool, and pass `--query="$(cat <terms-file>)"`. With no terms, omit `--query` — `claudron recall` then leads with project membership (recency) and uses the project name as the implicit relevance term (index-only, no full-text scan).
+Build the relevance query: write the positional terms, joined by spaces, to `<terms-file>`, a file in `<scratch>` (`../_shared/orchestration-guide.md` §1), with the Write tool, and pass `--query="$(cat <terms-file>)"`. With no terms, omit `--query` — `claudron recall` then leads with project membership (recency) and uses the project name as the implicit relevance term (index-only, no full-text scan).
 
 ```bash
 claudron recall [--query="$(cat <terms-file>)"] [--project <name>] --limit <n> --json   # <n> from --limit, default 5

@@ -30,7 +30,7 @@ If none match, warn the user this lens targets Python/Postgres/SQLAlchemy and of
 
 ## Step 2: Parallel Discovery
 
-**Scratch directory:** `/tmp/data-model-audit-<YYYY-MM-DD_HHMMSS>/research/`
+**Scratch directory:** `<scratch>/research/`, where `<scratch>` is a private directory made with `mktemp -d "${TMPDIR:-/tmp}/audit-data-model.XXXXXX"` (orchestration guide §1)
 
 Launch two `general-purpose` subagents in parallel (Agent tool, `subagent_type: "general-purpose"`). Each writes findings to scratch dir, returns 2-4 line summary. Orchestrator does NOT read full research files. (General-purpose because Explore lacks Write tool.) With no dispatch primitive available, scan the two areas inline and sequentially per `../../_shared/orchestration-guide.md` §14.2, writing to the same scratch paths so aggregation is unchanged.
 

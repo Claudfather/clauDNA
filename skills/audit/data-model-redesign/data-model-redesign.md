@@ -33,7 +33,7 @@ The full per-part requirements live in `evaluation-prompt-template.md` (same dir
 
 Follow the steps in order. Call `EnterPlanMode` first per the lens contract (`../../_shared/audit-lens-contract.md`) §6 — every step through the direction gate (1–6) is read-only for the orchestrator. After the gate, follow the **mode-specific** plan-mode transition in Step 7. All pre-gate scratch files are written by subagents (Task = separate sessions, not bound by the orchestrator's plan mode), per the house pattern (`../../_shared/orchestration-guide.md` §2–§3, §6).
 
-**Scratch root** for this run: `/tmp/audit-<YYYY-MM-DD_HHMMSS>/data-model-redesign/` — reconstruction files under `research/`, authored deliverables under `docs/`. The Write tool creates directories on first write; do not `mkdir`.
+**Scratch root** for this run: `<scratch>/data-model-redesign/`, where `<scratch>` is the run's private directory, made once with `mktemp -d "${TMPDIR:-/tmp}/audit.XXXXXX"` — reconstruction files under `research/`, authored deliverables under `docs/`. The Write tool creates directories on first write; do not `mkdir`.
 
 Do not re-read CLAUDE.md or MEMORY.md if already in context.
 

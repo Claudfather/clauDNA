@@ -8,7 +8,7 @@ Reference material for the `/claudna:audit access-path` lens. Detailed instructi
 
 Launch a general-purpose subagent:
 
-**Prompt:** "Discover every access path into this system's core logic. Create the directory and write your findings to `/tmp/access-path-audit-<YYYY-MM-DD_HHMMSS>/research/path-inventory.md` using the Write tool. Return a 2-4 line summary when done."
+**Prompt:** "Discover every access path into this system's core logic. Create the directory and write your findings to `<scratch>/research/path-inventory.md` using the Write tool. Return a 2-4 line summary when done."
 
 The subagent should:
 
@@ -55,7 +55,7 @@ The subagent should:
 
 Launch a general-purpose subagent:
 
-**Prompt:** "Map how cross-cutting concerns are enforced across this system's access paths. Read the scan categories from `<skill-dir>/scan-categories.md` for the checklist. Write your findings to `/tmp/access-path-audit-<YYYY-MM-DD_HHMMSS>/research/concern-mapping.md` using the Write tool. Return a 2-4 line summary when done."
+**Prompt:** "Map how cross-cutting concerns are enforced across this system's access paths. Read the scan categories from `<skill-dir>/scan-categories.md` for the checklist. Write your findings to `<scratch>/research/concern-mapping.md` using the Write tool. Return a 2-4 line summary when done."
 
 The subagent should:
 
@@ -99,7 +99,7 @@ The subagent should:
 
 Launch a third general-purpose subagent after A and B complete:
 
-**Prompt:** "Read the path inventory and concern mapping research files in `/tmp/access-path-audit-<YYYY-MM-DD_HHMMSS>/research/`. Also read the codebase directly to verify and deepen the findings. Build a concern placement analysis and write it to `/tmp/access-path-audit-<YYYY-MM-DD_HHMMSS>/research/convergence.md` using the Write tool. Return a summary of key findings (2-4 lines)."
+**Prompt:** "Read the path inventory and concern mapping research files in `<scratch>/research/`. Also read the codebase directly to verify and deepen the findings. Build a concern placement analysis and write it to `<scratch>/research/convergence.md` using the Write tool. Return a summary of key findings (2-4 lines)."
 
 The convergence subagent must perform three analyses:
 
