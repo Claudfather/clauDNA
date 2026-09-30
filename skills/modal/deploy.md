@@ -31,9 +31,9 @@ git status --porcelain
 - If the user wants to tag this deployment → use `--tag <tag>`
 - Otherwise → no tag
 
-**Local syntax check (optional but recommended):**
+**Local syntax check (optional but recommended):** run it only if the app file's path matches `^[A-Za-z0-9._/-]+$`; otherwise skip it and say why.
 ```bash
-python -c "import ast; ast.parse(open('<app-file>').read())"
+python3 -c 'import ast, sys; ast.parse(open(sys.argv[1]).read())' '<app-file>'
 ```
 If the syntax check fails, warn the user before proceeding.
 

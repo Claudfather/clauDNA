@@ -31,10 +31,10 @@ Run the detection ladder (`../_shared/claudron-engine.md` §1) before anything e
 
 ## Step 1: Recall from the engine
 
-Build the relevance query: join the positional terms into `--query "<terms>"`. With no terms, omit `--query` — `claudron recall` then leads with project membership (recency) and uses the project name as the implicit relevance term (index-only, no full-text scan).
+Build the relevance query: write the positional terms, joined by spaces, to `<terms-file>` with the Write tool, and pass `--query="$(cat <terms-file>)"`. With no terms, omit `--query` — `claudron recall` then leads with project membership (recency) and uses the project name as the implicit relevance term (index-only, no full-text scan).
 
 ```bash
-claudron recall [--query "<terms>"] [--project <name>] --limit <n> --json   # <n> from --limit, default 5
+claudron recall [--query="$(cat <terms-file>)"] [--project <name>] --limit <n> --json   # <n> from --limit, default 5
 ```
 
 `--limit` is **per tier**. Validate the envelope (claudron-engine.md §2): assert `data` carries `project`, `query`, `conventions`, and `notes` (a list). On exit 3 or an unrecognized envelope, degrade to the fallback and say so (claudron-engine.md §3).
