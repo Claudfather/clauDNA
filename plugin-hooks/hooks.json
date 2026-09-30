@@ -11,6 +11,17 @@
         ]
       }
     ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/plugin-hooks/session-store.sh UserPromptSubmit",
+            "async": true
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Write|Edit",
@@ -26,7 +37,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/plugin-hooks/telemetry-emit.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/plugin-hooks/session-store.sh PostToolUse",
+            "async": true
           }
         ]
       }
@@ -85,6 +97,17 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/plugin-hooks/session-store.sh SessionEnd",
             "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/plugin-hooks/session-store.sh PostToolUseFailure",
+            "async": true
           }
         ]
       }

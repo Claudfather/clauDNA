@@ -375,8 +375,21 @@ class TestWiring:
         for event in ("SessionStart", "PreCompact", "SessionEnd"):
             (h,) = store_hooks(event)
             assert h["command"].endswith(f"session-store.sh {event}")
+            assert not h.get("async")  # a seal fixes a byte range: boundaries stay synchronous
         assert store_hooks("SessionEnd")[0]["timeout"] == 5
-        assert not any(store_hooks(e) for e in hooks if e not in ("SessionStart", "PreCompact", "SessionEnd"))
+        wired = ("SessionStart", "PreCompact", "SessionEnd", "UserPromptSubmit", "PostToolUse", "PostToolUseFailure")
+        assert not any(store_hooks(e) for e in hooks if e not in wired)
+
+    def test_activity_hooks_are_async_and_matched(self):
+        hooks = json.loads(HOOKS_JSON.read_text())["hooks"]
+        for event, matcher in (("UserPromptSubmit", None), ("PostToolUse", "Skill"), ("PostToolUseFailure", None)):
+            (entry,) = [e for e in hooks[event] if any("session-store.sh" in h["command"] for h in e["hooks"])]
+            (h,) = entry["hooks"]
+            assert entry.get("matcher") == matcher
+            assert h["command"].endswith(f"session-store.sh {event}") and h["async"] is True  # no prompt waits on it
+
+    def test_telemetry_emit_is_no_longer_wired(self):
+        assert "telemetry-emit.sh" not in HOOKS_JSON.read_text()
 
     def test_the_store_sees_every_session_start_source(self):
         entries = json.loads(HOOKS_JSON.read_text())["hooks"]["SessionStart"]

@@ -36,11 +36,11 @@ from pathlib import Path
 from typing import Callable, Mapping
 
 from . import events as ev
-from . import lineage, unclosed
+from . import activity, lineage, unclosed
 from .paths import CHILD_ENV, InvalidSessionId
 from .fsio import cap_log, ensure_dir, file_size
 from .project import SessionFacts, load_lifecycle, session_facts, summary_gate
-from .store import SessionHandle, SessionStore
+from .store import SessionHandle, SessionStore, StoreError
 
 _SOURCES = ev.REGISTRY["session.opened"].choices["source"]
 _CLOSE_REASONS = ev.HOOK_CLOSE_REASONS
@@ -247,6 +247,27 @@ def _seal(handle: SessionHandle, payload: dict, *, sealed_by: str, trigger: str 
     return index
 
 
+def _record_activity(handle: SessionHandle, event: str, payload: dict, facts: SessionFacts,
+                     env: Mapping[str, str]) -> str:
+    """Append the activity event for an in-segment hook (``activity.py``), to the current segment.
+
+    These hooks run async, so one can land after its session closed (SessionEnd
+    raced it) or before its first segment exists. That is expected, not an
+    error: nothing is recorded and nothing is logged.
+    """
+    mapped = activity.event_for(event, payload, env)
+    if mapped is None:
+        return f"ignored: nothing to record for {event}"
+    if facts.status != "open":
+        return "ignored: no open session"
+    kind, data = mapped
+    try:
+        handle.append(kind, data)
+    except StoreError as exc:  # the store's own invariant (no current segment, a closed session): expected here
+        return f"ignored: {exc}"
+    return f"recorded {kind}"
+
+
 def _facts(handle: SessionHandle) -> SessionFacts:
     """The session's facts, folded from the lifecycle log once per hook.
 
@@ -294,7 +315,7 @@ def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str
     """
     if env.get(CHILD_ENV) == "1":
         return "ignored: clauDNA child"
-    if event not in ("SessionStart", "PreCompact", "SessionEnd"):
+    if event not in ("SessionStart", "PreCompact", "SessionEnd", *activity.EVENTS):
         return f"ignored: event {event!r}"
     if not isinstance(payload, dict):
         return "ignored: payload is not an object"
@@ -305,6 +326,8 @@ def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str
     facts = _facts(session)
     if _inherited(event, payload, facts, env):
         return "ignored: nested child with an inherited session id"
+    if event in activity.EVENTS:
+        return _record_activity(session, event, payload, facts, env)
     spawn = spawn or spawn_summarizer
     find_pid = find_pid or (lambda: claude_pid_of(env) or lineage.claude_pid())  # $CLAUDE_PID, else the walk
     if event == "SessionStart":
