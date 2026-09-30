@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- **clauDNA is licensed under Apache-2.0 instead of MIT.** `LICENSE` carries the unmodified Apache License 2.0 text, and a new `NOTICE` names the copyright holder, `Copyright 2026 Chris Rogers`, as the MIT notice did. Section 4(d) of the license carries `NOTICE` into every redistribution. Both plugin manifests (`.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`) declare `Apache-2.0`, and the README has a License section. Every commit on `main` is by the copyright holder, so no contributor's MIT notice needs preserving.
 
 ## [0.20.0] - 2026-09-29
 ### Added
