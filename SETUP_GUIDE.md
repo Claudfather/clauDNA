@@ -670,7 +670,7 @@ Each `claudna:*` skill call appends one line, in Claudosseum's ingestion format:
 | `data.success` | whether the Skill call succeeded, from Claude Code |
 | `data.session_id` | Claude Code's session id |
 
-No prompts, tool arguments, file paths, or PII are captured. Since 0.23 the line is written by the session store's PostToolUse hook (§3.7), which replaced `telemetry-emit.sh`. The shape is unchanged, but `duration_ms`, `success` and `session_id` are now the real values. Before, they were `null`, a guess from the skill's output text, and the hook shell's pid. Telemetry keeps working with `CLAUDNA_SESSION_STORE=0`.
+No prompts, tool arguments, file paths, or PII are captured. Since 0.23, `telemetry-emit.sh` hands the payload to the session store's telemetry writer (§3.7). The shape is unchanged, but `duration_ms`, `success` and `session_id` are now the real values. Before, they were `null`, a guess from the skill's output text, and the hook shell's pid. Telemetry keeps working with `CLAUDNA_SESSION_STORE=0`.
 
 ### Where events go
 

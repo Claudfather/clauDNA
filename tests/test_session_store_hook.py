@@ -384,12 +384,14 @@ class TestWiring:
         hooks = json.loads(HOOKS_JSON.read_text())["hooks"]
         for event, matcher in (("UserPromptSubmit", None), ("PostToolUse", "Skill"), ("PostToolUseFailure", None)):
             (entry,) = [e for e in hooks[event] if any("session-store.sh" in h["command"] for h in e["hooks"])]
-            (h,) = entry["hooks"]
+            (h,) = [h for h in entry["hooks"] if "session-store.sh" in h["command"]]
             assert entry.get("matcher") == matcher
             assert h["command"].endswith(f"session-store.sh {event}") and h["async"] is True  # no prompt waits on it
 
-    def test_telemetry_emit_is_no_longer_wired(self):
-        assert "telemetry-emit.sh" not in HOOKS_JSON.read_text()
+    def test_telemetry_has_its_own_async_hook_on_skill_calls(self):
+        (entry,) = [e for e in json.loads(HOOKS_JSON.read_text())["hooks"]["PostToolUse"] if e.get("matcher") == "Skill"]
+        (h,) = [h for h in entry["hooks"] if "telemetry-emit.sh" in h["command"]]
+        assert h["async"] is True
 
     def test_the_store_sees_every_session_start_source(self):
         entries = json.loads(HOOKS_JSON.read_text())["hooks"]["SessionStart"]

@@ -50,13 +50,11 @@ from typing import TYPE_CHECKING
 
 from . import boundaries
 from . import events as ev
-from . import schema, telemetry
+from . import schema
 from .fsio import append_jsonl, cap_log, ensure_dir, read_json, read_jsonl
 from .paths import InvalidSessionId, InvalidStateDir, state_root
 from .project import SUMMARY_ENV
 from .store import SessionHandle, SessionStore
-
-STORE_ENV = "CLAUDNA_SESSION_STORE"
 
 if TYPE_CHECKING:
     import argparse
@@ -178,21 +176,12 @@ def run_hook(event: str, raw: str | bytes, env: dict[str, str] | None = None) ->
     so invalid UTF-8 is logged to ``errors.log`` like any other bad payload.
     """
     env = dict(os.environ) if env is None else env
-    root, root_error = None, None
+    root = None
     try:
         root = state_root(env)
-    except Exception as exc:  # noqa: BLE001 — held: telemetry below doesn't need the store's root
-        root_error = exc
-    try:
         if isinstance(raw, bytes):
             raw = raw.decode("utf-8")
         payload = json.loads(raw) if raw.strip() else None
-        if event == "PostToolUse" and isinstance(payload, dict):
-            telemetry.emit(payload, env)  # the Claudosseum projection: independent of the store below
-        if env.get(STORE_ENV) == "0":
-            return "ignored: session store off"
-        if root_error is not None:
-            raise root_error
         return boundaries.handle(event, payload, store=SessionStore(root), env=env)
     except Exception as exc:  # noqa: BLE001 — a hook must fail open, and say so
         _log_hook_error(root, event, exc)
@@ -222,6 +211,11 @@ def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if argv[:1] == ["hook"] and len(argv) == 2:  # the hot path: no argparse
         run_hook(argv[1], sys.stdin.buffer.read())
+        return 0
+    if argv == ["telemetry"]:  # telemetry-emit.sh: its own entry, so it works with the store off
+        from . import telemetry
+
+        telemetry.run_hook(sys.stdin.buffer.read(), os.environ)
         return 0
     import argparse
 

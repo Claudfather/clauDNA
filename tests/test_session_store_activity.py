@@ -27,10 +27,11 @@ import pytest
 from conftest import CLI_ENV, fire
 
 from claudna.session_store import activity, telemetry, unclosed
-from claudna.session_store.cli import run_hook
+from claudna.session_store.fsio import read_jsonl
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WRAPPER = REPO_ROOT / "plugin-hooks" / "session-store.sh"
+TELEMETRY_HOOK = REPO_ROOT / "plugin-hooks" / "telemetry-emit.sh"
 FAKE_TOKEN = "ghp" + "_" + "aB3" * 12  # assembled: never a contiguous literal
 BASH_FAILURE = {"tool_name": "Bash", "tool_input": {"command": "ls /nope"}, "tool_use_id": "toolu_1",
                 "prompt_id": "p1", "duration_ms": 414, "is_interrupt": False,
@@ -41,8 +42,7 @@ SKILL_CALL = {"tool_name": "Skill", "tool_input": {"skill": "claudna:recall", "a
 
 
 def events(store, sid, seg=1) -> list[dict]:
-    path = store.session(sid).paths.segment(seg).events
-    return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
+    return read_jsonl(store.session(sid).paths.segment(seg).events).records
 
 
 def counts(store, sid, seg=1) -> dict:
@@ -176,8 +176,7 @@ class TestTelemetry:
         return {"CLAUDNA_TELEMETRY": "1", "CLAUDNA_TELEMETRY_PATH": str(tmp_path / "t.jsonl"), **extra}
 
     def lines(self, tmp_path):
-        path = tmp_path / "t.jsonl"
-        return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
+        return read_jsonl(tmp_path / "t.jsonl").records
 
     def test_the_line_keeps_claudosseums_shape_with_real_values(self, tmp_path):
         assert telemetry.emit({**SKILL_CALL, "session_id": "sess-9"}, self.env(tmp_path, BOT_NAME="scout"))
@@ -209,10 +208,26 @@ class TestTelemetry:
         unclosed.sweep(store, self.env(tmp_path))
         assert (tmp_path / "t.jsonl").read_text() == ""
 
-    def test_run_hook_writes_telemetry_even_with_the_store_off(self, tmp_path):
-        env = self.env(tmp_path, CLAUDNA_SESSION_STORE="0", CLAUDNA_STATE_DIR=str(tmp_path / "state"))
-        assert run_hook("PostToolUse", json.dumps(SKILL_CALL), env=env) == "ignored: session store off"
-        assert len(self.lines(tmp_path)) == 1 and not (tmp_path / "state" / "sessions").exists()
+    def test_its_own_hook_writes_it_even_with_the_store_off(self, tmp_path):
+        env = {**self.env(tmp_path, CLAUDNA_SESSION_STORE="0"), "PATH": os.environ["PATH"], "HOME": str(tmp_path)}
+        proc = subprocess.run(["bash", str(TELEMETRY_HOOK)], input=json.dumps(SKILL_CALL), capture_output=True,
+                              text=True, env=env, cwd=tmp_path, timeout=20)
+        assert (proc.returncode, proc.stdout, proc.stderr) == (0, "", "")
+        assert len(self.lines(tmp_path)) == 1 and not (tmp_path / ".claudna").exists()
+
+    def test_the_line_is_private(self, tmp_path):
+        telemetry.emit(SKILL_CALL, self.env(tmp_path))
+        assert (tmp_path / "t.jsonl").stat().st_mode & 0o077 == 0
+
+    def test_a_bad_payload_never_raises(self, tmp_path):
+        assert telemetry.run_hook(b"\xff{not json", self.env(tmp_path)).startswith("error:")
+        assert telemetry.run_hook(b"", self.env(tmp_path)) == "ignored"
+
+    def test_telemetry_and_skill_invoked_agree(self, tmp_path):
+        payload = {**SKILL_CALL, "duration_ms": -5, "tool_response": {"success": False}}
+        _, data = activity.event_for("PostToolUse", payload, {})
+        rec = telemetry.record_for(payload, {})
+        assert (rec["data"]["duration_ms"], rec["data"]["success"]) == (data["duration_ms"], data["ok"]) == (None, False)
 
 
 class TestWrapper:

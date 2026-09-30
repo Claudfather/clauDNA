@@ -21,6 +21,7 @@ import contextlib
 import fcntl
 import json
 import os
+import time
 import tempfile
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -28,6 +29,11 @@ from pathlib import Path
 
 DIR_MODE = 0o700
 FILE_MODE = 0o600
+
+
+def utc_seconds(epoch: float | None = None) -> str:
+    """``epoch`` (default: now) as ``YYYY-MM-DDTHH:MM:SSZ``, UTC. The run records' and telemetry's timestamp."""
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() if epoch is None else epoch))
 
 
 def ensure_dir(path: Path) -> Path:

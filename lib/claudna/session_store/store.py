@@ -40,6 +40,10 @@ class StoreError(RuntimeError):
     """An operation that the store's invariants forbid (e.g. activity with no segment)."""
 
 
+class NotAppendable(StoreError):
+    """The event has nowhere to go: no segment yet, or a closed session. Expected for async activity hooks."""
+
+
 class SessionHandle:
     """All reads and writes for one session id."""
 
@@ -84,7 +88,7 @@ class SessionHandle:
                 current = self.current_segment()  # one directory listing, reused below
                 if seg is None:
                     if current is None:
-                        raise StoreError(f"session {self.sid} has no segment for {kind}")
+                        raise NotAppendable(f"session {self.sid} has no segment for {kind}")
                     seg = current
             return self._append_locked(kind, data, seg=seg, current=current)
 
@@ -105,7 +109,7 @@ class SessionHandle:
                 state = "is superseded; its log is frozen" if self.paths.segment(seg).dir.is_dir() else "does not exist"
                 raise StoreError(f"segment {seg} of session {self.sid} {state}")
             if self._current_session()["status"] == "closed":
-                raise StoreError(f"session {self.sid} is closed; its logs are frozen")
+                raise NotAppendable(f"session {self.sid} is closed; its logs are frozen")
             log = self.paths.segment(seg).events
         else:
             if seg is not None and not self.paths.segment(seg).dir.is_dir():

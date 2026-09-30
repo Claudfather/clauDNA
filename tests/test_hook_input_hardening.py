@@ -16,7 +16,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PRECOMPACT = REPO_ROOT / "plugin-hooks" / "precompact-reflect.sh"
-STORE_HOOK = REPO_ROOT / "plugin-hooks" / "session-store.sh"
+TELEMETRY = REPO_ROOT / "plugin-hooks" / "telemetry-emit.sh"
 
 
 class TestPrecompactSessionIdIsPathSafe:
@@ -65,7 +65,7 @@ class TestPrecompactSessionIdIsPathSafe:
 
 
 class TestTelemetryEmitsValidJson:
-    """Skill telemetry (now the session store's telemetry.py, #phase-4) writes one
+    """Skill telemetry (telemetry-emit.sh, writing through the store's telemetry.py) writes one
     JSON line per claudna skill; whatever the slug, the line is valid JSON with
     a slug of the real charset, or nothing at all."""
 
@@ -73,7 +73,7 @@ class TestTelemetryEmitsValidJson:
         out_path = tmp_path / "events.jsonl"
         env = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "CLAUDNA_TELEMETRY": "1",
                "CLAUDNA_TELEMETRY_PATH": str(out_path), "CLAUDNA_SESSION_STORE": "0"}
-        subprocess.run(["bash", str(STORE_HOOK), "PostToolUse"], input=json.dumps(event),
+        subprocess.run(["bash", str(TELEMETRY)], input=json.dumps(event),
                        capture_output=True, text=True, cwd=tmp_path, env=env, timeout=20)
         return out_path.read_text().splitlines() if out_path.exists() else []
 

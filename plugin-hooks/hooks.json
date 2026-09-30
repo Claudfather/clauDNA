@@ -39,6 +39,11 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/plugin-hooks/session-store.sh PostToolUse",
             "async": true
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/plugin-hooks/telemetry-emit.sh",
+            "async": true
           }
         ]
       }

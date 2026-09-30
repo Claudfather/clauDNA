@@ -36,11 +36,11 @@ from pathlib import Path
 from typing import Callable, Mapping
 
 from . import events as ev
-from . import activity, lineage, unclosed
+from . import activity
 from .paths import CHILD_ENV, InvalidSessionId
 from .fsio import cap_log, ensure_dir, file_size
 from .project import SessionFacts, load_lifecycle, session_facts, summary_gate
-from .store import SessionHandle, SessionStore, StoreError
+from .store import NotAppendable, SessionHandle, SessionStore
 
 _SOURCES = ev.REGISTRY["session.opened"].choices["source"]
 _CLOSE_REASONS = ev.HOOK_CLOSE_REASONS
@@ -131,6 +131,7 @@ def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str],
         return "segment opened (compact)"
     if source not in _SOURCES:
         return f"ignored: SessionStart source {source!r}"
+    from . import lineage, unclosed  # opening SessionStarts only: keep them off the per-prompt path
     root = handle.paths.root
     parent = None
     if source == "clear":  # spec §4.3: the SessionEnd(clear) before us left a link under our claude's pid
@@ -214,6 +215,8 @@ def abandon_session(handle: SessionHandle, env: Mapping[str, str], owner_pid: in
     ``ValueError`` for a session that isn't open, or that a resume took from
     ``owner_pid`` (the sweep's) since it was judged unclosed.
     """
+    from . import unclosed
+
     index = unclosed.abandon(handle, owner_pid)
     if index is not None:
         _summarize_segment(handle, index, _facts(handle), env, spawn_summarizer)
@@ -263,7 +266,7 @@ def _record_activity(handle: SessionHandle, event: str, payload: dict, facts: Se
     kind, data = mapped
     try:
         handle.append(kind, data)
-    except StoreError as exc:  # the store's own invariant (no current segment, a closed session): expected here
+    except NotAppendable as exc:  # it raced SessionEnd, or came before the first segment: expected here
         return f"ignored: {exc}"
     return f"recorded {kind}"
 
@@ -328,6 +331,8 @@ def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str
         return "ignored: nested child with an inherited session id"
     if event in activity.EVENTS:
         return _record_activity(session, event, payload, facts, env)
+    from . import lineage
+
     spawn = spawn or spawn_summarizer
     find_pid = find_pid or (lambda: claude_pid_of(env) or lineage.claude_pid())  # $CLAUDE_PID, else the walk
     if event == "SessionStart":
