@@ -44,6 +44,8 @@ SESSION_STORE_LAYERS = {
     "telemetry": 2,
     "summarize": 5,
     "readers": 5,
+    "retention": 5,
+    "export": 5,
     "unclosed": 5,
     "harvest": 6,
     "boundaries": 7,

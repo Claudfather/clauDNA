@@ -207,6 +207,27 @@ def _log_hook_error(root: Path | None, event: str, exc: BaseException) -> None:
         print(f"session_store hook {event}: {type(exc).__name__}: {exc}", file=sys.stderr)
 
 
+def _export(args) -> int:
+    """The export door (spec §8): the envelope, or an ack."""
+    from . import export
+
+    store = _store(args)
+    if store is None:
+        return 1
+    try:
+        if args.ack:
+            if args.sid is None or args.through is None:
+                raise ValueError("--ack needs --sid and --through")
+            cursor = export.ack(store, args.consumer, args.sid, args.through)
+            print(json.dumps({"consumer": args.consumer, "sid": args.sid, "through_seg": cursor}))
+        else:
+            print(json.dumps(export.export(store, args.consumer, since_seg=args.since_seg, limit=args.limit)))
+    except (LookupError, InvalidSessionId, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def _read(args) -> int:
     """The reader verbs (spec §8): data from readers.py, printed as text or JSON."""
     from . import readers
@@ -281,6 +302,15 @@ def main(argv: list[str] | None = None) -> int:
     fails.add_argument("--group", action="store_true")
     fails.add_argument("--since", help="7d, 12h, 2w, or an ISO date")
     fails.add_argument("--json", action="store_true")
+    exp = sub.add_parser("export", help="what a consumer hasn't taken yet (claudna.export/1), or --ack",
+                         parents=[rooted])
+    exp.add_argument("--consumer", required=True)
+    exp.add_argument("--since-seg", type=int)
+    exp.add_argument("--limit", type=int, default=100)
+    exp.add_argument("--json", action="store_true", help="the envelope is always JSON; accepted for the contract")
+    exp.add_argument("--ack", action="store_true", help="record that the consumer took --sid through --through")
+    exp.add_argument("--sid")
+    exp.add_argument("--through", type=int)
     harv = sub.add_parser("harvest", help="write summarized blocks to the vault as drafts (via claudron)",
                           parents=[rooted])
     harv.add_argument("--force", action="store_true", help="run even if the last run is recent")
@@ -312,9 +342,15 @@ def main(argv: list[str] | None = None) -> int:
         # each abandoned session is summarized only by its own recorded opt-in (the #373 B2 rule).
         own = {k: v for k, v in env.items() if k != SUMMARY_ENV}
         report = unclosed.sweep(store, env, dry_run=args.dry_run,
-                                close=lambda h, pid: boundaries.abandon_session(h, own, owner_pid=pid))
-        print(json.dumps(report.as_dict()))
+                                close=lambda h, pid: boundaries.abandon_session(h, own, owner_pid=pid)).as_dict()
+        if not args.dry_run:  # retention (spec §9) rides the same detached, debounced worker
+            from . import retention
+
+            report["retention"] = retention.sweep(store, env).as_dict()
+        print(json.dumps(report))
         return 0
+    if args.verb == "export":
+        return _export(args)
     handle = _handle(args)
     if handle is None:
         return 1

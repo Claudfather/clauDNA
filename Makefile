@@ -52,7 +52,8 @@ test:
 RUNTIME_TESTS = tests/test_session_store.py tests/test_session_store_hook.py \
 	tests/test_session_store_summarize.py tests/test_session_store_harvest.py \
 	tests/test_session_store_lineage.py tests/test_session_store_unclosed.py \
-	tests/test_session_store_activity.py \
+	tests/test_session_store_activity.py tests/test_session_store_readers.py \
+	tests/test_session_store_export.py \
 	tests/test_redact.py tests/test_runtime_layout.py tests/test_precompact_defer.py \
 	tests/test_session_start_hook.py
 

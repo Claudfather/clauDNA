@@ -1,0 +1,153 @@
+"""Tests for the export door (export.py, spec §8) and retention (retention.py, spec §9).
+
+What these guard:
+
+* **Export** hands a consumer each final, done segment it hasn't acked, with a
+  ``next`` cursor that stops at the first segment still in flight and passes
+  skipped ones. Private sessions are never exported; acks never move back.
+* **Retention** retires a final segment once every registered consumer acked
+  it (after the 7-day floor) or past the 30-day cap, logs ``segment.retired``
+  first, keeps its knowledge in the rollup, never touches a current segment,
+  and never lets an index be reused.
+"""
+
+from __future__ import annotations
+
+import json
+import time
+
+import pytest
+from conftest import ACTOR, ORIGIN
+from test_session_store_readers import BLOCK_A, summary
+
+from claudna.session_store import export, retention, rollup
+from claudna.session_store.cli import check_session, main
+from claudna.session_store.fsio import atomic_write_json
+
+DAY = 86400
+
+
+def session_with(store, sid, statuses, *, close=True, private=False):
+    """One segment per entry: "done", "skipped", "pending" or None (never summarized)."""
+    h = store.session(sid)
+    h.open_session("startup", actor=ACTOR, origin={**ORIGIN, "repo": "webapp"}, transcript_path="/t.jsonl")
+    if private:
+        h.set_private(True)
+    for i, status in enumerate(statuses, 1):
+        h.open_segment("session_open" if i == 1 else "compact", (i - 1) * 100)
+        h.seal_segment(i * 100, "precompact")
+        if status == "done":
+            atomic_write_json(h.paths.segment(i).summary, summary(sid, i, title=f"t{i}", blocks=[BLOCK_A], end=i * 100))
+            h.append("summary.completed", {"job_id": f"j{i}", "artifact": f"seg-{i:03d}/summary.json",
+                                           "input_sha256": "0" * 64, "duration_ms": 1}, seg=i)
+        elif status == "skipped":
+            h.append("summary.skipped", {"reason": "trivial"}, seg=i)
+        elif status == "pending":
+            h.append("summary.requested", {"job_id": f"j{i}"}, seg=i)
+    if close:
+        h.close_session("other")
+    return h
+
+
+class TestExport:
+    def test_items_and_the_next_cursor(self, store):
+        session_with(store, "s1", ["done", "skipped", "done", "pending", "done"])
+        env = export.export(store, "claudron")
+        assert env["schema"] == "claudna.export/1" and env["consumer"] == "claudron"
+        assert [(i["sid"], i["seg"]) for i in env["items"]] == [("s1", 1), ("s1", 3)]  # stops at the pending one
+        assert env["next"] == {"s1": 3}
+        item = env["items"][0]
+        assert item["session"]["sid"] == "s1" and item["summary"]["journey"]["title"] == "t1"
+        assert set(item["session"]) == set(export.SESSION_FIELDS)
+
+    def test_the_current_segment_of_an_open_session_waits(self, store):
+        session_with(store, "s1", ["done", "done"], close=False)
+        assert [i["seg"] for i in export.export(store, "c")["items"]] == [1]
+
+    def test_an_ack_moves_the_cursor_forward_only(self, store):
+        session_with(store, "s1", ["done", "done"])
+        assert export.ack(store, "claudron", "s1", 1) == 1
+        assert [i["seg"] for i in export.export(store, "claudron")["items"]] == [2]
+        assert export.ack(store, "claudron", "s1", 0) == 1  # never back
+        assert export.export(store, "other")["next"] == {"s1": 2}  # each consumer has its own cursor
+
+    def test_since_seg_and_limit(self, store):
+        session_with(store, "s1", ["done", "done", "done"])
+        assert [i["seg"] for i in export.export(store, "c", since_seg=1)["items"]] == [2, 3]
+        env = export.export(store, "c", limit=1)
+        assert len(env["items"]) == 1 and env["next"] == {"s1": 1}
+
+    def test_private_sessions_are_never_exported(self, store):
+        session_with(store, "p", ["done"], private=True)
+        assert export.export(store, "c") == {"schema": "claudna.export/1", "consumer": "c", "items": [], "next": {}}
+
+    @pytest.mark.parametrize("name", ["", "Claudron", "a/b", "x" * 40])
+    def test_consumer_names_are_checked(self, store, name):
+        with pytest.raises(ValueError):
+            export.export(store, name)
+
+    def test_the_cli(self, store, capsys):
+        session_with(store, "s1", ["done"])
+        root = ["--root", str(store.root)]
+        assert main(["export", "--consumer", "claudron", "--json", *root]) == 0
+        assert json.loads(capsys.readouterr().out)["next"] == {"s1": 1}
+        assert main(["export", "--consumer", "claudron", "--ack", "--sid", "s1", "--through", "1", *root]) == 0
+        assert json.loads(capsys.readouterr().out)["through_seg"] == 1
+        assert main(["export", "--consumer", "claudron", "--ack", "--sid", "s1", *root]) == 1
+        assert "--ack needs" in capsys.readouterr().err
+
+
+class TestRetention:
+    def later(self, days):
+        return time.time() + days * DAY
+
+    def test_age_cap_retires_final_segments_and_logs_first(self, store):
+        h = session_with(store, "s1", ["done", "done"])
+        rollup.refresh(h.paths)
+        report = retention.sweep(store, {}, now=self.later(31))
+        assert report.retired == ["s1/seg-001 (age)", "s1/seg-002 (age)"] and h.paths.segment_indices() == []
+        kinds = [json.loads(line)["kind"] for line in h.paths.lifecycle.read_text().splitlines()]
+        assert kinds.count("segment.retired") == 2
+        assert json.loads(h.paths.session_json.read_text())["segments"] == {"count": 0, "open": None, "retired": 2}
+        assert json.loads(rollup.rollup_path(h.paths).read_text())["fields"]["blocks"][0]["claim"] == BLOCK_A["claim"]
+        assert check_session(h).problems == []
+
+    def test_acked_segments_wait_for_the_floor(self, store):
+        h = session_with(store, "s1", ["done", "done"])
+        h.ack("harvest", 1)
+        assert retention.due(h, {}, now=self.later(1)) == []
+        assert retention.due(h, {}, now=self.later(8)) == [(1, "acked")]
+
+    def test_every_registered_consumer_must_have_acked(self, store):
+        h = session_with(store, "s1", ["done", "done"])
+        h.ack("harvest", 2)
+        h.ack("claudron", 1)  # registered, but behind on seg 2
+        assert retention.due(h, {}, now=self.later(8)) == [(1, "acked")]
+
+    def test_no_registered_consumer_means_the_cap_alone(self, store):
+        h = session_with(store, "s1", ["done"])
+        assert retention.due(h, {}, now=self.later(8)) == []
+        assert retention.due(h, {retention.CAP_ENV: "5"}, now=self.later(8)) == [(1, "age")]
+
+    def test_the_current_segment_of_an_open_session_is_never_retired(self, store):
+        h = session_with(store, "s1", ["done", "done"], close=False)
+        assert retention.due(h, {}, now=self.later(99)) == [(1, "age")]
+
+    def test_an_index_is_never_reused_after_retirement(self, store):
+        h = session_with(store, "s1", ["done", "done"], close=False)
+        retention.sweep(store, {}, now=self.later(31))
+        assert h.open_segment("compact", 200) == 3
+
+    def test_the_limit_bounds_a_run(self, store):
+        session_with(store, "s1", ["done", "done", "done"])
+        assert len(retention.sweep(store, {}, now=self.later(31), limit=2).retired) == 2
+
+    @pytest.mark.parametrize("value", ["nan", "-1", "junk"])
+    def test_bad_settings_fall_back(self, value):
+        assert retention._days({retention.CAP_ENV: value}, retention.CAP_ENV, 30.0) == 30.0
+
+    def test_the_sweep_verb_runs_retention(self, store, capsys, monkeypatch):
+        session_with(store, "s1", ["done"])
+        monkeypatch.setenv(retention.CAP_ENV, "0")
+        assert main(["sweep", "--root", str(store.root)]) == 0
+        assert json.loads(capsys.readouterr().out)["retention"]["retired"] == ["s1/seg-001 (age)"]

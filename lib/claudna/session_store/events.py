@@ -118,6 +118,10 @@ REGISTRY: dict[str, KindSpec] = {
         choices={"opened_by": ("session_open", "compact")},
         constraints={"start": _NON_NEGATIVE},
     ),
+    # Retention (spec §9): recorded before the segment's directory is removed, so a
+    # deletion is visible in the log rather than inferred from a missing directory.
+    "segment.retired": KindSpec(log=LIFECYCLE, seg=True, fields={"reason": _STR},
+                                choices={"reason": ("acked", "age")}),
     "segment.sealed": KindSpec(
         log=LIFECYCLE,
         seg=True,

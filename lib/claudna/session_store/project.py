@@ -286,7 +286,8 @@ def project_session(sid: str, lifecycle: Log, segments: list[dict], *, transcrip
         "opened_by": first["data"]["source"] if first else None,
         "closed_at": closed_at,
         "close_reason": close_reason,
-        "segments": {"count": len(segments), "open": max(open_segments) if open_segments else None},
+        "segments": {"count": len(segments), "open": max(open_segments) if open_segments else None,
+                     "retired": len({e["seg"] for e in lifecycle.events if e["kind"] == "segment.retired"})},
         "summary": {f"segments_{k}": n for k, n in tally.items()},
         "projected_from": lifecycle.projected_from,
     }

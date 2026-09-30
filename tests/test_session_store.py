@@ -379,7 +379,7 @@ class TestStore:
         s2 = h.open_segment("compact", 100)
         h.append("tool.failed", {"tool": "Bash", "signature": "sig", "exit_code": 1}, seg=s2)
         live = load(h.paths.session_json)
-        assert live["status"] == "open" and live["segments"] == {"count": 2, "open": 2}
+        assert live["status"] == "open" and live["segments"] == {"count": 2, "open": 2, "retired": 0}
 
         h.seal_segment(300, "session_end")
         h.link_child("child-1")
@@ -388,7 +388,7 @@ class TestStore:
         h.close_session("clear")
         done = load(h.paths.session_json)
         assert done["status"] == "closed" and done["close_reason"] == "clear"
-        assert done["segments"] == {"count": 2, "open": None}
+        assert done["segments"] == {"count": 2, "open": None, "retired": 0}
         assert done["children"] == ["child-1"] and done["private"] is True
         assert done["chain_id"] == h.sid  # no parent: its own chain root
         assert load(h.paths.segment(1).segment_json)["counts"] == {"prompts": 1, "skills": 1, "failures": 0, "interrupts": 0,
@@ -488,7 +488,7 @@ class TestStore:
         seg = load(h.paths.segment(new).segment_json)
         assert new == 4 and seg["status"] == "open"
         assert seg["transcript"]["range"] == {"start": 400, "end": None}
-        assert load(h.paths.session_json)["segments"] == {"count": 1, "open": 4}
+        assert load(h.paths.session_json)["segments"] == {"count": 1, "open": 4, "retired": 0}
 
     def test_foreign_session_events_do_not_fold(self, store):
         h = opened(store)
