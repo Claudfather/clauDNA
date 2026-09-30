@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Changed
 - **clauDNA is licensed under Apache-2.0 instead of MIT.** `LICENSE` carries the unmodified Apache License 2.0 text, and a new `NOTICE` names the copyright holder, `Copyright 2026 Chris Rogers`, as the MIT notice did. Section 4(d) of the license carries `NOTICE` into every redistribution. Both plugin manifests (`.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`) declare `Apache-2.0`, and the README has a License section. Every commit on `main` is by the copyright holder, so no contributor's MIT notice needs preserving.
+- **`recall` takes the harness memory directory only from the user's own settings.** `scripts/resolve_memory_dir.py` no longer reads a project's shared `.claude/settings.json`. It reads `.claude/settings.local.json` only while that file is the user's own, as Claude Code defines it: not tracked in git, and not reached through a symlinked `.claude`. When git cannot say whether it tracks the file, the file does not count. The value must be an absolute path or start with `~/`, which is what Claude Code accepts; any other value is skipped instead of being resolved against the working directory. The one git read runs with `-c core.fsmonitor=`, as the SessionStart and statusline hooks' reads do. Set the directory in `.claude/settings.local.json` or `~/.claude/settings.json`. Tests: `tests/test_resolve_memory_dir.py`.
 
 ## [0.21.0] - 2026-09-30
 ### Added
