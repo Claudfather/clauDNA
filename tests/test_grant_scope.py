@@ -310,3 +310,40 @@ class TestWiredIntoValidator:
         )
         errors = skill_checks.validate_skill_md(d / "SKILL.md", dir_name="demo")
         assert errors == []
+
+
+class TestClaudronVerbSetIsPinned:
+    """The claudron safe-subcommand set decides which `Bash(claudron <verb> *)` grants
+    the allowlist accepts. Nothing pinned it before, so a verb added to the set (a
+    writing verb granted with any arguments) or removed from it passed silently. These
+    cases pin the set in both directions and pin `doctor` to its one exact form."""
+
+    # The read-only verbs a grant may take with any arguments.
+    SAFE = {"status", "lookup", "recall"}
+    # claudron verbs that are NOT read-only or otherwise must never be granted `*`.
+    # A fixed literal, not derived from the set, so adding one to the set fails here.
+    UNSAFE = ["capture", "hooks", "index", "init", "migrate", "sync", "validate",
+              "promote", "publish", "doctor"]
+
+    def test_the_safe_set_is_exactly_these_three(self):
+        # A direct pin: adding or removing a verb changes this and must be deliberate.
+        assert skill_checks._GRANT_SAFE_CLAUDRON_SUB == self.SAFE
+
+    def test_each_safe_verb_is_accepted_with_arguments(self):
+        wrongly = [v for v in self.SAFE if not accepted(f"Bash(claudron {v} *)")]
+        assert wrongly == [], f"a safe claudron read verb was rejected: {wrongly}"
+
+    def test_every_other_verb_is_rejected(self):
+        # Granting any of these with `*` would pre-approve a write (or doctor --fix).
+        accepted_wrongly = [v for v in self.UNSAFE if accepted(f"Bash(claudron {v} *)")]
+        assert accepted_wrongly == [], f"an unsafe claudron verb was accepted: {accepted_wrongly}"
+
+    def test_a_bare_claudron_wildcard_is_rejected(self):
+        assert rejected("Bash(claudron *)")
+
+    def test_doctor_is_only_the_exact_read_form(self):
+        assert accepted("Bash(claudron doctor --json)")
+        for form in ["Bash(claudron doctor *)", "Bash(claudron doctor --json *)",
+                     "Bash(claudron doctor --fix)", "Bash(claudron doctor --json --fix)",
+                     "Bash(claudron doctor --json --vault *)"]:
+            assert rejected(form), form
