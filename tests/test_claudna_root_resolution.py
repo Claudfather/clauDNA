@@ -127,7 +127,7 @@ def test_every_bundled_script_resolves_and_runs_without_claude_plugin_root(
 ) -> None:
     filled_in, env, owner, cache, expected = CASES[case]
     scripts = _bundled_scripts()
-    assert scripts == {"env_from_file.py", "redact.py", "resolve_memory_dir.py"}
+    assert scripts == {"crawl_page.py", "env_from_file.py", "redact.py", "resolve_memory_dir.py"}
     run_env = {k: v for k, v in os.environ.items() if k not in ("CLAUDE_PLUGIN_ROOT", "CLAUDNA_ROOT")}
     run_env["HOME"] = str(tmp_path / "home")
     layout["work"].mkdir(exist_ok=True)
@@ -156,8 +156,8 @@ def test_every_bundled_script_resolves_and_runs_without_claude_plugin_root(
             )
             assert run.returncode == 0, run.stderr
             assert "hunter2" not in target.read_text() and "[REDACTED]" in target.read_text()
-        elif script == "env_from_file.py":
-            # With no arguments it says how it is run and exits 2; it must get that far.
+        elif script in ("crawl_page.py", "env_from_file.py"):
+            # Run bare, it says how it is run and exits 2; it must get that far.
             run = subprocess.run(
                 [sys.executable, str(root / "scripts" / script)],
                 cwd=layout["work"],

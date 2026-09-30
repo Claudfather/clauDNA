@@ -76,8 +76,10 @@ Wait for a reply. Use it as the Page/URL value.
 
 **4c. Dupe and related-issue search.** Run once, against the target repo (re-run if target repo changes during Step 5 edits). Use 2–3 salient keywords from the user prose and screenshot (the draft title doesn't exist yet — it's produced in 4d):
 
+Write the keywords to `<keywords-file>` with the Write tool, then:
+
 ```sh
-gh issue list --repo <repo-slug> --search "<2-3 keywords>" --state all --limit 10 --json number,title,state
+gh issue list --repo <repo-slug> --search="$(cat <keywords-file>)" --state all --limit 10 --json number,title,state
 ```
 
 Include any clearly related hits in the `## Related > Issues` bullet with their state and a one-line relationship note. If the search returns nothing germane, the bullet is "none found" (or omit if there are also no Links).
@@ -162,16 +164,20 @@ Max file size: the Contents API hard-limits at 100MB. For files over ~1MB the AP
 1. Write the substituted body to a tmpfile. BSD `mktemp` on macOS requires `XXXXXX` at the **end** of the template — no `.md` suffix; `gh --body-file` doesn't care about extension:
    ```sh
    TMPFILE=$(mktemp "${TMPDIR:-/tmp}/claudna:file-github-issue.XXXXXX")
+   TITLEFILE=$(mktemp "${TMPDIR:-/tmp}/claudna:file-github-issue.XXXXXX")
+   LABELFILE=$(mktemp "${TMPDIR:-/tmp}/claudna:file-github-issue.XXXXXX")
    ```
+   Write the title into `$TITLEFILE` the same way, and the effective labels, comma-separated, into `$LABELFILE`. The title and labels never go into the command itself.
 2. File the issue with the effective label set from step 3:
    ```sh
    gh issue create \
      --repo <repo-slug> \
-     --title "<title>" \
+     --title "$(cat "$TITLEFILE")" \
      --body-file "$TMPFILE" \
-     [--label <effective-label-1>] [--label <effective-label-2>] ...
+     --label "$(cat "$LABELFILE")"
    ```
-3. Delete the tmpfile: `rm "$TMPFILE"`.
+   Leave out the `--label` line when the effective label set is empty.
+3. Delete the tmpfiles: `rm "$TMPFILE" "$TITLEFILE" "$LABELFILE"`.
 4. Print the issue URL (from `gh` stdout) and the attachment URL(s). If any labels were dropped in step 3, repeat the warning:
    > ⚠ Filed without labels (target repo missing: `<comma-separated>`). Create them in the repo to enable labeling next time.
 
