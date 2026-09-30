@@ -89,6 +89,23 @@ def file_size(path: Path | str | None) -> int:
         return 0
 
 
+LOG_LIMIT = 1024 * 1024  #: a log past this size is rotated to ``<name>.old`` (one generation kept)
+
+
+def cap_log(path: Path, limit: int = LOG_LIMIT) -> Path:
+    """Rotate ``path`` to ``<path>.old`` once it passes ``limit`` bytes; return ``path``.
+
+    For the store's own diagnostic logs (hook errors, worker stderr), so a host
+    where something fails on every hook can't grow them without bound.
+    """
+    try:
+        if path.stat().st_size > limit:
+            os.replace(path, path.with_name(path.name + ".old"))
+    except OSError:
+        pass
+    return path
+
+
 def append_jsonl(path: Path, record: dict, *, durable: bool = True) -> None:
     """Append ``record`` as one line to ``path`` (created ``0600``); fsync it when ``durable``.
 

@@ -47,7 +47,7 @@ from typing import TYPE_CHECKING
 from . import boundaries
 from . import events as ev
 from . import schema
-from .fsio import append_jsonl, ensure_dir, read_json, read_jsonl
+from .fsio import append_jsonl, cap_log, ensure_dir, read_json, read_jsonl
 from .paths import InvalidSessionId, InvalidStateDir, state_root
 from .store import SessionHandle, SessionStore
 
@@ -186,7 +186,8 @@ def _log_hook_error(root: Path | None, event: str, exc: BaseException) -> None:
         if root is None:
             raise exc
         hooks_dir = ensure_dir(root / "hooks")
-        append_jsonl(hooks_dir / "errors.log", {
+        cap_log(hooks_dir / "session-store.stderr")  # the wrapper's capture; the next call starts a fresh one
+        append_jsonl(cap_log(hooks_dir / "errors.log"), {
             "ts": ev.now_ts(), "component": "session_store", "event": event,
             "error": f"{type(exc).__name__}: {exc}",
             "where": f"{Path(frame.filename).name}:{frame.lineno} in {frame.name}" if frame else None,

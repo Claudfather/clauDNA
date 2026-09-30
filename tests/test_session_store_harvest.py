@@ -42,8 +42,9 @@ class FakeCapture:
         return self.answers.pop(0) if self.answers else "created"
 
 
-def summarized_session(store, sid: str, blocks_per_segment: list[list[dict]], *, repo="webapp", done=True):
-    """A session whose segments each carry a completed summary with the given blocks."""
+def summarized_session(store, sid: str, blocks_per_segment: list[list[dict]], *, repo="webapp", done=True,
+                       closed=True):
+    """A session whose segments each carry a completed summary with the given blocks (closed: all final)."""
     h = store.session(sid)
     h.open_session("startup", actor=ACTOR, origin={**ORIGIN, "repo": repo}, transcript_path="/t.jsonl")
     for i, blocks in enumerate(blocks_per_segment, 1):
@@ -55,6 +56,8 @@ def summarized_session(store, sid: str, blocks_per_segment: list[list[dict]], *,
                                            "input_sha256": "0" * 64, "duration_ms": 1}, seg=i)
         else:
             h.append("summary.requested", {"job_id": f"j{i}"}, seg=i)
+    if closed:
+        h.close_session("other")
     return h
 
 
@@ -159,6 +162,82 @@ class TestHarvest:
         atomic_write_json(h.paths.segment(2).dir / "summary.json", {"summary": {"blocks": [BLOCK]}})  # old shape
         report = harvest.harvest(store, env={}, capture=FakeCapture())
         assert cursor(h) == 1 and "seg-002/summary.json is missing or invalid" in report.errors[0]
+
+    def test_a_skipped_segment_never_holds_the_cursor(self, store):
+        h = summarized_session(store, "s1", [[BLOCK], [BLOCK]])
+        h.append("summary.skipped", {"reason": "trivial"}, seg=1)  # final: nothing will summarize it again
+        capture = FakeCapture()
+        harvest.harvest(store, env={}, capture=capture)
+        assert len(capture.findings) == 1 and cursor(h) == 2
+
+
+class TestFinalSegmentsOnly:
+    def test_the_current_segment_of_an_open_session_waits(self, store):
+        h = summarized_session(store, "s1", [[BLOCK], [BLOCK]], closed=False)
+        report = harvest.harvest(store, env={}, capture=FakeCapture())
+        assert report.segments == 1 and cursor(h) == 1  # seg 2 may still be re-sealed and re-summarized
+
+    def test_once_closed_the_last_segment_is_taken(self, store):
+        h = summarized_session(store, "s1", [[BLOCK], [BLOCK]], closed=False)
+        harvest.harvest(store, env={}, capture=FakeCapture())
+        h.close_session("other")
+        harvest.harvest(store, env={}, capture=FakeCapture(), force=True)
+        assert cursor(h) == 2
+
+
+class TestStrandedSummaries:
+    def stranded(self, store, kind: str, *, retryable=True, attempts=1, age_s=3600):
+        h = summarized_session(store, "s1", [[BLOCK], [BLOCK]])
+        for n in range(attempts):
+            h.append("summary.requested", {"job_id": f"r{n}"}, seg=2)
+            if kind == "failed":
+                h.append("summary.failed", {"job_id": f"r{n}", "error": "claude timed out", "retryable": retryable},
+                         seg=2)
+        if kind == "pending" and age_s:
+            lines = h.paths.lifecycle.read_text().splitlines()
+            last = json.loads(lines[-1])
+            last["ts"] = "2000-01-01T00:00:00.000Z"
+            h.paths.lifecycle.write_text("\n".join([*lines[:-1], json.dumps(last)]) + "\n")
+        h.rebuild()
+        return h
+
+    def test_a_retryable_failure_is_summarized_again(self, store):
+        h = self.stranded(store, "failed")
+        calls = []
+
+        def resummarize(handle, index):
+            calls.append(index)
+            handle.append("summary.requested", {"job_id": "again"}, seg=index)
+            handle.append("summary.completed", {"job_id": "again", "artifact": "seg-002/summary.json",
+                                                "input_sha256": "0" * 64, "duration_ms": 1}, seg=index)
+            return "summarized"
+
+        report = harvest.harvest(store, env={}, capture=FakeCapture(), resummarize=resummarize)
+        assert calls == [2] and report.retried == 1 and cursor(h) == 2
+
+    def test_a_pending_summary_whose_worker_died_is_retried_but_a_fresh_one_is_left(self, store):
+        calls = []
+        self.stranded(store, "pending")
+        harvest.harvest(store, env={}, capture=FakeCapture(), resummarize=lambda h, i: calls.append(i) or "x")
+        assert calls == [2]
+
+    def test_a_fresh_pending_summary_is_left_to_its_worker(self, tmp_path):
+        from claudna.session_store.store import SessionStore
+
+        store = SessionStore(tmp_path / "fresh")
+        self.stranded(store, "pending", age_s=0)
+        report = harvest.harvest(store, env={}, capture=FakeCapture(), resummarize=lambda h, i: pytest.fail("retried"))
+        assert report.retried == 0 and report.segments == 1
+
+    def test_after_the_last_attempt_harvest_gives_up_and_moves_on(self, store):
+        h = self.stranded(store, "failed", attempts=harvest.MAX_ATTEMPTS)
+        report = harvest.harvest(store, env={}, capture=FakeCapture(), resummarize=lambda h, i: pytest.fail("retried"))
+        assert report.gave_up == 1 and cursor(h) == 2 and "never summarized" in report.errors[0]
+
+    def test_a_permanent_failure_is_given_up_at_once(self, store):
+        h = self.stranded(store, "failed", retryable=False)
+        report = harvest.harvest(store, env={}, capture=FakeCapture(), resummarize=lambda h, i: pytest.fail("retried"))
+        assert report.gave_up == 1 and cursor(h) == 2
 
 
 class TestScheduling:

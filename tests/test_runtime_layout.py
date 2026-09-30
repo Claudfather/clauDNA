@@ -39,10 +39,10 @@ SESSION_STORE_LAYERS = {
     "project": 3,
     "store": 4,
     "summarize": 5,
-    "harvest": 5,
-    "boundaries": 6,
-    "cli": 7,
-    "__main__": 8,
+    "harvest": 6,
+    "boundaries": 7,
+    "cli": 8,
+    "__main__": 9,
 }
 
 

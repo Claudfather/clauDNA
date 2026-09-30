@@ -37,7 +37,7 @@ from typing import Callable, Mapping
 
 from . import events as ev
 from .paths import CHILD_ENV, InvalidSessionId
-from .fsio import ensure_dir, file_size
+from .fsio import cap_log, ensure_dir, file_size
 from .project import SessionFacts, load_lifecycle, session_facts, summary_gate
 from .store import SessionHandle, SessionStore
 
@@ -99,11 +99,14 @@ def origin_from_cwd(cwd: str) -> dict:
 # ── actions ──────────────────────────────────────────────────────────────────
 
 
-def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str]) -> str:
+def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str], *,
+                   spawn: Callable[..., None]) -> str:
     source = payload.get("source")
     transcript = payload.get("transcript_path") or None
+    previous = handle.current_segment()
     if source == "compact":  # the store starts it where the last seal ended; the size is the fallback
         handle.open_segment("compact", file_size(transcript))
+        _summarize_implicit_seal(handle, previous, env, spawn)
         return "segment opened (compact)"
     if source not in _SOURCES:
         return f"ignored: SessionStart source {source!r}"
@@ -111,6 +114,7 @@ def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str])
                         origin=origin_from_cwd(payload.get("cwd") or os.getcwd()),
                         transcript_path=transcript)
     handle.open_segment("session_open", file_size(transcript))
+    _summarize_implicit_seal(handle, previous, env, spawn)
     from . import harvest  # only an opening SessionStart asks
 
     if harvest.is_due(handle.paths.root, env):  # spec §7.2: harvest runs at SessionStart, detached
@@ -128,7 +132,7 @@ def spawn_worker(root: Path, args: list[str], env: Mapping[str, str], *, log: st
     import subprocess
 
     package = Path(__file__).resolve().parent
-    with open(ensure_dir(root / "hooks") / log, "ab") as err:
+    with open(cap_log(ensure_dir(root / "hooks") / log), "ab") as err:
         subprocess.Popen(
             [sys.executable, "-S", str(package), *args, "--root", str(root)],
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=err,
@@ -144,6 +148,33 @@ def spawn_harvest(root: Path, env: Mapping[str, str]) -> None:
     spawn_worker(root, ["harvest"], env, log="harvest.stderr")
 
 
+def _summarize_segment(handle: SessionHandle, index: int, facts: SessionFacts, env: Mapping[str, str],
+                       spawn: Callable[..., None]) -> None:
+    """Spawn the summarizer for sealed segment ``index``, or record why not."""
+    reason = summary_gate(facts, env)
+    if reason:
+        handle.append("summary.skipped", {"reason": reason}, seg=index)
+    else:
+        spawn(handle, index, env)
+
+
+def _summarize_implicit_seal(handle: SessionHandle, previous: int | None, env: Mapping[str, str],
+                             spawn: Callable[..., None]) -> None:
+    """Summarize a predecessor :meth:`SessionHandle.open_segment` just sealed itself.
+
+    A missed PreCompact or a lost SessionEnd (a crash, then a resume) leaves
+    the predecessor to be sealed by ``open_segment`` (``sealed_by`` ``compact``
+    or ``resume``); no hook seal ran, so nothing else would ever summarize it,
+    and harvest's cursor would hold at it forever.
+    """
+    if previous is None:
+        return
+    boundary = handle.boundary(previous)
+    if boundary.sealed and boundary.summary["status"] == "none" and \
+            boundary.last_seal["data"]["sealed_by"] in ("compact", "resume"):
+        _summarize_segment(handle, previous, _facts(handle), env, spawn)
+
+
 def _seal(handle: SessionHandle, payload: dict, facts: SessionFacts, env: Mapping[str, str], *,
           sealed_by: str, trigger: str | None, spawn: Callable[..., None]) -> bool:
     """Seal the current segment, then summarize it: spawn the worker, or record why not."""
@@ -152,11 +183,7 @@ def _seal(handle: SessionHandle, payload: dict, facts: SessionFacts, env: Mappin
         return False
     handle.seal_segment(file_size(payload.get("transcript_path")), sealed_by, index=index, trigger=trigger,
                         clamp=True)
-    reason = summary_gate(facts, env)
-    if reason:
-        handle.append("summary.skipped", {"reason": reason}, seg=index)
-    else:
-        spawn(handle, index, env)
+    _summarize_segment(handle, index, facts, env, spawn)
     return True
 
 
@@ -203,9 +230,9 @@ def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str
     facts = _facts(session)
     if _inherited(event, payload, facts, env):
         return "ignored: nested child with an inherited session id"
-    if event == "SessionStart":
-        return _session_start(session, payload, env)
     spawn = spawn or spawn_summarizer
+    if event == "SessionStart":
+        return _session_start(session, payload, env, spawn=spawn)
     if event == "PreCompact":
         trigger = payload.get("trigger") if payload.get("trigger") in _TRIGGERS else None
         sealed = _seal(session, payload, facts, env, sealed_by="precompact", trigger=trigger, spawn=spawn)

@@ -41,7 +41,7 @@ from typing import Callable, Mapping
 from . import events as ev
 from . import schema
 from .fsio import append_jsonl, atomic_write_json, ensure_dir, exclusive_lock, read_json
-from .project import load_lifecycle, session_facts
+from .project import by_segment, load_lifecycle, session_facts
 from .store import SessionStore
 
 ENABLE_ENV = "CLAUDNA_HARVEST"
@@ -54,6 +54,12 @@ CONSUMER = "harvest"
 NOTE_TYPES = {"entity": "knowledge", "concept": "knowledge", "project": "knowledge",
               "practice": "knowledge", "decision": "decision"}
 TIMEOUT_S = 30
+#: A summary still ``pending`` this long after its request lost its worker (killed, machine asleep).
+STALE_PENDING_S = 15 * 60
+#: Summarizer attempts per segment before harvest gives up on it and moves on.
+MAX_ATTEMPTS = 3
+#: Stranded summaries harvest re-runs per run (each is one model call, in this detached process).
+MAX_RETRIES_PER_RUN = 2
 LAST_RUN = "harvest/last_run.json"
 
 
@@ -81,11 +87,13 @@ def run_claudron_capture(finding: dict, cwd: str | None, env: Mapping[str, str])
         envelope = json.loads(proc.stdout)
     except (OSError, subprocess.SubprocessError, ValueError) as exc:
         raise CaptureError(f"claudron capture: {str(exc)[:150]}") from exc
-    data = envelope.get("data") if isinstance(envelope, dict) else None
+    if not isinstance(envelope, dict):
+        raise CaptureError(f"claudron capture exited {proc.returncode}: the output is not a JSON object")
+    data = envelope.get("data")
     action = data.get("action") if isinstance(data, dict) else None
     if envelope.get("command") != "capture" or action not in _ACTIONS or \
             (proc.returncode != 0 and action != "rejected") or (not envelope.get("ok") and action != "rejected"):
-        errors = envelope.get("errors") if isinstance(envelope, dict) else None
+        errors = envelope.get("errors")
         raise CaptureError(f"claudron capture exited {proc.returncode}: {str(errors or data)[:150]}")
     return action
 
@@ -161,6 +169,8 @@ class RunReport:
     known: int = 0
     held_back: int = 0
     rejected: int = 0
+    retried: int = 0
+    gave_up: int = 0
     errors: list[str] = field(default_factory=list)
 
     @property
@@ -175,8 +185,29 @@ class RunReport:
         return {**self.__dict__, "started_at": self.started_at}
 
 
+def _stranded(events: list[dict], now: float) -> str | None:
+    """Why a segment's summary needs another attempt — or ``"give up"`` — from its summary events.
+
+    ``pending`` long past its request (the worker died) and a retryable
+    failure get another attempt, up to :data:`MAX_ATTEMPTS`; after that, or
+    after a permanent failure, harvest gives up so the session isn't stuck.
+    """
+    summary = [e for e in events if e["kind"].startswith("summary.")]
+    if not summary or summary[-1]["kind"] not in ("summary.requested", "summary.failed"):
+        return None
+    attempts = sum(e["kind"] == "summary.requested" for e in summary)
+    last = summary[-1]
+    if last["kind"] == "summary.failed" and not last["data"]["retryable"]:
+        return "give up"
+    if last["kind"] == "summary.requested":
+        requested = time.mktime(time.strptime(last["ts"][:19], "%Y-%m-%dT%H:%M:%S")) - time.timezone
+        if now - requested < STALE_PENDING_S:
+            return None  # a worker may still be on it
+    return "give up" if attempts >= MAX_ATTEMPTS else "retry"
+
+
 def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: Callable[..., str],
-                     env: Mapping[str, str], held_log: Path) -> None:
+                     env: Mapping[str, str], held_log: Path, resummarize: Callable[..., str]) -> None:
     handle = store.session(sid)
     through = handle.cursor(CONSUMER)
     if through >= max(handle.paths.segment_indices(), default=0):
@@ -185,10 +216,30 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
     if session_facts(lifecycle).private:
         return  # a private session is never harvested (and never summarized)
     origin = _latest_origin(lifecycle)
-    for index in handle.paths.segment_indices():
+    indices = handle.paths.segment_indices()
+    closed = session_facts(lifecycle).status == "closed"
+    for index in indices:
         if index <= through:
             continue
-        if handle.boundary(index, lifecycle).summary["status"] != "done":
+        if index == indices[-1] and not closed:
+            return  # the current segment can still be re-sealed and re-summarized: only final ones are taken
+        status = handle.boundary(index, lifecycle).summary["status"]
+        if status in ("pending", "failed"):
+            verdict = _stranded(by_segment(lifecycle)[index], report.started_epoch)
+            if verdict == "retry" and report.retried < MAX_RETRIES_PER_RUN:
+                report.retried += 1
+                resummarize(handle, index)
+                lifecycle = load_lifecycle(handle.paths).events
+                status = handle.boundary(index, lifecycle).summary["status"]
+            elif verdict == "give up":
+                report.gave_up += 1
+                report.errors.append(f"{sid}: seg-{index:03d} was never summarized; skipped by harvest")
+                handle.ack(CONSUMER, index)
+                continue
+        if status == "skipped":  # final: trivial, gated off, or its transcript is gone — nothing to take
+            handle.ack(CONSUMER, index)
+            continue
+        if status != "done":
             return  # harvest in order: a segment still pending holds the cursor
         summary = read_json(handle.paths.segment(index).summary)
         if not isinstance(summary, dict) or schema.validate(summary, schema.load("segment-summary")):
@@ -219,8 +270,15 @@ def _latest_origin(lifecycle: list[dict]) -> dict:
     return opened[-1]["data"].get("origin") or {} if opened else {}
 
 
+def _resummarize(handle, index: int) -> str:
+    from . import summarize  # only a run with a stranded summary needs it
+
+    return summarize.summarize(handle, index)
+
+
 def harvest(store: SessionStore, *, env: Mapping[str, str] = os.environ,
-            capture: Callable[..., str] = run_claudron_capture, force: bool = False) -> RunReport:
+            capture: Callable[..., str] = run_claudron_capture, force: bool = False,
+            resummarize: Callable[..., str] = _resummarize) -> RunReport:
     """One harvest run over every session in ``store``; see the module doc."""
     report = RunReport(started_epoch=time.time())
     if env.get(ENABLE_ENV) == "0":
@@ -237,7 +295,7 @@ def harvest(store: SessionStore, *, env: Mapping[str, str] = os.environ,
             return report
         for sid in store.session_ids():
             try:
-                _harvest_session(store, sid, report, capture, env, home / "held.jsonl")
+                _harvest_session(store, sid, report, capture, env, home / "held.jsonl", resummarize)
             except CaptureError as exc:
                 report.status = "error"
                 report.errors.append(f"{sid}: {exc}")
@@ -261,5 +319,9 @@ def liveness_line(report: RunReport) -> str:
         parts.append(f"{report.held_back} person fact(s) held for review")
     if report.rejected:
         parts.append(f"{report.rejected} rejected")
+    if report.retried:
+        parts.append(f"{report.retried} summary retried")
+    if report.gave_up:
+        parts.append(f"{report.gave_up} segment(s) never summarized")
     line = f"{head}: {', '.join(parts)} from {report.segments} segment(s)"
     return line + (f"; problem: {report.errors[0][:160]}" if report.errors else "")

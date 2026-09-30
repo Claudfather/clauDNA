@@ -96,7 +96,7 @@ if [ -n "$STATE_DIR" ] && [ -f "$STATE_DIR/harvest/liveness.txt" ]; then
 fi
 
 # --- Emit. Nothing to say → say nothing.
-if [ -z "$BRANCH" ] && [ -z "$NEXT_STEPS" ] && [ -z "$OPEN_QS" ] && [ -z "$PRS" ]; then
+if [ -z "$BRANCH" ] && [ -z "$NEXT_STEPS" ] && [ -z "$OPEN_QS" ] && [ -z "$PRS" ] && [ -z "$HARVEST" ]; then
     exit 0
 fi
 

@@ -90,6 +90,12 @@ class TestSessionStartHook:
         (claude / "session.md").write_text("## Next Steps\n- finish the refactor\n")
         assert "Memory: " not in run_hook(tmp_path)[1]
 
+    def test_a_failed_harvest_is_shown_outside_a_repo_too(self, tmp_path):
+        harvest = tmp_path / "claudna-state" / "harvest"
+        harvest.mkdir(parents=True)
+        (harvest / "liveness.txt").write_text("clauDNA harvest 2026-09-30 12:00Z: FAILED — vault not found\n")
+        assert "FAILED" in run_hook(tmp_path)[1]
+
     def test_briefing_frames_content_as_untrusted_data(self, tmp_path):
         # A handoff can be a committed file in a cloned (untrusted) repo, and PR
         # titles can come from outside accounts. The directive must frame the

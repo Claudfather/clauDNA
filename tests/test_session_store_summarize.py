@@ -218,6 +218,23 @@ class TestSummarize:
             out = summarize.summarize(sealed, 1, env={}, runner=FakeRunner())
         assert out == "ignored: another summarizer holds the segment"
 
+    def test_a_re_seal_during_a_run_is_summarized_by_the_same_worker(self, sealed, tmp_path):
+        path = tmp_path / "t.jsonl"
+
+        class ResealingRunner(FakeRunner):
+            def __call__(self, *args):
+                if not self.calls:  # a later /compact re-seals while this call runs
+                    with path.open("a") as fh:
+                        fh.write(json.dumps(record("user", "and one more thing")) + "\n")
+                    sealed.seal_segment(path.stat().st_size, "precompact")
+                return super().__call__(*args)
+
+        runner = ResealingRunner()
+        assert summarize.summarize(sealed, 1, env={}, runner=runner).startswith("summarized")
+        assert len(runner.calls) == 2 and "one more thing" in runner.calls[1]["dialogue"]
+        artifact = json.loads((sealed.paths.segment(1).dir / "summary.json").read_text())
+        assert artifact["input"]["range"]["end"] == path.stat().st_size
+
 
 # ── the real command line, against a fake claude ─────────────────────────────
 

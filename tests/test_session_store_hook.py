@@ -137,6 +137,12 @@ class TestBoundaries:
         fire(store, "SessionStart", transcript, source="resume")
         assert (session(store)["status"], segment(store, 2)["transcript"]["range"]["start"]) == ("open", 125)
 
+    def test_a_segment_the_store_sealed_itself_is_still_summarized(self, store, transcript, spawned):
+        fire(store, "SessionStart", transcript, source="startup")
+        grow(transcript, 20)  # a crash: no SessionEnd, so segment 1 is still open
+        fire(store, "SessionStart", transcript, source="resume")
+        assert segment(store, 1)["status"] == "sealed" and (SID, 1) in spawned
+
     def test_an_unknown_close_reason_is_recorded_as_other(self, store, transcript):
         fire(store, "SessionStart", transcript, source="startup")
         fire(store, "SessionEnd", transcript, reason="bypass_permissions_disabled")
@@ -330,3 +336,14 @@ class TestWiring:
         entries = json.loads(HOOKS_JSON.read_text())["hooks"]["SessionStart"]
         (entry,) = [e for e in entries if any("session-store.sh" in h["command"] for h in e["hooks"])]
         assert "matcher" not in entry  # startup, resume, clear, compact and fork all matter
+
+
+class TestLogsAreCapped:
+    def test_a_log_past_the_limit_is_rotated_to_old(self, tmp_path):
+        from claudna.session_store.fsio import cap_log
+
+        log = tmp_path / "errors.log"
+        log.write_text("x" * 20)
+        assert cap_log(log, limit=10) == log and not log.exists()
+        assert (tmp_path / "errors.log.old").read_text() == "x" * 20
+        cap_log(log, limit=10)  # a missing log is fine
