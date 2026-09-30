@@ -117,18 +117,47 @@ class TestMainExit:
 
     def test_trusted_exits_0(self, tmp_path):
         gh = _fake_gh(tmp_path, 'echo "MEMBER"')
-        r = self._run(["o", "r", "issue", "1", "--gh", gh], gh)
+        r = self._run(["o", "r", "issue", "1"], gh)
         assert r.returncode == 0, r.stderr
         assert "TRUSTED" in r.stdout
 
     def test_untrusted_exits_2(self, tmp_path):
         gh = _fake_gh(tmp_path, 'echo "NONE"')
-        r = self._run(["o", "r", "issue", "1", "--gh", gh], gh)
+        r = self._run(["o", "r", "issue", "1"], gh)
         assert r.returncode == 2
         assert "UNTRUSTED" in r.stdout
 
     def test_unreadable_exits_3(self, tmp_path):
         gh = _fake_gh(tmp_path, 'echo "boom" >&2', rc=1)
-        r = self._run(["o", "r", "issue", "1", "--gh", gh], gh)
+        r = self._run(["o", "r", "issue", "1"], gh)
         assert r.returncode == 3
         assert "UNREADABLE" in r.stdout
+
+
+class TestNoArbitraryProgramViaGh:
+    """vera #361: the gate must not run a caller-named program. There is no `--gh`
+    argument, so an argv (or an injection that controls it) cannot point the gate
+    at another binary; `gh` is resolved from PATH. A `--gh <program>` invocation is
+    rejected and the named program never runs."""
+
+    def test_gh_flag_is_rejected_and_the_program_never_runs(self, tmp_path):
+        marker = tmp_path / "ran.marker"
+        evil = tmp_path / "evil"
+        evil.write_text(f'#!/usr/bin/env bash\ntouch {marker}\n')
+        evil.chmod(0o755)
+        # a real gh on PATH too, so a failure would be "ran gh", not "no gh"
+        gh = _fake_gh(tmp_path, 'echo "MEMBER"')
+        env = {"PATH": str(Path(gh).parent) + ":/usr/bin:/bin"}
+        r = subprocess.run(
+            [sys.executable, str(SCRIPT), "o", "r", "issue", "1", "--gh", str(evil)],
+            capture_output=True, text=True, env=env,
+        )
+        assert r.returncode != 0, "an unknown --gh argument must be refused"
+        assert not marker.exists(), "the caller-named program was run"
+
+    def test_the_cli_has_no_gh_option(self):
+        r = subprocess.run(
+            [sys.executable, str(SCRIPT), "--help"],
+            capture_output=True, text=True, env={"PATH": "/usr/bin:/bin"},
+        )
+        assert "--gh" not in r.stdout

@@ -71,6 +71,10 @@ def classify(assoc: str | None) -> tuple[str, int]:
 
 
 def read_assoc(path: str, gh: str = "gh") -> tuple[str | None, str | None]:
+    # `gh` is resolved from PATH ("gh") and is NOT a CLI argument: a caller (or
+    # an injection that controls this gate's argv) must not be able to name an
+    # arbitrary program for the gate to run. The parameter exists only so a unit
+    # test can point at a fake gh; the command line has no way to set it.
     """Read author_association at PATH via `gh api`. Return (value, None) on
     success, or (None, reason) on any failure — fail closed."""
     try:
@@ -99,13 +103,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("repo")
     p.add_argument("kind", choices=sorted(_KIND_PATHS))
     p.add_argument("id", help="issue/PR number, or comment id")
-    p.add_argument("--gh", default="gh", help="gh binary (default: gh on PATH)")
     try:
         args = p.parse_args(argv)
     except SystemExit:
         return 1
     path = api_path(args.kind, args.owner, args.repo, args.id)
-    assoc, reason = read_assoc(path, gh=args.gh)
+    assoc, reason = read_assoc(path)
     if assoc is None:
         print(f"UNREADABLE {reason}")
         print(f"provenance: could not read author_association for {path} — treating as UNTRUSTED", file=sys.stderr)
