@@ -11,20 +11,26 @@ can rot on its own:
    probe, `claudron status` and `claudron doctor`, so it cannot grow a private
    check that drifts from the engine.
 4. The one write, `--fix`, runs only after a read-only diagnosis and an explicit
-   yes, and never in `--auto`.
+   yes, and never in `--auto`. No allow rule the setup guide recommends approves it,
+   so the permission prompt stays a second gate.
 """
 
 from __future__ import annotations
 
+import fnmatch
+import json
 import re
 import sys
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SKILL_DIR = REPO_ROOT / "skills" / "claudron"
 SKILL = SKILL_DIR / "SKILL.md"
 DOCTOR = SKILL_DIR / "doctor.md"
 ENGINE = REPO_ROOT / "skills" / "_shared" / "claudron-engine.md"
+SETUP_GUIDE = REPO_ROOT / "SETUP_GUIDE.md"
 
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
@@ -49,6 +55,19 @@ def steps(text: str) -> list[tuple[str, str]]:
         end = marks[i + 1].start() if i + 1 < len(marks) else len(text)
         out.append((m.group(1), text[m.end() : end]))
     return out
+
+
+def claudron_allow_rules() -> list[str]:
+    """The `permissions.allow` entries SETUP_GUIDE §7.3 recommends for the engine."""
+    section = SETUP_GUIDE.read_text().split("### 7.3", 1)[1].split("\n### ", 1)[0]
+    return json.loads(re.search(r"```json\n(.*?)```", section, re.S).group(1))["permissions"]["allow"]
+
+
+def approves(rule: str, command: str) -> bool:
+    """Whether a `Bash(...)` allow rule covers a command, by the glob the plugin's
+    PreToolUse hook applies: `*` matches anything, including flags that follow."""
+    m = re.fullmatch(r"Bash\((.*)\)", rule)
+    return bool(m) and fnmatch.fnmatchcase(command, m.group(1))
 
 
 class TestItIsAModeNotASkill:
@@ -76,6 +95,9 @@ class TestItGatesOnTheCapability:
         text = doctor_text()
         assert text, "precondition: the depth file exists"
         assert not re.search(r"(>=|≥)\s*v?\d", text)
+        # Nor can a floor with no comparison sign ("engine_version is 0.5.2 or later",
+        # #353), so the mode names no version number at all. §3.1 is a section, not one.
+        assert not re.search(r"\d+\.\d+", re.sub(r"§\d+(?:\.\d+)*", "§", text))
 
     def test_the_shared_contract_names_capabilities_as_the_feature_gate(self):
         section_1 = ENGINE.read_text().split("## 2.")[0]
@@ -157,4 +179,96 @@ class TestNothingToApplyMeansNoD001:
         # `fixable: []` and one D001, and `--fix` records the format and commits.
         step5 = next(b for h, b in steps(doctor_text()) if h.startswith("Step 5"))
         sentence = next(line for line in step5.splitlines() if "nothing to apply" in line)
-        assert "D001" in sentence, sentence
+        # The polarity is what matters: "nothing to apply, even with a `D001` finding"
+        # names D001 too (#353).
+        assert "there is no `D001` finding" in sentence, sentence
+
+
+# The CLIs a private vault check would reach for: git, the engine's other verbs, and
+# the file readers. Inline code that starts with one of these and has arguments is a
+# command line; other inline code (fields, flags, codes) is not checked.
+PROSE_COMMAND_HEADS = ("git", "claudron", "ls", "cat", "find", "stat", "test", "grep", "rg", "jq")
+
+
+class TestTheProseKeepsItsRules:
+    """#353: rules in the prose that an edit could delete, or break, with every test
+    above still green. A line is pinned only where the edit changes what the skill does.
+    The three sentences that describe a format-only `D001` (Step 4's row, Step 5, Step
+    6's `data.repairs` line) stay unpinned on purpose: they describe what happens, and
+    the stop rule pinned above is what protects the user."""
+
+    def test_an_unknown_code_gets_the_engines_message_and_no_guess(self):
+        # Claudron is adding D-codes (the per-host checks under Claudron #190), so this
+        # rule decides what a user sees for a code the table does not know.
+        step4 = next(b for h, b in steps(doctor_text()) if h.startswith("Step 4"))
+        assert "For a code not in this table, show the engine's message verbatim" in step4
+        assert "Never guess what it means" in step4
+
+    def test_the_table_is_handed_to_the_user_not_run(self):
+        # Without this sentence, the table's `claudron index` or `git rm --cached` read
+        # as steps to run. The prose check below exempts the table because of it.
+        step4 = next(b for h, b in steps(doctor_text()) if h.startswith("Step 4"))
+        assert "This verb runs none of these commands itself; they are what to hand the user." in step4
+
+    def test_the_prose_names_no_command_outside_the_engines_doors(self):
+        # The fence check above cannot see a command written in prose: "run `git
+        # check-ignore -v .claudron`" passed every test. Outside Step 4's hand-off table,
+        # a command line in inline code is a door the mode runs, or the remedy Step 1 prints.
+        body = re.sub(r"```.*?```", "", doctor_text(), flags=re.S)
+        prose, in_step4 = [], False
+        for line in body.splitlines():
+            if line.startswith("## "):
+                in_step4 = line.startswith("## Step 4")
+            if not (in_step4 and line.startswith("|")):
+                prose.append(line)
+        commands = [
+            span
+            for span in re.findall(r"`([^`\n]+)`", "\n".join(prose))
+            if len(span.split()) > 1 and span.split()[0] in PROSE_COMMAND_HEADS
+        ]
+        assert commands, "precondition: the prose names the doors the mode runs"
+        for span in commands:
+            assert re.match(r"^claudron (status|doctor)\b", span) or span == "claudron init <path> --personal", span
+
+
+class TestNoAllowRuleApprovesTheWrite:
+    """#353: `claudron doctor --fix` writes the vault, and the skill's question before it
+    should not be its only gate. A `*` also matches the flags that follow, so
+    `Bash(claudron *)`, `Bash(claudron doctor *)` and `Bash(claudron doctor --json *)`
+    each approve `--fix` with no prompt."""
+
+    WRITES = (
+        "claudron doctor --fix --json",
+        "claudron doctor --json --fix",
+        "claudron doctor --json --vault /v --fix",
+        "claudron sync --push",
+        "claudron promote --to canonical <note>",
+        "claudron plug",
+    )
+
+    def test_the_setup_guide_rules_leave_the_write_to_a_prompt(self):
+        rules = claudron_allow_rules()
+        # Positive control: the rules do match the reads, so a miss below is real.
+        assert any(approves(r, "claudron doctor --json") for r in rules), rules
+        assert any(approves(r, "claudron status --json") for r in rules), rules
+        for cmd in self.WRITES:
+            assert not [r for r in rules if approves(r, cmd)], cmd
+
+    def test_the_grant_allowlist_accepts_the_guides_doctor_rule_and_no_wildcard(self):
+        # The guide and the grant allowlist (#360) name one doctor form, whichever of
+        # the two lands second.
+        import skill_checks
+
+        check = getattr(skill_checks, "check_settings_grants", None)
+        if check is None:
+            pytest.skip("the grant allowlist (#360) is not on this tree")
+        doctor_rules = [r for r in claudron_allow_rules() if "claudron doctor" in r]
+        assert doctor_rules == ["Bash(claudron doctor --json)"]
+        assert check(doctor_rules) == []
+        for rule in (
+            "Bash(claudron *)",
+            "Bash(claudron doctor *)",
+            "Bash(claudron doctor --json *)",
+            "Bash(claudron doctor:*)",
+        ):
+            assert check([rule]), rule

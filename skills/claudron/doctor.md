@@ -93,7 +93,7 @@ Also report the format line: `vault format <vault_format>, engine format <engine
 - the migrations in `data.pending`, in order: show each one's `id` and `title`;
 - the structure findings that `data.fixable` names.
 
-With a `D001` finding and nothing pending, only the vault's recorded format is behind: `--fix` records the engine's format in the identity file and commits that alone.
+With a `D001` finding and nothing pending, only the vault's recorded format is behind: `--fix` records the engine's format in the identity file; with `data.fixable` empty, that is the whole commit.
 
 Say plainly what `--fix` will **not** do:
 - it never deletes a note;
@@ -114,7 +114,7 @@ claudron doctor --fix --json
 Add `--vault <path>` when Step 1 used one. Then report:
 
 - `data.applied`: the migration ids, in order;
-- `data.repairs`: for a format-only `D001`, the one repair that records the format, with `data.applied` empty;
+- `data.repairs`: one line per change the run made or skipped. For a format-only `D001`, one of them records the format, and `data.applied` is empty;
 - `data.commit`: its `message` when `committed` is true, or its `error` verbatim when not. A clone that is mid-rebase gets the files but not the commit;
 - what is still pending (`data.pending` after the run is `[]` on success), and every finding the run still carries.
 
