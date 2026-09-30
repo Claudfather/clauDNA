@@ -10,8 +10,11 @@ A session is **unclosed** when all three hold:
 * it is ``open``;
 * its lifecycle log hasn't changed for :data:`DEFAULT_AFTER_H` hours
   (``$CLAUDNA_UNCLOSED_AFTER_H``). Appends are the only writes to that log,
-  so its mtime is the last event's time, for the cost of one ``stat``. Only
-  boundaries write it, so its transcript must be as idle too;
+  so its mtime is the last event's time, for the cost of one ``stat``. Hooks
+  aren't its only writers (summary jobs, retention's ``segment.retired``, this
+  sweep's own close), but each of those can only make it look newer, which
+  delays a sweep, never hastens one. Activity goes to the segment's own log,
+  so the transcript's mtime is checked as well;
 * the ``claude`` process it recorded at open (``claude_pid``) is gone.
 
 A session that recorded no pid is never swept automatically: an idle live
@@ -96,7 +99,7 @@ def unclosed_owner(handle: SessionHandle, env: Mapping[str, str], *, now: float 
     facts = session_facts(lifecycle)
     if facts.status != "open" or facts.claude_pid is None:
         return None
-    # Only boundaries touch the lifecycle log; a working session writes its transcript every turn.
+    # Activity never touches the lifecycle log; a working session writes its transcript every turn.
     transcript = transcript_path_of(lifecycle)
     try:
         if transcript and now - os.stat(transcript).st_mtime < after_s(env):

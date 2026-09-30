@@ -2,8 +2,11 @@
 
 Everything the store writes is private to the user (dirs ``0700``, files
 ``0600``). Projections are written temp-then-``os.replace`` so a reader never
-sees a torn file; they are rebuildable, so they are not fsynced. Logs
-are the truth: appended one JSON object per line and fsynced. A reader tolerates
+sees a torn file; they are rebuildable, so they are not fsynced (``consumers.json``,
+which no log can regenerate, is written ``durable=True``). Logs are the truth:
+appended one JSON object per line, fsynced by default. Callers whose lines are
+derivable pass ``durable=False``: the store's activity logs (only lifecycle
+events are fsynced), telemetry and the runs log. A reader tolerates
 a torn final line (a writer killed mid-append) by skipping it, and the next
 append first terminates that fragment so the torn write can't swallow a good one.
 

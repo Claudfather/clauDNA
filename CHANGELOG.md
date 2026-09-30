@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Skill telemetry reports real values.** `plugin-hooks/telemetry-emit.sh` is now a thin, async gate on `CLAUDNA_TELEMETRY=1` that calls the session store's `telemetry` writer (`telemetry.py`). The Skill payload is decoded once, by the same code that records `skill.invoked`. The Claudosseum `skill_invocation` line keeps its opt-in, path and shape, and it still works with the store off. `data.success` and `data.duration_ms` now come from Claude Code instead of a grep of the output and `null`, and `data.session_id` is the real session id instead of a shell pid. The file is created `0600`. A failed Skill call, which Claude Code reports through PostToolUseFailure, is now recorded with `success: false`; before, failures never produced a line. An interrupted call records nothing. Pruning (30 days) moved from every ~100th write to at most once a day, from the same async hook, so it still works with the store off; it rewrites the file only when a line is due, and a prune killed mid-way no longer loses its lines to the next one. A telemetry failure now lands in `<telemetry file>.stderr` instead of being discarded. SETUP_GUIDE §8 now documents the line as it really is.
 
 ### Fixed
+- **Session store fixes from a phase 1–3 audit.**
+  - A nested `claude -p` that outlives its parent can no longer reopen or re-seal the parent's session after it closed. The inherited-id checks now cover closed sessions too (a resume still always reopens), and PreCompact never re-seals a closed session.
+  - A rejected first write (a seal with no segment, an append with nowhere to go) no longer leaves an empty session directory behind.
+  - `session_store check` reports a projection missing `projected_from` instead of crashing; the field is now required in both schemas.
+  - Export and harvest acks (`consumers.json`, the one file no log can rebuild) are written durably.
 - **`scripts/redact.py` masks current credential shapes ([#356](https://github.com/Claudfather/clauDNA/issues/356)).** It missed several formats in use today. The rules that change:
   - Vendor prefixes for current formats: `github_pat_`, `sk_live_`/`rk_test_`, `whsec_`, `sk-proj-`/`sk-ant-`/`sk-or-`, `npm_`, `hf_`, `gsk_`, `glpat-`, `ASIA`, `xox?-` and `xapp-`.
   - Telegram tokens inside a bot URL.

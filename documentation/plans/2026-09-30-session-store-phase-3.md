@@ -15,7 +15,7 @@ A plugin-dir hook logged every payload, plus the `claude` process's pid and the 
 
 | Question | Observed | Consequence |
 |---|---|---|
-| **§11.4:** is the `claude` pid stable across `/clear`? | **Yes.** Every hook in the run, before and after `/clear`, had the same `claude` ancestor. The hook's parent is a per-hook `sh`; `claude` is its parent. | The clear link keyed on the `claude` pid (§4.3) works. Find the pid by walking ancestors to the process named `claude`. |
+| **§11.4:** is the `claude` pid stable across `/clear`? | **Yes.** Every hook in the run, before and after `/clear`, had the same `claude` ancestor. The hook's parent is a per-hook `sh`; `claude` is its parent. | The clear link keyed on the `claude` pid (§4.3) works. Find the pid by walking ancestors to the first process whose name contains `claude`. |
 | What does `/clear` look like? | `SessionEnd{reason: clear}` on the old id, then `SessionStart{source: clear}` on a **new** id and a new transcript file. The new file doesn't exist yet at SessionStart (size 0). No payload names the other session. | Lineage has to come from our own link; nothing in the payload carries it. |
 | **§11.3:** does PreCompact's size mark where post-compact content begins? | PreCompact at 155177; SessionStart(compact) at 155741. The 564 bytes between are bookkeeping only (`queue-operation`, `last-prompt`, `atis-latch`), and the `compact_boundary` record comes right after. | Starting the next segment at the seal's end is right. The boundary and compact-summary records land in the new segment, and the transcript reader already drops them (`isCompactSummary`). |
 | Does a fork name its source? | `SessionStart{source: fork}` carries no source id. The forked transcript rewrites every `sessionId` to the new id, with no `forkedFrom`. | A fork's parent is unobservable from hooks. `parent_sid` stays null; lineage is never guessed. |
@@ -28,7 +28,7 @@ A plugin-dir hook logged every payload, plus the `claude` process's pid and the 
 - **SessionStart(`source: clear`)** reads `links/<claude-pid>.json`. The link is used only when it names a *different* session and is under 60 s old. It is consumed (deleted), and the new session opens with `parent_sid` set to the link's `sid` and `chain_id` set to the link's `chain_id`, so a chain keeps one root across any number of clears. A `session.child_linked` event goes to the **parent's** lifecycle log (a write to another session, under that session's lock). A parent whose directory is gone is never recreated.
 - **No link, a stale link, or one for the same session:** `parent_sid: null`. Never guessed.
 - **Sweep:** the detached unclosed-session sweep (§3) deletes links older than 60 s, so no hook pays for it. `take_link` enforces the TTL anyway.
-- **Finding the pid:** `$CLAUDE_PID`, which Claude Code exports to its hooks. It is the same value `session.opened` records for the nested-child guard (#373). Only when it is missing (an older Claude Code) does the adapter walk ancestors to the first process named `claude`, at most 6 hops (`/proc` on Linux, one `ps -o ppid=,comm=` per hop on macOS). No pid means no link.
+- **Finding the pid:** `$CLAUDE_PID`, which Claude Code exports to its hooks. It is the same value `session.opened` records for the nested-child guard (#373). Only when it is missing (an older Claude Code) does the adapter walk ancestors to the first process whose name contains `claude`, at most 6 hops (`/proc` on Linux, one `ps -o ppid=,comm=` per hop on macOS). No pid means no link.
 
 ## 2. Child isolation — done in #373
 

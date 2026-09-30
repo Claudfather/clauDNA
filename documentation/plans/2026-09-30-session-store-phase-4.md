@@ -71,7 +71,7 @@ P4 says free text (prompts, stderr) is off unless opted in. `tool.failed.command
 - The same opt-in, path, `claudna:` filter, bare slug and field names apply. It's a projection of `skill.invoked`, written in the same hook call, so there's one PostToolUse(Skill) hook instead of two.
 - **Byte-compatible by default:** `success` and `duration_ms` keep their current meaning (the heuristic, and `null`) unless the owner approves switching to the real values from the payload (open question 2). The real values are strictly better, but they are a contract change.
 - `session_id` becomes the real session id. Today it is `${CLAUDE_SESSION_ID:-$$}`, and Claude Code doesn't export `CLAUDE_SESSION_ID`, so it's a shell pid. That's a behavior change on a field the contract names, so it's part of question 2.
-- Pruning (30 days, every ~100th write) moves from the shell to the sweep worker (phase 3), off the hook path.
+- Pruning (30 days, every ~100th write) moves from the shell into `telemetry.py`. As built, it runs at most once a day from the telemetry hook itself (async, so no Skill call waits on it), not from the store's sweep, so it keeps working with the store off.
 - `telemetry-emit.sh` stays one release as a no-op shim that exits 0, then is removed. That covers a user who wired it by hand.
 - If the owner would rather not touch the contract in phase 4, the fallback is to leave `telemetry-emit.sh` exactly as it is and record `skill.invoked` alongside it. The spec's "migrate" then moves to a later phase.
 
@@ -85,7 +85,7 @@ P4 says free text (prompts, stderr) is off unless opted in. `tool.failed.command
   - an activity hook with no open session, or after SessionEnd, records nothing and isn't logged as an error;
   - a nested child's activity is ignored.
 - `segment.json.counts` after a mix of events, including a rebuild.
-- **The telemetry projection:** golden lines byte-compatible with today's script for the same input, the filter and opt-in, the `bot` default, and pruning in the sweep.
+- **The telemetry projection:** golden lines byte-compatible with today's script for the same input, the filter and opt-in, the `bot` default, and pruning from the telemetry hook (at most once a day).
 - **`hooks.json`:** the three activity hooks are `async: true` and wired with the right matchers. The Cursor manifest still has no hooks (`make check-manifest`).
 - **Canaries still needed:**
   - **interactive** timing on a plain machine, to confirm an async UserPromptSubmit adds nothing a person can feel;

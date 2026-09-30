@@ -260,7 +260,17 @@ If you enable sandbox, you may also want these filesystem extensions. The skills
 
 ### 3.4 Plugin-provided hooks (no action required)
 
-The PreToolUse permission-expansion hook, the PostToolUse auto-format hook, the Notification hook, the PreCompact capture hook, and the session store hook (SessionStart / PreCompact / SessionEnd, §3.7) all ship with the plugin and auto-wire on enable. You don't need to add anything to `settings.json` for them. To verify they're firing, run `/plugin list` and confirm `claudna` is enabled, then trigger a `Write` to a `.py` file and watch `ruff` run.
+These ship with the plugin (`plugin-hooks/hooks.json`) and auto-wire on enable:
+
+- `pretooluse-permissions.sh` — PreToolUse, `Bash` (permission expansion)
+- `auto-format.sh` — PostToolUse, `Write|Edit`
+- `notify.sh` — Notification
+- `precompact-reflect.sh` — PreCompact (the capture prompt, §3.5)
+- `session-start.sh` — SessionStart, `startup|clear` (the briefing, §3.6)
+- `session-store.sh` (§3.7) — SessionStart, PreCompact and SessionEnd (5 s timeout); async on UserPromptSubmit, PostToolUse (`Skill`) and PostToolUseFailure
+- `telemetry-emit.sh` (§8) — async on PostToolUse and PostToolUseFailure, both `Skill`
+
+You don't need to add anything to `settings.json` for them. To verify they're firing, run `/plugin list` and confirm `claudna` is enabled, then trigger a `Write` to a `.py` file and watch `ruff` run.
 
 ### 3.5 PreCompact capture hook
 
@@ -294,7 +304,7 @@ Every interactive session opens with a short context briefing injected by `plugi
 
 In an opted-in interactive session, a detached worker summarizes each segment after it is sealed (at session end, and after a compaction has happened). The worker makes one `claude -p` call with Haiku, with no tools and no settings, and sends it only the user and assistant prose, redacted; a segment re-sealed while the worker runs takes up to 3 calls. It writes `seg-NNN/summary.json`, the segment's story plus typed knowledge blocks, redacted again. When [Claudron](https://github.com/Claudfather/Claudron) is installed, a detached **harvest** at SessionStart writes those blocks into the session's own vault as `maturity: draft` notes through `claudron capture --vault`, each title prefixed `(unverified)`. Sessions outside a git repo are not harvested. `/claudna:recall` shows drafts in a separate **Unverified** block, and a person promotes or discards them.
 
-**Background spend:** with `CLAUDNA_HARVEST=1`, each summarized segment is one Haiku call on your account, about $0.02, in the background. Nothing is spent without the opt-in. The summarizer runs with `--setting-sources ""`, so it doesn't load an `apiKeyHelper` from your settings. The child then authenticates with whatever else Claude Code finds (a stored login, or `ANTHROPIC_API_KEY`), which may be a different account. With nothing else, the call fails, is retried at most 3 times, and is then reported on the `Memory:` line. This hasn't been checked yet on a machine whose only credential is a helper.
+**Background spend:** with `CLAUDNA_HARVEST=1`, each summarized segment is one Haiku call on your account, about $0.02, in the background. Nothing is spent without the opt-in. The summarizer runs with `--setting-sources ""`, so it doesn't load an `apiKeyHelper` from your settings. The child then authenticates with whatever else Claude Code finds (a stored login, or `ANTHROPIC_API_KEY`), which may be a different account. With nothing else, the call fails, is tried at most 3 times in all (the first attempt included), and is then reported on the `Memory:` line. This hasn't been checked yet on a machine whose only credential is a helper.
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -307,7 +317,7 @@ In an opted-in interactive session, a detached worker summarizes each segment af
 | `CLAUDNA_STATE_DIR` | `~/.claudna` | Where all clauDNA state lives: the store, hook markers, logs. It must be an absolute path. A relative one keeps no state instead of writing into your project. |
 
 - **What it never does:** it never writes to the vault except through `claudron`, never writes to git (it reads the branch and HEAD once, at SessionStart), never prints into your session, and never blocks. It always exits 0.
-- **Sessions that never ended:** a crash or a kill skips SessionEnd and leaves a session open. About every 6 hours, a SessionStart starts a detached sweep. It closes up to 5 sessions that have sat idle for `CLAUDNA_UNCLOSED_AFTER_H` and whose `claude` process is gone, and marks them `abandoned`. Their last segment is summarized as usual if the session opted in. A session that recorded no process id is never closed automatically. `python3 "<plugin>/lib/claudna/session_store" sweep --dry-run` lists the candidates, and `seal <session-id>` closes one by hand.
+- **Sessions that never ended:** a crash or a kill skips SessionEnd and leaves a session open. About every 6 hours, a SessionStart starts a detached sweep. It closes up to 5 sessions that have sat idle for `CLAUDNA_UNCLOSED_AFTER_H` and whose `claude` process is gone, and marks them `abandoned`. Their last segment is summarized as usual if the session opted in. A session that recorded no process id is never closed automatically. `python3 "<plugin>/lib/claudna/session_store" sweep --dry-run` lists the candidates, and `seal <session-id>` closes one by hand. `seal` applies the summary gate with your shell's environment, so a `CLAUDNA_SESSION_SUMMARY` set there counts; the session's own harvest opt-in, recorded at open, still applies.
 - **`/clear` lineage:** the session a `/clear` starts records the one it cleared (`parent_sid`), and every session in that chain shares one `chain_id`.
 - **Looking back:** `/claudna:session list`, `show <id>`, `timeline <id>` and `failures [--group]` read what the store recorded. `failures --group` shows which tool errors recur across sessions. Each session's rolled-up summary is `sessions/<id>/summary.json`.
 - **What the background work did:** `python3 "<plugin>/lib/claudna/session_store" runs` lists the summarizer, harvest and sweep runs, newest first, from `~/.claudna/runs/runs.jsonl`.

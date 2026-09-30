@@ -64,7 +64,7 @@ Read `$PLUGIN_ROOT/plugin-hooks/hooks.json`. Verify **all wired hooks** and that
 | notify | Notification | *(any)* |
 | session-store | SessionStart, PreCompact, SessionEnd | *(any)* |
 | session-store (async) | UserPromptSubmit, PostToolUseFailure; PostToolUse | *(any)*; Skill |
-| telemetry-emit (async) | PostToolUse | Skill |
+| telemetry-emit (async) | PostToolUse, PostToolUseFailure | Skill |
 
 - **PASS** — all present in JSON, all scripts exist. **WARN** — entries or scripts missing (list them). **FAIL** — hooks.json missing/unparseable. `statusline.sh` is opt-in, informational only.
 
