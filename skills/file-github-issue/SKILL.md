@@ -162,7 +162,7 @@ Max file size: the Contents API hard-limits at 100MB. For files over ~1MB the AP
 1. Write the substituted body to a tmpfile. BSD `mktemp` on macOS requires `XXXXXX` at the **end** of the template — no `.md` suffix; `gh --body-file` doesn't care about extension:
    ```sh
    TMPFILE=$(mktemp "${TMPDIR:-/tmp}/claudna:file-github-issue.XXXXXX")
-   TITLEFILE=$(mktemp "${TMPDIR:-/tmp}/claudna:file-github-issue-title.XXXXXX")
+   TITLEFILE=$(mktemp "${TMPDIR:-/tmp}/claudna:file-github-issue.XXXXXX")
    ```
    Write the title into `$TITLEFILE` the same way. The title never goes into the command itself.
 2. File the issue with the effective label set from step 3:

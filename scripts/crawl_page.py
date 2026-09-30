@@ -188,7 +188,8 @@ async def deep(job: dict) -> str:
 
         elements = await page.evaluate(
             """() => {
-            return [...document.querySelectorAll('a,button,input,select,textarea,[role=button],[role=link],[onclick],[tabindex]')]
+            return [...document.querySelectorAll(
+                'a,button,input,select,textarea,[role=button],[role=link],[onclick],[tabindex]')]
             .map((e,i) => ({
                 i, tag:e.tagName.toLowerCase(), type:e.type||null,
                 text:(e.textContent||'').trim().slice(0,80), href:e.href||null,
@@ -337,7 +338,8 @@ async def chat(job: dict) -> str:
                 await page.wait_for_timeout(3000)
                 for _ in range(27):
                     loading = await page.evaluate(
-                        "() => document.querySelectorAll('[class*=loading],[class*=spinner],[class*=pulse],[class*=skeleton]').length > 0"
+                        "() => document.querySelectorAll("
+                        "'[class*=loading],[class*=spinner],[class*=pulse],[class*=skeleton]').length > 0"
                     )
                     if not loading:
                         break
