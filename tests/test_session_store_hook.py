@@ -50,6 +50,7 @@ def spawned(monkeypatch) -> list[tuple[str, int]]:
     monkeypatch.setattr(boundaries, "spawn_summarizer", lambda handle, index, env: calls.append((handle.sid, index)))
     monkeypatch.setattr(boundaries, "spawn_harvest", lambda root, env: pytest.fail("unexpected harvest spawn"))
     monkeypatch.setattr(harvest, "is_due", lambda root, env: False)  # whatever this machine has installed
+    monkeypatch.setattr(boundaries, "spawn_sweep", lambda root, env: None)  # tested in test_session_store_unclosed
     return calls
 
 

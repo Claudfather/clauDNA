@@ -214,22 +214,26 @@ def main(argv: list[str] | None = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(prog="claudna.session_store", description="clauDNA session store")
+    rooted = argparse.ArgumentParser(add_help=False)
+    rooted.add_argument("--root", help="store root (default: $CLAUDNA_STATE_DIR or ~/.claudna)")
     sub = parser.add_subparsers(dest="verb", required=True)
     for verb, text in (("rebuild", "regenerate projections from logs"),
                        ("check", "validate logs and projections; writes nothing"),
-                       ("summarize", "summarize one sealed segment (the detached worker)")):
-        p = sub.add_parser(verb, help=text)
+                       ("summarize", "summarize one sealed segment (the detached worker)"),
+                       ("seal", "close a session whose SessionEnd never ran, as abandoned")):
+        p = sub.add_parser(verb, help=text, parents=[rooted])
         p.add_argument("sid")
         if verb == "summarize":
             p.add_argument("seg", type=int)
-        p.add_argument("--root", help="store root (default: $CLAUDNA_STATE_DIR or ~/.claudna)")
-    priv = sub.add_parser("private", help="mark a session private: never summarized or harvested")
+    priv = sub.add_parser("private", help="mark a session private: never summarized or harvested", parents=[rooted])
     priv.add_argument("sid")
     priv.add_argument("--off", action="store_true", help="clear the mark")
-    priv.add_argument("--root", help="store root (default: $CLAUDNA_STATE_DIR or ~/.claudna)")
-    harv = sub.add_parser("harvest", help="write summarized blocks to the vault as drafts (via claudron)")
+    swp = sub.add_parser("sweep", help="close unclosed sessions (open, idle, claude gone), oldest first",
+                         parents=[rooted])
+    swp.add_argument("--dry-run", action="store_true", help="list what would be closed; write nothing")
+    harv = sub.add_parser("harvest", help="write summarized blocks to the vault as drafts (via claudron)",
+                          parents=[rooted])
     harv.add_argument("--force", action="store_true", help="run even if the last run is recent")
-    harv.add_argument("--root", help="store root (default: $CLAUDNA_STATE_DIR or ~/.claudna)")
     hook = sub.add_parser("hook", help="apply one Claude Code hook event (payload on stdin); always exits 0")
     hook.add_argument("event")
     args = parser.parse_args(argv)
@@ -245,9 +249,28 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print(json.dumps(harvest.harvest(store, force=args.force).as_dict()))
         return 0
+    if args.verb == "sweep":
+        from . import unclosed
+
+        store = _store(args)
+        if store is None:
+            return 1
+        env = dict(os.environ)
+        report = unclosed.sweep(store, env, dry_run=args.dry_run,
+                                close=lambda h: boundaries.abandon_session(h, env))
+        print(json.dumps(report.as_dict()))
+        return 0
     handle = _handle(args)
     if handle is None:
         return 1
+    if args.verb == "seal":
+        try:
+            index = boundaries.abandon_session(handle, dict(os.environ))
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        print(f"{args.sid}: closed (abandoned)" + (f", seg-{index:03d} sealed" if index is not None else ""))
+        return 0
     if args.verb == "private":
         handle.set_private(not args.off)
         print(f"{args.sid}: {'not ' if args.off else ''}private")
