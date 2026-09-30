@@ -19,7 +19,9 @@ mktemp -d "${TMPDIR:-/tmp}/<skill-name>.XXXXXX"
 
 Never name a scratch path yourself under `/tmp` or `$TMPDIR` (a fixed name, or one built from a timestamp): make it with `mktemp -d`.
 
-**Permissions note:** this is the one Bash call the pattern needs. After it, subagents write with the Write tool, which creates the subdirectories (`research/`, `docs/`) inside `<scratch>` as it writes, so the rest of the workflow uses only Read and Write.
+**Every file a skill writes for its own use goes in `<scratch>`, orchestrated or not:** a file a command takes its text from (a title, a body, search terms, a message, a JSON payload), a draft of a doc to publish, fetched content, a working ledger. A skill that has not made `<scratch>` yet makes it as above before it writes the first such file. Never write one at a name you chose under `/tmp` or `$TMPDIR`, however unlikely the name.
+
+**Permissions note:** this is the one Bash call the pattern needs. If `mktemp -d` is refused, stop and say so; never fall back to a name of your own. After it, subagents write with the Write tool, which creates the subdirectories (`research/`, `docs/`) inside `<scratch>` as it writes, so the rest of the workflow uses only Read and Write.
 
 **Subagent type note:** Explore agents (`subagent_type: "Explore"`) do NOT have the Write tool — they are read-only. For the disk-write pattern, use `general-purpose` subagents (`subagent_type: "general-purpose"`) which have access to all tools including Write. Use Explore agents only when you need fast, read-only codebase searches that don't need to persist results to disk.
 

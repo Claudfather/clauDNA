@@ -106,7 +106,7 @@ Read every `<scratch>/lenses/<lens>/result.md`. Deduplicate: findings sharing th
 
 ### Phase 8: Post the aggregated comment
 
-Post a **single** aggregated comment to the target (Issue or PR). A PR comment is an issue comment in GitHub's API; write the markdown body to a temp file (with the Write tool) and post it with `-F body=@<file>` so multi-line markdown stays intact:
+Post a **single** aggregated comment to the target (Issue or PR). A PR comment is an issue comment in GitHub's API; write the markdown body to a file in `<scratch>` (with the Write tool) and post it with `-F body=@<file>` so multi-line markdown stays intact:
 
 ```
 gh api --method POST repos/<owner>/<repo>/issues/<pr-number>/comments -F body=@<body-file>

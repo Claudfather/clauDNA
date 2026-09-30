@@ -239,7 +239,7 @@ Sandbox configuration eliminates ~84% of permission prompts by auto-approving Ba
 }
 ```
 
-If you enable sandbox, you may also want the sandbox filesystem extensions for the orchestration skills that write to `/tmp/`:
+If you enable sandbox, you may also want these filesystem extensions. The skills write their scratch files inside a private directory they make with `mktemp -d` under `$TMPDIR`, or under `/tmp` when `TMPDIR` is unset; if yours points elsewhere, allow that path instead of `/tmp/**`:
 
 ```json
 {

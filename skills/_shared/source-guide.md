@@ -111,7 +111,7 @@ Parse the issue body for the structured format defined in the output guide (Sect
 | Step | Action |
 |---|---|
 | Receive plan | `gh issue view <number>` |
-| Challenge round updates | `gh issue edit <number> --body-file <file>` (the updated body, written with the Write tool) |
+| Challenge round updates | `gh issue edit <number> --body-file <file>` (the updated body, written to a file in `<scratch>` with the Write tool; `../_shared/orchestration-guide.md` §1) |
 | Mark in progress | Add `in-progress` label: `gh issue edit <number> --add-label "in-progress"` |
 | PR created | PR body includes `Closes #<number>` |
 | Mark complete | Remove `in-progress` label. Issue auto-closes when PR merges. |
@@ -129,7 +129,7 @@ The `in-progress` label is removed when the PR is created (the PR itself tracks 
 
 ### Editing issue bodies
 
-When updating the issue body during the challenge round, preserve the full structured format. Write the complete updated body to a file with the Write tool, then pass the file:
+When updating the issue body during the challenge round, preserve the full structured format. Write the complete updated body to a file in `<scratch>` (`../_shared/orchestration-guide.md` §1) with the Write tool, then pass the file:
 
 ```
 gh issue edit <number> --body-file <file>

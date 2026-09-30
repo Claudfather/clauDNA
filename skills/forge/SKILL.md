@@ -56,7 +56,7 @@ Read everything relevant:
 - **PROJECT_MISSION.md** — if it exists in the repo, read it. The plan must align with the north star.
 - **Existing plans** — search for related plans in `documentation/planning/`, `shared/planning/active/`, or `planning/`. Don't duplicate or contradict.
 - **Codebase state** — read the actual code in the target area. Plans based on assumed architecture drift on contact with reality.
-- **Prior art** — write the keywords to `<keywords-file>` with the Write tool, then `git log --all --oneline --grep="$(cat <keywords-file>)"` for past attempts. Check closed issues and merged PRs for context on what was tried before.
+- **Prior art** — write the keywords to `<keywords-file>`, a file in `<scratch>` (`../_shared/orchestration-guide.md` §1), with the Write tool, then `git log --all --oneline --grep="$(cat <keywords-file>)"` for past attempts. Check closed issues and merged PRs for context on what was tried before.
 
 ### Step 2: Identify Decision Forks
 
@@ -203,7 +203,7 @@ Forge is an *author*, not a publisher: it produces a §4.1 publishable doc and h
 2. **Multi-phase → epic + per-phase docs.** §4.1 is "one phase per issue," so a multi-phase plan becomes an epic/overview doc plus one §4.1 doc per phase (mirrors the docs-plane `00_overview` + phase-docs pattern). A single-phase plan may be one doc.
 3. Route to the requested target:
    - `--output github` → `/claudna:publish <doc> --to github-issue --repo <repo>`
-   - `--output docs` → write the doc(s) to a scratch directory — multi-phase named `00_OVERVIEW.md` + `NN_<slug>.md` (family mode's required shape) — then `/claudna:publish <scratch-file-or-dir> --to docs --dir documentation/planning/<topic-slug>/<session>_<date>/` (the PR-reviewable plan directory)
+   - `--output docs` → write the doc(s) to `<scratch>` (`../_shared/orchestration-guide.md` §1) — multi-phase named `00_OVERVIEW.md` + `NN_<slug>.md` (family mode's required shape) — then `/claudna:publish <scratch-file-or-dir> --to docs --dir documentation/planning/<topic-slug>/<session>_<date>/` (the PR-reviewable plan directory)
 4. **Issue generation** — with `--output github` and a multi-phase plan, forge publishes the *whole family*, epic first, then cross-links:
    1. Publish the epic doc → note its issue number `E`.
    2. Publish each per-phase doc in phase order. Every phase doc's `## Summary` opens with `Part of #E (<track>). Size: <S/M/L/XL>.` and its `### Dependencies` names the phase issues it waits on — the numbers exist because publication follows phase order.

@@ -51,7 +51,7 @@ Before proceeding, you must be able to answer:
 Gather surrounding context:
 - **Codebase state** — does the code the plan references actually look the way the plan assumes? Are there recent changes the plan doesn't account for?
 - **Open PRs/Issues** — anything in flight that conflicts with or duplicates this plan?
-- **Prior attempts** — has something similar been tried before? Write the keywords to `<keywords-file>` with the Write tool, then `git log --all --oneline --grep="$(cat <keywords-file>)"` for signals.
+- **Prior attempts** — has something similar been tried before? Write the keywords to `<keywords-file>` in `<scratch>` (`../_shared/orchestration-guide.md` §1) with the Write tool, then `git log --all --oneline --grep="$(cat <keywords-file>)"` for signals.
 
 ---
 

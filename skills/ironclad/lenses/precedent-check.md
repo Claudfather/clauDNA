@@ -38,7 +38,7 @@ Search these sources (listed in decreasing order of reliability, but all three c
 
 Search the commit log for relevant prior work. Start with recent history (last 12 months) — extend to full history only when the initial search reveals a pattern of repeated churn or yields no hits for a topic that should have prior art.
 
-Write each search term from Step 1 to its own file with the Write tool (`<term-file>`); a term never goes into a command itself. A path goes on a command line only if it matches `^[A-Za-z0-9._/@+-]+$`; list any other path in the report as not searched.
+Write each search term from Step 1 to its own file in `<scratch>/lenses/precedent-check/`, beside your result, with the Write tool (`<term-file>`); a term never goes into a command itself. A path goes on a command line only if it matches `^[A-Za-z0-9._/@+-]+$`; list any other path in the report as not searched.
 
 - `git log --all --oneline --since="12 months ago" --grep="$(cat <term-file>)"` for each search term.
 - `git log --all --oneline --since="12 months ago" -- <path>` for files/directories the plan proposes to create or modify — shows who touched them before and why.

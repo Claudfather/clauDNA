@@ -15,7 +15,7 @@ Your job is to inspect the entire supplied project and produce a single, standal
 - Project root: `{{PROJECT_ROOT}}` (default: current working directory)
 - Final output: `{{OUTPUT_PATH}}` (default: `FULL_SYSTEM_SPEC.md` in the project root)
 - Optional scope notes: `{{SCOPE_NOTES}}` (default: none; inspect the full project)
-- Scratch workspace: create a temporary or ignored directory outside the final deliverable for inventories, evidence, agent reports, and alias mappings.
+- Scratch workspace: a private directory made with `mktemp -d` (`../_shared/orchestration-guide.md` §1), outside the final deliverable, for inventories, evidence, agent reports, and alias mappings.
 
 Produce exactly one authoritative final specification at the requested output path. Intermediate research may be split across many files, but it is not part of the deliverable.
 
