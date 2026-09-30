@@ -9,7 +9,7 @@ Trace bugs backward through the call stack to find the original trigger. Fix at 
 What exactly is failing? Capture the full error message, stack trace, and context.
 
 ```
-Example: "Error: ENOENT: no such file or directory '/tmp/worktrees/'"
+Example: "Error: ENOENT: no such file or directory '/srv/worktrees/'"
 ```
 
 ### Step 2: Find the Immediate Cause
@@ -17,8 +17,8 @@ Example: "Error: ENOENT: no such file or directory '/tmp/worktrees/'"
 Look at the line that threw. What variable/value is wrong?
 
 ```
-Example: projectDir is empty string "" → path resolves to "/tmp/worktrees/"
-         instead of "/tmp/worktrees/my-project/"
+Example: projectDir is empty string "" → path resolves to "/srv/worktrees/"
+         instead of "/srv/worktrees/my-project/"
 ```
 
 ### Step 3: Ask — What Called This?

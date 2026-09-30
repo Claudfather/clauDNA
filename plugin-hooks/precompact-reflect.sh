@@ -161,8 +161,15 @@ if [ -z "$SESSION_ID" ]; then
     exit 0
 fi
 
-MARKER_DIR="${TMPDIR:-/tmp}"
-MARKER="${MARKER_DIR}/claudna-reflected-${SESSION_ID}"
+# The marker lives in the user's own state directory, which no other user can
+# write, so nobody else can plant or remove it.
+STATE_HOME="${XDG_STATE_HOME:-${HOME:+$HOME/.local/state}}"
+# Nowhere private to keep the marker: fail open, as for a missing session id.
+if [ -z "$STATE_HOME" ]; then
+    exit 0
+fi
+MARKER_DIR="${STATE_HOME}/claudna"
+MARKER="${MARKER_DIR}/reflected-${SESSION_ID}"
 
 if [ -f "$MARKER" ]; then
     # Capture already ran this session — allow compaction
@@ -170,6 +177,8 @@ if [ -f "$MARKER" ]; then
     exit 0
 fi
 
-# First compaction attempt — block and request capture
-touch "$MARKER"
+# First compaction attempt — block and request capture. The marker is created
+# new (noclobber); if it cannot be, fail open rather than block every compaction.
+mkdir -p -m 700 "$MARKER_DIR" 2>/dev/null || exit 0
+( set -C; : > "$MARKER" ) 2>/dev/null || exit 0
 printf '{"decision":"block","reason":"Run /claudna:capture to distill session learnings before compacting. Then run /compact again."}\n'

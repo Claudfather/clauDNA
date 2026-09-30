@@ -39,7 +39,7 @@ Look for `PROJECT_MISSION.md` in the repo root. This file contains the project's
 
 ### Step 2: Deep Codebase Exploration
 
-Launch **Explore subagents** in parallel (disk-write pattern, scratch dir: `/tmp/product-vision-<YYYY-MM-DD_HHMMSS>/research/`). Each subagent writes findings to a file and returns only a summary.
+Launch **Explore subagents** in parallel (disk-write pattern, scratch dir: `<scratch>/research/`, with `<scratch>` made by `mktemp -d "${TMPDIR:-/tmp}/product-vision.XXXXXX"`). Each subagent writes findings to a file and returns only a summary.
 
 Subagent assignments:
 1. **Architecture & capabilities** — what does this system do today? Map every major module, service, API endpoint, and user-facing feature.

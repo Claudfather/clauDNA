@@ -184,7 +184,7 @@ If neither `--url` nor `--local` is specified, ask the user.
 
 ### Process
 
-1. **Setup.** Scratch dir: `/tmp/qa-crawl-<YYYY-MM-DD_HHMMSS>/`. Create subdirectories: `screenshots/`, `research/`, `console-logs/`. Detect Chrome/Chromium: `which chromium`, `which google-chrome`, `which chromium-browser` in parallel.
+1. **Setup.** Scratch dir: make it with `mktemp -d "${TMPDIR:-/tmp}/qa-crawl.XXXXXX"` (`<scratch>` below). Create subdirectories: `screenshots/`, `research/`, `console-logs/`. Detect Chrome/Chromium: `which chromium`, `which google-chrome`, `which chromium-browser` in parallel.
 
 2. **Determine base URL.**
    - **If `--url <base-url>`:** Use directly. Verify reachable with `curl -sI <base-url>`.
@@ -244,7 +244,7 @@ When `--auto` is set:
     "dead_links": 1,
     "interaction_failures": 0,
     "design_token_violations": 5,
-    "scratch_dir": "/tmp/qa-crawl-<timestamp>/"
+    "scratch_dir": "<scratch>/"
   },
   "summary": "<2-3 line digest>",
   "next": null,

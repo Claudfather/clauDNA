@@ -198,7 +198,7 @@ Launch these reviewers in parallel:
 | **User** | Consumer experience | How does someone actually use this? Is the workflow ergonomic? What's the learning curve? |
 | **Counter-Planner** | Dialectical inquiry | Develop a complete alternative approach built on the opposite assumptions. Present it seriously, not as a straw man. |
 
-Each reviewer writes findings to `/tmp/adversarial-review-<timestamp>/<reviewer>.md`.
+Each reviewer writes findings to `<scratch>/<reviewer>.md`, where `<scratch>` is a private directory the orchestrator makes first with `mktemp -d "${TMPDIR:-/tmp}/adversarial-review.XXXXXX"`.
 
 After all return, synthesize: merge overlapping findings, resolve contradictions, rank by severity.
 

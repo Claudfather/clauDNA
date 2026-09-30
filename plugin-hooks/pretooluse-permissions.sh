@@ -19,7 +19,8 @@ set -eo pipefail
 #     and .claude/settings.local.json
 #   - Falls through (no output) for unrecognized or unparseable commands
 #   - Never returns "deny" — only "allow" or silent pass-through
-#   - Debug log: /tmp/claude-permissions.log
+#   - Debug log: ${XDG_STATE_HOME:-~/.local/state}/claudna/permissions.log,
+#     readable by the user alone
 #
 # Compound-command splitting scope:
 #   Handled (split + each part validated independently):
@@ -36,12 +37,19 @@ set -eo pipefail
 #     { ; }      brace groups (not detected — falls through via match failure)
 #     nested quoting edge cases beyond basic single/double quote tracking
 
-LOG="/tmp/claude-permissions.log"
+# The log holds whole command lines: it lives in the user's own state directory,
+# and every file the hook creates is readable by the user alone.
+STATE_HOME="${XDG_STATE_HOME:-${HOME:+$HOME/.local/state}}"
+LOG_DIR="${STATE_HOME:+$STATE_HOME/claudna}"
+LOG="$LOG_DIR/permissions.log"
 MAX_LOG_SIZE=1048576  # 1MB
+umask 077
 
 # ─── Helpers ──────────────────────────────────────────────────────────
 
 log() {
+    [[ -n "$LOG_DIR" ]] || return 0
+    [[ -d "$LOG_DIR" ]] || mkdir -p -m 700 "$LOG_DIR" 2>/dev/null || return 0
     if [[ -f "$LOG" ]]; then
         local size
         size=$(wc -c < "$LOG" 2>/dev/null) || size=0

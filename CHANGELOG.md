@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- **Scratch files are private to the user who made them.** A skill makes its scratch directory with `mktemp -d "${TMPDIR:-/tmp}/<skill-name>.XXXXXX"`, which creates it new and readable by that user alone, and calls it `<scratch>`. No skill names a fixed or timestamped path in the shared temp directory. The orchestration guide defines it once; the audit lenses, `adversarial-review`, `build`, `heist`, `investigate-app`, `ironclad`, `product-enhance`, `product-vision`, `qa`, `review-work`, `railway logs` and `github-activity-report` use it.
+  - `github-activity-report` runs its bundled `crawl.sh` from the plugin, never a copy, and `crawl.sh` requires `OUT`.
+- **Hook state lives in the user's own state directory**, `${XDG_STATE_HOME:-~/.local/state}/claudna/` (mode 0700): the permission hook's log, `permissions.log`, readable by the user alone, and the pre-compact marker, created new each time. Closes #319. The old `/tmp/claude-permissions.log` is no longer written; remove your own copy by hand.
+- **Tests.** `tests/test_scratch_paths.py` fails on a named path in the shared temp directory and pins its own cases; the hook tests check where the log and the marker live, and that a marker in `TMPDIR` changes nothing.
 
 ## [0.20.0] - 2026-09-29
 ### Added
