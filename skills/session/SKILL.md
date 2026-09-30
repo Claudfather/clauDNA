@@ -1,8 +1,8 @@
 ---
 name: session
 user-invocable: true
-description: "Use at session boundaries — resume at the start of a new session (read the per-cwd handoff and brief on where to pick up), handoff at the end of a session (write it), checkpoint for a mid-session save without the full ceremony, or name to label the session. Replaces /session-handoff, /session-resume, /name-session."
-argument-hint: "[handoff|resume|name|checkpoint] [--auto]"
+description: "Use at session boundaries — resume at the start of a new session (read the per-cwd handoff and brief on where to pick up), handoff at the end of a session (write it), checkpoint for a mid-session save without the full ceremony, or name to label the session. Also use to look back at recorded sessions — list, show, timeline, or recurring tool failures. Replaces /session-handoff, /session-resume, /name-session."
+argument-hint: "[handoff|resume|name|checkpoint|list|show|timeline|failures] [--auto]"
 allowed-tools: Bash(git status *), Bash(git branch *), Bash(git log *), Bash(git rev-parse *), Bash(git stash *), Bash(git worktree *), Bash(git check-ignore *), Bash(gh pr view *), Bash(gh pr list *), Bash(ls *), Bash(wc *), Bash(date *), Bash(grep *), Bash(stat *), Bash(mv *), Bash(mkdir *), Read, Write, Edit, Glob
 ---
 
@@ -20,6 +20,7 @@ Arguments to dispatch (first token = verb, the rest belong to the verb): $ARGUME
 | `handoff` | End of a session — capture, reap, write the handoff | yes | `handoff.md` |
 | `checkpoint` | Mid-session save — append new items, no reaping, no ceremony | yes | `checkpoint.md` |
 | `name` | Label the session for `/resume` discovery | no | `name.md` |
+| `list`, `show`, `timeline`, `failures` | Look back at what the session store recorded: past sessions, one session's events, recurring tool failures | yes | `history.md` |
 
 For the selected verb, read ONLY its depth file in this skill directory and follow it exactly — never load another verb's depth.
 

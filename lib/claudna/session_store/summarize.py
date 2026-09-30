@@ -40,7 +40,7 @@ from typing import Callable, Mapping
 
 from claudna.redact import redact_strings, redact_text
 
-from . import schema
+from . import rollup, schema
 from .fsio import atomic_write_json, exclusive_lock, read_json
 from .paths import CHILD_ENV
 from .project import load_lifecycle, segment_transcript_paths, session_facts, summary_gate
@@ -190,6 +190,7 @@ def _summarize_once(handle: SessionHandle, index: int, *, env: Mapping[str, str]
     atomic_write_json(seg.dir / "summary.json", artifact)
     handle.append("summary.completed", {"job_id": job_id, "artifact": f"{seg.dir.name}/summary.json",
                                         "input_sha256": sha, "duration_ms": duration_ms}, seg=index)
+    rollup.refresh(handle.paths)  # §6.7: the session rollup follows every completed segment
     return f"summarized: {len(artifact['blocks'])} block(s)", end
 
 

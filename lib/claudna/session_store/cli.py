@@ -207,6 +207,33 @@ def _log_hook_error(root: Path | None, event: str, exc: BaseException) -> None:
         print(f"session_store hook {event}: {type(exc).__name__}: {exc}", file=sys.stderr)
 
 
+def _read(args) -> int:
+    """The reader verbs (spec §8): data from readers.py, printed as text or JSON."""
+    from . import readers
+
+    store = _store(args)
+    if store is None:
+        return 1
+    try:
+        if args.verb == "list":
+            data = readers.list_sessions(store, since=args.since, repo=args.repo, bot=args.bot, limit=args.limit)
+        elif args.verb == "show":
+            data = readers.show(store, args.sid)
+        elif args.verb == "timeline":
+            data = readers.timeline(store, args.sid)
+        else:
+            data = readers.failures(store, args.sid, group=args.group, since=args.since)
+    except (LookupError, InvalidSessionId, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(data, indent=2, sort_keys=True))
+    else:
+        for line in readers.render(args.verb, data, group=getattr(args, "group", False)):
+            print(line)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if argv[:1] == ["hook"] and len(argv) == 2:  # the hot path: no argparse
@@ -237,6 +264,23 @@ def main(argv: list[str] | None = None) -> int:
     swp = sub.add_parser("sweep", help="close unclosed sessions (open, idle, claude gone), oldest first",
                          parents=[rooted])
     swp.add_argument("--dry-run", action="store_true", help="list what would be closed; write nothing")
+    lst = sub.add_parser("list", help="sessions, newest first", parents=[rooted])
+    lst.add_argument("--since", help="7d, 12h, 2w, or an ISO date")
+    lst.add_argument("--repo")
+    lst.add_argument("--bot", help="a bot name or id")
+    lst.add_argument("--limit", type=int, default=50)
+    lst.add_argument("--json", action="store_true")
+    for verb, text in (("show", "one session: its projection, segments, rollup and lineage"),
+                       ("timeline", "one session's lifecycle and activity, in time order")):
+        p = sub.add_parser(verb, help=text, parents=[rooted])
+        p.add_argument("sid")
+        p.add_argument("--json", action="store_true")
+    fails = sub.add_parser("failures", help="tool.failed events, newest first; --group folds by signature",
+                           parents=[rooted])
+    fails.add_argument("sid", nargs="?")
+    fails.add_argument("--group", action="store_true")
+    fails.add_argument("--since", help="7d, 12h, 2w, or an ISO date")
+    fails.add_argument("--json", action="store_true")
     harv = sub.add_parser("harvest", help="write summarized blocks to the vault as drafts (via claudron)",
                           parents=[rooted])
     harv.add_argument("--force", action="store_true", help="run even if the last run is recent")
@@ -255,6 +299,8 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print(json.dumps(harvest.harvest(store, force=args.force).as_dict()))
         return 0
+    if args.verb in ("list", "show", "timeline", "failures"):
+        return _read(args)
     if args.verb == "sweep":
         from . import unclosed
 
