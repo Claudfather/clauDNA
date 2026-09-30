@@ -337,10 +337,14 @@ def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str
 
     spawn = spawn or spawn_summarizer
     find_pid = find_pid or (lambda: claude_pid_of(env) or lineage.claude_pid())  # $CLAUDE_PID, else the walk
+    if event == "SessionStart" and payload.get("source") != "compact":
+        return _session_start(session, payload, env, spawn=spawn, find_pid=find_pid)
+    # A closed session's segments are final: never re-sealed, re-closed or extended by a compaction.
+    # A session the store never opened (enabled mid-session) gets no phantom segment either.
+    if facts.status != "open":
+        return "ignored: no open session"
     if event == "SessionStart":
         return _session_start(session, payload, env, spawn=spawn, find_pid=find_pid)
-    if facts.status != "open":  # a closed session's segments are final: never re-sealed, never re-closed
-        return "ignored: no open session"
     if event == "PreCompact":  # seal only: the summary waits for SessionStart(compact) or SessionEnd
         trigger = payload.get("trigger") if payload.get("trigger") in _TRIGGERS else None
         return "segment sealed" if _seal(session, payload, sealed_by="precompact", trigger=trigger) is not None \

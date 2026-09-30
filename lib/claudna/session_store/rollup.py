@@ -114,6 +114,18 @@ def current(paths: SessionPaths, lifecycle: list[dict] | None = None) -> dict | 
     return compute(paths.sid, summaries(paths, lifecycle))
 
 
+def discard(paths: SessionPaths) -> None:
+    """Remove the rollup under its lock (a failed refresh left it stale); never raises.
+
+    Under the lock, so it can't remove the fresh rollup another summarizer just wrote.
+    """
+    try:
+        with exclusive_lock(paths.dir / ".rollup.lock"):
+            rollup_path(paths).unlink(missing_ok=True)
+    except OSError:
+        pass  # the directory is gone: so is the rollup
+
+
 def refresh(paths: SessionPaths, lifecycle: list[dict] | None = None) -> dict | None:
     """Recompute and write the rollup (atomically); return it, or ``None`` when there is nothing yet.
 

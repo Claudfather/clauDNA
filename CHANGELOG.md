@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Session store fixes from a phase 1–3 audit.**
-  - A nested `claude -p` that outlives its parent can no longer reopen or re-seal the parent's session after it closed. The inherited-id checks now cover closed sessions too (a resume still always reopens), and PreCompact never re-seals a closed session.
+  - A nested `claude -p` that outlives its parent can no longer reopen or re-seal the parent's session after it closed. The inherited-id checks now cover closed sessions too (a resume still always reopens), PreCompact never re-seals a closed session, and a compaction never opens a segment in one (or in a session the store never opened).
   - A rejected first write (a seal with no segment, an append with nowhere to go) no longer leaves an empty session directory behind.
   - `session_store check` reports a projection missing `projected_from` instead of crashing; the field is now required in both schemas.
   - Export and harvest acks (`consumers.json`, the one file no log can rebuild) are written durably.

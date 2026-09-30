@@ -474,6 +474,16 @@ class TestNestedChildren:
         fire(store, "SessionEnd", transcript, reason="other")
         assert fire(store, "PreCompact", transcript, trigger="auto") == "ignored: no open session"
 
+    def test_a_compaction_never_opens_a_segment_in_a_closed_session(self, store, transcript):
+        fire(store, "SessionStart", transcript, source="startup")
+        fire(store, "SessionEnd", transcript, reason="other")
+        assert fire(store, "SessionStart", transcript, source="compact") == "ignored: no open session"
+        assert store.session(SID).paths.segment_indices() == [1]
+
+    def test_a_compaction_of_a_session_the_store_never_opened_makes_no_directory(self, store, transcript):
+        assert fire(store, "SessionStart", transcript, source="compact") == "ignored: no open session"
+        assert not store.session(SID).exists()
+
     def test_a_resume_of_a_closed_session_from_another_process_reopens_it(self, store, transcript):
         fire(store, "SessionStart", transcript, env=self.env("cli", 100), source="startup")
         fire(store, "SessionEnd", transcript, env=self.env("cli", 100), reason="other")

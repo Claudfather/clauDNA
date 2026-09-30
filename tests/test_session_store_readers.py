@@ -216,3 +216,25 @@ def test_a_rollup_with_nothing_left_to_roll_up_is_removed(store):
     assert rollup.refresh(h.paths) is not None
     h.seal_segment(150, "precompact")  # re-sealed: the only summary is stale now
     assert rollup.refresh(h.paths) is None and not rollup.rollup_path(h.paths).exists()
+
+
+def test_a_failed_refresh_after_a_summary_drops_the_stale_rollup(store, tmp_path, monkeypatch):
+    from claudna.session_store import summarize
+    from test_session_store_summarize import DIALOGUE, FakeRunner, OPTED_IN, write_transcript
+
+    path = tmp_path / "t.jsonl"
+    write_transcript(path, DIALOGUE)
+    h = store.session("s1")
+    h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path=str(path), harvest=OPTED_IN)
+    h.open_segment("session_open", 0)
+    h.seal_segment(path.stat().st_size, "precompact")
+    rollup.rollup_path(h.paths).write_text(json.dumps({"schema": rollup.ROLLUP_SCHEMA, "stale": True}))
+
+    def broken(paths, lifecycle=None):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(rollup, "refresh", broken)
+    assert summarize.summarize(h, 1, env={}, runner=FakeRunner()).startswith("summarized")
+    assert not rollup.rollup_path(h.paths).exists()
+    kinds = [json.loads(line)["kind"] for line in h.paths.lifecycle.read_text().splitlines()]
+    assert kinds[-1] == "summary.completed"

@@ -193,8 +193,7 @@ def _summarize_once(handle: SessionHandle, index: int, *, env: Mapping[str, str]
     try:
         rollup.refresh(handle.paths)  # §6.7: the session rollup follows every completed segment
     except Exception:  # noqa: BLE001 — the summary is done; a failed rollup must not log summary.failed after it
-        # Drop the now-stale file: `session show` computes a missing rollup, `rebuild` rewrites it.
-        rollup.rollup_path(handle.paths).unlink(missing_ok=True)
+        rollup.discard(handle.paths)  # stale now: `session show` computes a missing rollup, `rebuild` rewrites it
     return f"summarized: {len(artifact['blocks'])} block(s)", end
 
 
