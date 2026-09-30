@@ -44,22 +44,26 @@ from .store import SessionHandle, SessionStore
 _SOURCES = ev.REGISTRY["session.opened"].choices["source"]
 _CLOSE_REASONS = ev.REGISTRY["session.closed"].choices["reason"]
 _TRIGGERS = ev.REGISTRY["segment.sealed"].choices["trigger"]
+#: Entrypoints a person drives. Anything else (``sdk-*``, CI actions, chat bots) is headless (#373, M5).
+INTERACTIVE_ENTRYPOINTS = ("cli", "claude-vscode", "claude-desktop")
 
 
 def actor_from_env(env: Mapping[str, str]) -> dict:
     """Who is running this session, from the environment Claude Code and Claudlobby set.
 
     A Claudlobby bot exports ``BOT_ID`` (and ``BOT_NAME``, ``FLEET_NAME``) in
-    its ``bot.conf``. ``claude -p`` runs with ``CLAUDE_CODE_ENTRYPOINT=sdk-cli``;
-    an interactive session with ``cli``.
+    its ``bot.conf``. Interactive means an entrypoint a person drives
+    (:data:`INTERACTIVE_ENTRYPOINTS`); every other entrypoint — ``sdk-cli``
+    for ``claude -p``, a CI action, a chat integration — is headless. No
+    entrypoint at all (a direct call) counts as interactive.
     """
     entrypoint = env.get("CLAUDE_CODE_ENTRYPOINT") or None
     if env.get("BOT_ID"):
         kind = "bot"
-    elif entrypoint and entrypoint.startswith("sdk"):
-        kind = "headless"
-    else:
+    elif entrypoint is None or entrypoint in INTERACTIVE_ENTRYPOINTS:
         kind = "interactive"
+    else:
+        kind = "headless"
     return {
         "kind": kind,
         "fleet": env.get("FLEET_NAME") or env.get("CLAUDLOBBY_FLEET") or None,
@@ -99,6 +103,20 @@ def origin_from_cwd(cwd: str) -> dict:
 # ── actions ──────────────────────────────────────────────────────────────────
 
 
+def claude_pid_of(env: Mapping[str, str]) -> int | None:
+    """The owning Claude Code process: ``$CLAUDE_PID``, which Claude Code exports to the commands it runs."""
+    try:
+        pid = int(env.get("CLAUDE_PID") or 0)
+    except ValueError:
+        return None
+    return pid if pid > 0 else None
+
+
+def harvest_choice(env: Mapping[str, str]) -> dict:
+    """This session's own harvest choice, recorded at open: opted in, and the vault it would pick."""
+    return {"enabled": env.get("CLAUDNA_HARVEST") == "1", "vault": env.get("CLAUDRON_VAULT_PATH") or None}
+
+
 def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str], *,
                    spawn: Callable[..., None]) -> str:
     source = payload.get("source")
@@ -106,15 +124,17 @@ def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str],
     previous = handle.current_segment()
     if source == "compact":  # the store starts it where the last seal ended; the size is the fallback
         handle.open_segment("compact", file_size(transcript))
-        _summarize_implicit_seal(handle, previous, env, spawn)
+        # The compaction happened: summarize the segment its PreCompact sealed. Not at PreCompact
+        # itself, which fires again when precompact-reflect.sh blocks the first attempt (#373, M5).
+        _summarize_previous(handle, previous, env, spawn)
         return "segment opened (compact)"
     if source not in _SOURCES:
         return f"ignored: SessionStart source {source!r}"
     handle.open_session(source, actor=actor_from_env(env),
                         origin=origin_from_cwd(payload.get("cwd") or os.getcwd()),
-                        transcript_path=transcript)
+                        transcript_path=transcript, claude_pid=claude_pid_of(env), harvest=harvest_choice(env))
     handle.open_segment("session_open", file_size(transcript))
-    _summarize_implicit_seal(handle, previous, env, spawn)
+    _summarize_previous(handle, previous, env, spawn)
     from . import harvest  # only an opening SessionStart asks
 
     if harvest.is_due(handle.paths.root, env):  # spec §7.2: harvest runs at SessionStart, detached
@@ -150,41 +170,45 @@ def spawn_harvest(root: Path, env: Mapping[str, str]) -> None:
 
 def _summarize_segment(handle: SessionHandle, index: int, facts: SessionFacts, env: Mapping[str, str],
                        spawn: Callable[..., None]) -> None:
-    """Spawn the summarizer for sealed segment ``index``, or record why not."""
+    """Spawn the summarizer for sealed segment ``index``, or record why not.
+
+    A spawn that fails is recorded as a retryable ``summary.failed``, so
+    harvest's retry finds it instead of a segment stuck at ``none``.
+    """
     reason = summary_gate(facts, env)
     if reason:
         handle.append("summary.skipped", {"reason": reason}, seg=index)
-    else:
+        return
+    try:
         spawn(handle, index, env)
+    except OSError as exc:
+        handle.append("summary.failed", {"job_id": "spawn", "error": f"spawn failed: {exc}", "retryable": True},
+                      seg=index)
 
 
-def _summarize_implicit_seal(handle: SessionHandle, previous: int | None, env: Mapping[str, str],
-                             spawn: Callable[..., None]) -> None:
-    """Summarize a predecessor :meth:`SessionHandle.open_segment` just sealed itself.
+def _summarize_previous(handle: SessionHandle, previous: int | None, env: Mapping[str, str],
+                        spawn: Callable[..., None]) -> None:
+    """Summarize the segment before the one just opened, when its seal hasn't been summarized yet.
 
-    A missed PreCompact or a lost SessionEnd (a crash, then a resume) leaves
-    the predecessor to be sealed by ``open_segment`` (``sealed_by`` ``compact``
-    or ``resume``); no hook seal ran, so nothing else would ever summarize it,
-    and harvest's cursor would hold at it forever.
+    That is a PreCompact seal (summarized once the compaction happened), or a
+    predecessor :meth:`SessionHandle.open_segment` sealed itself after a missed
+    PreCompact or a lost SessionEnd.
     """
     if previous is None:
         return
     boundary = handle.boundary(previous)
-    if boundary.sealed and boundary.summary["status"] == "none" and \
-            boundary.last_seal["data"]["sealed_by"] in ("compact", "resume"):
+    if boundary.sealed and boundary.summary["status"] == "none":
         _summarize_segment(handle, previous, _facts(handle), env, spawn)
 
 
-def _seal(handle: SessionHandle, payload: dict, facts: SessionFacts, env: Mapping[str, str], *,
-          sealed_by: str, trigger: str | None, spawn: Callable[..., None]) -> bool:
-    """Seal the current segment, then summarize it: spawn the worker, or record why not."""
+def _seal(handle: SessionHandle, payload: dict, *, sealed_by: str, trigger: str | None) -> int | None:
+    """Seal the current segment at the transcript's size; return its index."""
     index = handle.current_segment()
     if index is None:
-        return False
+        return None
     handle.seal_segment(file_size(payload.get("transcript_path")), sealed_by, index=index, trigger=trigger,
                         clamp=True)
-    _summarize_segment(handle, index, facts, env, spawn)
-    return True
+    return index
 
 
 def _facts(handle: SessionHandle) -> SessionFacts:
@@ -197,16 +221,31 @@ def _facts(handle: SessionHandle) -> SessionFacts:
 
 
 def _inherited(event: str, payload: dict, facts: SessionFacts, env: Mapping[str, str]) -> bool:
-    """Is this hook a nested ``claude -p`` reusing an open session's id?
+    """Is this hook a nested ``claude`` reusing an open session's id? (spec §11.5)
 
-    A stopgap until every child carries a marker (spec §11.5): a hook whose
-    entrypoint differs from the one the open session recorded. A resume is let
-    through — ``claude -p --resume`` of a session a crash left open must reopen
-    it — and the canary shows an inheriting child reports ``startup``.
+    A nested child inherits ``CLAUDE_CODE_SESSION_ID`` — and its entrypoint,
+    except that a ``cli`` parent's child reports ``sdk-cli`` — so its hooks can
+    look like the parent's. Three checks, any one enough:
+
+    * **Another Claude Code process.** Claude Code exports ``CLAUDE_PID`` to
+      what it runs; a hook whose ``CLAUDE_PID`` differs from the one the open
+      session recorded belongs to someone else.
+    * **A fresh start of an open session.** ``startup``, ``clear`` or ``fork``
+      never reopens a session that is already open — only a child can.
+    * **Another entrypoint** (the phase 2 check; kept for sessions opened
+      before ``claude_pid`` was recorded).
+
+    A ``resume`` is always let through: ``claude --resume`` of a session a crash
+    left open must reopen it, from whatever process.
     """
-    if facts.status != "open" or facts.actor is None or (event == "SessionStart" and payload.get("source") == "resume"):
+    if facts.status != "open" or (event == "SessionStart" and payload.get("source") == "resume"):
         return False
-    return facts.actor["entrypoint"] != (env.get("CLAUDE_CODE_ENTRYPOINT") or None)
+    pid = claude_pid_of(env)
+    if facts.claude_pid and pid and pid != facts.claude_pid:
+        return True
+    if event == "SessionStart" and payload.get("source") in ("startup", "clear", "fork"):
+        return True
+    return facts.actor is not None and facts.actor["entrypoint"] != (env.get("CLAUDE_CODE_ENTRYPOINT") or None)
 
 
 def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str, str],
@@ -233,13 +272,15 @@ def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str
     spawn = spawn or spawn_summarizer
     if event == "SessionStart":
         return _session_start(session, payload, env, spawn=spawn)
-    if event == "PreCompact":
+    if event == "PreCompact":  # seal only: the summary waits for SessionStart(compact) or SessionEnd
         trigger = payload.get("trigger") if payload.get("trigger") in _TRIGGERS else None
-        sealed = _seal(session, payload, facts, env, sealed_by="precompact", trigger=trigger, spawn=spawn)
-        return "segment sealed" if sealed else "ignored: no segment"
+        return "segment sealed" if _seal(session, payload, sealed_by="precompact", trigger=trigger) is not None \
+            else "ignored: no segment"
     if facts.status != "open":
         return "ignored: no open session"
-    _seal(session, payload, facts, env, sealed_by="session_end", trigger=None, spawn=spawn)
+    index = _seal(session, payload, sealed_by="session_end", trigger=None)
     reason = payload.get("reason") if payload.get("reason") in _CLOSE_REASONS else "other"
-    session.close_session(reason)
+    session.close_session(reason)  # closed before anything that could fail after it (#373, M2)
+    if index is not None:
+        _summarize_segment(session, index, facts, env, spawn)
     return f"session closed ({reason})"

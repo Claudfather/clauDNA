@@ -5,6 +5,7 @@
     python3 lib/claudna/session_store hook <event>     (hook payload on stdin)
     python3 lib/claudna/session_store summarize <sid> <seg> [--root DIR]
     python3 lib/claudna/session_store harvest [--force] [--root DIR]
+    python3 lib/claudna/session_store private <sid> [--off] [--root DIR]
 
 (with ``lib/`` on ``PYTHONPATH``; ``python3 lib/claudna/session_store …`` also works)
 
@@ -26,6 +27,9 @@ what it did and exits 0 unless the session or segment doesn't exist.
 ``harvest`` writes summarized segments' knowledge blocks to the vault as
 drafts, through ``claudron capture`` (:mod:`harvest`); it prints the run report
 as JSON. SessionStart starts it detached when one is due.
+
+``private`` marks a session private (``--off`` clears it): it is never
+summarized or harvested from then on.
 
 ``hook`` is what the hook wrappers call: it applies one Claude Code hook event
 to the store (:mod:`boundaries`) and always exits 0, because a failing hook must
@@ -164,12 +168,18 @@ def _unparseable_lines(log: Path) -> tuple[int, int]:
     return torn, corrupt
 
 
-def run_hook(event: str, raw: str, env: dict[str, str] | None = None) -> str:
-    """Apply one hook event; never raise. Returns the outcome (``"error: …"`` on failure)."""
+def run_hook(event: str, raw: str | bytes, env: dict[str, str] | None = None) -> str:
+    """Apply one hook event; never raise. Returns the outcome (``"error: …"`` on failure).
+
+    ``raw`` may be the undecoded stdin bytes: decoding happens inside the guard,
+    so invalid UTF-8 is logged to ``errors.log`` like any other bad payload.
+    """
     env = dict(os.environ) if env is None else env
     root = None
     try:
         root = state_root(env)
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8")
         payload = json.loads(raw) if raw.strip() else None
         return boundaries.handle(event, payload, store=SessionStore(root), env=env)
     except Exception as exc:  # noqa: BLE001 — a hook must fail open, and say so
@@ -199,7 +209,7 @@ def _log_hook_error(root: Path | None, event: str, exc: BaseException) -> None:
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if argv[:1] == ["hook"] and len(argv) == 2:  # the hot path: no argparse
-        run_hook(argv[1], sys.stdin.read())
+        run_hook(argv[1], sys.stdin.buffer.read())
         return 0
     import argparse
 
@@ -213,6 +223,10 @@ def main(argv: list[str] | None = None) -> int:
         if verb == "summarize":
             p.add_argument("seg", type=int)
         p.add_argument("--root", help="store root (default: $CLAUDNA_STATE_DIR or ~/.claudna)")
+    priv = sub.add_parser("private", help="mark a session private: never summarized or harvested")
+    priv.add_argument("sid")
+    priv.add_argument("--off", action="store_true", help="clear the mark")
+    priv.add_argument("--root", help="store root (default: $CLAUDNA_STATE_DIR or ~/.claudna)")
     harv = sub.add_parser("harvest", help="write summarized blocks to the vault as drafts (via claudron)")
     harv.add_argument("--force", action="store_true", help="run even if the last run is recent")
     harv.add_argument("--root", help="store root (default: $CLAUDNA_STATE_DIR or ~/.claudna)")
@@ -220,7 +234,7 @@ def main(argv: list[str] | None = None) -> int:
     hook.add_argument("event")
     args = parser.parse_args(argv)
     if args.verb == "hook":
-        run_hook(args.event, sys.stdin.read())
+        run_hook(args.event, sys.stdin.buffer.read())
         return 0
 
     if args.verb == "harvest":
@@ -234,6 +248,10 @@ def main(argv: list[str] | None = None) -> int:
     handle = _handle(args)
     if handle is None:
         return 1
+    if args.verb == "private":
+        handle.set_private(not args.off)
+        print(f"{args.sid}: {'not ' if args.off else ''}private")
+        return 0
     if args.verb == "summarize":
         from . import summarize  # off the hook path: it pulls in hashlib, uuid and subprocess
 

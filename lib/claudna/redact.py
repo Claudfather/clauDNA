@@ -37,12 +37,22 @@ MASK = "[REDACTED]"
 # string rules keep the surrounding structure (flag name, URL scheme/host) so
 # redacted output stays readable.
 PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    # A PEM private-key block, whole: its base64 lines hold + and /, which no
+    # token rule below sees as one run.
+    (
+        re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY-----|\Z)"),
+        MASK,
+    ),
     # Telegram bot token: <8-10 digits>:<35+ base64url> (a real leak).
     (re.compile(r"\b\d{8,10}:[A-Za-z0-9_-]{35,}\b"), MASK),
     # Vendor-prefixed keys. The prefix is the signal; length guards false hits.
+    # Anthropic (sk-ant-api03-…, sk-ant-admin01-…) and OpenAI project keys: dashed, so
+    # the plain sk- rule below can't span them. The most common secret in a Claude Code transcript.
+    (re.compile(r"\bsk-(?:ant|proj|svcacct|admin)-[A-Za-z0-9_-]{20,}"), MASK),
     (re.compile(r"\b(?:sk|pk|rk)-[A-Za-z0-9]{20,}\b"), MASK),  # OpenAI / Stripe-style
     (re.compile(r"\b(?:sk|pk|rk)[-_](?:live|test)[-_][A-Za-z0-9]{10,}\b"), MASK),  # Stripe live/test keys
     (re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b"), MASK),  # GitHub PAT / token
+    (re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}"), MASK),  # GitHub fine-grained PAT
     (re.compile(r"\bnapi_[A-Za-z0-9]{20,}\b"), MASK),  # neon API key (a real leak)
     (re.compile(r"\bxox[baprs]-[A-Za-z0-9]{8,}(?:-[A-Za-z0-9]+)*\b"), MASK),  # Slack token
     (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), MASK),  # AWS access key id
@@ -62,10 +72,13 @@ PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # An HTTP bearer token (`Authorization: Bearer X`, `-H 'Bearer X'`): any shape.
     # Keep the scheme word so the redacted header stays legible.
     (re.compile(r"(\bBearer\s+)[A-Za-z0-9._~+/-]{16,}=*", re.IGNORECASE), r"\1" + MASK),
+    # HTTP Basic credentials: base64 of user:password.
+    # (A digit or base64 punctuation is required, so "Basic configuration" stays prose.)
+    (re.compile(r"(\bBasic\s+)(?=[A-Za-z0-9+/]*[0-9+/=])[A-Za-z0-9+/]{12,}=*"), r"\1" + MASK),
     # Credential in a connection string: scheme://user:PASSWORD@host. neon's
     # DATABASE_URL is the primary neon credential and matches no vendor prefix.
     # Keep scheme and host; drop the userinfo.
-    (re.compile(r"(://)[^:/@\s]+:[^@/\s]+(@)"), r"\1" + MASK + r"\2"),
+    (re.compile(r"(://)[^:/@\s]*:[^@/\s]+(@)"), r"\1" + MASK + r"\2"),  # user may be empty: redis://:pw@
     # Structural: a secret-named field assigned a value, incl. prefixed names
     # (DATABASE_PASSWORD, MY_API_KEY) and JSON ("api_key": "...").
     (
@@ -88,6 +101,17 @@ PATTERNS: list[tuple[re.Pattern[str], str]] = [
         MASK,
     ),
 ]
+
+
+def redact_strings(value):
+    """``value`` with every string inside it redacted: dicts, lists and scalars, recursively."""
+    if isinstance(value, str):
+        return redact_text(value)
+    if isinstance(value, dict):
+        return {k: redact_strings(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [redact_strings(v) for v in value]
+    return value
 
 
 def redact_text(text: str) -> str:

@@ -144,19 +144,27 @@ class SessionHandle:
         transcript_path: str | None,
         parent_sid: str | None = None,
         chain_id: str | None = None,
+        claude_pid: int | None = None,
+        harvest: dict | None = None,
     ) -> dict:
-        """Record ``session.opened``. A session with no parent is its own chain root."""
-        return self.append(
-            "session.opened",
-            {
-                "source": source,
-                "parent_sid": parent_sid,
-                "chain_id": chain_id or self.sid,
-                "actor": actor,
-                "origin": origin,
-                "transcript_path": transcript_path,
-            },
-        )
+        """Record ``session.opened``. A session with no parent is its own chain root.
+
+        ``claude_pid`` (the owning Claude Code process) and ``harvest`` (this
+        session's own ``{enabled, vault}``) are optional, recorded by the hook.
+        """
+        data = {
+            "source": source,
+            "parent_sid": parent_sid,
+            "chain_id": chain_id or self.sid,
+            "actor": actor,
+            "origin": origin,
+            "transcript_path": transcript_path,
+        }
+        if claude_pid is not None:
+            data["claude_pid"] = claude_pid
+        if harvest is not None:
+            data["harvest"] = harvest
+        return self.append("session.opened", data)
 
     def boundary(self, index: int, lifecycle: list[dict] | None = None):
         """Segment ``index``'s open/seal boundary, folded from the lifecycle log."""

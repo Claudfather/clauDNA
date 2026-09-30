@@ -84,8 +84,16 @@ REGISTRY: dict[str, KindSpec] = {
             "origin": _DICT,
             "transcript_path": _OPT_STR,
         },
+        # claude_pid: the owning Claude Code process ($CLAUDE_PID), so a nested child reusing the id is
+        # told apart. harvest: this session's own consumer choice and vault, so a harvest another
+        # session starts files it where *this* session would have (#373 review, B2).
+        optional={"claude_pid": _OPT_INT, "harvest": _DICT},
         choices={"source": ("startup", "clear", "resume", "fork")},
-        constraints={"actor": _SESSION_DEFS["actor_or_null"], "origin": _SESSION_DEFS["origin_or_null"]},
+        constraints={"actor": _SESSION_DEFS["actor_or_null"], "origin": _SESSION_DEFS["origin_or_null"],
+                     "claude_pid": {"type": ["integer", "null"], "minimum": 1},
+                     "harvest": {"type": "object", "required": ["enabled", "vault"], "additionalProperties": False,
+                                 "properties": {"enabled": {"type": "boolean"},
+                                                "vault": {"type": ["string", "null"], "minLength": 1}}}},
     ),
     "session.child_linked": KindSpec(log=LIFECYCLE, seg=False, fields={"child_sid": _STR}),
     "session.privacy_set": KindSpec(

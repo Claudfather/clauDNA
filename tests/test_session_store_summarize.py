@@ -29,6 +29,8 @@ from conftest import ACTOR, ORIGIN
 from claudna.session_store import schema, summarize, transcript
 from claudna.session_store.fsio import exclusive_lock
 
+OPTED_IN = {"enabled": True, "vault": None}  # an interactive session that opted into harvest: a summary has a reader
+
 GOOD_OUTPUT = {
     "journey": {"title": "Fix the flaky auth test", "intent": "Make CI green", "outcome": "shipped",
                 "arc": [{"step": "pinned the clock", "result": "tests pass"}],
@@ -76,7 +78,7 @@ def sealed(store, tmp_path):
     path = tmp_path / "t.jsonl"
     write_transcript(path, DIALOGUE)
     h = store.session("sess-1")
-    h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path=str(path))
+    h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path=str(path), harvest=OPTED_IN)
     h.open_segment("session_open", 0)
     h.seal_segment(path.stat().st_size, "precompact")
     return h
@@ -192,7 +194,8 @@ class TestSummarize:
         path = tmp_path / "t.jsonl"
         write_transcript(path, DIALOGUE)
         h = store.session("sess-h")
-        h.open_session("startup", actor={**ACTOR, "kind": kind}, origin=ORIGIN, transcript_path=str(path))
+        h.open_session("startup", actor={**ACTOR, "kind": kind}, origin=ORIGIN, transcript_path=str(path),
+                       harvest=OPTED_IN)
         h.open_segment("session_open", 0)
         h.seal_segment(path.stat().st_size, "session_end")
         assert summarize.summarize(h, 1, env={}, runner=FakeRunner()) == "skipped: headless"
@@ -288,9 +291,114 @@ class TestRedaction:
         write_transcript(path, [record("user", "deploy with GITHUB_TOKEN=" + "ghp" + "_" + "aB3" * 12),
                                 record("assistant", [{"type": "text", "text": "done"}])])
         h = store.session("sess-r")
-        h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path=str(path))
+        h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path=str(path), harvest=OPTED_IN)
         h.open_segment("session_open", 0)
         h.seal_segment(path.stat().st_size, "precompact")
         runner = FakeRunner()
         summarize.summarize(h, 1, env={}, runner=runner)
         assert "aB3aB3" not in runner.calls[0]["dialogue"] and "[REDACTED]" in runner.calls[0]["dialogue"]
+
+
+FAKE_ANTHROPIC_KEY = "sk-" + "ant-" + "api03-" + "aB3_cD4-eF5" * 4  # assembled: never a contiguous literal
+
+
+def sealed_over(store, tmp_path, records, sid="sess-b1"):
+    path = tmp_path / f"{sid}.jsonl"
+    write_transcript(path, records)
+    h = store.session(sid)
+    h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path=str(path), harvest=OPTED_IN)
+    h.open_segment("session_open", 0)
+    h.seal_segment(path.stat().st_size, "precompact")
+    return h
+
+
+class TestNothingSecretLeavesTheSummarizer:
+    """B1 (#373 review): the model's output is redacted too, and shell I/O never reaches it."""
+
+    def test_a_key_the_model_echoes_is_redacted_in_summary_json(self, store, tmp_path):
+        h = sealed_over(store, tmp_path, DIALOGUE)
+        leaky = {**GOOD_OUTPUT, "blocks": [{**GOOD_OUTPUT["blocks"][0], "claim": f"The key is {FAKE_ANTHROPIC_KEY}."}],
+                 "journey": {**GOOD_OUTPUT["journey"], "title": f"Rotate {FAKE_ANTHROPIC_KEY}"}}
+        assert summarize.summarize(h, 1, env={}, runner=FakeRunner(output=leaky)).startswith("summarized")
+        written = (h.paths.segment(1).dir / "summary.json").read_text()
+        assert "aB3_cD4" not in written and written.count("[REDACTED]") == 2
+
+    def test_shell_io_recorded_as_user_text_never_reaches_the_model(self, store, tmp_path):
+        bang = "<bash-input>cat .env</bash-input><bash-stdout>DB_PASSWORD=hunter2hunter2</bash-stdout>"
+        h = sealed_over(store, tmp_path, [record("user", bang), record("user", "now fix the login bug"),
+                                          record("assistant", [{"type": "text", "text": "fixed"}])])
+        runner = FakeRunner()
+        summarize.summarize(h, 1, env={}, runner=runner)
+        dialogue = runner.calls[0]["dialogue"]
+        assert "hunter2" not in dialogue and "cat .env" not in dialogue and "fix the login bug" in dialogue
+
+    def test_the_model_cannot_overwrite_provenance(self, store, tmp_path):
+        h = sealed_over(store, tmp_path, DIALOGUE)
+        spoof = {**GOOD_OUTPUT, "sid": "SPOOFED", "producer": {"model": "gpt-9"}}
+        out = summarize.summarize(h, 1, env={}, runner=FakeRunner(output=spoof))
+        assert out.startswith("failed: invalid summary")  # extra keys are not model output
+        assert not (h.paths.segment(1).dir / "summary.json").exists()
+
+    def test_a_worker_error_is_recorded_as_a_failure(self, store, tmp_path):
+        h = sealed_over(store, tmp_path, DIALOGUE)
+        out = summarize.summarize(h, 1, env={}, runner=FakeRunner(error=RuntimeError("boom")))
+        last = json.loads(h.paths.lifecycle.read_text().splitlines()[-1])
+        assert out.startswith("failed: RuntimeError") and (last["kind"], last["data"]["retryable"]) == \
+            ("summary.failed", True)
+
+    def test_a_lone_surrogate_in_the_transcript_is_not_fatal(self, store, tmp_path):
+        path = tmp_path / "s.jsonl"
+        path.write_text(json.dumps(record("user", "bad \ud800 char")) + "\n", encoding="utf-8", errors="surrogatepass")
+        h = store.session("sess-s")
+        h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path=str(path), harvest=OPTED_IN)
+        h.open_segment("session_open", 0)
+        h.seal_segment(path.stat().st_size, "precompact")
+        assert summarize.summarize(h, 1, env={}, runner=FakeRunner()).startswith("summarized")
+
+
+class TestRegressionsThatBite:
+    """#373 review: each of these fails when its fix is reverted (mutation-checked)."""
+
+    def fake(self, tmp_path, script: str) -> dict:
+        fake = tmp_path / "claude"
+        fake.write_text(script)
+        fake.chmod(0o755)
+        return {"PATH": os.environ["PATH"], "CLAUDNA_CLAUDE_BIN": str(fake), "FAKE_LOG": str(tmp_path / "log.json"),
+                "FAKE_OUTPUT": json.dumps(GOOD_OUTPUT)}
+
+    def test_redaction_runs_before_the_input_cut(self, store, tmp_path, monkeypatch):
+        token = "ghp" + "_" + "aB3" * 12
+        h = sealed_over(store, tmp_path, [record("user", f"use {token} to deploy"),
+                                          record("assistant", [{"type": "text", "text": "ok"}])])
+        # Cut so that, unredacted, only the tail of the token survives: a tail no pattern knows.
+        monkeypatch.setattr(summarize, "INPUT_LIMIT", len(f"{token[10:]} to deploy\n\n[assistant]\nok"))
+        runner = FakeRunner()
+        summarize.summarize(h, 1, env={}, runner=runner)
+        assert "aB3aB3" not in runner.calls[0]["dialogue"]
+
+    def test_the_output_format_and_schema_flags_are_passed(self, tmp_path):
+        env = self.fake(tmp_path, FAKE_CLAUDE)
+        wanted = {"type": "object", "properties": {"x": {"type": "string"}}}
+        summarize.run_claude("s", "d", wanted, "haiku", env)
+        argv = json.loads((tmp_path / "log.json").read_text())["argv"]
+        assert argv[argv.index("--output-format") + 1] == "json"
+        assert json.loads(argv[argv.index("--json-schema") + 1]) == wanted
+        assert argv[argv.index("--model") + 1] == "haiku"
+
+    @pytest.mark.parametrize("reply", ['[1, 2]', '{"is_error": false, "structured_output": [1]}',
+                                       '{"is_error": false, "structured_output": "text"}'])
+    def test_a_reply_that_is_not_an_object_is_a_retryable_failure(self, tmp_path, reply):
+        env = self.fake(tmp_path, f"#!/bin/sh\ncat > /dev/null\necho '{reply}'\n")
+        with pytest.raises(summarize.SummarizerError) as exc:
+            summarize.run_claude("s", "d", {}, "haiku", env)
+        assert exc.value.retryable and "no structured output" in str(exc.value)
+
+    @pytest.mark.parametrize("oversize", [
+        {"journey": {**GOOD_OUTPUT["journey"], "title": "x" * 121}},
+        {"blocks": [GOOD_OUTPUT["blocks"][0]] * 21},
+    ])
+    def test_the_length_and_count_caps_are_enforced(self, store, tmp_path, oversize):
+        h = sealed_over(store, tmp_path, DIALOGUE)
+        out = summarize.summarize(h, 1, env={}, runner=FakeRunner(output={**GOOD_OUTPUT, **oversize}))
+        assert out.startswith("failed: invalid summary")
+        assert not (h.paths.segment(1).dir / "summary.json").exists()

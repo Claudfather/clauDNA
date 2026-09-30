@@ -19,6 +19,7 @@ Pins are recorded as commit SHAs in the results doc. A change to either arm's pr
 ## Battery
 
 - **Bots:** 3 fleet bots with different workloads, named at ratification. Both arms are on for these bots (`CLAUDNA_SESSION_SUMMARY=1`, digest enabled) and off for every other bot.
+- **The arms must not interact.** Arm B runs its own `claude -p` at the bot's SessionEnd, and that child inherits the bot's session id. Arm A ignores hooks from any `claude` process but the one that opened the session (`CLAUDE_PID`, recorded at open; #373 review). Before the period starts, one canary session per battery bot confirms that Arm B's child records nothing in the bot's session. If it does, the period waits for the child marker in [Claudlobby#1961](https://github.com/Claudfather/Claudlobby/issues/1961).
 - **Sessions:** every session those bots end during the period, with no cherry-picking. Sessions that are **trivial** (no user turn) or **private** are excluded from quality scoring, but still count toward coverage.
 - **Gold labels:** a random sample of 30 sessions, stratified 10 per bot. A reviewer reads each transcript and lists the durable facts a teammate would want next month. The reviewer does this **before** seeing either arm's output, and without knowing which arm produced what when judging.
 

@@ -170,6 +170,8 @@ STATE_DIR="$(claudna_state_dir)"
 if [ -z "$STATE_DIR" ]; then
     exit 0
 fi
+# 077: if this hook creates the state root first, it must still be 0700 (SETUP_GUIDE §3.7).
+umask 077
 MARKER_DIR="${STATE_DIR}/hooks"
 MARKER="${MARKER_DIR}/reflected-${SESSION_ID}"
 

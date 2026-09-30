@@ -165,6 +165,8 @@ class SessionFacts:
     status: str
     actor: dict | None  # the latest session.opened's: whoever reopened the session last owns it
     private: bool
+    claude_pid: int | None = None  # the latest session.opened's owning Claude Code process
+    harvest: dict | None = None  # the latest session.opened's {enabled, vault}: its own consumer choice
 
 
 SUMMARY_ENV = "CLAUDNA_SESSION_SUMMARY"
@@ -173,28 +175,37 @@ SUMMARY_ENV = "CLAUDNA_SESSION_SUMMARY"
 def summary_gate(facts: SessionFacts, env) -> str | None:
     """The ``summary.skipped`` reason for a session's segments, or ``None`` to summarize (spec §7.1).
 
-    Summaries are on for interactive sessions; headless ``claude -p`` and
-    Claudlobby bots are off unless ``CLAUDNA_SESSION_SUMMARY=1``; ``=0`` turns
-    them off everywhere; a private session is never summarized.
+    Phase 2 has one reader of summaries, harvest, so a summary is only paid for
+    when something will read it: an interactive session that opted into
+    harvest (``CLAUDNA_HARVEST=1`` when it opened), or anywhere
+    ``CLAUDNA_SESSION_SUMMARY=1`` asks. Headless ``claude -p`` and Claudlobby
+    bots need ``=1``; ``=0`` turns them off everywhere; a private session is
+    never summarized.
     """
     if facts.private:
         return "private"
     switch = env.get(SUMMARY_ENV)
     if switch == "0":
         return "disabled"
-    if switch != "1" and (facts.actor or {}).get("kind") in ("headless", "bot"):
+    if switch == "1":
+        return None
+    if (facts.actor or {}).get("kind") in ("headless", "bot"):
         return "headless"
+    if not (facts.harvest or {}).get("enabled"):
+        return "disabled"  # nothing reads summaries yet unless this session opted into harvest (#373, M5)
     return None
 
 
 def session_facts(lifecycle: list[dict]) -> SessionFacts:
-    actor, private = None, False
+    actor, private, claude_pid, harvest = None, False, None, None
     for e in lifecycle:
         if e["kind"] == "session.opened":
             actor = e["data"]["actor"]
+            claude_pid, harvest = e["data"].get("claude_pid"), e["data"].get("harvest")
         elif e["kind"] == "session.privacy_set":
             private = e["data"]["private"]
-    return SessionFacts(status=session_status(lifecycle)[0], actor=actor, private=private)
+    return SessionFacts(status=session_status(lifecycle)[0], actor=actor, private=private,
+                        claude_pid=claude_pid, harvest=harvest)
 
 
 def next_segment_index(paths: SessionPaths) -> int:

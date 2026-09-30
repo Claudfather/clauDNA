@@ -8,7 +8,10 @@ byte offsets into it. :func:`read_range` returns the user and assistant prose in
   tool output is where secrets and bulk live);
 * thinking blocks, sidechains (subagent turns), and meta records;
 * context Claude Code or a hook injected into a user turn (``<system-reminder>``
-  blocks, slash-command wrappers) — it is not what the user said.
+  blocks, slash-command wrappers) — it is not what the user said;
+* ``!cmd`` shell input and output (``<bash-input>`` / ``<bash-stdout>`` /
+  ``<bash-stderr>``), which Claude Code records as user-role text: it is tool
+  output, where ``cat .env`` lands.
 
 Partial lines at either edge of the range are skipped, and a record that isn't
 understood is skipped rather than fatal: the transcript format is Claude Code's,
@@ -24,7 +27,7 @@ from pathlib import Path
 
 _INJECTED = re.compile(
     r"<(system-reminder|command-name|command-message|command-args|local-command-stdout|"
-    r"local-command-stderr|user-prompt-submit-hook)>.*?</\1>",
+    r"local-command-stderr|user-prompt-submit-hook|bash-input|bash-stdout|bash-stderr)>.*?</\1>",
     re.DOTALL,
 )
 

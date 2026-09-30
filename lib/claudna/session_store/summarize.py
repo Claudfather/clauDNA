@@ -38,7 +38,7 @@ import uuid
 from pathlib import Path
 from typing import Callable, Mapping
 
-from claudna.redact import redact_text
+from claudna.redact import redact_strings, redact_text
 
 from . import schema
 from .fsio import atomic_write_json, exclusive_lock, read_json
@@ -113,7 +113,12 @@ def summarize(handle: SessionHandle, index: int, *, env: Mapping[str, str] = os.
         # The seal is appended before that spawn, so re-reading it after a pass
         # catches the later range. Bounded, so a re-seal loop can't pin a worker.
         for _ in range(MAX_PASSES):
-            outcome, end = _summarize_once(handle, index, env=env, runner=runner)
+            try:
+                outcome, end = _summarize_once(handle, index, env=env, runner=runner)
+            except Exception as exc:  # noqa: BLE001 — any worker failure is recorded, so harvest can retry it
+                handle.append("summary.failed", {"job_id": "worker-error", "error": f"{type(exc).__name__}: {exc}",
+                                                 "retryable": True}, seg=index)
+                return f"failed: {type(exc).__name__}: {exc}"
             if end is None or handle.boundary(index).last_seal["data"]["end"] == end:
                 break
         return outcome
@@ -147,9 +152,12 @@ def _summarize_once(handle: SessionHandle, index: int, *, env: Mapping[str, str]
     if not any(t.role == "user" for t in turns):
         return _skip(handle, index, "trivial"), end
 
-    # Credentials never reach the model. Redact each turn before render cuts
-    # the oldest text: a cut through a secret could leave a tail no pattern matches.
+    # Redact each turn before render cuts the oldest text: a cut through a secret
+    # could leave a tail no pattern matches. The redactor is pattern-based, so this
+    # stops the credential shapes it knows; the output is redacted again below.
+    # A lone surrogate (invalid UTF-8 in the transcript) is replaced, not fatal.
     dialogue = render([Turn(t.role, redact_text(t.text)) for t in turns], limit=INPUT_LIMIT)
+    dialogue = dialogue.encode("utf-8", "replace").decode("utf-8")
     sha = hashlib.sha256(f"{PROMPT_VERSION}\n{dialogue}".encode()).hexdigest()
     job_id = str(uuid.uuid4())
     handle.append("summary.requested", {"job_id": job_id}, seg=index)
@@ -159,12 +167,18 @@ def _summarize_once(handle: SessionHandle, index: int, *, env: Mapping[str, str]
     try:
         output, cost = runner(PROMPT_FILE.read_text(), dialogue, full["$defs"]["model_output"], model, env)
         duration_ms = int((time.monotonic() - began) * 1000)
+        # The model's part is checked on its own first, then redacted (it can echo
+        # a secret the input redaction missed), and provenance is merged last so
+        # no key the model returns can stand in for it.
+        problems = schema.validate(output, full["$defs"]["model_output"])
+        if problems:
+            raise SummarizerError("invalid summary: " + "; ".join(problems[:3]), retryable=True)
         artifact = {
+            **redact_strings(output),
             "schema": SCHEMA_ID, "sid": handle.sid, "index": index,
             "input": {**wanted, "sha256": sha, "turns": len(turns)},
             "producer": {"model": model, "prompt_version": PROMPT_VERSION, "duration_ms": duration_ms,
                          "cost_usd": cost},
-            **(output if isinstance(output, dict) else {}),
         }
         problems = schema.validate(artifact, full)
         if problems:

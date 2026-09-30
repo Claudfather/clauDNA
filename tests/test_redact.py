@@ -41,6 +41,13 @@ FAKE = {
     "google_api_key": "AIza" + "gK9" * 11 + "gk",
     "stripe_live_key": "sk" + "_live_" + "51Hab" * 4,
     "bearer_token": "Bearer " + "eyJhbGci" + "Oi" * 8,
+    "anthropic_key": "sk-" + "ant-" + "api03-" + "aB3_cD4-eF5" * 4,
+    "openai_project_key": "sk-" + "proj-" + "aB3cD4eF5gH6" * 3,
+    "github_fine_grained_pat": "github" + "_pat_" + "11AB3CD4E0" + "aB3cD4_eF5" * 4,
+    "redis_url_password": "redis://" + ":" + "s3cretPassw0rd" + "@cache.internal:6379",
+    "basic_auth": "Basic " + "dXNlcjpw" + "YXNzd29yZDEyMw==",
+    "pem_private_key": "-----BEGIN " + "PRIVATE KEY-----\nMIIEvQIBADANBgkqh+kiG9w0BAQEFAASC/BKcwggSjAgEAAoIBAQC7\n"
+                       "-----END " + "PRIVATE KEY-----",
 }
 
 # Lines that MUST survive verbatim — over-redaction breaks review output.
@@ -53,6 +60,7 @@ BENIGN = [
     "https://ep-cool-lab-12345678.us-east-2.aws.neon.tech/neondb",  # URL, no user:pass@
     "neonctl branches list --project-id proj_12345 --org-id org_67890 --json",  # no credential flag
     "A Bearer of good news arrived; the bearer bond matured.",  # the word, not a token
+    "Basic configuration steps come first; Basic troubleshooting follows.",  # the word, not credentials
 ]
 
 

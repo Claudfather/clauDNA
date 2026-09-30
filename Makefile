@@ -18,7 +18,7 @@
 #                    (CI forwards PR labels via this env var; consumed
 #                    by scripts/skill_checks.py)
 
-.PHONY: check deps check-skills check-integration check-agents check-manifest check-changelog lint test
+.PHONY: check deps deps-runtime test-runtime check-skills check-integration check-agents check-manifest check-changelog lint test
 
 check: check-skills check-integration check-agents check-manifest check-changelog lint test
 
@@ -45,3 +45,17 @@ lint:
 
 test:
 	python3 -m pytest tests/
+
+# The runtime floor: hooks and the session store run under the user's own
+# python3, which is 3.9 on stock macOS. CI runs these suites on 3.9 too; they
+# also pass on any newer Python, so this target works locally as-is.
+RUNTIME_TESTS = tests/test_session_store.py tests/test_session_store_hook.py \
+	tests/test_session_store_summarize.py tests/test_session_store_harvest.py \
+	tests/test_redact.py tests/test_runtime_layout.py tests/test_precompact_defer.py \
+	tests/test_session_start_hook.py
+
+deps-runtime:
+	python3 -m pip install -r requirements-runtime-test.txt
+
+test-runtime:
+	python3 -m pytest $(RUNTIME_TESTS)

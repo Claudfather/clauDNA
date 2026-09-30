@@ -1,0 +1,4 @@
+# Toolchain for `make test-runtime`: the runtime-floor leg (Python 3.9, spec
+# §10 of the session-store design). pytest 9 needs 3.10+, so this leg pins the
+# last 8.x; the main check-set keeps requirements-dev.txt.
+pytest==8.4.2

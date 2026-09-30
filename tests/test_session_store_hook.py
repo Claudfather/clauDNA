@@ -33,7 +33,7 @@ from claudna.session_store.fsio import append_jsonl  # noqa: E402
 WRAPPER = REPO_ROOT / "plugin-hooks" / "session-store.sh"
 HOOKS_JSON = REPO_ROOT / "plugin-hooks" / "hooks.json"
 SID = "3fbbf216-f848-4d8b-b5b5-7839fc98b820"
-CLI_ENV = {"CLAUDE_CODE_ENTRYPOINT": "cli"}
+CLI_ENV = {"CLAUDE_CODE_ENTRYPOINT": "cli", "CLAUDNA_HARVEST": "1"}  # opted in: summaries have a reader
 
 
 @pytest.fixture
@@ -107,7 +107,7 @@ class TestBoundaries:
                                                                              env, reason):
         fire(store, "SessionStart", transcript, env=env, source="startup")
         fire(store, "SessionEnd", transcript, env=env, reason="other")
-        last = json.loads(store.session(SID).paths.lifecycle.read_text().splitlines()[-2])
+        last = json.loads(store.session(SID).paths.lifecycle.read_text().splitlines()[-1])
         assert spawned == [] and (last["kind"], last["data"]) == ("summary.skipped", {"reason": reason})
 
     def test_a_session_start_starts_a_harvest_when_one_is_due(self, store, transcript, monkeypatch):
@@ -251,6 +251,34 @@ class TestRunHook:
         assert run_hook("SessionStart", "{not json", env={"CLAUDNA_STATE_DIR": str(root)}).startswith("error:")
         assert (root / "hooks" / "errors.log").is_file()
 
+    def test_a_failing_prompt_payload_never_reaches_the_log(self, tmp_path, transcript):
+        root = tmp_path / "state"
+        root.mkdir()
+        (root / "sessions").write_text("not a directory")
+        payload = json.dumps({"session_id": SID, "transcript_path": str(transcript), "source": "startup",
+                              "prompt": "PROMPT-TEXT-THAT-MUST-NOT-BE-LOGGED"})
+        assert run_hook("SessionStart", payload, env={"CLAUDNA_STATE_DIR": str(root), **CLI_ENV}).startswith("error:")
+        assert "PROMPT-TEXT" not in (root / "hooks" / "errors.log").read_text()
+
+    def test_invalid_utf8_on_stdin_is_logged_not_raised(self, tmp_path):
+        root = tmp_path / "state"
+        out = run_hook("SessionStart", b'{"session_id": "\xff"}', env={"CLAUDNA_STATE_DIR": str(root)})
+        assert out.startswith("error: UnicodeDecodeError")
+        assert "UnicodeDecodeError" in (root / "hooks" / "errors.log").read_text()
+
+    def test_logging_an_error_rotates_both_hook_logs(self, tmp_path):
+        from claudna.session_store.fsio import LOG_LIMIT
+
+        root = tmp_path / "state"
+        hooks = root / "hooks"
+        hooks.mkdir(parents=True)
+        for name in ("errors.log", "session-store.stderr"):
+            (hooks / name).write_text("x" * (LOG_LIMIT + 1))
+        run_hook("SessionStart", "{not json", env={"CLAUDNA_STATE_DIR": str(root)})
+        assert (hooks / "errors.log.old").stat().st_size == LOG_LIMIT + 1
+        assert (hooks / "errors.log").stat().st_size < 1024
+        assert (hooks / "session-store.stderr.old").is_file() and not (hooks / "session-store.stderr").exists()
+
 
 def run_wrapper(tmp_path: Path, event: str, payload: dict, extra_env: dict | None = None, cwd: Path | None = None):
     env = {"HOME": str(tmp_path / "home"), "PATH": os.environ["PATH"], "CLAUDNA_HARVEST": "0", **CLI_ENV,
@@ -296,6 +324,23 @@ class TestWrapper:
                            {"PATH": f"{fake}:{os.environ['PATH']}"})
         assert (proc.returncode, proc.stdout) == (0, "")
         assert "ImportError" in (tmp_path / "home" / ".claudna" / "hooks" / "session-store.stderr").read_text()
+
+    def test_the_wrapper_rotates_its_stderr_capture_even_when_python_cannot_start(self, tmp_path, transcript):
+        fake = tmp_path / "bin"
+        fake.mkdir()
+        (fake / "python3").write_text("#!/bin/sh\necho 'ImportError: again' >&2\nexit 1\n")
+        (fake / "python3").chmod(0o755)
+        hooks = tmp_path / "home" / ".claudna" / "hooks"
+        hooks.mkdir(parents=True)
+        (hooks / "session-store.stderr").write_text("x" * (1024 * 1024 + 1))
+        run_wrapper(tmp_path, "SessionStart", self.payload(transcript), {"PATH": f"{fake}:{os.environ['PATH']}"})
+        assert (hooks / "session-store.stderr.old").stat().st_size == 1024 * 1024 + 1
+        assert (hooks / "session-store.stderr").read_text().strip() == "ImportError: again"
+
+    def test_the_wrapper_limit_matches_the_python_one(self):
+        from claudna.session_store.fsio import LOG_LIMIT
+
+        assert f"-gt {LOG_LIMIT}" in WRAPPER.read_text()
 
 
 STATE_DIR_SH = REPO_ROOT / "plugin-hooks" / "lib" / "state-dir.sh"
@@ -347,3 +392,98 @@ class TestLogsAreCapped:
         assert cap_log(log, limit=10) == log and not log.exists()
         assert (tmp_path / "errors.log.old").read_text() == "x" * 20
         cap_log(log, limit=10)  # a missing log is fine
+
+    def test_a_worker_spawn_rotates_its_stderr_log(self, tmp_path, monkeypatch):
+        import subprocess as sp
+
+        from claudna.session_store import boundaries
+        from claudna.session_store.fsio import LOG_LIMIT
+
+        monkeypatch.setattr(sp, "Popen", lambda *a, **k: None)
+        (tmp_path / "hooks").mkdir()
+        (tmp_path / "hooks" / "summarizer.stderr").write_text("x" * (LOG_LIMIT + 1))
+        boundaries.spawn_worker(tmp_path, ["summarize", SID, "1"], {}, log="summarizer.stderr")
+        assert (tmp_path / "hooks" / "summarizer.stderr.old").stat().st_size == LOG_LIMIT + 1
+
+
+# ── #373 review: M3 (nested children), M5 (spend), M2 (a closed end) ──────────
+
+
+class TestNestedChildren:
+    def env(self, entrypoint, pid):
+        return {"CLAUDE_CODE_ENTRYPOINT": entrypoint, "CLAUDE_PID": str(pid), "CLAUDNA_HARVEST": "1"}
+
+    @pytest.mark.parametrize("entrypoint", ["claude-vscode", "claude-desktop", "sdk-cli"])
+    def test_a_nested_child_under_any_entrypoint_cannot_touch_its_parent(self, store, transcript, entrypoint):
+        parent, child = self.env(entrypoint, 100), self.env(entrypoint, 200)  # same entrypoint, other process
+        fire(store, "SessionStart", transcript, env=parent, source="startup")
+        assert fire(store, "SessionStart", transcript, env=child, source="startup").startswith("ignored: nested")
+        assert fire(store, "PreCompact", transcript, env=child, trigger="auto").startswith("ignored: nested")
+        assert fire(store, "SessionEnd", transcript, env=child, reason="other").startswith("ignored: nested")
+        assert session(store)["status"] == "open" and store.session(SID).paths.segment_indices() == [1]
+        assert fire(store, "SessionEnd", transcript, env=parent, reason="other") == "session closed (other)"
+
+    def test_a_fresh_start_never_reopens_an_open_session_even_without_pids(self, store, transcript):
+        fire(store, "SessionStart", transcript, env={"CLAUDE_CODE_ENTRYPOINT": "claude-vscode"}, source="startup")
+        out = fire(store, "SessionStart", transcript, env={"CLAUDE_CODE_ENTRYPOINT": "claude-vscode"},
+                   source="startup")
+        assert out.startswith("ignored: nested") and store.session(SID).paths.segment_indices() == [1]
+
+    def test_a_resume_from_another_process_reopens_a_session_a_crash_left_open(self, store, transcript):
+        fire(store, "SessionStart", transcript, env=self.env("cli", 100), source="startup")
+        assert fire(store, "SessionStart", transcript, env=self.env("cli", 300), source="resume") == \
+            "session opened (resume)"
+        assert session(store)["status"] == "open" and store.session(SID).paths.segment_indices() == [1, 2]
+
+    def test_the_owning_claude_pid_is_recorded(self, store, transcript):
+        fire(store, "SessionStart", transcript, env=self.env("cli", 4242), source="startup")
+        opened = json.loads(store.session(SID).paths.lifecycle.read_text().splitlines()[0])
+        assert opened["data"]["claude_pid"] == 4242
+
+
+class TestSpend:
+    def test_a_blocked_compaction_is_summarized_once(self, store, transcript, spawned):
+        """precompact-reflect.sh blocks the first attempt, so PreCompact fires twice; one summary."""
+        fire(store, "SessionStart", transcript, source="startup")
+        fire(store, "PreCompact", transcript, trigger="manual")  # blocked
+        grow(transcript, 10)
+        fire(store, "PreCompact", transcript, trigger="manual")  # allowed
+        assert spawned == []  # nothing yet: the compaction hasn't happened
+        fire(store, "SessionStart", transcript, source="compact")
+        assert spawned == [(SID, 1)]
+
+    @pytest.mark.parametrize("entrypoint", ["claude-code-github-action", "claude-in-slack", "sdk-ts"])
+    def test_automation_entrypoints_are_headless(self, entrypoint):
+        assert boundaries.actor_from_env({"CLAUDE_CODE_ENTRYPOINT": entrypoint})["kind"] == "headless"
+
+    @pytest.mark.parametrize("entrypoint", ["cli", "claude-vscode", "claude-desktop"])
+    def test_the_interactive_entrypoints(self, entrypoint):
+        assert boundaries.actor_from_env({"CLAUDE_CODE_ENTRYPOINT": entrypoint})["kind"] == "interactive"
+
+    def test_no_reader_no_summary(self, store, transcript, spawned):
+        env = {"CLAUDE_CODE_ENTRYPOINT": "cli"}  # harvest not opted in, summaries not asked for
+        fire(store, "SessionStart", transcript, env=env, source="startup")
+        fire(store, "SessionEnd", transcript, env=env, reason="other")
+        last = json.loads(store.session(SID).paths.lifecycle.read_text().splitlines()[-1])
+        assert spawned == [] and (last["kind"], last["data"]["reason"]) == ("summary.skipped", "disabled")
+
+    def test_a_failed_spawn_still_closes_the_session_and_is_recorded(self, store, transcript, monkeypatch):
+        def broken(handle, index, env):
+            raise OSError("fork failed")
+
+        fire(store, "SessionStart", transcript, source="startup")
+        payload = {"session_id": SID, "transcript_path": str(transcript), "reason": "other"}
+        boundaries.handle("SessionEnd", payload, store=store, env=CLI_ENV, spawn=broken)
+        kinds = [json.loads(line)["kind"] for line in store.session(SID).paths.lifecycle.read_text().splitlines()]
+        assert kinds[-2:] == ["session.closed", "summary.failed"] and session(store)["status"] == "closed"
+
+
+class TestPrivateVerb:
+    def test_private_marks_and_clears(self, store, transcript):
+        fire(store, "SessionStart", transcript, source="startup")
+        cmd = [sys.executable, str(REPO_ROOT / "lib" / "claudna" / "session_store"), "private", SID,
+               "--root", str(store.root)]
+        assert subprocess.run(cmd, capture_output=True, text=True).returncode == 0
+        assert session(store)["private"] is True
+        subprocess.run([*cmd, "--off"], capture_output=True, text=True, check=True)
+        assert session(store)["private"] is False

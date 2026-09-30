@@ -29,7 +29,15 @@ STATE_DIR="$(claudna_state_dir)"
 umask 077
 [ -d "$STATE_DIR/hooks" ] || mkdir -p -m 700 "$STATE_DIR/hooks" 2> /dev/null || exit 0
 
+# Rotate the stderr capture here, not in Python: the case it exists for (the
+# store failing to import) is exactly when Python can't rotate it. Same 1 MiB
+# limit as fsio.LOG_LIMIT.
+ERR="$STATE_DIR/hooks/session-store.stderr"
+if [ -f "$ERR" ] && [ "$(wc -c < "$ERR" 2> /dev/null || echo 0)" -gt 1048576 ]; then
+  mv -f "$ERR" "$ERR.old" 2> /dev/null || :
+fi
+
 # -S: the store is stdlib-only, so skip site-packages setup (a few ms per call).
 PKG="${BASH_SOURCE[0]%/*}/../lib/claudna/session_store"
-python3 -S "$PKG" hook "${1:-}" > /dev/null 2>> "$STATE_DIR/hooks/session-store.stderr"
+python3 -S "$PKG" hook "${1:-}" > /dev/null 2>> "$ERR"
 exit 0
