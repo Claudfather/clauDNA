@@ -81,6 +81,14 @@ def read_json(path: Path) -> object | None:
         return None
 
 
+def file_size(path: Path | str | None) -> int:
+    """A file's size in bytes; 0 if there is no path or no file."""
+    try:
+        return os.stat(path).st_size if path else 0
+    except OSError:
+        return 0
+
+
 def append_jsonl(path: Path, record: dict, *, durable: bool = True) -> None:
     """Append ``record`` as one line to ``path`` (created ``0600``); fsync it when ``durable``.
 

@@ -26,20 +26,14 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "lib"))
 
 import claudna.session_store.store as store_module  # noqa: E402
-from claudna.session_store import boundaries  # noqa: E402
+from claudna.session_store import boundaries, paths  # noqa: E402
 from claudna.session_store.cli import run_hook  # noqa: E402
 from claudna.session_store.fsio import append_jsonl  # noqa: E402
-from claudna.session_store.store import SessionStore  # noqa: E402
 
 WRAPPER = REPO_ROOT / "plugin-hooks" / "session-store.sh"
 HOOKS_JSON = REPO_ROOT / "plugin-hooks" / "hooks.json"
 SID = "3fbbf216-f848-4d8b-b5b5-7839fc98b820"
 CLI_ENV = {"CLAUDE_CODE_ENTRYPOINT": "cli"}
-
-
-@pytest.fixture
-def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "state")
 
 
 @pytest.fixture
@@ -259,18 +253,42 @@ class TestWrapper:
         proc = run_wrapper(tmp_path, "SessionStart", self.payload(transcript),
                            {"PATH": f"{fake}:{os.environ['PATH']}"})
         assert (proc.returncode, proc.stdout) == (0, "")
-        assert "ImportError" in (tmp_path / "home" / ".claudna" / "hooks" / "errors.log").read_text()
+        assert "ImportError" in (tmp_path / "home" / ".claudna" / "hooks" / "session-store.stderr").read_text()
+
+
+STATE_DIR_SH = REPO_ROOT / "plugin-hooks" / "lib" / "state-dir.sh"
+
+
+class TestStateRootParity:
+    """plugin-hooks/lib/state-dir.sh and paths.state_root must agree on every input."""
+
+    @pytest.mark.parametrize("override", [None, "/abs/state", "~/state", "~", "relative/state", ""])
+    def test_bash_and_python_resolve_the_same_root(self, tmp_path, monkeypatch, override):
+        monkeypatch.setenv("HOME", str(tmp_path))  # Path.expanduser reads the process's HOME
+        env = {"HOME": str(tmp_path), "PATH": os.environ["PATH"]}
+        if override is not None:
+            env["CLAUDNA_STATE_DIR"] = override
+        bash = subprocess.run(["bash", "-c", f". {STATE_DIR_SH}; claudna_state_dir"], env=env,
+                              capture_output=True, text=True, check=True).stdout
+        try:
+            python = str(paths.state_root(env))
+        except ValueError:
+            python = ""
+        assert bash == python
 
 
 class TestWiring:
     def test_the_store_is_wired_for_its_three_events_and_session_end_has_a_timeout(self):
         hooks = json.loads(HOOKS_JSON.read_text())["hooks"]
-        wired = {event: [h for entry in entries for h in entry["hooks"] if "session-store.sh" in h["command"]]
-                 for event, entries in hooks.items()}
-        assert {e for e, hs in wired.items() if hs} == {"SessionStart", "PreCompact", "SessionEnd"}
-        for event, (h,) in ((e, hs) for e, hs in wired.items() if hs):
+
+        def store_hooks(event):
+            return [h for entry in hooks.get(event, []) for h in entry["hooks"] if "session-store.sh" in h["command"]]
+
+        for event in ("SessionStart", "PreCompact", "SessionEnd"):
+            (h,) = store_hooks(event)
             assert h["command"].endswith(f"session-store.sh {event}")
-        assert wired["SessionEnd"][0]["timeout"] == 5
+        assert store_hooks("SessionEnd")[0]["timeout"] == 5
+        assert not any(store_hooks(e) for e in hooks if e not in ("SessionStart", "PreCompact", "SessionEnd"))
 
     def test_the_store_sees_every_session_start_source(self):
         entries = json.loads(HOOKS_JSON.read_text())["hooks"]["SessionStart"]

@@ -62,11 +62,6 @@ ACTOR = {"kind": "interactive", "fleet": None, "bot_id": None, "bot_name": None,
 ORIGIN = {"cwd": "/work", "repo": None, "branch": None, "head": None}
 
 
-@pytest.fixture
-def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "state")
-
-
 def opened(store: SessionStore, sid: str = "sess-1"):
     handle = store.session(sid)
     handle.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl")

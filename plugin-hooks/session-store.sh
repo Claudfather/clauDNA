@@ -10,9 +10,10 @@
 #   - Silent in clauDNA's own children (CLAUDNA_SESSION_CHILD=1), and off when
 #     CLAUDNA_SESSION_STORE=0.
 #   - Never touches the vault or git beyond one read of the branch; never blocks.
-#   - Failures are logged to <state>/hooks/errors.log (the Python side), and
-#     anything Python can't log itself (an ImportError, a missing interpreter's
-#     noise) is appended there by this wrapper — never swallowed silently.
+#   - Failures are logged to <state>/hooks/errors.log, one JSON line each (the
+#     Python side). Anything Python can't log itself — an ImportError, an
+#     interpreter that won't start — lands in <state>/hooks/session-store.stderr,
+#     never swallowed silently.
 #
 # The store runs in the directory form, not `python3 -m`: hooks run in the
 # user's project, and -m would let a project's json.py shadow the stdlib.
@@ -26,8 +27,9 @@ command -v python3 > /dev/null 2>&1 || exit 0
 STATE_DIR="$(claudna_state_dir)"
 [ -n "$STATE_DIR" ] || exit 0
 umask 077
-mkdir -p -m 700 "$STATE_DIR/hooks" 2> /dev/null || exit 0
+[ -d "$STATE_DIR/hooks" ] || mkdir -p -m 700 "$STATE_DIR/hooks" 2> /dev/null || exit 0
 
+# -S: the store is stdlib-only, so skip site-packages setup (a few ms per call).
 PKG="${BASH_SOURCE[0]%/*}/../lib/claudna/session_store"
-python3 "$PKG" hook "${1:-}" > /dev/null 2>> "$STATE_DIR/hooks/errors.log"
+python3 -S "$PKG" hook "${1:-}" > /dev/null 2>> "$STATE_DIR/hooks/session-store.stderr"
 exit 0

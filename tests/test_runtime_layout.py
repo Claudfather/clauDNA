@@ -34,6 +34,7 @@ SESSION_STORE_LAYERS = {
     "schema": 0,
     "paths": 1,
     "fsio": 1,
+    "transcript": 1,
     "events": 2,
     "project": 3,
     "store": 4,

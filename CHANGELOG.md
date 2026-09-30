@@ -6,7 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **The session store records session and segment boundaries (phase 2).** A new hook, `plugin-hooks/session-store.sh`, is wired for SessionStart (every source), PreCompact and SessionEnd (5 s timeout). It writes sessions and compaction segments to `${CLAUDNA_STATE_DIR:-~/.claudna}/sessions/`. For each hook payload, `lib/claudna/session_store/boundaries.py` opens a session and a segment at the transcript's size, seals the segment at PreCompact, opens the next segment where the seal ended, and seals and closes at SessionEnd. The hook always exits 0, prints nothing, and stays out of the vault and git. It records nothing in clauDNA's own `claude -p` children (`CLAUDNA_SESSION_CHILD=1`), when `CLAUDNA_SESSION_STORE=0` is set, or for a nested `claude -p` that inherited its parent's session id. Failures go to `~/.claudna/hooks/errors.log` without the payload. Lifecycle appends are fsynced and activity appends are not. A hook call takes about 75 ms, most of it interpreter start and imports.
+
 ### Changed
+- **clauDNA keeps one state root, `~/.claudna`.** The permission hook's debug log and the pre-compact marker move from `${XDG_STATE_HOME:-~/.local/state}/claudna/` to `${CLAUDNA_STATE_DIR:-~/.claudna}/hooks/`, next to the session store. A relative `CLAUDNA_STATE_DIR` keeps no state instead of writing into the project.
 - **clauDNA is licensed under Apache-2.0 instead of MIT.** `LICENSE` carries the unmodified Apache License 2.0 text, and a new `NOTICE` names the copyright holder, `Copyright 2026 Chris Rogers`, as the MIT notice did. Section 4(d) of the license carries `NOTICE` into every redistribution. Both plugin manifests (`.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`) declare `Apache-2.0`, and the README has a License section. Every commit on `main` is by the copyright holder, so no contributor's MIT notice needs preserving.
 
 ## [0.21.0] - 2026-09-30

@@ -3,7 +3,8 @@
 #
 # One root for everything clauDNA stores on a machine: ${CLAUDNA_STATE_DIR:-~/.claudna}.
 # The session store lives under sessions/, hook state under hooks/. It mirrors
-# lib/claudna/session_store/paths.py: a relative CLAUDNA_STATE_DIR is rejected,
+# lib/claudna/session_store/paths.py (a parity test holds them together): a
+# leading ~ expands, and a relative CLAUDNA_STATE_DIR is rejected,
 # because hooks run inside the user's project and a relative root would put
 # private state in a repository that can be committed.
 #
@@ -12,6 +13,10 @@
 # fail open.
 claudna_state_dir() {
     local root="${CLAUDNA_STATE_DIR:-${HOME:+$HOME/.claudna}}"
+    case "$root" in
+        "~") root="${HOME:-~}" ;;
+        "~/"*) root="${HOME:+$HOME/${root#"~/"}}" ;;
+    esac
     case "$root" in
         /*) printf '%s' "$root" ;;
         *) return 0 ;;
