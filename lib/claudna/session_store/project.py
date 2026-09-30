@@ -42,6 +42,7 @@ _COUNTED = {
     "prompt.submitted": "prompts",
     "skill.invoked": "skills",
     "tool.failed": "failures",
+    "tool.interrupted": "interrupts",
     "checkpoint.noted": "checkpoints",
 }
 
@@ -385,8 +386,9 @@ def _refresh_activity(paths: SessionPaths, event: dict, *, bytes_before: int) ->
         _fold_segment(paths, seg, buckets=by_segment(lifecycle.events),
                       transcripts=segment_transcript_paths(lifecycle.events))
         return
-    if kind in _COUNTED:
-        projected["counts"][_COUNTED[kind]] += 1
+    if kind in _COUNTED:  # .get: a 0.22 projection has no "interrupts" yet
+        counts = projected["counts"]
+        counts[_COUNTED[kind]] = counts.get(_COUNTED[kind], 0) + 1
     pf = projected["projected_from"]
     projected["projected_from"] = {"lines": pf["lines"] + 1, "bytes": paths.segment(seg).events.stat().st_size,
                                    "skipped": pf["skipped"]}

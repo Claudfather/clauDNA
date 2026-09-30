@@ -2,6 +2,7 @@
   "counts": {
     "checkpoints": 1,
     "failures": 0,
+    "interrupts": 0,
     "prompts": 1,
     "skills": 0
   },
