@@ -216,7 +216,7 @@ class TestSummarize:
         assert summarize.summarize(h, 9, env={}, runner=FakeRunner()) == "ignored: no segment 9"
 
     def test_one_summarizer_per_segment(self, sealed):
-        with exclusive_lock(sealed.paths.segment(1).dir / ".summarize.lock", blocking=False) as taken:
+        with exclusive_lock(sealed.paths.segment(1).summarize_lock, blocking=False) as taken:
             assert taken
             out = summarize.summarize(sealed, 1, env={}, runner=FakeRunner())
         assert out == "ignored: another summarizer holds the segment"

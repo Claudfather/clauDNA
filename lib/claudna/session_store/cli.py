@@ -445,7 +445,10 @@ def main(argv: list[str] | None = None) -> int:
         print(outcome)
         return 0
     if args.verb == "rebuild":
+        from . import rollup  # the rollup is derived from summaries, not logs: rebuild regenerates it too
+
         report = handle.rebuild()
+        rollup.refresh(handle.paths)
         print(json.dumps(dataclasses.asdict(report)))
         return 0
     report = check_session(handle)

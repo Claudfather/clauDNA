@@ -339,14 +339,12 @@ def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str
     find_pid = find_pid or (lambda: claude_pid_of(env) or lineage.claude_pid())  # $CLAUDE_PID, else the walk
     if event == "SessionStart":
         return _session_start(session, payload, env, spawn=spawn, find_pid=find_pid)
+    if facts.status != "open":  # a closed session's segments are final: never re-sealed, never re-closed
+        return "ignored: no open session"
     if event == "PreCompact":  # seal only: the summary waits for SessionStart(compact) or SessionEnd
-        if facts.status != "open":
-            return "ignored: no open session"  # a closed session's last segment is final: never re-sealed
         trigger = payload.get("trigger") if payload.get("trigger") in _TRIGGERS else None
         return "segment sealed" if _seal(session, payload, sealed_by="precompact", trigger=trigger) is not None \
             else "ignored: no segment"
-    if facts.status != "open":
-        return "ignored: no open session"
     index = _seal(session, payload, sealed_by="session_end", trigger=None)
     reason = payload.get("reason") if payload.get("reason") in _CLOSE_REASONS else "other"
     session.close_session(reason)  # closed before anything that could fail after it (#373, M2)

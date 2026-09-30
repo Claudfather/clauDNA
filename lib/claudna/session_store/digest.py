@@ -120,10 +120,11 @@ def items(root: Path, *, limit: int | None = DIGEST_SIZE) -> list[Item]:
     people: dict[str, Item] = {}
     for rec in held:
         key, block = rec.get("key"), rec.get("block") if isinstance(rec.get("block"), dict) else {}
-        if isinstance(key, str) and person_item(key) not in done and key not in done:
-            name = (block.get("subject_hint") or {}).get("name") or "person fact"
-            people[key] = Item("person", person_item(key), name, block.get("claim"), None,
-                               len(seen.get(key, ())), block.get("asserted_by"), rec.get("ts") or "")
+        if not isinstance(key, str) or (item := person_item(key)) in done:
+            continue
+        name = (block.get("subject_hint") or {}).get("name") or "person fact"
+        people[key] = Item("person", item, name, block.get("claim"), None, len(seen.get(key, ())),
+                           block.get("asserted_by"), rec.get("ts") or "")
     found = ranked + sorted(people.values(), key=lambda i: i.last_ts, reverse=True)
     return found if limit is None else found[:limit]
 

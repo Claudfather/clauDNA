@@ -15,7 +15,7 @@ Hook adapters call this module; they never write store files themselves.
 
 from __future__ import annotations
 
-from contextlib import contextmanager
+import contextlib
 from pathlib import Path
 from typing import Iterator
 
@@ -70,31 +70,43 @@ class SessionHandle:
 
     # ── generic append ──────────────────────────────────────────────────────
 
-    @contextmanager
-    def _locked(self) -> Iterator[None]:
+    def _locked(self):
         """The session lock — creating the session directory on first write.
 
-        A first write that is rejected (a seal with no segment, an append with
-        nowhere to go, an invalid event) takes the directory back out, so a
-        refused call never leaves a phantom session with no log behind.
+        The lock file lives in that directory and is never removed, so every
+        writer contends on one inode. A call that would be refused therefore
+        checks before it gets here when the session doesn't exist yet
+        (:meth:`_refuse_first_write`): a refused call never makes a directory.
         """
-        created = not self.paths.dir.is_dir()
         ensure_dir(self.paths.dir)
-        try:
-            with exclusive_lock(self.paths.lock):
-                yield
-        except BaseException:
-            if created:
-                self._drop_if_empty()
-            raise
+        return exclusive_lock(self.paths.lock)
 
-    def _drop_if_empty(self) -> None:
-        try:
-            if {p.name for p in self.paths.dir.iterdir()} <= {self.paths.lock.name}:
-                self.paths.lock.unlink(missing_ok=True)
-                self.paths.dir.rmdir()
-        except OSError:
-            pass  # someone else wrote into it meanwhile: it isn't a phantom
+    @contextlib.contextmanager
+    def segment_lock(self, index: int) -> Iterator[str]:
+        """Try segment ``index``'s single-flight lock without waiting: yield ``taken``, ``busy`` or ``missing``.
+
+        The summarizer holds it while it works, and retention holds it while it
+        retires the segment, removing the directory (and so the lock file) under
+        it. ``missing`` covers both orders: the directory was already gone, or
+        it went while this caller waited to open the lock.
+        """
+        seg = self.paths.segment(index)
+        with contextlib.ExitStack() as stack:
+            try:
+                taken = stack.enter_context(exclusive_lock(seg.summarize_lock, blocking=False))
+            except FileNotFoundError:
+                taken = None
+            yield "missing" if taken is None or (taken and not seg.dir.is_dir()) else "taken" if taken else "busy"
+
+    def _refuse_first_write(self, kind: str, data: dict, *, seg: int | None) -> None:
+        """For a session with no directory: raise now whatever the locked append would refuse."""
+        if self.exists():
+            return  # decided under the lock, as always
+        if ev.REGISTRY[kind].seg:  # a session with no directory has no segment
+            if seg is None or ev.REGISTRY[kind].log == ev.ACTIVITY:
+                raise NotAppendable(f"session {self.sid} has no segment for {kind}")
+            raise StoreError(f"segment {seg} does not exist for session {self.sid}")
+        ev.check_data(kind, ev.cap_text(kind, data))
 
     def append(self, kind: str, data: dict, *, seg: int | None = None) -> dict:
         """Append one event to the log its kind belongs to, then re-project.
@@ -105,6 +117,7 @@ class SessionHandle:
         spec = ev.REGISTRY.get(kind)
         if spec is None:
             raise ev.EventError(f"unknown event kind: {kind}")
+        self._refuse_first_write(kind, data, seg=seg)
         with self._locked():
             current = None
             if spec.seg and (seg is None or spec.log == ev.ACTIVITY):
@@ -261,6 +274,8 @@ class SessionHandle:
         summarizer nonsense. ``clamp=True`` raises ``end`` to the start instead
         of refusing: for a hook whose transcript size is unknown or behind.
         """
+        if not self.exists():
+            raise StoreError(f"session {self.sid} has no segment to seal")
         with self._locked():
             target = index if index is not None else self.current_segment()
             if target is None:
@@ -287,6 +302,8 @@ class SessionHandle:
         still owned by that (dead) process. Returns the index it sealed, or
         ``None`` when no segment was left unsealed.
         """
+        if not self.exists():
+            raise StoreError(f"session {self.sid} is not open")
         with self._locked():
             lifecycle = load_lifecycle(self.paths).events
             facts = session_facts(lifecycle)

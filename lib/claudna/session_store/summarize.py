@@ -42,7 +42,7 @@ from typing import Callable, Mapping
 from claudna.redact import redact_strings, redact_text
 
 from . import rollup, schema
-from .fsio import atomic_write_json, exclusive_lock, read_json
+from .fsio import atomic_write_json, read_json
 from .paths import CHILD_ENV
 from .project import load_lifecycle, segment_transcript_paths, session_facts, summary_gate
 from .store import SessionHandle
@@ -103,20 +103,11 @@ def run_claude(system_prompt: str, dialogue: str, output_schema: dict, model: st
 def summarize(handle: SessionHandle, index: int, *, env: Mapping[str, str] = os.environ,
               runner: Callable[..., tuple[dict, float | None]] = run_claude) -> str:
     """Summarize sealed segment ``index``; return what happened (see the module doc)."""
-    try:
-        return _summarize_locked(handle, index, env=env, runner=runner)
-    except FileNotFoundError:  # retention removed the directory before (or while) the lock was taken
-        return f"ignored: no segment {index}"
-
-
-def _summarize_locked(handle: SessionHandle, index: int, *, env: Mapping[str, str],
-                      runner: Callable[..., tuple[dict, float | None]]) -> str:
-    seg = handle.paths.segment(index)
-    with exclusive_lock(seg.dir / ".summarize.lock", blocking=False) as taken:
-        if not taken:
-            return "ignored: another summarizer holds the segment"
-        if not seg.dir.is_dir():  # retired between our open and our lock: the lock file was unlinked
+    with handle.segment_lock(index) as lock:
+        if lock == "missing":
             return f"ignored: no segment {index}"
+        if lock == "busy":
+            return "ignored: another summarizer holds the segment"
         # A re-seal while this run holds the lock (a blocked compaction, then
         # /compact again) starts a worker that finds the lock taken and leaves.
         # The seal is appended before that spawn, so re-reading it after a pass
@@ -202,7 +193,8 @@ def _summarize_once(handle: SessionHandle, index: int, *, env: Mapping[str, str]
     try:
         rollup.refresh(handle.paths)  # §6.7: the session rollup follows every completed segment
     except Exception:  # noqa: BLE001 — the summary is done; a failed rollup must not log summary.failed after it
-        pass  # the next summary.completed, retirement or reader recomputes the rollup whole
+        # Drop the now-stale file: `session show` computes a missing rollup, `rebuild` rewrites it.
+        rollup.rollup_path(handle.paths).unlink(missing_ok=True)
     return f"summarized: {len(artifact['blocks'])} block(s)", end
 
 

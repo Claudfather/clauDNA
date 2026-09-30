@@ -109,6 +109,11 @@ class SegmentPaths:
     def summary(self) -> Path:
         return self.dir / "summary.json"
 
+    @property
+    def summarize_lock(self) -> Path:
+        """The segment's single-flight lock: one summarizer at a time, and retention waits for it."""
+        return self.dir / ".summarize.lock"
+
 
 @dataclass(frozen=True)
 class SessionPaths:

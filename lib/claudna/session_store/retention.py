@@ -25,14 +25,14 @@ segments per run.
 
 from __future__ import annotations
 
-import os
+import contextlib
 import shutil
 import time
 from dataclasses import asdict, dataclass, field
 from typing import Mapping
 
 from . import rollup
-from .fsio import ensure_dir, env_number, epoch_of, exclusive_lock, read_json
+from .fsio import atomic_write_json, ensure_dir, env_number, epoch_of, read_json
 from .project import load_lifecycle, segment_states
 from .store import SessionHandle, SessionStore
 
@@ -72,27 +72,28 @@ def due(handle: SessionHandle, env: Mapping[str, str], *, now: float | None = No
 def retire(handle: SessionHandle, batch: list[tuple[int, str]]) -> list[tuple[int, str]]:
     """Retire ``batch`` (``(index, reason)`` pairs from :func:`due`): archive, log, remove; refresh once.
 
-    Returns the pairs actually retired: a segment whose summarizer holds its lock is left for a later sweep.
+    Every segment's lock is taken first, so no summarizer is writing while the
+    summaries are judged: only a current ``done`` summary is archived (a stale
+    one would re-enter the rollup). A segment a summarizer holds is left for a
+    later sweep. Returns the pairs actually retired.
     """
-    done = {s.index for s in segment_states(handle.paths, load_lifecycle(handle.paths).events)
-            if s.summary == "done"}  # only a current summary is archived: a stale one would re-enter the rollup
-    retired = []
-    for index, reason in batch:
-        seg = handle.paths.segment(index)
-        with exclusive_lock(seg.dir / ".summarize.lock", blocking=False) as taken:
-            if not taken:
-                continue  # a summarizer is writing into it: retire it on a later sweep
-            if index in done and seg.summary.is_file():  # the rollup reads a retired summary from the archive
+    with contextlib.ExitStack() as stack:
+        held = [(index, reason) for index, reason in batch
+                if stack.enter_context(handle.segment_lock(index)) == "taken"]
+        if not held:
+            return []
+        states = {s.index: s for s in segment_states(handle.paths, load_lifecycle(handle.paths).events)}
+        for index, reason in held:
+            state = states.get(index)
+            if state is not None and state.summary == "done":  # the rollup reads a retired summary from here
                 archived = handle.paths.archived_summary(index)
                 ensure_dir(archived.parent)
-                os.replace(seg.summary, archived)
+                atomic_write_json(archived, state.doc)
             handle.append("segment.retired", {"reason": reason}, seg=index)
-            shutil.rmtree(seg.dir)
-        retired.append((index, reason))
-    if retired:
-        rollup.refresh(handle.paths)
-        handle.rebuild()  # the directories are the segment count's truth: one re-fold for the whole batch
-    return retired
+            shutil.rmtree(handle.paths.segment(index).dir)
+    rollup.refresh(handle.paths)
+    handle.rebuild()  # the directories are the segment count's truth: one re-fold for the whole batch
+    return held
 
 
 @dataclass

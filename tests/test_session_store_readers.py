@@ -22,6 +22,7 @@ from conftest import ACTOR, ORIGIN, complete_segment, segment_summary
 
 from claudna.session_store import readers, retention, rollup
 from claudna.session_store.cli import main
+from claudna.session_store.fsio import exclusive_lock
 
 BLOCK_A = {"home": "entity", "subject_hint": {"name": "staging DB", "kind": "service", "aliases": []},
            "claim": "The staging DB resets nightly.", "asserted_by": "user", "tags": []}
@@ -90,10 +91,8 @@ class TestRollup:
         assert not h.paths.archived_summary(1).exists() and rollup.refresh(h.paths) is None
 
     def test_a_segment_a_summarizer_holds_is_left_for_later(self, store):
-        from claudna.session_store.fsio import exclusive_lock
-
         h = session_with(store, "s1", [{"title": "a", "blocks": [BLOCK_A]}, None])
-        with exclusive_lock(h.paths.segment(1).dir / ".summarize.lock"):
+        with exclusive_lock(h.paths.segment(1).summarize_lock):
             assert retention.retire(h, [(1, "acked")]) == []
         assert h.paths.segment(1).dir.is_dir()
 
@@ -202,3 +201,18 @@ def test_a_summarizer_for_a_retired_segment_is_ignored(store):
     h = session_with(store, "s1", [{"title": "a", "blocks": [BLOCK_A]}])
     retention.retire(h, [(1, "age")])
     assert summarize.summarize(h, 1, runner=lambda *a, **k: pytest.fail("no model call")) == "ignored: no segment 1"
+
+
+def test_rebuild_regenerates_a_lost_rollup(store, capsys):
+    h = session_with(store, "s1", [{"title": "a", "blocks": [BLOCK_A]}])
+    rollup.rollup_path(h.paths).unlink(missing_ok=True)
+    assert main(["rebuild", "s1", "--root", str(store.root)]) == 0
+    capsys.readouterr()
+    assert json.loads(rollup.rollup_path(h.paths).read_text())["fields"]["title"] == "a"
+
+
+def test_a_rollup_with_nothing_left_to_roll_up_is_removed(store):
+    h = session_with(store, "s1", [{"title": "a", "blocks": [BLOCK_A]}], close=False)
+    assert rollup.refresh(h.paths) is not None
+    h.seal_segment(150, "precompact")  # re-sealed: the only summary is stale now
+    assert rollup.refresh(h.paths) is None and not rollup.rollup_path(h.paths).exists()

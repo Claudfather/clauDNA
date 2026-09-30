@@ -36,7 +36,7 @@ sys.path.insert(0, str(LIB))
 
 from claudna.session_store import events as ev  # noqa: E402
 from claudna.session_store import schema  # noqa: E402
-from claudna.session_store.cli import check_session  # noqa: E402
+from claudna.session_store.cli import check_session, main  # noqa: E402
 from claudna.session_store.fsio import (  # noqa: E402
     append_jsonl,
     atomic_write_json,
@@ -52,7 +52,7 @@ from claudna.session_store.paths import (  # noqa: E402
     state_root,
     validate_sid,
 )
-from claudna.session_store.store import SessionStore, StoreError  # noqa: E402
+from claudna.session_store.store import NotAppendable, SessionStore, StoreError  # noqa: E402
 
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "session-store" / "basic"
 FIXTURE_SID = "5f0c2d1e-0000-4000-8000-000000000001"
@@ -945,58 +945,45 @@ class TestWritersRedact:
 class TestRejectedFirstWrites:
     """A refused call on a session the store doesn't have leaves nothing behind (no phantom directory)."""
 
-    def test_a_seal_with_no_segment(self, store):
+    @pytest.mark.parametrize("call, error", [
+        (lambda h: h.seal_segment(10, "precompact"), StoreError),
+        (lambda h: h.append("prompt.submitted", {"prompt_id": None, "chars": 1}), NotAppendable),
+        (lambda h: h.append("summary.skipped", {"reason": "trivial"}, seg=1), StoreError),
+        (lambda h: h.close_session("not-a-reason"), ev.EventError),
+        (lambda h: h.close_abandoned(), StoreError),
+    ], ids=["seal", "activity", "segment-event", "bad-close", "abandon"])
+    def test_nothing_is_created(self, store, call, error):
         h = store.session("fresh")
-        with pytest.raises(Exception):
-            h.seal_segment(10, "precompact")
+        with pytest.raises(error):
+            call(h)
         assert not h.paths.dir.exists() and store.session_ids() == []
 
-    def test_an_append_with_nowhere_to_go(self, store):
-        from claudna.session_store.store import NotAppendable
-
-        h = store.session("fresh")
-        with pytest.raises(NotAppendable):
-            h.append("prompt.submitted", {"chars": 1})
-        assert not h.paths.dir.exists()
-
-    def test_an_invalid_close_reason(self, store):
-        h = store.session("fresh")
-        with pytest.raises(Exception):
-            h.close_session("not-a-reason")
-        assert not h.paths.dir.exists()
-
     def test_a_refused_call_on_an_existing_session_keeps_it(self, store):
-        h = store.session("s1")
-        h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl")
-        with pytest.raises(Exception):
+        h = opened(store, "s1")
+        with pytest.raises(ev.EventError):
             h.close_session("not-a-reason")
         assert h.paths.lifecycle.is_file()
 
 
 def test_check_reports_a_projection_missing_projected_from(store, capsys):
     """A hand-edited projection without its watermark is an error for ``check``, never a KeyError."""
-    import json as _json
-
-    from claudna.session_store.cli import main
-
-    h = store.session("s1")
-    h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl")
-    doc = _json.loads(h.paths.session_json.read_text())
+    h = opened(store, "s1")
+    doc = load(h.paths.session_json)
     del doc["projected_from"]
-    h.paths.session_json.write_text(_json.dumps(doc))
+    h.paths.session_json.write_text(json.dumps(doc))
     assert main(["check", "s1", "--root", str(store.root)]) != 0
     assert "projected_from" in capsys.readouterr().out
 
 
 def test_check_writes_nothing(store):
     """``check`` is read-only: a stale projection is reported, never rewritten."""
-    from claudna.session_store.cli import main
-
-    h = store.session("s1")
-    h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl")
+    h = opened(store, "s1")
     h.open_segment("session_open", 0)
     h.paths.session_json.unlink()  # a lost projection: check must not rebuild it
-    before = sorted((p.relative_to(store.root), p.stat().st_mtime_ns) for p in store.root.rglob("*") if p.is_file())
+
+    def files():
+        return sorted((p.relative_to(store.root), p.stat().st_mtime_ns) for p in store.root.rglob("*") if p.is_file())
+
+    before = files()
     main(["check", "s1", "--root", str(store.root)])
-    after = sorted((p.relative_to(store.root), p.stat().st_mtime_ns) for p in store.root.rglob("*") if p.is_file())
-    assert after == before
+    assert files() == before

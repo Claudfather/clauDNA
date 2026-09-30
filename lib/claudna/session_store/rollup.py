@@ -109,16 +109,25 @@ def rollup_path(paths: SessionPaths) -> Path:
     return paths.dir / "summary.json"
 
 
+def current(paths: SessionPaths, lifecycle: list[dict] | None = None) -> dict | None:
+    """The rollup as the summaries on disk make it now, computed in memory (nothing is written)."""
+    return compute(paths.sid, summaries(paths, lifecycle))
+
+
 def refresh(paths: SessionPaths, lifecycle: list[dict] | None = None) -> dict | None:
     """Recompute and write the rollup (atomically); return it, or ``None`` when there is nothing yet.
 
-    Serialized on ``.rollup.lock``: two summarizers finishing different
-    segments at once must not let the one that read first write last.
+    With nothing to roll up, a leftover ``summary.json`` is removed, so the
+    file on disk is always current or absent. Serialized on ``.rollup.lock``:
+    two summarizers finishing different segments at once must not let the one
+    that read first write last.
     """
     if not paths.dir.is_dir():
         return None
     with exclusive_lock(paths.dir / ".rollup.lock"):
-        doc = compute(paths.sid, summaries(paths, lifecycle))
+        doc = current(paths, lifecycle)
         if doc is not None:
             atomic_write_json(rollup_path(paths), doc)
+        else:
+            rollup_path(paths).unlink(missing_ok=True)
     return doc
