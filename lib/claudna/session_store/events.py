@@ -137,7 +137,8 @@ REGISTRY: dict[str, KindSpec] = {
         log=LIFECYCLE,
         seg=True,
         fields={"reason": _STR},
-        choices={"reason": ("private", "disabled", "trivial", "headless")},
+        # no_transcript: Claude Code deleted it (cleanupPeriodDays) or never wrote it
+        choices={"reason": ("private", "disabled", "trivial", "headless", "no_transcript")},
     ),
     # ── seg-NNN/events.jsonl: in-segment activity ───────────────────────────
     "prompt.submitted": KindSpec(

@@ -20,20 +20,23 @@ Guards, in order (each makes the hook record nothing):
   into the parent (see :func:`_inherited`).
 * An event or payload this adapter doesn't know.
 
-Clear lineage (``parent_sid``) and the summarizer arrive in later phases; this
-adapter records boundaries only. It never prints: SessionStart stdout would
-land in the agent's context.
+After a seal, the adapter starts the summarizer for that segment as a detached
+process (:func:`spawn_summarizer`) and returns at once; clear lineage
+(``parent_sid``) arrives in a later phase. It never prints: SessionStart stdout
+would land in the agent's context.
 """
 
 from __future__ import annotations
 
 import os
-from typing import Mapping
+import sys
+from pathlib import Path
+from typing import Callable, Mapping
 
 from . import events as ev
 from .paths import InvalidSessionId
-from .fsio import file_size
-from .project import load_lifecycle, session_status
+from .fsio import ensure_dir, file_size
+from .project import SessionFacts, load_lifecycle, session_facts
 from .store import SessionHandle, SessionStore
 
 CHILD_ENV = "CLAUDNA_SESSION_CHILD"
@@ -106,28 +109,47 @@ def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str])
     return f"session opened ({source})"
 
 
-def _seal(handle: SessionHandle, payload: dict, sealed_by: str, trigger: str | None) -> bool:
-    if handle.current_segment() is None:
-        return False
-    handle.seal_segment(file_size(payload.get("transcript_path")), sealed_by, trigger=trigger, clamp=True)
-    return True
+def spawn_summarizer(handle: SessionHandle, index: int, env: Mapping[str, str]) -> None:
+    """Start ``session_store summarize <sid> <index>`` detached, and return at once.
+
+    Its own session (``start_new_session``), so a group kill of the hook's tree
+    doesn't reap it; ``CLAUDNA_SESSION_CHILD=1``, so nothing it starts records
+    into the store; its stderr goes to ``<root>/hooks/summarizer.stderr``.
+    """
+    import subprocess
+
+    root = handle.paths.root
+    package = Path(__file__).resolve().parent
+    with open(ensure_dir(root / "hooks") / "summarizer.stderr", "ab") as err:
+        subprocess.Popen(
+            [sys.executable, "-S", str(package), "summarize", handle.sid, str(index), "--root", str(root)],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=err,
+            env={**env, CHILD_ENV: "1"}, start_new_session=True, close_fds=True,
+        )
 
 
-def _facts(handle: SessionHandle) -> tuple[str, dict | None]:
-    """``(status, actor)`` folded straight from the lifecycle log, once per hook.
+Spawner = Callable[[SessionHandle, int, Mapping[str, str]], None]
+
+
+def _seal(handle: SessionHandle, payload: dict, sealed_by: str, trigger: str | None) -> int | None:
+    index = handle.current_segment()
+    if index is None:
+        return None
+    handle.seal_segment(file_size(payload.get("transcript_path")), sealed_by, index=index, trigger=trigger,
+                        clamp=True)
+    return index
+
+
+def _facts(handle: SessionHandle) -> SessionFacts:
+    """The session's facts, folded from the lifecycle log once per hook.
 
     Read-only, so it is safe outside the session lock: the projection may be
-    stale after a lost refresh; the log isn't. The actor is the *latest*
-    ``session.opened``'s — whoever reopened the session last owns it now.
+    stale after a lost refresh; the log isn't.
     """
-    if not handle.exists():
-        return "unknown", None
-    lifecycle = load_lifecycle(handle.paths).events
-    opened = [e for e in lifecycle if e["kind"] == "session.opened"]
-    return session_status(lifecycle)[0], opened[-1]["data"]["actor"] if opened else None
+    return session_facts(load_lifecycle(handle.paths).events if handle.exists() else [])
 
 
-def _inherited(event: str, payload: dict, facts: tuple[str, dict | None], env: Mapping[str, str]) -> bool:
+def _inherited(event: str, payload: dict, facts: SessionFacts, env: Mapping[str, str]) -> bool:
     """Is this hook a nested ``claude -p`` reusing an open session's id?
 
     A stopgap until every child carries a marker (spec §11.5): a hook whose
@@ -135,13 +157,13 @@ def _inherited(event: str, payload: dict, facts: tuple[str, dict | None], env: M
     through — ``claude -p --resume`` of a session a crash left open must reopen
     it — and the canary shows an inheriting child reports ``startup``.
     """
-    status, actor = facts
-    if status != "open" or actor is None or (event == "SessionStart" and payload.get("source") == "resume"):
+    if facts.status != "open" or facts.actor is None or (event == "SessionStart" and payload.get("source") == "resume"):
         return False
-    return actor["entrypoint"] != (env.get("CLAUDE_CODE_ENTRYPOINT") or None)
+    return facts.actor["entrypoint"] != (env.get("CLAUDE_CODE_ENTRYPOINT") or None)
 
 
-def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str, str]) -> str:
+def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str, str],
+           spawn: Spawner = spawn_summarizer) -> str:
     """Apply one hook event to the store; return what happened, for tests and the error log.
 
     Raises only on a store failure (the caller logs it); every guard returns.
@@ -165,10 +187,16 @@ def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str
         return _session_start(session, payload, env)
     if event == "PreCompact":
         trigger = payload.get("trigger") if payload.get("trigger") in _TRIGGERS else None
-        return "segment sealed" if _seal(session, payload, "precompact", trigger) else "ignored: no segment"
-    if facts[0] != "open":
+        index = _seal(session, payload, "precompact", trigger)
+        if index is None:
+            return "ignored: no segment"
+        spawn(session, index, env)
+        return "segment sealed"
+    if facts.status != "open":
         return "ignored: no open session"
-    _seal(session, payload, "session_end", None)
+    index = _seal(session, payload, "session_end", None)
     reason = payload.get("reason") if payload.get("reason") in _CLOSE_REASONS else "other"
     session.close_session(reason)
+    if index is not None:
+        spawn(session, index, env)
     return f"session closed ({reason})"

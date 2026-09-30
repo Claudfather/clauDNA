@@ -158,6 +158,25 @@ def session_status(lifecycle: list[dict]) -> tuple[str, str | None, str | None]:
     return status, closed_at, close_reason
 
 
+@dataclass(frozen=True)
+class SessionFacts:
+    """What a hook or worker needs to decide, folded straight from the lifecycle log."""
+
+    status: str
+    actor: dict | None  # the latest session.opened's: whoever reopened the session last owns it
+    private: bool
+
+
+def session_facts(lifecycle: list[dict]) -> SessionFacts:
+    actor, private = None, False
+    for e in lifecycle:
+        if e["kind"] == "session.opened":
+            actor = e["data"]["actor"]
+        elif e["kind"] == "session.privacy_set":
+            private = e["data"]["private"]
+    return SessionFacts(status=session_status(lifecycle)[0], actor=actor, private=private)
+
+
 def next_segment_index(paths: SessionPaths) -> int:
     """One past every index the session has *ever* used, so a deleted segment's index is never reused.
 

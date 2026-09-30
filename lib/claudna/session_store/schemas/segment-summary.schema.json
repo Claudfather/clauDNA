@@ -1,0 +1,331 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "claudna.segment-summary/1",
+  "title": "seg-NNN/summary.json \u2014 the summarizer's artifact (spec \u00a76.6)",
+  "description": "The one LLM-authored file in the store. $defs.model_output is exactly what the model returns (it is passed to claude --json-schema, so it holds no $ref); the rest is provenance the summarizer adds.",
+  "type": "object",
+  "required": [
+    "schema",
+    "sid",
+    "index",
+    "input",
+    "producer",
+    "summary"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "claudna.segment-summary/1"
+    },
+    "sid": {
+      "type": "string",
+      "minLength": 1
+    },
+    "index": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "input": {
+      "type": "object",
+      "required": [
+        "transcript_path",
+        "range",
+        "sha256",
+        "turns"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "transcript_path": {
+          "type": "string"
+        },
+        "range": {
+          "type": "object",
+          "required": [
+            "start",
+            "end"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "start": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "end": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "turns": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "producer": {
+      "type": "object",
+      "required": [
+        "model",
+        "prompt_version",
+        "duration_ms",
+        "cost_usd"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "prompt_version": {
+          "type": "string"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cost_usd": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "summary": {
+      "$ref": "#/$defs/model_output"
+    }
+  },
+  "$defs": {
+    "model_output": {
+      "type": "object",
+      "required": [
+        "journey",
+        "blocks",
+        "procedures"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "journey": {
+          "type": "object",
+          "required": [
+            "title",
+            "intent",
+            "outcome",
+            "arc",
+            "done",
+            "in_progress",
+            "next"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "intent": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 400
+            },
+            "outcome": {
+              "enum": [
+                "shipped",
+                "partial",
+                "blocked",
+                "abandoned",
+                "exploratory"
+              ]
+            },
+            "arc": {
+              "type": "array",
+              "maxItems": 12,
+              "items": {
+                "type": "object",
+                "required": [
+                  "step",
+                  "result"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "step": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "result": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                }
+              }
+            },
+            "done": {
+              "type": "array",
+              "maxItems": 12,
+              "items": {
+                "type": "object",
+                "required": [
+                  "text"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  }
+                }
+              }
+            },
+            "in_progress": {
+              "type": "array",
+              "maxItems": 8,
+              "items": {
+                "type": "object",
+                "required": [
+                  "text"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  }
+                }
+              }
+            },
+            "next": {
+              "type": "array",
+              "maxItems": 8,
+              "items": {
+                "type": "object",
+                "required": [
+                  "text"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  }
+                }
+              }
+            }
+          }
+        },
+        "blocks": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "required": [
+              "home",
+              "subject_hint",
+              "claim",
+              "asserted_by"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "home": {
+                "enum": [
+                  "entity",
+                  "concept",
+                  "person",
+                  "project",
+                  "decision",
+                  "practice"
+                ]
+              },
+              "subject_hint": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "kind"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "kind": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  },
+                  "aliases": {
+                    "type": "array",
+                    "maxItems": 5,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    }
+                  }
+                }
+              },
+              "claim": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "section_hint": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "asserted_by": {
+                "enum": [
+                  "user",
+                  "agent",
+                  "tool"
+                ]
+              },
+              "tags": {
+                "type": "array",
+                "maxItems": 6,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9-]+:[a-z0-9._-]+$",
+                  "maxLength": 60
+                }
+              }
+            }
+          }
+        },
+        "procedures": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "required": [
+              "text",
+              "why"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              },
+              "why": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

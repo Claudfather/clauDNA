@@ -160,6 +160,25 @@ def read_jsonl(path: Path) -> JsonlRead:
 
 
 @contextlib.contextmanager
+def try_exclusive_lock(path: Path) -> Iterator[bool]:
+    """Try to take an exclusive ``flock`` on ``path`` without waiting; yield whether it was taken.
+
+    For single-flight work (one summarizer per segment): a second runner sees
+    ``False`` and leaves the work to the first.
+    """
+    fd = os.open(path, os.O_RDWR | os.O_CREAT, FILE_MODE)
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            yield False
+            return
+        yield True
+    finally:
+        os.close(fd)
+
+
+@contextlib.contextmanager
 def exclusive_lock(path: Path) -> Iterator[None]:
     """Hold an exclusive ``flock`` on ``path`` for the ``with`` body (blocking).
 

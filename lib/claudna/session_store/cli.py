@@ -3,6 +3,7 @@
     python3 -m claudna.session_store rebuild <sid> [--root DIR]
     python3 -m claudna.session_store check   <sid> [--root DIR]
     python3 lib/claudna/session_store hook <event>     (hook payload on stdin)
+    python3 lib/claudna/session_store summarize <sid> <seg> [--root DIR]
 
 (with ``lib/`` on ``PYTHONPATH``; ``python3 lib/claudna/session_store …`` also works)
 
@@ -17,6 +18,9 @@ schema, registry, and placement violations, bad or missing projections, and
 corrupt lines. The one exception is a torn write — an unterminated fragment of
 a JSON object, which the store deliberately keeps as one skippable line and
 no ``rebuild`` can remove. That is crash debris, reported as a warning.
+
+``summarize`` is the detached worker a seal starts (:mod:`summarize`); it prints
+what it did and exits 0 unless the session or segment doesn't exist.
 
 ``hook`` is what the hook wrappers call: it applies one Claude Code hook event
 to the store (:mod:`boundaries`) and always exits 0, because a failing hook must
@@ -35,7 +39,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from . import boundaries
+from . import boundaries, summarize
 from . import events as ev
 from . import schema
 from .fsio import append_jsonl, ensure_dir, read_json, read_jsonl
@@ -190,6 +194,10 @@ def main(argv: list[str] | None = None) -> int:
         p = sub.add_parser(verb, help=text)
         p.add_argument("sid")
         p.add_argument("--root", help="store root (default: $CLAUDNA_STATE_DIR or ~/.claudna)")
+    summ = sub.add_parser("summarize", help="summarize one sealed segment (the detached worker)")
+    summ.add_argument("sid")
+    summ.add_argument("seg", type=int)
+    summ.add_argument("--root", help="store root (default: $CLAUDNA_STATE_DIR or ~/.claudna)")
     hook = sub.add_parser("hook", help="apply one Claude Code hook event (payload on stdin); always exits 0")
     hook.add_argument("event")
     args = parser.parse_args(argv)
@@ -200,6 +208,9 @@ def main(argv: list[str] | None = None) -> int:
     handle = _handle(args)
     if handle is None:
         return 1
+    if args.verb == "summarize":
+        print(summarize.summarize(handle, args.seg))
+        return 0
     if args.verb == "rebuild":
         report = handle.rebuild()
         print(json.dumps(dataclasses.asdict(report)))

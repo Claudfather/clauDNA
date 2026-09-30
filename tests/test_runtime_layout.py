@@ -39,6 +39,7 @@ SESSION_STORE_LAYERS = {
     "project": 3,
     "store": 4,
     "boundaries": 5,
+    "summarize": 5,
     "cli": 6,
     "__main__": 7,
 }
