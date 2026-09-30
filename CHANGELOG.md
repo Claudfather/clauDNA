@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- **Credentials stay out of commands.** Each CLI reads its own credentials: a libpq service or pass file, `~/.snowsql/config`, `neon auth` or `NEON_API_KEY`, the Vercel and Railway CLI configs or `VERCEL_TOKEN`, Modal's token variables. A value that lives only in a project's `.env` reaches one command through its environment with the bundled `scripts/env_from_file.py`, which reads the file as text. `.env` is never sourced, and a credential is never read into the session or printed.
+  - Postgres: `env_from_file.py` turns a URL into libpq's own variables (`KEY=@libpq`, `--url-env`, `--url-file`), so `psql` never takes a connection string as an argument. Every SQL statement goes in a file and runs with `-f` (`psql`, `snowsql`).
+  - Railway and Vercel API calls send the auth header on stdin (`curl -K -`). `railway status`'s GraphQL step points at the dashboard.
+  - Neon: the CLI reads `NEON_API_KEY` from its environment, never `--api-key`, and key-based commands run with an empty config directory. A branch's connection string goes to a file in a private scratch directory; `branches create` output is read for the branch's own fields only.
+  - Applies to the `neon`, `dbt`, `modal`, `vercel`, `railway status` and `investigate-app` skills, the shared contracts (`infra-cli-contract.md`, `orchestration-guide.md`), and the dbt, modal, neon, railway, snowflake and vercel agents. The neon, railway and snowflake agents list the Write tool they now use for those files.
+- **Tests.** `tests/test_connections_and_tokens.py` checks every skill and agent for a sourced `.env`, SQL passed inline, a connection string or token on a command line, a printed credential, or a contract that says to inline a value, and that an agent told to use the Write tool is granted it. `tests/test_env_from_file.py` covers the reader.
 
 ## [0.20.0] - 2026-09-29
 ### Added

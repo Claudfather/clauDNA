@@ -15,7 +15,7 @@ Quick dbt operations.
 ## Authentication
 
 dbt typically needs Snowflake credentials available in the shell before any command runs. Most projects use one of:
-- A `.env` file: never source it (that runs it as code). Hand the variables to the one dbt command that needs them: `python3 "<claudna-root>/scripts/env_from_file.py" .env SNOWFLAKE_ACCOUNT SNOWFLAKE_USER SNOWFLAKE_PASSWORD -- dbt <verb> ...` (`<claudna-root>` per `../_shared/claudna-root.md`). Use whichever names the project's `profiles.yml` reads with `env_var()`.
+- A `.env` file: never source it. Hand the variables to the one dbt command that needs them: `python3 "<claudna-root>/scripts/env_from_file.py" .env SNOWFLAKE_ACCOUNT SNOWFLAKE_USER SNOWFLAKE_PASSWORD -- dbt <verb> ...` (`<claudna-root>` per `../_shared/claudna-root.md`). Use whichever names the project's `profiles.yml` reads with `env_var()`.
 - A project-specific auth helper that exports `SNOWFLAKE_*` vars: ask the user to run it in the shell the session starts from; do not source it yourself.
 - Direct env vars exported in `~/.zshrc` / `~/.bashrc`
 

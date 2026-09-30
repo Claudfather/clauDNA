@@ -202,14 +202,14 @@ Rules for all skills:
 - **For Python virtual environments:** Use the venv's python directly — `./venv/bin/python -m pytest` not `source venv/bin/activate && pytest`.
 - **For `cd`:** Use absolute paths — `python /path/to/app.py` not `cd /path/to && python app.py`.
 
-**No exceptions.** Previous versions of this guide listed `source .env &&` and `cd <worktree> &&` as accepted. They are not: both have clean alternatives — see below.
+**No exceptions.** Previous versions of this guide listed `source .env &&` and `cd <worktree> &&` as accepted, and they are not: both have clean alternatives — see below.
 
 ### Environment variables from `.env`
 
-Skills that need credentials or config from `.env` must NOT use `source .env && command`: sourcing runs the file as code. They must not Read `.env` for a credential either (the value would enter the session transcript), nor put a value into a command, where every local user can read it from the process table. Instead:
+Skills that need credentials or config from `.env` must NOT use `source .env && command`. They must not Read `.env` for a credential either, nor put a value into a command. Instead:
 
 1. **Let the tool read its own credentials** where it has a config: a libpq service or pass file (`psql "service=<name>"`), `~/.snowsql/config` (`snowsql -c <connection>`), `neon auth`, `vercel login`, the Railway CLI's config. CLIs such as `neonctl` and `vercel` also read `NEON_API_KEY` / `VERCEL_TOKEN` from the environment.
-2. **When the value lives only in `.env`, hand it to the one command that needs it** through its environment, with the bundled reader: `python3 "<claudna-root>/scripts/env_from_file.py" .env DATABASE_URL=PGDATABASE -- psql -X -f <sql-file>` (`<claudna-root>` per `claudna-root.md`). It reads the file as text, never runs it, and never prints the value. `env_from_file.py .env --has DATABASE_URL NEON_PROD_URL` names the first key that is set, without its value, so you can discover the variable name.
+2. **When the value lives only in `.env`, hand it to the one command that needs it** through its environment, with the bundled reader: `python3 "<claudna-root>/scripts/env_from_file.py" .env VERCEL_TOKEN -- vercel whoami` (`<claudna-root>` per `claudna-root.md`). It reads the file as text, never runs it, and never prints the value. `env_from_file.py .env --has DATABASE_URL NEON_PROD_URL` names the first key that is set, without its value, so you can discover the variable name. A Postgres URL takes `=@libpq` (`env_from_file.py .env DATABASE_URL=@libpq -- psql -X -f <sql-file>`), which turns it into libpq's own variables (`PGHOST`, `PGPASSWORD`, …): psql does not read a URL from `PGDATABASE`. `--url-env DATABASE_URL` does the same for a URL already in the environment, and `--url-file <file>` for one a CLI wrote to a file.
 3. **Write SQL, bodies and other text to a file** with the Write tool and pass the file (`psql -f`, `snowsql -f`, `--body-file`).
 
 This eliminates the `&&` operator AND makes skills portable across projects that use different variable names.

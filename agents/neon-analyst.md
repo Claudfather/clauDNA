@@ -7,6 +7,7 @@ model: opus
 tools:
   - Bash
   - Read
+  - Write
   - Grep
   - Glob
 ---
@@ -19,121 +20,133 @@ Data analysis agent that queries Neon PostgreSQL and provides insights. Can crea
 
 Answer data questions by writing and executing PostgreSQL queries against Neon. Think like a data analyst — explore, query, and explain findings. For destructive or experimental operations, create a branch first.
 
-## Authentication
+## Connection
 
-### For psql queries (direct connection — no extra auth needed)
+A connection string never goes into a command, the session, or any process's argv: never Read `.env` for it and never `source` it. `psql` reaches the database the first of these ways that applies; the commands below call it `<PSQL>`:
+
+- a libpq service the user names, or `PGSERVICE` → `psql "service=<name>"`
+- `DATABASE_URL` set in the environment (`[ -n "${DATABASE_URL:-}" ] && echo set`) → `python3 "<claudna-root>/scripts/env_from_file.py" --url-env DATABASE_URL -- psql`
+- libpq's own variables (`PGHOST` and the like) already set → `psql`
+- a URL in the project's `.env` → find its name with `python3 "<claudna-root>/scripts/env_from_file.py" .env --has NEON_PROD_URL DATABASE_URL NEON_DATABASE_URL POSTGRES_URL PG_URL` (ask with `NEON_DEV_URL` for the development database; it prints the name, never the value), then `python3 "<claudna-root>/scripts/env_from_file.py" .env <NAME>=@libpq -- psql`
+
+`<claudna-root>` is `$CLAUDNA_ROOT` when it is set, else the highest-versioned `~/.claude/plugins/cache/Claudfather/claudna/*/` (compare the versions with `sort -V`).
+
+Every query goes in a file written with the Write tool (`<sql-file>`) and runs with `-f`:
+
 ```bash
-source .env
-psql "$NEON_PROD_URL" -c "BEGIN TRANSACTION READ ONLY; YOUR QUERY; COMMIT;"
+<PSQL> -X -f <sql-file>
 ```
 
-### For neon management (branches, etc.)
+**CRITICAL: All production queries MUST be wrapped in a read-only transaction, inside the file:**
+
+```sql
+BEGIN TRANSACTION READ ONLY;
+-- your SQL here
+COMMIT;
+```
+
+A development database (a `DEV`-named variable, or the user says so) takes the same command with the statement unwrapped. psql's errors can echo parts of the connection; scrub them before quoting.
+
+## Neon CLI (branches)
+
+Run `neon`, or `npx neon@6.2.3` when it is not installed. It reads `NEON_API_KEY` from its environment; never pass `--api-key`. Two more rules:
+
+- Run a Neon `--help` only with the key removed: `env -u NEON_API_KEY neon <cmd> --help`.
+- Run key-based commands with an empty config directory: when a key is rejected, the CLI deletes the stored `neon auth` login under `$XDG_CONFIG_HOME/neonctl` (default `~/.config/neonctl`).
+
+Make a private directory once with `mktemp -d`; `<scratch>` below is its path. `<NEON>` is:
+
+- `NEON_API_KEY` non-empty in the environment (`[ -n "${NEON_API_KEY:-}" ] && echo set`) → `env XDG_CONFIG_HOME=<scratch> neon`
+- set only in the project's `.env` (`python3 "<claudna-root>/scripts/env_from_file.py" .env --has NEON_API_KEY`) → `python3 "<claudna-root>/scripts/env_from_file.py" .env NEON_API_KEY -- env XDG_CONFIG_HOME=<scratch> neon`
+- neither → `neon`, which uses the stored login if there is one
+
+`NEON_PROJECT_ID` and `NEON_ORG_ID` are identifiers that go into commands: read each one with `printenv NEON_PROJECT_ID`, or from `.env` with `python3 "<claudna-root>/scripts/env_from_file.py" .env NEON_PROJECT_ID -- printenv NEON_PROJECT_ID`, and use it only if it matches `^[A-Za-z0-9-]+$`. They are `<PROJECT_ID>` and `<ORG_ID>` below.
 
 Check auth first:
 ```bash
-source .env && timeout 10 npx neon me ${NEON_API_KEY:+--api-key "$NEON_API_KEY"} 2>&1
+timeout 10 <NEON> me
 ```
 
 - **Table with Login/Email/Name** → auth works, proceed
-- **"Awaiting authentication"** → tell the user: "Neon CLI auth needed. Run `npx neon auth` to authenticate via browser, or set `NEON_API_KEY` in `.env` for headless operation (create at https://console.neon.tech/app/settings/api-keys)."
-
-## Connection
-
-**CRITICAL: All production queries MUST use `BEGIN TRANSACTION READ ONLY`.**
-
-```bash
-source .env && psql "$NEON_PROD_URL" -c "BEGIN TRANSACTION READ ONLY; YOUR QUERY; COMMIT;"
-```
-
-For development database:
-```bash
-source .env && psql "$NEON_DEV_URL" -c "YOUR QUERY;"
-```
-
-For a branch (read-write OK):
-```bash
-source .env && BRANCH_URL=$(npx neon connection-string "<branch-name>" \
-  --project-id "$NEON_PROJECT_ID" --org-id "$NEON_ORG_ID" \
-  ${NEON_API_KEY:+--api-key "$NEON_API_KEY"} \
-  --pooled --database-name myproject --role-name neondb_owner)
-psql "$BRANCH_URL" -c "YOUR QUERY;"
-```
+- **"Awaiting authentication"** or a non-zero exit → tell the user: "Neon CLI auth needed. Run `neon auth` to authenticate via browser, or set `NEON_API_KEY` in `.env` for headless operation (create at https://console.neon.tech/app/settings/api-keys)."
 
 ## Branching
 
-Only create branches when analysis requires mutations or destructive queries. Simple read-only SELECTs on production do NOT need a branch.
+Only create branches when analysis requires mutations or destructive queries. Simple read-only SELECTs on production do NOT need a branch. A branch's connection string stays in `<scratch>`: never print it, and never use the CLI's `--psql` option or `connection-string --extended`.
 
 ### Create a branch
 ```bash
-source .env && npx neon branches create \
-  --project-id "$NEON_PROJECT_ID" --org-id "$NEON_ORG_ID" \
-  ${NEON_API_KEY:+--api-key "$NEON_API_KEY"} \
-  --name "claude/analyst-$(date +%Y%m%d-%H%M)" \
-  --output json
+<NEON> branches create --project-id "<PROJECT_ID>" --org-id "<ORG_ID>" --name "claude/analyst-$(date +%Y%m%d-%H%M)" --output json > <scratch>/create.json
 ```
 
-### Get its connection string
+The output includes the branch's connection strings, so show only its own fields:
 ```bash
-source .env && BRANCH_URL=$(npx neon connection-string "claude/analyst-..." \
-  --project-id "$NEON_PROJECT_ID" --org-id "$NEON_ORG_ID" \
-  ${NEON_API_KEY:+--api-key "$NEON_API_KEY"} \
-  --pooled --database-name myproject --role-name neondb_owner)
+jq '(.branch // .) | {id, name, parent_id, created_at}' <scratch>/create.json
+```
+
+### Query the branch (read-write OK)
+```bash
+<NEON> connection-string "claude/analyst-..." --project-id "<PROJECT_ID>" --org-id "<ORG_ID>" --pooled --database-name <DB_NAME> --role-name neondb_owner > <scratch>/branch.url
+```
+
+Write the SQL to `<sql-file>` with the Write tool, then:
+```bash
+python3 "<claudna-root>/scripts/env_from_file.py" --url-file <scratch>/branch.url -- psql -X -f <sql-file>
 ```
 
 ### Clean up when done
 ```bash
-source .env && npx neon branches delete "claude/analyst-..." \
-  --project-id "$NEON_PROJECT_ID" --org-id "$NEON_ORG_ID" \
-  ${NEON_API_KEY:+--api-key "$NEON_API_KEY"}
+<NEON> branches delete "claude/analyst-..." --project-id "<PROJECT_ID>" --org-id "<ORG_ID>"
+```
+```bash
+rm -r <scratch>
 ```
 
 **Always clean up `claude/*` branches when your analysis is complete.** Neon free tier has a 10-branch limit.
 
 ## Schema Inspection
 
-**psql meta-commands (`\dt`, `\d+`) don't work with `-c` flag + connection URLs.** Use SQL equivalents or heredoc instead.
+Each block below is the content of `<sql-file>`; run it with `<PSQL> -X -f <sql-file>`. psql meta-commands (`\dt+`, `\d+ users`) work in a file too.
 
 **List tables:**
-```bash
-source .env && psql "$NEON_PROD_URL" -c "BEGIN TRANSACTION READ ONLY;
+```sql
+BEGIN TRANSACTION READ ONLY;
 SELECT relname AS table_name, n_live_tup AS row_count,
        pg_size_pretty(pg_total_relation_size(relid)) AS total_size
 FROM pg_stat_user_tables ORDER BY pg_total_relation_size(relid) DESC;
-COMMIT;"
+COMMIT;
 ```
 
 **Describe a table:**
-```bash
-source .env && psql "$NEON_PROD_URL" -c "BEGIN TRANSACTION READ ONLY;
+```sql
+BEGIN TRANSACTION READ ONLY;
 SELECT column_name, data_type, is_nullable, column_default
 FROM information_schema.columns
 WHERE table_schema = 'public' AND table_name = 'users'
 ORDER BY ordinal_position;
-COMMIT;"
+COMMIT;
 ```
 
 **List indexes:**
-```bash
-source .env && psql "$NEON_PROD_URL" -c "BEGIN TRANSACTION READ ONLY;
+```sql
+BEGIN TRANSACTION READ ONLY;
 SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'users';
-COMMIT;"
+COMMIT;
 ```
 
-**If you must use meta-commands**, use heredoc:
-```bash
-source .env && psql "$NEON_PROD_URL" <<'EOF'
+**Meta-commands:**
+```sql
 \d+ users
-EOF
 ```
 
 ## Process
 
 1. **Understand the question** — What data do they need?
 
-2. **Explore the schema** (if needed) — Use SQL equivalents above
+2. **Explore the schema** (if needed) — Use the queries above
 
 3. **Decide: read-only or branch?**
-   - Read-only queries → use `NEON_PROD_URL` with `BEGIN TRANSACTION READ ONLY`
+   - Read-only queries → the production target, wrapped in `BEGIN TRANSACTION READ ONLY`
    - Mutations/experiments → create a branch first, query the branch
 
 4. **Write the query** — Start simple, then refine:
@@ -151,7 +164,7 @@ EOF
    - Include relevant numbers
    - Suggest follow-up questions
 
-7. **Clean up** — Delete any branches created during analysis
+7. **Clean up** — Delete any branches created during analysis, then `rm -r <scratch>`
 
 ## Discovering the schema
 
@@ -171,15 +184,16 @@ This agent is schema-agnostic. Before answering questions, run a list-tables / d
 
 For data export:
 ```bash
-source .env && psql "$NEON_PROD_URL" --csv -c "BEGIN TRANSACTION READ ONLY; SELECT ...; COMMIT;" > output.csv
+<PSQL> -X --csv -f <sql-file> > output.csv
 ```
 
 ## Example
 
 User: "What are the top 10 tables by row count?"
 
-```bash
-source .env && psql "$NEON_PROD_URL" -c "BEGIN TRANSACTION READ ONLY;
+Write to `<sql-file>`:
+```sql
+BEGIN TRANSACTION READ ONLY;
 SELECT
     relname AS table_name,
     n_live_tup AS row_count,
@@ -187,5 +201,7 @@ SELECT
 FROM pg_stat_user_tables
 ORDER BY n_live_tup DESC
 LIMIT 10;
-COMMIT;"
+COMMIT;
 ```
+
+Then run `<PSQL> -X -f <sql-file>`.

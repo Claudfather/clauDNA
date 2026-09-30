@@ -1,21 +1,31 @@
 #!/usr/bin/env python3
 """Hand values from a dotenv file to one command, without running the file or showing the values.
 
-Two modes:
-
     env_from_file.py <env-file> --has KEY [KEY ...]
         Print the first KEY that holds a non-empty value, or nothing and exit 1.
         Only the NAME is printed, never the value.
 
     env_from_file.py <env-file> KEY[=NAME] [KEY[=NAME] ...] -- COMMAND [ARGS ...]
         Run COMMAND with each KEY's value in its environment, renamed to NAME when
-        given (for example DATABASE_URL=PGDATABASE for psql). A value reaches the
-        command's environment only: never its argv, never this script's output.
-        Exits 2 without running COMMAND when a KEY is missing or empty.
+        given. NAME `@libpq` means the value is a Postgres URL (see below).
 
-The file is read as text, line by line: `KEY=value`, `export KEY=value`, a value
-in single or double quotes, `#` comments. Nothing in it is expanded or executed,
-so `$VAR` and `$(...)` stay literal. Sourcing a project's file would run it as code.
+    env_from_file.py --url-file <file> -- COMMAND [ARGS ...]
+        The first line of <file> is a Postgres URL: a Neon branch's connection string
+        written there with `>`, so it never reaches the session.
+
+    env_from_file.py --url-env <NAME> -- COMMAND [ARGS ...]
+        The environment variable <NAME> holds a Postgres URL.
+
+A Postgres URL is expanded into libpq's own variables (PGHOST, PGPORT, PGUSER,
+PGPASSWORD, PGDATABASE, and PGSSLMODE, PGOPTIONS and the like from its query
+string), after every PG* variable already in the environment is left out, so the
+URL alone decides where the command connects. libpq does not read a URL from
+PGDATABASE (it takes the whole string as a database name).
+
+A value reaches the command's environment only: never its argv, never this script's
+output. A missing or empty value exits 2 without running COMMAND. The dotenv file is
+read as text, line by line (`KEY=value`, `export KEY=value`, quoted values, `#`
+comments); nothing in it is expanded or executed, so `$VAR` and `$(...)` stay literal.
 """
 
 from __future__ import annotations
@@ -23,8 +33,41 @@ from __future__ import annotations
 import os
 import re
 import sys
+from urllib.parse import parse_qsl, unquote, urlsplit
 
+USAGE = (
+    "usage: env_from_file.py <env-file> --has KEY [KEY ...]\n"
+    "       env_from_file.py <env-file> KEY[=NAME|=@libpq] [...] -- COMMAND [ARGS ...]\n"
+    "       env_from_file.py --url-file <file> -- COMMAND [ARGS ...]\n"
+    "       env_from_file.py --url-env <NAME> -- COMMAND [ARGS ...]"
+)
 _LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$")
+_LIBPQ_VARIABLE = re.compile(r"PG[A-Z]+")
+# Connection parameters a URL's query string may carry, and libpq's variable for each.
+_QUERY_TO_ENV = {
+    "host": "PGHOST",
+    "hostaddr": "PGHOSTADDR",
+    "port": "PGPORT",
+    "dbname": "PGDATABASE",
+    "user": "PGUSER",
+    "password": "PGPASSWORD",
+    "passfile": "PGPASSFILE",
+    "sslmode": "PGSSLMODE",
+    "sslnegotiation": "PGSSLNEGOTIATION",
+    "sslrootcert": "PGSSLROOTCERT",
+    "sslcert": "PGSSLCERT",
+    "sslkey": "PGSSLKEY",
+    "channel_binding": "PGCHANNELBINDING",
+    "gssencmode": "PGGSSENCMODE",
+    "target_session_attrs": "PGTARGETSESSIONATTRS",
+    "options": "PGOPTIONS",
+    "application_name": "PGAPPNAME",
+    "connect_timeout": "PGCONNECT_TIMEOUT",
+}
+
+
+class Refused(ValueError):
+    """The request cannot be run as written. The message never holds a value."""
 
 
 def parse(path: str) -> dict[str, str]:
@@ -45,48 +88,107 @@ def parse(path: str) -> dict[str, str]:
     return values
 
 
-def main(argv: list[str]) -> int:
-    if len(argv) < 3:
-        print(
-            "usage: env_from_file.py <env-file> --has KEY [KEY ...]\n"
-            "       env_from_file.py <env-file> KEY[=NAME] [KEY[=NAME] ...] -- COMMAND [ARGS ...]",
-            file=sys.stderr,
-        )
-        return 2
-    path, rest = argv[0], argv[1:]
+def libpq_env(url: str, source: str) -> dict[str, str]:
+    """libpq's variables for a Postgres URL. Errors name the source, never the value."""
     try:
-        values = parse(path)
-    except OSError as err:
-        print(f"env_from_file: cannot read {path}: {err.strerror}", file=sys.stderr)
-        return 2
+        parts = urlsplit(url.strip())
+    except ValueError as err:
+        raise Refused(f"{source} is not a URL libpq can use") from err
+    if parts.scheme not in ("postgres", "postgresql"):
+        raise Refused(f"{source} is not a postgres:// or postgresql:// URL")
+    userinfo, _, hostport = parts.netloc.rpartition("@")
+    if hostport.startswith("["):
+        host, _, after = hostport[1:].partition("]")
+        port = after[1:] if after.startswith(":") else after
+    else:
+        host, _, port = hostport.partition(":")
+    if port and not re.fullmatch(r"[0-9]+", port):
+        raise Refused(f"{source} names more than one host or a port that is not a number")
+    user, has_password, password = userinfo.partition(":")
+    env = {}
+    for name, value in (
+        ("PGHOST", unquote(host)),  # unquoted, not lowercased: it may be a socket directory
+        ("PGPORT", port),
+        ("PGUSER", unquote(user)),
+        ("PGPASSWORD", unquote(password) if has_password else ""),
+        ("PGDATABASE", unquote(parts.path.lstrip("/"))),
+    ):
+        if value:
+            env[name] = value
+    for key, value in parse_qsl(parts.query):
+        if key in _QUERY_TO_ENV:
+            env[_QUERY_TO_ENV[key]] = value
+        else:
+            print(f"env_from_file: {source}: URL parameter {key!r} has no libpq variable; ignored", file=sys.stderr)
+    return env
 
-    if rest[0] == "--has":
-        for key in rest[1:]:
-            if values.get(key):
-                print(key)
-                return 0
-        return 1
 
-    if "--" not in rest:
-        print("env_from_file: give the command after --", file=sys.stderr)
-        return 2
-    split = rest.index("--")
-    pairs, command = rest[:split], rest[split + 1 :]
-    if not pairs or not command:
-        print("env_from_file: name at least one KEY and a command", file=sys.stderr)
-        return 2
-    env = dict(os.environ)
-    for pair in pairs:
-        key, _, name = pair.partition("=")
-        if not values.get(key):
-            print(f"env_from_file: {key} is not set in {path}; the command was not run", file=sys.stderr)
-            return 2
-        env[name or key] = values[key]
+def _run(additions: dict[str, str], command: list[str], *, url: bool) -> int:
+    env = {k: v for k, v in os.environ.items() if not (url and _LIBPQ_VARIABLE.fullmatch(k))}
+    env.update(additions)
     try:
         os.execvpe(command[0], command, env)
     except OSError as err:
         print(f"env_from_file: cannot run {command[0]}: {err.strerror}", file=sys.stderr)
         return 127
+    return 0  # not reached: exec replaced this process
+
+
+def _command(rest: list[str]) -> list[str]:
+    if rest[:1] != ["--"] or len(rest) < 2:
+        raise Refused("give the command after --")
+    return rest[1:]
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) < 3:
+        print(USAGE, file=sys.stderr)
+        return 2
+    try:
+        if argv[0] in ("--url-file", "--url-env"):
+            source, command = argv[1], _command(argv[2:])
+            if argv[0] == "--url-file":
+                with open(source, encoding="utf-8") as fh:
+                    url = fh.readline()
+            else:
+                url = os.environ.get(source, "")
+            if not url.strip():
+                raise Refused(f"{source} holds no URL; the command was not run")
+            return _run(libpq_env(url, source), command, url=True)
+
+        path, rest = argv[0], argv[1:]
+        values = parse(path)
+        if rest[0] == "--has":
+            for key in rest[1:]:
+                if values.get(key):
+                    print(key)
+                    return 0
+            return 1
+
+        if "--" not in rest:
+            raise Refused("give the command after --")
+        split = rest.index("--")
+        pairs, command = rest[:split], _command(rest[split:])
+        if not pairs:
+            raise Refused("name at least one KEY")
+        additions: dict[str, str] = {}
+        url = False
+        for pair in pairs:
+            key, _, name = pair.partition("=")
+            if not values.get(key):
+                raise Refused(f"{key} is not set in {path}; the command was not run")
+            if name == "@libpq":
+                additions.update(libpq_env(values[key], key))
+                url = True
+            else:
+                additions[name or key] = values[key]
+        return _run(additions, command, url=url)
+    except Refused as why:
+        print(f"env_from_file: {why}", file=sys.stderr)
+        return 2
+    except OSError as err:
+        print(f"env_from_file: cannot read {err.filename}: {err.strerror}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

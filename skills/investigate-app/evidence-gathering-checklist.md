@@ -20,7 +20,7 @@ Reference for Steps 3-4 of `/claudna:investigate-app`. Each category is gathered
 
 ## C. Database State
 
-If the project keeps a database connection (`.env`, a libpq service, `~/.snowsql/config`), query it read-only. Never Read `.env` for the connection string: the password would enter the transcript. Write the SQL to a file with the Write tool first:
+If the project keeps a database connection (`.env`, a libpq service, `~/.snowsql/config`), query it read-only. Never Read `.env` for the connection string. Write the SQL to a file with the Write tool first:
 
 ```sql
 BEGIN TRANSACTION READ ONLY;
@@ -29,7 +29,7 @@ SELECT * FROM pg_stat_activity WHERE state = 'active' AND query NOT LIKE '%pg_st
 COMMIT;
 ```
 
-- Neon / Postgres: `python3 "<claudna-root>/scripts/env_from_file.py" .env --has DATABASE_URL NEON_PROD_URL POSTGRES_URL` names the variable. Then `python3 "<claudna-root>/scripts/env_from_file.py" .env <NAME>=PGDATABASE -- psql -X -f <sql-file>` runs the query with the URL in psql's environment only. Resolve `<claudna-root>` per `../_shared/claudna-root.md`. A libpq service works too: `psql "service=<name>" -X -f <sql-file>`.
+- Neon / Postgres: `python3 "<claudna-root>/scripts/env_from_file.py" .env --has DATABASE_URL NEON_PROD_URL POSTGRES_URL` names the variable. Then `python3 "<claudna-root>/scripts/env_from_file.py" .env <NAME>=@libpq -- psql -X -f <sql-file>` runs the query with the URL in psql's environment only (`@libpq` splits it into libpq's own variables; psql does not read a URL from `PGDATABASE`). A `DATABASE_URL` already in the environment: `python3 "<claudna-root>/scripts/env_from_file.py" --url-env DATABASE_URL -- psql -X -f <sql-file>`. Resolve `<claudna-root>` per `../_shared/claudna-root.md`. A libpq service works too: `psql "service=<name>" -X -f <sql-file>`.
 - Snowflake: check for `~/.snowsql/config`, write `SHOW RUNNING QUERIES;` to a file, run `snowsql -c default -f <sql-file>`.
 - Check for connection pool exhaustion, long-running queries, locks
 
@@ -43,7 +43,7 @@ COMMIT;
 ## E. Resource Metrics
 
 - Railway: the metrics API takes the account's token, so leave it to the `railway-ops` agent (header sent on stdin, token never printed or put on a command line). Never read `~/.railway/config.json` into the session, and never hand its token to a subagent
-- Vercel: `vercel inspect <production-url>` for function config (memory, maxDuration, regions). Use `vercel httpstat /api/<route>` for HTTP timing. Use `vercel logs --source serverless --json --since 1h` for slow function detection (Claude can parse JSON output and filter for high-duration entries — do not pipe through jq). For advanced metrics, use REST API with token from `~/.config/com.vercel.cli/auth.json`
+- Vercel: `vercel inspect <production-url>` for function config (memory, maxDuration, regions). Use `vercel httpstat /api/<route>` for HTTP timing. Use `vercel logs --source serverless --json --since 1h` for slow function detection (Claude can parse JSON output and filter for high-duration entries — do not pipe through jq). For advanced metrics, leave the REST API to the `vercel-ops` agent (header sent on stdin)
 - Modal: `modal container list --json` for running containers. For GPU workloads: `modal container exec <id> -- nvidia-smi` for GPU memory/utilization. `modal container exec <id> -- cat /proc/meminfo` for system memory. `modal container exec <id> -- df -h` for disk. For profiling: `modal shell <id>` then `py-spy top --pid 1`
 - If unavailable, note it and move on
 
