@@ -940,3 +940,63 @@ class TestWritersRedact:
                                                      "text": "curl -H 'Authorization: Bearer " + "tok" * 8 + "'"},
                           seg=1)
         assert "toktok" not in e["data"]["text"] and "[REDACTED]" in e["data"]["text"]
+
+
+class TestRejectedFirstWrites:
+    """A refused call on a session the store doesn't have leaves nothing behind (no phantom directory)."""
+
+    def test_a_seal_with_no_segment(self, store):
+        h = store.session("fresh")
+        with pytest.raises(Exception):
+            h.seal_segment(10, "precompact")
+        assert not h.paths.dir.exists() and store.session_ids() == []
+
+    def test_an_append_with_nowhere_to_go(self, store):
+        from claudna.session_store.store import NotAppendable
+
+        h = store.session("fresh")
+        with pytest.raises(NotAppendable):
+            h.append("prompt.submitted", {"chars": 1})
+        assert not h.paths.dir.exists()
+
+    def test_an_invalid_close_reason(self, store):
+        h = store.session("fresh")
+        with pytest.raises(Exception):
+            h.close_session("not-a-reason")
+        assert not h.paths.dir.exists()
+
+    def test_a_refused_call_on_an_existing_session_keeps_it(self, store):
+        h = store.session("s1")
+        h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl")
+        with pytest.raises(Exception):
+            h.close_session("not-a-reason")
+        assert h.paths.lifecycle.is_file()
+
+
+def test_check_reports_a_projection_missing_projected_from(store, capsys):
+    """A hand-edited projection without its watermark is an error for ``check``, never a KeyError."""
+    import json as _json
+
+    from claudna.session_store.cli import main
+
+    h = store.session("s1")
+    h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl")
+    doc = _json.loads(h.paths.session_json.read_text())
+    del doc["projected_from"]
+    h.paths.session_json.write_text(_json.dumps(doc))
+    assert main(["check", "s1", "--root", str(store.root)]) != 0
+    assert "projected_from" in capsys.readouterr().out
+
+
+def test_check_writes_nothing(store):
+    """``check`` is read-only: a stale projection is reported, never rewritten."""
+    from claudna.session_store.cli import main
+
+    h = store.session("s1")
+    h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl")
+    h.open_segment("session_open", 0)
+    h.paths.session_json.unlink()  # a lost projection: check must not rebuild it
+    before = sorted((p.relative_to(store.root), p.stat().st_mtime_ns) for p in store.root.rglob("*") if p.is_file())
+    main(["check", "s1", "--root", str(store.root)])
+    after = sorted((p.relative_to(store.root), p.stat().st_mtime_ns) for p in store.root.rglob("*") if p.is_file())
+    assert after == before

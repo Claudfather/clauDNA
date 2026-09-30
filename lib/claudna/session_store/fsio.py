@@ -78,25 +78,34 @@ def ensure_dir(path: Path) -> Path:
     return path
 
 
-def atomic_write_json(path: Path, obj: object) -> None:
+def atomic_write_json(path: Path, obj: object, *, durable: bool = False) -> None:
     """Write ``obj`` as pretty JSON to ``path`` atomically, mode ``0600``.
 
-    Atomic for readers, not crash-durable (no ``fsync``) — right for
-    projections, which ``rebuild`` regenerates. A file that must survive a
-    crash (e.g. export acks) should add a durable variant with its first caller.
-    ``path.parent`` must already exist.
+    Atomic for readers. Not crash-durable by default (no ``fsync``) — right for
+    projections, which ``rebuild`` regenerates. ``durable=True`` fsyncs the file
+    and its directory, for the one state no log can regenerate: the export
+    acks in ``consumers.json``. ``path.parent`` must already exist.
     """
     fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             json.dump(obj, fh, indent=2, sort_keys=True, ensure_ascii=False)
             fh.write("\n")
+            if durable:
+                fh.flush()
+                os.fsync(fh.fileno())
         os.chmod(tmp, FILE_MODE)
         os.replace(tmp, path)
     except BaseException:
         with contextlib.suppress(FileNotFoundError):
             os.unlink(tmp)
         raise
+    if durable:
+        dfd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(dfd)
+        finally:
+            os.close(dfd)
 
 
 def read_json(path: Path) -> object | None:

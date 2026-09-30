@@ -99,6 +99,12 @@ class TestLinks:
         assert lineage.take_link(tmp_path, PID, sid="s2", now=time.time() + lineage.LINK_TTL_S + 1) is None
         assert not (tmp_path / "links" / f"{PID}.json").exists()
 
+    def test_a_link_within_its_ttl_is_taken_once(self, tmp_path):
+        lineage.write_link(tmp_path, PID, sid="s1", chain_id="root")
+        now = time.time() + lineage.LINK_TTL_S - 1
+        assert lineage.take_link(tmp_path, PID, sid="s2", now=now) == {"sid": "s1", "chain_id": "root"}
+        assert lineage.take_link(tmp_path, PID, sid="s3", now=now) is None  # consumed
+
     def test_a_link_is_never_taken_by_the_session_that_wrote_it(self, tmp_path):
         lineage.write_link(tmp_path, PID, sid="s1", chain_id="s1")
         assert lineage.take_link(tmp_path, PID, sid="s1") is None
@@ -121,6 +127,14 @@ class TestClaudePid:
         tree = {30: (20, "python3"), 20: (10, "sh"), 10: (1, "claude")}
         monkeypatch.setattr(lineage, "_parent", lambda pid: tree.get(pid))
         assert lineage.claude_pid(30) == 10
+
+    def test_the_walk_gives_up_past_its_hop_limit(self, monkeypatch):
+        depth = lineage._MAX_HOPS  # from 100, the walk looks at 100 … 100+MAX_HOPS-1: claude sits just past it
+        tree = {100 + i: (100 + i + 1, "sh") for i in range(depth)}
+        tree[100 + depth] = (1, "claude")
+        monkeypatch.setattr(lineage, "_parent", lambda pid: tree.get(pid))
+        assert lineage.claude_pid(100) is None
+        assert lineage.claude_pid(101) == 100 + depth  # one hop closer: found
 
     def test_no_claude_ancestor_is_none(self, monkeypatch):
         tree = {30: (20, "python3"), 20: (1, "bash")}

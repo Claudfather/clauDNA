@@ -15,7 +15,9 @@ Hook adapters call this module; they never write store files themselves.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 from . import events as ev
 from .fsio import DIR_MODE, append_jsonl, atomic_write_json, ensure_dir, exclusive_lock, file_size, read_json
@@ -68,10 +70,31 @@ class SessionHandle:
 
     # ── generic append ──────────────────────────────────────────────────────
 
-    def _locked(self):
-        """The session lock — creating the session directory on first write."""
+    @contextmanager
+    def _locked(self) -> Iterator[None]:
+        """The session lock — creating the session directory on first write.
+
+        A first write that is rejected (a seal with no segment, an append with
+        nowhere to go, an invalid event) takes the directory back out, so a
+        refused call never leaves a phantom session with no log behind.
+        """
+        created = not self.paths.dir.is_dir()
         ensure_dir(self.paths.dir)
-        return exclusive_lock(self.paths.lock)
+        try:
+            with exclusive_lock(self.paths.lock):
+                yield
+        except BaseException:
+            if created:
+                self._drop_if_empty()
+            raise
+
+    def _drop_if_empty(self) -> None:
+        try:
+            if {p.name for p in self.paths.dir.iterdir()} <= {self.paths.lock.name}:
+                self.paths.lock.unlink(missing_ok=True)
+                self.paths.dir.rmdir()
+        except OSError:
+            pass  # someone else wrote into it meanwhile: it isn't a phantom
 
     def append(self, kind: str, data: dict, *, seg: int | None = None) -> dict:
         """Append one event to the log its kind belongs to, then re-project.
@@ -300,8 +323,10 @@ class SessionHandle:
     def ack(self, consumer: str, through: int) -> None:
         """Record, under the lock, that ``consumer`` has taken every segment up to ``through``.
 
-        The one writer of ``consumers.json``: harvest and (later) ``session
-        export --ack`` both come through here. A cursor never moves back.
+        The one writer of ``consumers.json``: harvest and ``session export
+        --ack`` both come through here. A cursor never moves back. The write is
+        fsynced: the acks are the one file ``rebuild`` can't regenerate (no log
+        records them), and a lost ack re-exports or re-harvests work.
         """
         with self._locked():
             doc = read_json(self.paths.consumers)
@@ -309,7 +334,7 @@ class SessionHandle:
                 doc = {"schema": "claudna.consumers/1", "sid": self.sid, "consumers": {}}
             if through > self.cursor(consumer):
                 doc["consumers"][consumer] = {"through_seg": through, "acked_at": ev.now_ts()}
-                atomic_write_json(self.paths.consumers, doc)
+                atomic_write_json(self.paths.consumers, doc, durable=True)
 
     def rebuild(self) -> RebuildReport:
         """Regenerate projections from the logs (read-only with respect to logs)."""
