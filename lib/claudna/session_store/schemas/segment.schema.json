@@ -54,6 +54,7 @@
         "compact",
         "session_end",
         "resume",
+        "abandoned",
         null
       ]
     },

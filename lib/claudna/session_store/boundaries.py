@@ -23,8 +23,8 @@ Guards, in order (each makes the hook record nothing):
 After a seal, the adapter starts the summarizer for that segment as a detached
 process (:func:`spawn_summarizer`) and returns at once — unless the summary
 gate is closed for the session (private, headless, a bot, switched off), in
-which case it records ``summary.skipped`` itself and starts nothing; clear lineage
-(``parent_sid``) arrives in a later phase. It never prints: SessionStart stdout
+which case it records ``summary.skipped`` itself and starts nothing. A ``/clear``
+records its lineage through :mod:`lineage` (spec §4.3). It never prints: SessionStart stdout
 would land in the agent's context.
 """
 
@@ -36,13 +36,14 @@ from pathlib import Path
 from typing import Callable, Mapping
 
 from . import events as ev
+from . import lineage, unclosed
 from .paths import CHILD_ENV, InvalidSessionId
 from .fsio import cap_log, ensure_dir, file_size
 from .project import SessionFacts, load_lifecycle, session_facts, summary_gate
 from .store import SessionHandle, SessionStore
 
 _SOURCES = ev.REGISTRY["session.opened"].choices["source"]
-_CLOSE_REASONS = ev.REGISTRY["session.closed"].choices["reason"]
+_CLOSE_REASONS = ev.HOOK_CLOSE_REASONS
 _TRIGGERS = ev.REGISTRY["segment.sealed"].choices["trigger"]
 #: Entrypoints a person drives. Anything else (``sdk-*``, CI actions, chat bots) is headless (#373, M5).
 INTERACTIVE_ENTRYPOINTS = ("cli", "claude-vscode", "claude-desktop")
@@ -118,7 +119,7 @@ def harvest_choice(env: Mapping[str, str]) -> dict:
 
 
 def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str], *,
-                   spawn: Callable[..., None]) -> str:
+                   spawn: Callable[..., None], find_pid: Callable[[], int | None]) -> str:
     source = payload.get("source")
     transcript = payload.get("transcript_path") or None
     previous = handle.current_segment()
@@ -130,15 +131,29 @@ def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str],
         return "segment opened (compact)"
     if source not in _SOURCES:
         return f"ignored: SessionStart source {source!r}"
+    root = handle.paths.root
+    parent = None
+    if source == "clear":  # spec §4.3: the SessionEnd(clear) before us left a link under our claude's pid
+        pid = find_pid()
+        parent = lineage.take_link(root, pid, sid=handle.sid) if pid else None
     handle.open_session(source, actor=actor_from_env(env),
                         origin=origin_from_cwd(payload.get("cwd") or os.getcwd()),
-                        transcript_path=transcript, claude_pid=claude_pid_of(env), harvest=harvest_choice(env))
-    handle.open_segment("session_open", file_size(transcript))
+                        transcript_path=transcript, claude_pid=claude_pid_of(env), harvest=harvest_choice(env),
+                        parent_sid=parent["sid"] if parent else None,
+                        chain_id=parent["chain_id"] if parent else None)
+    handle.open_segment("session_open", file_size(transcript))  # before the parent's write, which can fail
+    if parent:
+        parent_handle = SessionStore(root).session(parent["sid"])
+        if parent_handle.exists():  # never create a phantom parent; the child's lineage is already recorded
+            parent_handle.link_child(handle.sid)
     _summarize_previous(handle, previous, env, spawn)
     from . import harvest  # only an opening SessionStart asks
 
     if harvest.is_due(handle.paths.root, env):  # spec §7.2: harvest runs at SessionStart, detached
         spawn_harvest(handle.paths.root, env)
+    if unclosed.sweep_due(root):  # one stat; the walk over the store runs detached
+        unclosed.mark_swept(root)
+        spawn_sweep(root, env)
     return f"session opened ({source})"
 
 
@@ -168,6 +183,10 @@ def spawn_harvest(root: Path, env: Mapping[str, str]) -> None:
     spawn_worker(root, ["harvest"], env, log="harvest.stderr")
 
 
+def spawn_sweep(root: Path, env: Mapping[str, str]) -> None:
+    spawn_worker(root, ["sweep"], env, log="sweep.stderr")
+
+
 def _summarize_segment(handle: SessionHandle, index: int, facts: SessionFacts, env: Mapping[str, str],
                        spawn: Callable[..., None]) -> None:
     """Spawn the summarizer for sealed segment ``index``, or record why not.
@@ -184,6 +203,23 @@ def _summarize_segment(handle: SessionHandle, index: int, facts: SessionFacts, e
     except OSError as exc:
         handle.append("summary.failed", {"job_id": "spawn", "error": f"spawn failed: {exc}", "retryable": True},
                       seg=index)
+
+
+def abandon_session(handle: SessionHandle, env: Mapping[str, str], owner_pid: int | None = None) -> int | None:
+    """Close a session whose SessionEnd never ran (``seal``, the sweep) and summarize its sealed segment.
+
+    Returns the sealed index, or ``None`` when no segment was left open. A
+    segment a PreCompact already sealed (the crash came before
+    SessionStart(``compact``)) is summarized too, when it hasn't been. Raises
+    ``ValueError`` for a session that isn't open, or that a resume took from
+    ``owner_pid`` (the sweep's) since it was judged unclosed.
+    """
+    index = unclosed.abandon(handle, owner_pid)
+    if index is not None:
+        _summarize_segment(handle, index, _facts(handle), env, spawn_summarizer)
+    else:
+        _summarize_previous(handle, handle.current_segment(), env, spawn_summarizer)
+    return index
 
 
 def _summarize_previous(handle: SessionHandle, previous: int | None, env: Mapping[str, str],
@@ -249,7 +285,7 @@ def _inherited(event: str, payload: dict, facts: SessionFacts, env: Mapping[str,
 
 
 def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str, str],
-           spawn: Callable[..., None] | None = None) -> str:
+           spawn: Callable[..., None] | None = None, find_pid: Callable[[], int | None] | None = None) -> str:
     """Apply one hook event to the store; return what happened, for tests and the error log.
 
     Raises only on a store failure (the caller logs it); every guard returns.
@@ -270,8 +306,9 @@ def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str
     if _inherited(event, payload, facts, env):
         return "ignored: nested child with an inherited session id"
     spawn = spawn or spawn_summarizer
+    find_pid = find_pid or (lambda: claude_pid_of(env) or lineage.claude_pid())  # $CLAUDE_PID, else the walk
     if event == "SessionStart":
-        return _session_start(session, payload, env, spawn=spawn)
+        return _session_start(session, payload, env, spawn=spawn, find_pid=find_pid)
     if event == "PreCompact":  # seal only: the summary waits for SessionStart(compact) or SessionEnd
         trigger = payload.get("trigger") if payload.get("trigger") in _TRIGGERS else None
         return "segment sealed" if _seal(session, payload, sealed_by="precompact", trigger=trigger) is not None \
@@ -281,6 +318,10 @@ def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str
     index = _seal(session, payload, sealed_by="session_end", trigger=None)
     reason = payload.get("reason") if payload.get("reason") in _CLOSE_REASONS else "other"
     session.close_session(reason)  # closed before anything that could fail after it (#373, M2)
-    if index is not None:
+    if index is not None:  # before the link: a failed link write must not strand the seal unsummarized
         _summarize_segment(session, index, facts, env, spawn)
+    if reason == "clear":  # spec §4.3: leave the link the next SessionStart(clear) from this claude consumes
+        pid = find_pid()
+        if pid:
+            lineage.write_link(store.root, pid, sid=session.sid, chain_id=facts.chain_id or session.sid)
     return f"session closed ({reason})"

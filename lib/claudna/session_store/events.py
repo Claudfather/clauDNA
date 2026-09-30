@@ -106,7 +106,8 @@ REGISTRY: dict[str, KindSpec] = {
         log=LIFECYCLE,
         seg=False,
         fields={"reason": _STR},
-        choices={"reason": ("clear", "resume", "logout", "prompt_input_exit", "other")},
+        # ``abandoned`` is the store's own (unclosed.py): a session whose SessionEnd never ran.
+        choices={"reason": ("clear", "resume", "logout", "prompt_input_exit", "other", "abandoned")},
     ),
     # ── lifecycle.jsonl: segment boundaries and summary jobs ────────────────
     "segment.opened": KindSpec(
@@ -123,7 +124,8 @@ REGISTRY: dict[str, KindSpec] = {
         optional={"sha256": _OPT_STR},
         choices={
             # "compact"/"resume": open_segment sealing an unsealed predecessor (missed PreCompact / lost SessionEnd)
-            "sealed_by": ("precompact", "compact", "session_end", "resume"),
+            # "abandoned": unclosed.py sealing a session whose SessionEnd never ran
+            "sealed_by": ("precompact", "compact", "session_end", "resume", "abandoned"),
             "trigger": ("manual", "auto", None),
         },
         constraints={"end": _NON_NEGATIVE, "sha256": _SHA256},
@@ -174,6 +176,11 @@ REGISTRY: dict[str, KindSpec] = {
     ),
     "checkpoint.noted": KindSpec(log=ACTIVITY, seg=True, fields={"note": _STR}, caps={"note": 1000}),
 }
+
+#: Close reasons only the store itself writes (``unclosed.py``). A SessionEnd payload can't claim them.
+STORE_CLOSE_REASONS = ("abandoned",)
+#: The close reasons a SessionEnd payload may carry.
+HOOK_CLOSE_REASONS = tuple(r for r in REGISTRY["session.closed"].choices["reason"] if r not in STORE_CLOSE_REASONS)
 
 def now_ts() -> str:
     """Current UTC time as ``YYYY-MM-DDTHH:MM:SS.mmmZ``."""

@@ -123,7 +123,7 @@ Identity hierarchy, each level stable across a different boundary:
 
 ### 4.3 Clear lineage
 
-SessionEnd(`reason=clear`) writes `links/<claude-pid>.json` naming the ending session. The next SessionStart(`source=clear`) from the same pid consumes it (reads, then deletes) and records `parent_sid`. The parent's `session.json` learns its child through a `session.child_linked` event appended to the parent's log. A link older than 60 s is ignored (stale). If no link is found, `parent_sid` is `null` — lineage is best-effort, never guessed.
+SessionEnd(`reason=clear`) writes `links/<claude-pid>.json` naming the ending session. The pid is `$CLAUDE_PID`, which Claude Code exports to its hooks; an ancestor walk to the process named `claude` is the fallback where it's missing. The next SessionStart(`source=clear`) from the same pid consumes it (reads, then deletes) and records `parent_sid`. The parent's `session.json` learns its child through a `session.child_linked` event appended to the parent's log. A link older than 60 s is ignored (stale). If no link is found, `parent_sid` is `null` — lineage is best-effort, never guessed.
 
 Worker identity across a chain of sessions is `(actor.fleet, actor.bot_id)`. Clear links order sessions within a repo switch; restarts (process relaunch, SessionEnd without `reason=clear`) produce unlinked sessions, ordered by `opened_at` within the same bot. The store never guesses a `parent_sid` for a restart.
 
@@ -363,7 +363,7 @@ Written only through the store's `SessionHandle.ack(consumer, through)`, under t
 { "schema": "claudna.clear-link/1", "pid": 4242, "sid": "533c…", "chain_id": "533c…", "ts": "…" }
 ```
 
-Consumed and deleted by the next SessionStart(clear) from that pid; ignored after 60 s; swept at SessionStart.
+Consumed and deleted by the next SessionStart(clear) from that pid; ignored after 60 s; stale links are deleted by the detached unclosed-session sweep.
 
 ## 7. Summarizer and harvest
 
@@ -469,7 +469,7 @@ The loop closes first; everything else broadens a loop that already works.
 
 1. **Store core** — `store`, `events`, `project`, schemas + fixtures, `rebuild`. No hooks wired.
 2. **Thin vertical slice** (shipped 2026-09-30) — the minimum that proves the loop end to end: SessionStart / PreCompact / SessionEnd boundaries → segment summary with `journey` + `blocks` → harvest (one capture per block; the plan model waits on Claudron#200) → one draft note written through Claudron (today's `claudron capture` until [Claudron#200](https://github.com/Claudfather/Claudron/issues/200)'s pipes land) → visible in the recall brief's Unverified block. Ugly is fine; closed is required. Includes the liveness line.
-3. **Boundaries, complete** — clear lineage, `chain_id`, child isolation, the unclosed-session flag and `session seal <sid>`. Canaries for §11.3–11.4.
+3. **Boundaries, complete** — clear lineage, `chain_id`, child isolation (done early, in #373), unclosed sessions closed as `abandoned` by `session seal <sid>` and a detached `session sweep`. Canaries for §11.3–11.4. Plan: `documentation/plans/2026-09-30-session-store-phase-3.md`.
 4. **Activity** — `prompt.submitted`, `skill.invoked`, `tool.failed`; migrate `telemetry-emit.sh`.
 5. **Harvest, complete** — risk tiers, inbox + ambiguous queues, evidence counting, `revert-run`, the promotion digest (`/claudna:capture --review`).
 6. **Readers + export** — `list`, `show`, `timeline`, `failures`; the export envelope and acks; retention sweep.
