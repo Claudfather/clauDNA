@@ -23,8 +23,8 @@ Guards, in order (each makes the hook record nothing):
 After a seal, the adapter starts the summarizer for that segment as a detached
 process (:func:`spawn_summarizer`) and returns at once — unless the summary
 gate is closed for the session (private, headless, a bot, switched off), in
-which case it records ``summary.skipped`` itself and starts nothing; clear lineage
-(``parent_sid``) arrives in a later phase. It never prints: SessionStart stdout
+which case it records ``summary.skipped`` itself and starts nothing. A ``/clear``
+records its lineage through :mod:`lineage` (spec §4.3). It never prints: SessionStart stdout
 would land in the agent's context.
 """
 
@@ -141,11 +141,11 @@ def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str],
                         transcript_path=transcript, claude_pid=claude_pid_of(env), harvest=harvest_choice(env),
                         parent_sid=parent["sid"] if parent else None,
                         chain_id=parent["chain_id"] if parent else None)
+    handle.open_segment("session_open", file_size(transcript))  # before the parent's write, which can fail
     if parent:
         parent_handle = SessionStore(root).session(parent["sid"])
         if parent_handle.exists():  # never create a phantom parent; the child's lineage is already recorded
             parent_handle.link_child(handle.sid)
-    handle.open_segment("session_open", file_size(transcript))
     _summarize_previous(handle, previous, env, spawn)
     from . import harvest  # only an opening SessionStart asks
 
@@ -205,15 +205,20 @@ def _summarize_segment(handle: SessionHandle, index: int, facts: SessionFacts, e
                       seg=index)
 
 
-def abandon_session(handle: SessionHandle, env: Mapping[str, str]) -> int | None:
+def abandon_session(handle: SessionHandle, env: Mapping[str, str], owner_pid: int | None = None) -> int | None:
     """Close a session whose SessionEnd never ran (``seal``, the sweep) and summarize its sealed segment.
 
-    Returns the sealed index, or ``None`` when no segment was left open. Raises
-    ``ValueError`` for a session that isn't open.
+    Returns the sealed index, or ``None`` when no segment was left open. A
+    segment a PreCompact already sealed (the crash came before
+    SessionStart(``compact``)) is summarized too, when it hasn't been. Raises
+    ``ValueError`` for a session that isn't open, or that a resume took from
+    ``owner_pid`` (the sweep's) since it was judged unclosed.
     """
-    index = unclosed.abandon(handle)
+    index = unclosed.abandon(handle, owner_pid)
     if index is not None:
         _summarize_segment(handle, index, _facts(handle), env, spawn_summarizer)
+    else:
+        _summarize_previous(handle, handle.current_segment(), env, spawn_summarizer)
     return index
 
 
@@ -313,10 +318,10 @@ def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str
     index = _seal(session, payload, sealed_by="session_end", trigger=None)
     reason = payload.get("reason") if payload.get("reason") in _CLOSE_REASONS else "other"
     session.close_session(reason)  # closed before anything that could fail after it (#373, M2)
+    if index is not None:  # before the link: a failed link write must not strand the seal unsummarized
+        _summarize_segment(session, index, facts, env, spawn)
     if reason == "clear":  # spec §4.3: leave the link the next SessionStart(clear) from this claude consumes
         pid = find_pid()
         if pid:
             lineage.write_link(store.root, pid, sid=session.sid, chain_id=facts.chain_id or session.sid)
-    if index is not None:
-        _summarize_segment(session, index, facts, env, spawn)
     return f"session closed ({reason})"

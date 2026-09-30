@@ -53,6 +53,7 @@ from . import events as ev
 from . import schema
 from .fsio import append_jsonl, cap_log, ensure_dir, read_json, read_jsonl
 from .paths import InvalidSessionId, InvalidStateDir, state_root
+from .project import SUMMARY_ENV
 from .store import SessionHandle, SessionStore
 
 if TYPE_CHECKING:
@@ -256,8 +257,11 @@ def main(argv: list[str] | None = None) -> int:
         if store is None:
             return 1
         env = dict(os.environ)
+        # The sweep acts for every session, so no session's summary override applies to the others:
+        # each abandoned session is summarized only by its own recorded opt-in (the #373 B2 rule).
+        own = {k: v for k, v in env.items() if k != SUMMARY_ENV}
         report = unclosed.sweep(store, env, dry_run=args.dry_run,
-                                close=lambda h: boundaries.abandon_session(h, env))
+                                close=lambda h, pid: boundaries.abandon_session(h, own, owner_pid=pid))
         print(json.dumps(report.as_dict()))
         return 0
     handle = _handle(args)

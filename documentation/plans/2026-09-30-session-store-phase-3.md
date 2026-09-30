@@ -37,11 +37,13 @@ The #373 review replaced the entrypoint stopgap before phase 3 started. Each ses
 ## 3. Unclosed sessions and `session seal` — built
 
 A SessionEnd that never ran (a crash, a kill, a laptop lid) leaves a session `open`. A later resume seals the old segment (phase 2); a session that is never resumed stays open for good. `unclosed.py` closes those.
-- **Unclosed** means: `open`; its lifecycle log unchanged for 24 h (`CLAUDNA_UNCLOSED_AFTER_H`, never under 1 h), read from the log's mtime since appends are its only writes; and the `claude` pid recorded at open (`session.opened.data.claude_pid`, shipped in #373) is no longer running.
+- **Unclosed** means: `open`; its lifecycle log unchanged for 24 h (`CLAUDNA_UNCLOSED_AFTER_H`, never under 1 h), read from the log's mtime since appends are its only writes, and its transcript unchanged as long (only boundaries touch the log; a working session writes its transcript every turn); and the `claude` pid recorded at open (`session.opened.data.claude_pid`, shipped in #373) is no longer running.
   - A session with **no recorded pid is never swept automatically.** An idle live session and a dead one look the same without it, and closing a live one would drop its real SessionEnd.
   - A reused pid reads as alive. That only delays a sweep.
 - **`session_store seal <sid>`** closes one session by hand. It seals the open segment at the transcript's size (`sealed_by: "abandoned"`, a new seal reason, so it never reads as a real SessionEnd) and closes with a new reason, `abandoned`, added to the registry and `session.schema.json` together. A SessionEnd payload can't claim `abandoned`. The sealed segment is summarized under the usual gate, so an abandoned session is still summarized and harvested when it opted in. A later `resume` reopens it as usual.
 - **`session_store sweep [--dry-run]`** does the same for at most 5 sessions per run, oldest first, single-flight.
+  - The close is one locked step (`SessionHandle.close_abandoned`). It re-checks that the session is still open and still owned by the dead pid the sweep judged, so a `resume` in between leaves it open.
+  - The sweep acts for every session, so it drops the spawning session's `CLAUDNA_SESSION_SUMMARY`. Each abandoned session is summarized only by its own recorded opt-in, the per-session rule from #373.
 - **Not in the hook itself** (a change from the first draft of this plan): a walk over every session costs a `stat` each, and the store only grows. So SessionStart checks one marker (`hooks/unclosed-sweep.last`) and spawns the sweep detached at most every 6 hours.
 - **Not built:** showing the flag on the SessionStart liveness line. `sweep --dry-run` lists the candidates in the meantime.
 

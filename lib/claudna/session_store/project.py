@@ -165,7 +165,7 @@ class SessionFacts:
     status: str
     actor: dict | None  # the latest session.opened's: whoever reopened the session last owns it
     private: bool
-    chain_id: str | None = None  # the latest session.opened's
+    chain_id: str | None = None  # the first session.opened's, as session.json has it: a resume records its own sid
     claude_pid: int | None = None  # the latest session.opened's owning Claude Code process
     harvest: dict | None = None  # the latest session.opened's {enabled, vault}: its own consumer choice
 
@@ -201,7 +201,7 @@ def session_facts(lifecycle: list[dict]) -> SessionFacts:
     actor, private, chain_id, claude_pid, harvest = None, False, None, None, None
     for e in lifecycle:
         if e["kind"] == "session.opened":
-            actor, chain_id = e["data"]["actor"], e["data"]["chain_id"]
+            actor, chain_id = e["data"]["actor"], chain_id or e["data"]["chain_id"]
             claude_pid, harvest = e["data"].get("claude_pid"), e["data"].get("harvest")
         elif e["kind"] == "session.privacy_set":
             private = e["data"]["private"]

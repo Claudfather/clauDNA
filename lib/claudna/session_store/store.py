@@ -31,6 +31,7 @@ from .project import (
     rebuild,
     refresh,
     segment_transcript_paths,
+    session_facts,
     transcript_path_of,
 )
 
@@ -249,6 +250,34 @@ class SessionHandle:
 
     def close_session(self, reason: str) -> dict:
         return self.append("session.closed", {"reason": reason})
+
+    def close_abandoned(self, *, owner_pid: int | None = None) -> int | None:
+        """Seal the open segment at its transcript's size and close as ``abandoned``: one locked step.
+
+        For a session whose SessionEnd never ran (``unclosed.py``). Everything is
+        decided under the lock, so a ``resume`` can't slip in between the check
+        and the writes: the session must still be open and, given ``owner_pid``,
+        still owned by that (dead) process. Returns the index it sealed, or
+        ``None`` when no segment was left unsealed.
+        """
+        with self._locked():
+            lifecycle = load_lifecycle(self.paths).events
+            facts = session_facts(lifecycle)
+            if facts.status != "open":
+                raise StoreError(f"session {self.sid} is not open")
+            if owner_pid is not None and facts.claude_pid != owner_pid:
+                raise StoreError(f"session {self.sid} was resumed by another process; left open")
+            index = self.current_segment()
+            sealed = None
+            if index is not None:
+                boundary = self.boundary(index, lifecycle)
+                if not boundary.sealed:
+                    end = max(file_size(segment_transcript_paths(lifecycle)[index]), boundary.start or 0)
+                    self._append_locked("segment.sealed", {"end": end, "sealed_by": "abandoned", "trigger": None},
+                                        seg=index)
+                    sealed = index
+            self._append_locked("session.closed", {"reason": "abandoned"}, seg=None)
+            return sealed
 
     def link_child(self, child_sid: str) -> dict:
         return self.append("session.child_linked", {"child_sid": child_sid})

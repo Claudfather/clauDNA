@@ -39,6 +39,7 @@ def open_session(store, tmp_path, sid, *, pid=DEAD, idle_s=2 * DAY, size=40):
     h.open_segment("session_open", 0)
     then = time.time() - idle_s
     os.utime(h.paths.lifecycle, (then, then))
+    os.utime(transcript, (then, then))
     return h
 
 
@@ -62,12 +63,18 @@ class TestIsUnclosed:
         os.utime(h.paths.lifecycle, (then, then))
         assert not unclosed.is_unclosed(h, {}, alive=alive)
 
+    def test_a_transcript_written_recently_keeps_it_open(self, store, tmp_path):
+        h = open_session(store, tmp_path, "s1")
+        (tmp_path / "s1.jsonl").touch()  # the lifecycle log is old, but the session is still writing
+        assert not unclosed.is_unclosed(h, {}, alive=alive)
+
     def test_the_threshold_is_configurable_but_never_under_an_hour(self, store, tmp_path):
         h = open_session(store, tmp_path, "s1", idle_s=3 * 3600)
         assert unclosed.is_unclosed(h, {unclosed.AFTER_ENV: "2"}, alive=alive)
         assert not unclosed.is_unclosed(h, {unclosed.AFTER_ENV: "4"}, alive=alive)
         assert unclosed.after_s({unclosed.AFTER_ENV: "0"}) == 3600
         assert unclosed.after_s({unclosed.AFTER_ENV: "junk"}) == unclosed.DEFAULT_AFTER_H * 3600
+        assert unclosed.after_s({unclosed.AFTER_ENV: "nan"}) == unclosed.DEFAULT_AFTER_H * 3600
 
     def test_pid_alive_reads_the_process_table(self):
         assert unclosed.pid_alive(os.getpid())
@@ -106,7 +113,7 @@ class TestSweep:
         open_session(store, tmp_path, "live", pid=LIVE)
         open_session(store, tmp_path, "recent", idle_s=60)
         closed = []
-        report = unclosed.sweep(store, {}, alive=alive, close=lambda h: closed.append(h.sid) or unclosed.abandon(h))
+        report = unclosed.sweep(store, {}, alive=alive, close=lambda h, pid: closed.append(h.sid) or unclosed.abandon(h, pid))
         assert report.closed == closed == ["dead"] and status(dead)[1] == "abandoned"
         assert status(store.session("live"))[0] == status(store.session("recent"))[0] == "open"
 
@@ -124,8 +131,8 @@ class TestSweep:
     def test_one_bad_session_never_stops_the_sweep(self, store, tmp_path, monkeypatch):
         open_session(store, tmp_path, "a", idle_s=3 * DAY)
         open_session(store, tmp_path, "b", idle_s=2 * DAY)
-        report = unclosed.sweep(store, {}, alive=alive, close=lambda h: 1 / 0 if h.sid == "a" else unclosed.abandon(h))
-        assert report.closed == ["a", "b"] and report.errors[0].startswith("a: ZeroDivisionError")
+        report = unclosed.sweep(store, {}, alive=alive, close=lambda h, pid: 1 / 0 if h.sid == "a" else unclosed.abandon(h, pid))
+        assert report.closed == ["b"] and report.errors[0].startswith("a: ZeroDivisionError")
 
     def test_a_held_lock_skips_the_run(self, store, tmp_path):
         from claudna.session_store.fsio import ensure_dir, exclusive_lock
@@ -166,6 +173,25 @@ class TestHookSpawnsTheSweep:
         assert not (store.root / "links" / "99.json").exists()
 
 
+class TestResumeRace:
+    """#383 review: the check and the writes happen under one lock, keyed on the dead owner's pid."""
+
+    def test_a_session_resumed_after_it_was_judged_unclosed_is_left_open(self, store, tmp_path):
+        h = open_session(store, tmp_path, "s1")
+        owner = unclosed.unclosed_owner(h, {}, alive=alive)
+        assert owner == DEAD
+        h.open_session("resume", actor=ACTOR, origin=ORIGIN, transcript_path=None, claude_pid=LIVE)  # the race
+        with pytest.raises(ValueError, match="resumed by another process"):
+            unclosed.abandon(h, owner)
+        assert status(h) == ("open", None) and not h.boundary(h.current_segment()).sealed
+
+    def test_the_sweep_passes_the_owner_it_judged(self, store, tmp_path):
+        open_session(store, tmp_path, "s1")
+        owners = []
+        unclosed.sweep(store, {}, alive=alive, close=lambda h, pid: owners.append(pid))
+        assert owners == [DEAD]
+
+
 class TestCli:
     def test_seal_closes_and_summarizes(self, store, tmp_path, monkeypatch, capsys):
         h = open_session(store, tmp_path, "s1", pid=LIVE)  # seal by hand works on any open session
@@ -174,6 +200,14 @@ class TestCli:
         assert main(["seal", "s1", "--root", str(store.root)]) == 0
         assert status(h) == ("closed", "abandoned") and summarized == [1]
         assert "closed (abandoned)" in capsys.readouterr().out
+
+    def test_seal_summarizes_a_segment_a_precompact_already_sealed(self, store, tmp_path, monkeypatch):
+        h = open_session(store, tmp_path, "s1")
+        h.seal_segment(10, "precompact")  # the crash came before SessionStart(compact) summarized it
+        summarized = []
+        monkeypatch.setattr(boundaries, "_summarize_segment", lambda h, i, facts, env, spawn: summarized.append(i))
+        assert main(["seal", "s1", "--root", str(store.root)]) == 0
+        assert status(h) == ("closed", "abandoned") and summarized == [1]
 
     def test_seal_refuses_a_closed_session(self, store, tmp_path, capsys):
         h = open_session(store, tmp_path, "s1")
@@ -185,3 +219,14 @@ class TestCli:
         open_session(store, tmp_path, "s1", pid=2**22 + 12345)  # a pid no process has
         assert main(["sweep", "--dry-run", "--root", str(store.root)]) == 0
         assert json.loads(capsys.readouterr().out)["closed"] == ["s1"]
+
+
+def test_the_sweep_ignores_the_spawning_sessions_summary_override(store, tmp_path, monkeypatch, capsys):
+    """#383 review: a bot's CLAUDNA_SESSION_SUMMARY=1 must not spend on sessions that never opted in."""
+    open_session(store, tmp_path, "s1", pid=2**22 + 12345)  # a pid no process has; OPTED out (no harvest choice)
+    seen = []
+    monkeypatch.setattr(boundaries, "_summarize_segment", lambda h, i, facts, env, spawn: seen.append(dict(env)))
+    monkeypatch.setenv("CLAUDNA_SESSION_SUMMARY", "1")
+    assert main(["sweep", "--root", str(store.root)]) == 0
+    assert json.loads(capsys.readouterr().out)["closed"] == ["s1"]
+    assert seen and "CLAUDNA_SESSION_SUMMARY" not in seen[0]

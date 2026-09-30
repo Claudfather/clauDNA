@@ -45,6 +45,26 @@ class TestClearLineage:
         assert [session(store, s)["chain_id"] for s in ("s1", "s2", "s3", "s4")] == ["s1"] * 4
         assert session(store, "s4")["parent_sid"] == "s3"
 
+    def test_a_resumed_child_keeps_its_chain_across_the_next_clear(self, store, tmp_path):
+        fire(store, "SessionStart", "s1", tmp_path, source="startup")
+        fire(store, "SessionEnd", "s1", tmp_path, reason="clear")
+        fire(store, "SessionStart", "s2", tmp_path, source="clear")
+        fire(store, "SessionEnd", "s2", tmp_path, reason="prompt_input_exit")
+        fire(store, "SessionStart", "s2", tmp_path, source="resume")  # records chain_id = its own sid
+        fire(store, "SessionEnd", "s2", tmp_path, reason="clear")
+        fire(store, "SessionStart", "s3", tmp_path, source="clear")
+        assert [session(store, s)["chain_id"] for s in ("s1", "s2", "s3")] == ["s1"] * 3
+
+    def test_a_failing_parent_write_still_opens_the_childs_segment(self, store, tmp_path, monkeypatch):
+        from claudna.session_store.store import SessionHandle
+
+        fire(store, "SessionStart", "s1", tmp_path, source="startup")
+        fire(store, "SessionEnd", "s1", tmp_path, reason="clear")
+        monkeypatch.setattr(SessionHandle, "link_child", lambda self, child: (_ for _ in ()).throw(OSError("disk")))
+        with pytest.raises(OSError):
+            fire(store, "SessionStart", "s2", tmp_path, source="clear")
+        assert session(store, "s2")["segments"]["open"] is not None
+
     def test_no_link_means_no_lineage(self, store, tmp_path):
         fire(store, "SessionStart", "s2", tmp_path, source="clear")
         assert (session(store, "s2")["parent_sid"], session(store, "s2")["chain_id"]) == (None, "s2")

@@ -10,7 +10,8 @@ A session is **unclosed** when all three hold:
 * it is ``open``;
 * its lifecycle log hasn't changed for :data:`DEFAULT_AFTER_H` hours
   (``$CLAUDNA_UNCLOSED_AFTER_H``). Appends are the only writes to that log,
-  so its mtime is the last event's time, for the cost of one ``stat``;
+  so its mtime is the last event's time, for the cost of one ``stat``. Only
+  boundaries write it, so its transcript must be as idle too;
 * the ``claude`` process it recorded at open (``claude_pid``) is gone.
 
 A session that recorded no pid is never swept automatically: an idle live
@@ -29,6 +30,7 @@ for a walk over the whole store.
 
 from __future__ import annotations
 
+import math
 import os
 import time
 from dataclasses import asdict, dataclass, field
@@ -36,9 +38,9 @@ from pathlib import Path
 from typing import Callable, Mapping
 
 from . import lineage
-from .fsio import ensure_dir, exclusive_lock, file_size, read_json
-from .project import load_lifecycle, segment_transcript_paths, session_facts
-from .store import SessionHandle, SessionStore
+from .fsio import ensure_dir, exclusive_lock, read_json
+from .project import load_lifecycle, session_facts, transcript_path_of
+from .store import SessionHandle, SessionStore, StoreError
 
 AFTER_ENV = "CLAUDNA_UNCLOSED_AFTER_H"
 DEFAULT_AFTER_H = 24.0
@@ -52,6 +54,8 @@ def after_s(env: Mapping[str, str]) -> float:
     try:
         hours = float(env.get(AFTER_ENV) or DEFAULT_AFTER_H)
     except ValueError:
+        hours = DEFAULT_AFTER_H
+    if not math.isfinite(hours):  # "nan" would pass every idle test; "inf" would never
         hours = DEFAULT_AFTER_H
     return max(hours, 1.0) * 3600  # never under an hour: a slow machine's live session isn't abandoned
 
@@ -75,42 +79,52 @@ def idle_s(handle: SessionHandle, now: float) -> float | None:
         return None
 
 
-def is_unclosed(handle: SessionHandle, env: Mapping[str, str], *, now: float | None = None,
-                alive: Callable[[int], bool] = pid_alive, idle: float | None = None) -> bool:
-    """Open, idle past the threshold, and its recorded ``claude`` process is gone (see the module doc).
+def unclosed_owner(handle: SessionHandle, env: Mapping[str, str], *, now: float | None = None,
+                   alive: Callable[[int], bool] = pid_alive, idle: float | None = None) -> int | None:
+    """The dead ``claude`` pid of an unclosed session, or ``None`` when it isn't one (see the module doc).
 
     Cheapest test first: the log's mtime (``idle``, when the caller already has
     it), then the small ``session.json`` projection's status, and only then the
     log itself. A projection behind a lost refresh can only make this say no.
+    The pid is handed to :func:`abandon`, which re-checks it under the lock.
     """
     now = time.time() if now is None else now
     idle = idle_s(handle, now) if idle is None else idle
     if idle is None or idle < after_s(env):
-        return False
+        return None
     projection = read_json(handle.paths.session_json)
     if isinstance(projection, dict) and projection.get("status") != "open":
-        return False
-    facts = session_facts(load_lifecycle(handle.paths).events)
-    return facts.status == "open" and facts.claude_pid is not None and not alive(facts.claude_pid)
+        return None
+    lifecycle = load_lifecycle(handle.paths).events
+    facts = session_facts(lifecycle)
+    if facts.status != "open" or facts.claude_pid is None:
+        return None
+    # Only boundaries touch the lifecycle log; a working session writes its transcript every turn.
+    transcript = transcript_path_of(lifecycle)
+    try:
+        if transcript and now - os.stat(transcript).st_mtime < after_s(env):
+            return None
+    except OSError:
+        pass
+    return None if alive(facts.claude_pid) else facts.claude_pid
 
 
-def abandon(handle: SessionHandle) -> int | None:
+def is_unclosed(handle: SessionHandle, env: Mapping[str, str], **kwargs) -> bool:
+    return unclosed_owner(handle, env, **kwargs) is not None
+
+
+def abandon(handle: SessionHandle, owner_pid: int | None = None) -> int | None:
     """Seal the current segment at its transcript's size and close the session as ``abandoned``.
 
-    Returns the sealed segment's index (``None`` when the session had none open),
-    for the caller to summarize. Refuses a session that isn't open.
+    Returns the sealed segment's index (``None`` when none was left unsealed),
+    for the caller to summarize. Given ``owner_pid`` (the sweep's), a session a
+    resume took over since is left open. Raises ``ValueError`` when the session
+    isn't open, or no longer belongs to ``owner_pid``.
     """
-    lifecycle = load_lifecycle(handle.paths).events
-    if session_facts(lifecycle).status != "open":
-        raise ValueError(f"session {handle.sid} is not open")
-    index = handle.current_segment()
-    if index is not None and not handle.boundary(index, lifecycle).sealed:
-        path = segment_transcript_paths(lifecycle)[index]  # a defaultdict: never .get()
-        handle.seal_segment(file_size(path), "abandoned", index=index, clamp=True)
-    else:
-        index = None
-    handle.close_session(CLOSE_REASON)
-    return index
+    try:
+        return handle.close_abandoned(owner_pid=owner_pid)
+    except StoreError as exc:
+        raise ValueError(str(exc)) from exc
 
 
 def _marker(root: Path) -> Path:
@@ -143,13 +157,13 @@ class SweepReport:
 
 
 def sweep(store: SessionStore, env: Mapping[str, str], *,
-          close: Callable[[SessionHandle], object] = abandon,
+          close: Callable[[SessionHandle, int], object] = abandon,
           now: float | None = None, alive: Callable[[int], bool] = pid_alive,
           limit: int = SWEEP_LIMIT, dry_run: bool = False) -> SweepReport:
     """Close up to ``limit`` unclosed sessions, oldest first, with ``close``; then drop stale clear links.
 
-    ``close`` defaults to :func:`abandon`; the CLI passes the hook adapter's
-    version, which also summarizes the sealed segment. Single-flight (a held
+    ``close(handle, owner_pid)`` defaults to :func:`abandon`; the CLI passes the
+    hook adapter's version, which also summarizes the sealed segment. Single-flight (a held
     lock skips the run). One session's failure is reported and the sweep moves on.
     """
     now = time.time() if now is None else now
@@ -163,11 +177,12 @@ def sweep(store: SessionStore, env: Mapping[str, str], *,
                        if (idle := idle_s(h, now)) is not None and idle >= threshold), reverse=True)
         for idle, sid, handle in aged:  # the longest idle first
             try:
-                if not is_unclosed(handle, env, now=now, alive=alive, idle=idle):
+                owner = unclosed_owner(handle, env, now=now, alive=alive, idle=idle)
+                if owner is None:
                     continue
-                report.closed.append(sid)
                 if not dry_run:
-                    close(handle)
+                    close(handle, owner)
+                report.closed.append(sid)  # only once it is closed: a failure is reported in errors alone
             except Exception as exc:  # noqa: BLE001 — one bad session never stops the sweep
                 report.errors.append(f"{sid}: {type(exc).__name__}: {exc}")
             if len(report.closed) == limit:
