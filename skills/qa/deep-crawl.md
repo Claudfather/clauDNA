@@ -8,7 +8,7 @@ Pair this with:
 
 ## Conventions
 
-- **Scratch dir:** `/tmp/qa-crawl-<YYYY-MM-DD_HHMMSS>/` with subdirectories `screenshots/`, `console-logs/`, `deep-crawl/`.
+- **Scratch dir:** `<scratch>/`, made with `mktemp -d "${TMPDIR:-/tmp}/qa-crawl.XXXXXX"`, with subdirectories `screenshots/`, `console-logs/`, `deep-crawl/`.
 - **One screenshot per Bash call.** No shell operators (`&&`, `||`, `;`, `|`). Playwright commands are single-shot.
 - **Sequential routes, parallel viewports.** Capture the three viewports of one route in parallel (3 Bash calls), but process routes one at a time — keeps browser memory pressure low and avoids resource exhaustion on constrained hardware.
 - **Screenshots are evidence.** Every finding must reference at least one screenshot file.

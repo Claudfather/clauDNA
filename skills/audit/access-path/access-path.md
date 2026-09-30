@@ -57,7 +57,7 @@ If fewer than 2 access paths found, tell the user: "This system appears to have 
 
 ### Step 2: Parallel Discovery
 
-**Scratch directory:** `/tmp/access-path-audit-<YYYY-MM-DD_HHMMSS>/research/`
+**Scratch directory:** `<scratch>/research/`, where `<scratch>` is a private directory made with `mktemp -d "${TMPDIR:-/tmp}/audit-access-path.XXXXXX"` (orchestration guide §1)
 
 Launch two `general-purpose` subagents in parallel (Agent tool, `subagent_type: "general-purpose"`). Each writes findings to scratch dir, returns 2-4 line summary. Orchestrator does NOT read full research files. With no dispatch primitive available, scan the two areas inline and sequentially per `../../_shared/orchestration-guide.md` §14.2, writing to the same scratch paths so aggregation is unchanged.
 
@@ -144,7 +144,7 @@ documentation/planning/access-paths/<session_name>_<YYYY-MM-DD>/
 └── ...
 ```
 
-Plan agents write the family to the session's scratch docs directory (`/tmp/access-path-audit-<YYYY-MM-DD_HHMMSS>/docs/`); the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/access-paths/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide, Section 3).
+Plan agents write the family to the session's scratch docs directory (`<scratch>/docs/`); the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/access-paths/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide, Section 3).
 
 > **Archive convention:** See orchestration guide, Section 8.
 
@@ -186,7 +186,7 @@ Each doc represents **exactly 1 PR** and must include:
 
 #### Subagent Workflow
 
-Follow Section 9 of the orchestration guide (`../../_shared/orchestration-guide.md`). Plan agents must also read `../../_shared/planning-standard.md` for quality standards and phase doc structure. Scratch directory: `/tmp/access-path-audit-<YYYY-MM-DD_HHMMSS>/research/`.
+Follow Section 9 of the orchestration guide (`../../_shared/orchestration-guide.md`). Plan agents must also read `../../_shared/planning-standard.md` for quality standards and phase doc structure. Scratch directory: `<scratch>/research/`.
 
 ---
 

@@ -77,7 +77,7 @@ This plane has two backends — a Claudron vault (engine) and a raw tree (fallba
 claudron capture --stdin --json < <finding-file>
 ```
 
-Write the finding as JSON to `<finding-file>` with the Write tool first (`type`, `title`, `body`, `tags`, `project`; `/claudna:capture` Step 4): the title and body never go on the command line. `project` comes from the doc's `repos:` / `--repo` (omit if unscoped). Validate the envelope (claudron-engine.md §2) and branch on `data.action`: `created` → report `data.path`; `suggest_update` / `suggest_supersede` → surface `data.reason` and the existing note to the caller (the engine's index-backed dedup replaces the raw adapter's file-compare); `rejected` (exit 1) → surface the validation errors. An engine failure *during* capture (exit 3 or an unrecognized envelope) degrades to the fallback path below, per claudron-engine.md §3 — say so. Do **not** run `/claudna:index` — the vault is engine-indexed (documentation-standard §10). Maturity is never set here; the engine stamps `draft`.
+Write the finding as JSON to `<finding-file>`, a file in `<scratch>` (`../_shared/orchestration-guide.md` §1), with the Write tool first (`type`, `title`, `body`, `tags`, `project`; `/claudna:capture` Step 4): the title and body never go on the command line. `project` comes from the doc's `repos:` / `--repo` (omit if unscoped). Validate the envelope (claudron-engine.md §2) and branch on `data.action`: `created` → report `data.path`; `suggest_update` / `suggest_supersede` → surface `data.reason` and the existing note to the caller (the engine's index-backed dedup replaces the raw adapter's file-compare); `rejected` (exit 1) → surface the validation errors. An engine failure *during* capture (exit 3 or an unrecognized envelope) degrades to the fallback path below, per claudron-engine.md §3 — say so. Do **not** run `/claudna:index` — the vault is engine-indexed (documentation-standard §10). Maturity is never set here; the engine stamps `draft`.
 
 **Provenance (capability-probed).** If the doc's frontmatter carries `source_url` / `source_type` (SCHEMA optional fields), put them in the finding file as `source_url` / `source_type` — but **only on a flags-capable engine**: `data.engine_version` present and ≥ **0.4.0** (the Claudron C2 release that added the flags; the same version probe `/claudna:capture` Step 1 uses, and the same floor its PreCompact defer keys on). An older / absent / unreadable version omits them (it would reject the flags, exit 2). Provenance is **never** folded into the body here: that trailing `Source:` workaround was capture's alone, and the github-pr adapter's `Source:` footer is an unrelated surface.
 
@@ -97,7 +97,7 @@ If the file already exists, compare and warn before overwriting (the raw adapter
 
 ### Adapter: docs
 
-Write the doc — or doc family — into the current repo's `documentation/` tree, the per-project plane. The author produces its output in a scratch directory and hands it here; publish is the single **placement path for finished docs** on this plane (status-marker write-backs and archiving by `/claudna:build` are the documented exceptions).
+Write the doc — or doc family — into the current repo's `documentation/` tree, the per-project plane. The author produces its output in `<scratch>` (`../_shared/orchestration-guide.md` §1) and hands it here; publish is the single **placement path for finished docs** on this plane (status-marker write-backs and archiving by `/claudna:build` are the documented exceptions).
 
 - `--dir <path>` is **required** and must resolve under `documentation/`. Reject anything outside it. Create the directory if it doesn't exist (the Write tool creates parents automatically) — don't fail on missing directories.
 - **Single-doc mode** (source is a file): validate per Step 1, write into `--dir`, report the path.
@@ -123,7 +123,7 @@ instead:
 | **Symptom** | what the reader observes going wrong | matches a duplicate filed from the outside in |
 | **Synonym** | the same defect said another way | the coverage the other two miss |
 
-**2. Run one query per term — separate commands, one term each.** Write each term to its own file with the Write tool first (`<component-file>`, `<symptom-file>`, `<synonym-file>`); a term never goes into the command itself.
+**2. Run one query per term — separate commands, one term each.** Write each term to its own file in `<scratch>` with the Write tool first (`<component-file>`, `<symptom-file>`, `<synonym-file>`); a term never goes into the command itself.
 
 ```bash
 gh issue list --repo <owner>/<repo> --search="$(cat <component-file>)" --state open --limit 20 --json number,title,url
@@ -179,7 +179,7 @@ gh issue create \
   --label "$(cat <labels-file>)"
 ```
 
-Write the title, the markdown body after the frontmatter, and the comma-separated labels to those three files with the Write tool first. Text in them never goes into the command itself.
+Write the title, the markdown body after the frontmatter, and the comma-separated labels to those three files, in `<scratch>`, with the Write tool first. Text in them never goes into the command itself.
 
 Labels come from `tags:` — skills express severity/priority as tags (`priority:critical`, `security`, `auto-audit`, …); publish maps `tags` → `--label` and creates any missing labels. The `--repo` flag is required; if `repos:` is set in frontmatter with exactly one repo, infer from that.
 
@@ -197,7 +197,7 @@ Rules: dedup is skipped (the target is explicit); the title is never changed (`g
 
 ### Adapter: github-pr
 
-Format the doc as a PR description body. Write the formatted text to a file with the Write tool, for the caller to pass as `gh pr create --body-file <file>`:
+Format the doc as a PR description body. Write the formatted text to a file in `<scratch>` with the Write tool, for the caller to pass as `gh pr create --body-file <file>`:
 
 ```
 ## Summary

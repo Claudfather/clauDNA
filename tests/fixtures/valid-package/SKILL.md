@@ -1,7 +1,7 @@
 ---
 name: example-review
 description: "Use when you want to review pull requests with detailed, actionable feedback on code quality, correctness, and maintainability."
-allowed-tools: Bash(git *), Bash(gh *), Read, Grep, Glob
+allowed-tools: Bash(git diff *), Bash(gh pr view *), Read, Grep, Glob
 ---
 
 # Example Review

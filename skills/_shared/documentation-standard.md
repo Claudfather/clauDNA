@@ -31,7 +31,7 @@ Every repo initialized with `/claudna:init-project` has this structure:
 
 ## 2. Planning Output Paths — the `--dir` registry
 
-Planning output (the default `--output docs` target) routes through `/claudna:publish --to docs --dir <path>` — the author writes its doc(s) to a scratch directory and publish validates + places them. This table is the `--dir` registry: each skill passes its category directory **with its session directory appended** (`<category>/<session-name>_<YYYY-MM-DD>/`, §3) — publish places docs into exactly the `--dir` it receives, no path composition of its own.
+Planning output (the default `--output docs` target) routes through `/claudna:publish --to docs --dir <path>` — the author writes its doc(s) to `<scratch>` (`../_shared/orchestration-guide.md` §1) and publish validates + places them. This table is the `--dir` registry: each skill passes its category directory **with its session directory appended** (`<category>/<session-name>_<YYYY-MM-DD>/`, §3) — publish places docs into exactly the `--dir` it receives, no path composition of its own.
 
 | Skill | `--dir` |
 |-------|-----------------|

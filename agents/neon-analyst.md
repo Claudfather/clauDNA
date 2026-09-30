@@ -31,7 +31,7 @@ A connection string never goes into a command, the session, or any process's arg
 
 `<claudna-root>` is `$CLAUDNA_ROOT` when it is set, else the highest-versioned `~/.claude/plugins/cache/Claudfather/claudna/*/` (compare the versions with `sort -V`).
 
-Every query goes in a file written with the Write tool (`<sql-file>`) and runs with `-f`:
+Every query goes in a file written with the Write tool (`<sql-file>`), inside a private directory made once with `mktemp -d`, and runs with `-f`:
 
 ```bash
 <PSQL> -X -f <sql-file>
@@ -89,7 +89,7 @@ jq '(.branch // .) | {id, name, parent_id, created_at}' <scratch>/create.json
 <NEON> connection-string "claude/analyst-..." --project-id "<PROJECT_ID>" --org-id "<ORG_ID>" --pooled --database-name <DB_NAME> --role-name neondb_owner > <scratch>/branch.url
 ```
 
-Write the SQL to `<sql-file>` with the Write tool, then:
+Write the SQL to `<sql-file>`, in that `mktemp -d` directory, with the Write tool, then:
 ```bash
 python3 "<claudna-root>/scripts/env_from_file.py" --url-file <scratch>/branch.url -- psql -X -f <sql-file>
 ```

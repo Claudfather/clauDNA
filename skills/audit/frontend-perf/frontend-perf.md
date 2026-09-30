@@ -31,7 +31,7 @@ Ask the user: (1) what's the symptom, (2) which page or flow, (3) how to reprodu
 
 ## Phase 2: Codebase Reconnaissance
 
-Scratch directory: `/tmp/frontend-performance-audit-<YYYY-MM-DD_HHMMSS>/research/`. All Explore agents write here and return 2-4 line summaries. Follow Explore Agent → Disk Pattern (orchestration guide, Section 2). Do NOT read CLAUDE.md/MEMORY.md in the orchestrator.
+Scratch directory: `<scratch>/research/`, with `<scratch>` a private directory made by `mktemp -d "${TMPDIR:-/tmp}/audit-frontend-perf.XXXXXX"`. All Explore agents write here and return 2-4 line summaries. Follow Explore Agent → Disk Pattern (orchestration guide, Section 2). Do NOT read CLAUDE.md/MEMORY.md in the orchestrator.
 
 **Map three areas via parallel Explore agents:**
 - **A. Framework & rendering setup** — framework/version, React version, strict mode, providers, middleware

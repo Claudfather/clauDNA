@@ -13,13 +13,13 @@ These are the full prompt templates for the 3 parallel recon subagents launched 
 > You are scanning a GitHub repo for skill-like patterns.
 >
 > **Target repo:** `<org>/<repo>`
-> **Browse mode:** [API | local clone at `/tmp/heist-<timestamp>/repo/`]
+> **Browse mode:** [API | local clone at `<scratch>/repo/`]
 > **Interesting files from tree:** [list of relevant paths]
 >
 > **If API mode:** Fetch files with `gh api repos/<org>/<repo>/contents/<path>` (returns base64 content — decode it). Alternatively use WebFetch on `https://raw.githubusercontent.com/<org>/<repo>/<branch>/<path>` for raw content.
-> **If local mode:** Read files directly from `/tmp/heist-<timestamp>/repo/`. Use Glob and Grep freely.
+> **If local mode:** Read files directly from `<scratch>/repo/`. Use Glob and Grep freely.
 >
-> **Write findings to:** `/tmp/heist-<timestamp>/research/skills-scout.md` using the Write tool. (The Write tool creates parent directories automatically — do not use `mkdir`.)
+> **Write findings to:** `<scratch>/research/skills-scout.md` using the Write tool. (The Write tool creates parent directories automatically — do not use `mkdir`.)
 > **Return only a 2-4 line summary** listing the count and most notable items found.
 >
 > **What to find:**
@@ -59,13 +59,13 @@ These are the full prompt templates for the 3 parallel recon subagents launched 
 > You are scanning a GitHub repo for configuration patterns relevant to Claude Code or similar AI coding tools.
 >
 > **Target repo:** `<org>/<repo>`
-> **Browse mode:** [API | local clone at `/tmp/heist-<timestamp>/repo/`]
+> **Browse mode:** [API | local clone at `<scratch>/repo/`]
 > **Interesting files from tree:** [list of relevant paths]
 >
 > **If API mode:** Fetch files with `gh api repos/<org>/<repo>/contents/<path>` or WebFetch on raw URLs.
 > **If local mode:** Read files directly. Use Glob and Grep freely.
 >
-> **Write findings to:** `/tmp/heist-<timestamp>/research/config-scout.md` using the Write tool.
+> **Write findings to:** `<scratch>/research/config-scout.md` using the Write tool.
 > **Return only a 2-4 line summary** listing the count and most notable items found.
 >
 > **What to find:**
@@ -106,13 +106,13 @@ These are the full prompt templates for the 3 parallel recon subagents launched 
 > You are scanning a GitHub repo for novel engineering approaches, prompt techniques, and orchestration patterns.
 >
 > **Target repo:** `<org>/<repo>`
-> **Browse mode:** [API | local clone at `/tmp/heist-<timestamp>/repo/`]
+> **Browse mode:** [API | local clone at `<scratch>/repo/`]
 > **Interesting files from tree:** [list of relevant paths]
 >
 > **If API mode:** Fetch files with `gh api repos/<org>/<repo>/contents/<path>` or WebFetch on raw URLs.
 > **If local mode:** Read files directly. Use Glob and Grep freely.
 >
-> **Write findings to:** `/tmp/heist-<timestamp>/research/patterns-scout.md` using the Write tool.
+> **Write findings to:** `<scratch>/research/patterns-scout.md` using the Write tool.
 > **Return only a 2-4 line summary** listing the count and most notable items found.
 >
 > **What to find:**

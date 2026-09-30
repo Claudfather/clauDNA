@@ -50,7 +50,7 @@ If the target cannot be fetched, report the error verbatim and stop.
 
 ### Phase 2: Prepare the scratch directory
 
-Create a scratch directory at `/tmp/ironclad-<YYYY-MM-DD_HHMMSS>/` (referred to as `<scratch>` below). Use the Write tool to create files inside it (auto-creates parents, so no `mkdir`, per the scratch-dir convention in `../_shared/orchestration-guide.md`). Write `<scratch>/source.md` with the PR metadata, type, and the full (transitively-resolved) plan or diff summary the lenses will review. Lay out per-lens result paths as `<scratch>/lenses/<lens>/result.md`.
+Create a scratch directory with `mktemp -d "${TMPDIR:-/tmp}/ironclad.XXXXXX"` (referred to as `<scratch>` below), per the scratch-dir convention in `../_shared/orchestration-guide.md`. Use the Write tool to create files inside it. Write `<scratch>/source.md` with the PR metadata, type, and the full (transitively-resolved) plan or diff summary the lenses will review. Lay out per-lens result paths as `<scratch>/lenses/<lens>/result.md`.
 
 **Cycle** starts at `1`. With `--loops N` on a plan Issue the procedure repeats (Phase 10) for up to `N` cycles; cross-cycle state lives in the **Issue's comments** (prior lens findings, `[FORK-LOCK]` markers) and the re-forged body — not `/tmp`, which stays ephemeral.
 
@@ -106,7 +106,7 @@ Read every `<scratch>/lenses/<lens>/result.md`. Deduplicate: findings sharing th
 
 ### Phase 8: Post the aggregated comment
 
-Post a **single** aggregated comment to the target (Issue or PR). A PR comment is an issue comment in GitHub's API; write the markdown body to a temp file (with the Write tool) and post it with `-F body=@<file>` so multi-line markdown stays intact:
+Post a **single** aggregated comment to the target (Issue or PR). A PR comment is an issue comment in GitHub's API; write the markdown body to a file in `<scratch>` (with the Write tool) and post it with `-F body=@<file>` so multi-line markdown stays intact:
 
 ```
 gh api --method POST repos/<owner>/<repo>/issues/<pr-number>/comments -F body=@<body-file>

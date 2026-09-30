@@ -51,7 +51,7 @@ Before proceeding, you must be able to answer:
 Gather surrounding context:
 - **Codebase state** — does the code the plan references actually look the way the plan assumes? Are there recent changes the plan doesn't account for?
 - **Open PRs/Issues** — anything in flight that conflicts with or duplicates this plan?
-- **Prior attempts** — has something similar been tried before? Write the keywords to `<keywords-file>` with the Write tool, then `git log --all --oneline --grep="$(cat <keywords-file>)"` for signals.
+- **Prior attempts** — has something similar been tried before? Write the keywords to `<keywords-file>` in `<scratch>` (`../_shared/orchestration-guide.md` §1) with the Write tool, then `git log --all --oneline --grep="$(cat <keywords-file>)"` for signals.
 
 ---
 
@@ -198,7 +198,7 @@ Launch these reviewers in parallel:
 | **User** | Consumer experience | How does someone actually use this? Is the workflow ergonomic? What's the learning curve? |
 | **Counter-Planner** | Dialectical inquiry | Develop a complete alternative approach built on the opposite assumptions. Present it seriously, not as a straw man. |
 
-Each reviewer writes findings to `/tmp/adversarial-review-<timestamp>/<reviewer>.md`.
+Each reviewer writes findings to `<scratch>/<reviewer>.md`, where `<scratch>` is a private directory the orchestrator makes first with `mktemp -d "${TMPDIR:-/tmp}/adversarial-review.XXXXXX"`.
 
 After all return, synthesize: merge overlapping findings, resolve contradictions, rank by severity.
 

@@ -15,7 +15,7 @@ Search the shared vault for existing notes via `claudron lookup`. Read-only. Fol
 claudron lookup --json -- "$(cat <terms-file>)"
 ```
 
-Write the search terms, joined by spaces, to `<terms-file>` with the Write tool first; they never go into the command itself. Optional scoping: `--project <name>`, `--fleet <name>`, `--limit <n>`, `--include-archived`, `--include-expired`.
+Write the search terms, joined by spaces, to `<terms-file>`, a file in `<scratch>` (`../_shared/orchestration-guide.md` §1), with the Write tool first; they never go into the command itself. Optional scoping: `--project <name>`, `--fleet <name>`, `--limit <n>`, `--include-archived`, `--include-expired`.
 
 ## Step 2: Envelope + results
 

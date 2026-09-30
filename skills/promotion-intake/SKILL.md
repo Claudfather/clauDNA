@@ -26,7 +26,7 @@ Versioning is out of scope: no `plugin.json` bump, no CHANGELOG version cut — 
 ### 1. Acquire the package
 
 - Local path → use it directly.
-- URL → fetch into the scratch directory (`gh repo clone`/`gh release download`/`curl` per the URL's shape), then treat as a local path.
+- URL → fetch into `<scratch>`, a private directory made per `../_shared/orchestration-guide.md` §1 (`gh repo clone`/`gh release download`/`curl` per the URL's shape), then treat as a local path.
 - Not found / unreadable → **blocked** (§5).
 
 ### 2. Validate against the promotion contract

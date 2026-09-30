@@ -92,7 +92,7 @@ Decide the fields:
 
 ## Step 4: Build the capture call
 
-Write the finding as JSON to `<finding-file>` with the Write tool, then pass it on stdin. Its fields: `type`, `title`, `body`, `tags`, `owner` (optional), the scope (`project` for repo-scoped, including session mode; `fleet` for fleet-wide; neither for general), and — flags-capable engine only, Step 1 — `source_url` / `source_type`. Text never goes on the command line.
+Write the finding as JSON to `<finding-file>`, a file in `<scratch>` (`../_shared/orchestration-guide.md` §1), with the Write tool, then pass it on stdin. Its fields: `type`, `title`, `body`, `tags`, `owner` (optional), the scope (`project` for repo-scoped, including session mode; `fleet` for fleet-wide; neither for general), and — flags-capable engine only, Step 1 — `source_url` / `source_type`. Text never goes on the command line.
 
 ```bash
 claudron capture --stdin --json < <finding-file>
@@ -106,7 +106,7 @@ Validate the envelope (claudron-engine.md §2), then branch on `data.action`:
 
 - **`created`** → done. Report `data.path` (absolute).
 - **`suggest_update`** (a *current* note already covers this) → present `data.reason` and the existing note (`data.path`, vault-relative). Ask: **"A current note already covers this — append to it, create a new note anyway, or cancel? (append/create/cancel)"**
-  - *append* → write the addendum to a file with the Write tool, then `claudron capture --update <path> --body "$(cat <addendum-file>)" --json` (→ `updated`).
+  - *append* → write the addendum to a file in `<scratch>` with the Write tool, then `claudron capture --update <path> --body "$(cat <addendum-file>)" --json` (→ `updated`).
   - *create* → re-run Step 4 with `--force` (→ `created`, `-N` slug suffix).
   - *cancel* → stop, nothing written.
 - **`suggest_supersede`** (the near-dup is **stale**) → present `data.reason` (the CLI emits this action when the matched note's status is `stale`). Automatic supersession — marking the old note superseded for you — is Claudron curation, not this skill's job; offer the same three routes: **"A stale note is near this — append, create fresh, or cancel? (append/create/cancel)"**
@@ -115,7 +115,7 @@ Validate the envelope (claudron-engine.md §2), then branch on `data.action`:
 
 **`--auto` (no prompts, never `--force`):**
 - `created` → done.
-- `suggest_update` → take the suggested route: write the body to a file with the Write tool, then `claudron capture --update <path> --body "$(cat <body-file>)" --json`.
+- `suggest_update` → take the suggested route: write the body to a file in `<scratch>` with the Write tool, then `claudron capture --update <path> --body "$(cat <body-file>)" --json`.
 - `suggest_supersede` → do **not** write (force is forbidden; appending current knowledge to a stale note mislabels it). Record the suggestion in `errors[]`, set `outcome: "needs-input"` naming the stale path.
 - `rejected` → `outcome: "blocked"`, `blocker_description` = the validation reason.
 - anything else (unlisted/absent `action`, partial/unrecognized envelope) → `outcome: "blocked"`, `blocker_description` = the engine failure, the raw envelope + stderr verbatim in `errors[]`. No `artifacts.action`/`artifacts.path` from an unrecognized envelope, and no raw-tree fallback (vault state unknown) — a loud blocked result, never an improvised success.

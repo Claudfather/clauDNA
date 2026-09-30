@@ -91,7 +91,7 @@ railway logs --lines 100 --json
 ```bash
 railway logs --lines 500 --json
 ```
-If the user wants logs saved to a file, write the output to `/tmp/railway-log-output.json` using the Write tool.
+If the user wants logs saved to a file, make a private directory with `mktemp -d "${TMPDIR:-/tmp}/railway.XXXXXX"` and write the output to `railway-log-output.json` inside it using the Write tool.
 
 **Structured view:**
 ```bash

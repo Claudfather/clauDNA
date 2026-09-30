@@ -39,7 +39,7 @@ Run detection checks in parallel, bootstrap missing CLIs, present detection summ
 
 ### Steps 3-4: Gather Evidence & Trace Code
 
-Scratch directory: `/tmp/investigate-app-<YYYY-MM-DD_HHMMSS>/research/`.
+Scratch directory: `<scratch>/research/`, with `<scratch>` a private directory made by `mktemp -d "${TMPDIR:-/tmp}/investigate-app.XXXXXX"`.
 
 Launch **parallel Explore subagents** per orchestration guide, Section 2 (Explore Agent Disk Pattern). Each writes research to the scratch directory, returns a 2-4 line summary. Do NOT read CLAUDE.md or MEMORY.md in the orchestrator.
 
