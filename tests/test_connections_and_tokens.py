@@ -21,10 +21,13 @@ FILES = sorted(p for d in ("skills", "agents") for p in (REPO / d).rglob("*.md")
 _PROSE_SAYS_NOT = re.compile(r"\b(?:not|never|NOT|Never|NEVER)\b")
 
 
+_SENTENCE_END = r"[.!?][*_`)\]\"']*"  # closing markup or quotes may follow the stop
+
+
 def _sentence(line: str, col: int) -> str:
     """The sentence of ``line`` that holds column ``col``."""
-    start = max([0] + [m.end() for m in re.finditer(r"[.!?]\s+", line) if m.end() <= col])
-    end = re.search(r"[.!?](?:\s|$)", line[col:])
+    start = max([0] + [m.end() for m in re.finditer(_SENTENCE_END + r"\s+", line) if m.end() <= col])
+    end = re.search(_SENTENCE_END + r"(?:\s|$)", line[col:])
     return line[start : col + end.end() if end else len(line)]
 
 
@@ -52,6 +55,8 @@ def test_a_negation_counts_only_in_its_own_sentence():
     col = line.index("auth.json")
     assert _sentence(line, col) == "Read the token from `~/.x/auth.json` for the API."
     assert _sentence("Never `cat ~/.x/auth.json`.", 10) == "Never `cat ~/.x/auth.json`."
+    bold = "**Never show a value.** Only list names with `railway variables`."
+    assert _sentence(bold, bold.index("railway")) == "Only list names with `railway variables`."
 
 
 def test_files_are_found():
@@ -119,3 +124,18 @@ def test_an_agent_told_to_write_a_file_is_granted_the_write_tool():
         if not tools or "  - Write\n" not in tools.group(1):
             missing.append(str(agent.relative_to(REPO)))
     assert not missing, "list Write in the agent's tools:\n" + "\n".join(missing)
+
+
+def test_branch_create_output_goes_to_a_file():
+    # `neon branches create` prints the new branch's connection strings.
+    pattern = re.compile(r"^.*(?:<NEON>|\bneon(?:\x40[\w.]+)?)\s+branches create\b(?!.*\s>).*$", re.MULTILINE)
+    hits = _hits(pattern)
+    assert not hits, "send the output to a private file with >:\n" + "\n".join(hits)
+
+
+def test_railway_variables_output_goes_to_a_file():
+    # `railway variables` prints each variable's value with its name.
+    # The match ends at the command, so a negation counts only in its sentence.
+    pattern = re.compile(r"\brailway variables?\b(?![^\n]*\s>)")
+    hits = _hits(pattern, skip=_PROSE_SAYS_NOT)
+    assert not hits, "send the output to a private file with > and show only the names:\n" + "\n".join(hits)

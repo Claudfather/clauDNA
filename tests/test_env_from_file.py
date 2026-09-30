@@ -8,6 +8,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO = Path(__file__).resolve().parent.parent
 SCRIPT = REPO / "scripts" / "env_from_file.py"
 PROBE = "import os, sys; print(os.environ.get('TARGET')); print(sys.argv[1:])"
@@ -64,15 +66,16 @@ def test_a_value_reaches_the_command_environment_renamed_and_not_its_argv(tmp_pa
 
 
 def test_the_file_is_read_as_text_never_run(tmp_path):
-    (tmp_path / ".env").write_text('DATABASE_URL="$(touch ran-by-shell)`touch ran-by-backtick`"\n')
+    (tmp_path / ".env").write_text('DATABASE_URL="$(touch ran-by-shell)`touch ran-by-backtick`$HOME"\n')
     run = _run(".env", "DATABASE_URL=TARGET", "--", sys.executable, "-c", PROBE, cwd=tmp_path)
     assert run.returncode == 0, run.stderr
-    assert run.stdout.splitlines()[0] == "$(touch ran-by-shell)`touch ran-by-backtick`"
+    assert run.stdout.splitlines()[0] == "$(touch ran-by-shell)`touch ran-by-backtick`$HOME"
     assert not (tmp_path / "ran-by-shell").exists() and not (tmp_path / "ran-by-backtick").exists()
 
 
-def test_a_missing_key_runs_nothing(tmp_path):
-    (tmp_path / ".env").write_text("OTHER=x\n")
+@pytest.mark.parametrize("content", ["OTHER=x\n", "DATABASE_URL=\n"], ids=["missing", "empty"])
+def test_a_missing_or_empty_key_runs_nothing(tmp_path, content):
+    (tmp_path / ".env").write_text(content)
     run = _run(".env", "DATABASE_URL", "--", "touch", "ran", cwd=tmp_path)
     assert run.returncode == 2 and "not set" in run.stderr
     assert not (tmp_path / "ran").exists()
@@ -86,8 +89,33 @@ def test_comments_quotes_and_export_parse(tmp_path):
     spec.loader.exec_module(mod)
     (tmp_path / ".env").write_text(
         "# a comment\n\nexport A=one\nB = \"two words\"\nC='three' \nD=four # trailing note\nnot a line\n"
+        "E=\"five # not a comment\" # a comment\nF='six' #c\nG=seven\t# tab note\n"
     )
-    assert mod.parse(str(tmp_path / ".env")) == {"A": "one", "B": "two words", "C": "three", "D": "four"}
+    assert mod.parse(str(tmp_path / ".env")) == {
+        "A": "one",
+        "B": "two words",
+        "C": "three",
+        "D": "four",
+        "E": "five # not a comment",
+        "F": "six",
+        "G": "seven",
+    }
+
+
+def test_a_byte_order_mark_does_not_hide_the_first_key(tmp_path):
+    (tmp_path / ".env").write_bytes(b"\xef\xbb\xbfFIRST=1\nSECOND=2\n")
+    run = _run(".env", "--has", "FIRST", cwd=tmp_path)
+    assert (run.returncode, run.stdout) == (0, "FIRST\n"), run.stderr
+
+
+@pytest.mark.parametrize(
+    "content", [b"DATABASE_URL=x\x00y\n", b"DATABASE_URL=\xff\n"], ids=["nul-in-value", "not-utf-8"]
+)
+def test_a_value_the_command_cannot_take_is_refused_without_a_traceback(tmp_path, content):
+    (tmp_path / ".env").write_bytes(content)
+    run = _run(".env", "DATABASE_URL", "--", "touch", "ran", cwd=tmp_path)
+    assert run.returncode == 2 and "Traceback" not in run.stderr, run.stderr
+    assert not (tmp_path / "ran").exists()
 
 
 # A Postgres URL becomes libpq's own variables. libpq does not read a URL from
@@ -107,7 +135,13 @@ def test_the_url_alone_decides_the_target(tmp_path):
     # A service or host address already in the environment would outrank or
     # redirect the URL's host, so every inherited PG* variable is dropped.
     (tmp_path / ".env").write_text(f"DATABASE_URL={URL}\n")
-    env = {**os.environ, "PGSERVICE": "elsewhere", "PGHOSTADDR": "192.0.2.1", "PGPASSWORD": "other-fake"}
+    env = {
+        **os.environ,
+        "PGSERVICE": "elsewhere",
+        "PGHOSTADDR": "192.0.2.1",
+        "PGPASSWORD": "other-fake",
+        "PGCONNECT_TIMEOUT": "99",
+    }
     run = _run(".env", "DATABASE_URL=@libpq", "--", sys.executable, "-c", PG_PROBE, cwd=tmp_path, env=env)
     assert _probe(run)["env"] == EXPANDED
 
@@ -123,6 +157,7 @@ def test_a_value_libpq_cannot_take_as_a_url_is_refused_without_showing_it(tmp_pa
         "mysql://u:topsecret-fake@h/db",
         "host=h password=topsecret-fake",
         "postgresql://u:topsecret-fake@h1:5432,h2:5432/db",
+        "postgresql://u:topsecret-fake\uff03x@h/db",
     ):
         (tmp_path / ".env").write_text(f"DATABASE_URL={value}\n")
         run = _run(".env", "DATABASE_URL=@libpq", "--", "touch", "ran", cwd=tmp_path)
@@ -158,3 +193,15 @@ def test_url_env_runs_nothing_when_the_variable_is_empty_or_missing(tmp_path):
         run = _run("--url-env", "DATABASE_URL", "--", "touch", "ran", cwd=tmp_path, env=env)
         assert run.returncode == 2 and "DATABASE_URL" in run.stderr
         assert not (tmp_path / "ran").exists()
+
+
+def test_a_host_in_the_query_string_is_used(tmp_path):
+    (tmp_path / ".env").write_text("DATABASE_URL=postgresql:///app?host=/tmp/fake-socket-dir\n")
+    run = _run(".env", "DATABASE_URL=@libpq", "--", sys.executable, "-c", PG_PROBE, cwd=tmp_path)
+    assert _probe(run)["env"] == {"PGHOST": "/tmp/fake-socket-dir", "PGDATABASE": "app"}
+
+
+def test_an_unencoded_colon_in_the_password_is_kept(tmp_path):
+    (tmp_path / ".env").write_text("DATABASE_URL=postgresql://fakeuser:pa:ss-fake@db.example.test/app\n")
+    run = _run(".env", "DATABASE_URL=@libpq", "--", sys.executable, "-c", PG_PROBE, cwd=tmp_path)
+    assert _probe(run)["env"]["PGPASSWORD"] == "pa:ss-fake"
