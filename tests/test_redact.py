@@ -216,3 +216,129 @@ class TestInlinedFlagValues:
         out = redact_text(f"Error: command failed: {cmd}")
         assert value not in out
         assert MASK in out
+
+
+# --- #356: current credential shapes --------------------------------------------
+# FAKE values, assembled from fragments like FAKE above, so no contiguous
+# credential sits in the source. One case per shape: the list below IS the
+# redactor's tested coverage.
+FAKE_CURRENT = {
+    "telegram_token_in_bot_url": "https://api.telegram.org/bot" + "8012345678" + ":" + "AA" + "_bC" * 12 + "/sendMessage",
+    "github_fine_grained_pat": "github_pat_" + "11ABCDEFG" + "0" * 13 + "_" + "aB3" * 19 + "cd",
+    "stripe_live_secret": "sk_" + "live_" + "aB3" * 8,
+    "stripe_restricted_test": "rk_" + "test_" + "aB3" * 8,
+    "stripe_webhook_secret": "whsec_" + "aB3" * 11,
+    "openai_project_key": "sk-" + "proj-" + "aB3" * 16 + "_" + "Xy9" * 5,
+    "anthropic_key": "sk-" + "ant-" + "api03-" + "aB3-" * 20 + "AA",
+    "openrouter_key": "sk-" + "or-" + "v1-" + "ab12" * 16,
+    "npm_token": "npm_" + "aB3" * 12,
+    "huggingface_token": "hf_" + "aB3" * 11 + "c",
+    "groq_key": "gsk_" + "aB3" * 16,
+    "gitlab_pat": "glpat-" + "aB3" * 6 + "-_",
+    "aws_temporary_key_id": "ASIA" + "QRST1234UVWX5678",
+    "slack_refresh_token": "xox" + "e-" + "1-" + "aB3" * 8,
+    "slack_app_token": "xapp-" + "1-" + "A0" * 5 + "-" + "1" * 12 + "-" + "ab" * 32,
+}
+
+# Assignments and headers whose VALUE has no vendor shape: the name or the
+# context is the signal. The value after the separator must not survive.
+CONTEXT_SECRETS = [
+    ("SECRET_KEY=", "Fk3" * 8),
+    ("GITHUB_PAT=", "Fk3" * 8),
+    ("DB_PASS=", "Fk3pw" * 3),
+    ("SMTP_PWD: ", "Fk3pw" * 3),
+    ("SIGNING_PRIVATE_KEY=", "Fk3" * 8),
+    ('{"clientSecret": "', "Fk3" * 8),
+    ("Authorization: Bearer ", "aB3" * 10),
+    ("Authorization: Basic ", "dXNlcjpw" + "YXNz" * 4),
+    ("doctl auth init --access-token ", "dop_v1_" + "ab12" * 16),
+    ("gh-cli --api-token ", "Fk3" * 8),
+    ("curl -u admin:", "Fk3pw" * 3),
+    ("redis://:", "s3Kr3t" + "Pwd0rd"),
+]
+
+# Must survive verbatim: the new rules must not eat ordinary output.
+BENIGN_CURRENT = [
+    "Branch fix/1822-Heavy-Slot-Guard-Classifier-v2 is merged.",
+    "PATH=/usr/local/bin:/usr/bin:/bin",
+    "PWD=/home/user/project",
+    "MY_PATH=/opt/tools/bin",
+    "tokenizer=bert-base-uncased-v2",
+    "max_tokens=4096 and TOKEN_TYPE=bearer",
+    "Compare test_login_flow_Handles_Expired_Session_2 with its sibling.",
+    "git push -u origin feat/add-redactor-rules",
+]
+
+
+class TestCurrentShapes:
+    @pytest.mark.parametrize("name", list(FAKE_CURRENT))
+    def test_redacts_current_shape(self, name):
+        value = FAKE_CURRENT[name]
+        out = redact_text(f"captured output with {value} in it")
+        assert _leaked(value, out) is None, out
+        assert MASK in out
+
+    @pytest.mark.parametrize("prefix,value", CONTEXT_SECRETS)
+    def test_redacts_value_by_its_context(self, prefix, value):
+        out = redact_text(f"line: {prefix}{value}@host tail" if prefix.endswith("://:") else f"line: {prefix}{value} tail")
+        assert value not in out, out
+        assert MASK in out
+
+    def test_keeps_the_name_of_a_masked_assignment(self):
+        out = redact_text("SECRET_KEY=" + "Fk3" * 8)
+        assert out.startswith("SECRET_KEY=") and MASK in out
+
+    def test_redacts_a_pem_private_key_block(self):
+        # Real base64 lines carry + and /, which split them into short runs no
+        # entropy backstop sees: only a block rule can catch the key.
+        body = "MIIEpAIBAAKCAQEA" + "+aB3/" * 9
+        pem = "-----BEGIN " + "RSA PRIVATE KEY-----\n" + body + "\n" + "/Xy9+" * 12 + "\n-----END RSA PRIVATE KEY-----"
+        out = redact_text(f"key file:\n{pem}\nnext line")
+        assert body not in out and "/Xy9+" * 12 not in out
+        assert "next line" in out and MASK in out
+
+    def test_redacts_an_unterminated_pem_block(self):
+        out = redact_text("-----BEGIN " + "OPENSSH PRIVATE KEY-----\n" + "b3Bl" + "+aB3/" * 12)
+        assert "+aB3/" * 12 not in out and MASK in out
+
+    def test_preserves_benign_lines(self):
+        for line in BENIGN_CURRENT:
+            assert redact_text(line) == line, f"over-redacted: {line!r}"
+
+    def test_idempotent_on_current_shapes(self):
+        blob = "\n".join(FAKE_CURRENT.values())
+        once = redact_text(blob)
+        assert redact_text(once) == once
+
+
+class TestInPlaceRobustness:
+    def test_a_file_that_is_not_utf8_is_still_redacted(self, tmp_path):
+        secret = FAKE["github_pat"]
+        f = tmp_path / "mixed.log"
+        f.write_bytes(b"\xff\xfe latin-1 bytes \xe9 then " + secret.encode() + b"\n")
+        proc = subprocess.run([sys.executable, str(REDACT_PY), str(f)],
+                              capture_output=True, text=True)
+        data = f.read_bytes()
+        assert secret.encode() not in data and MASK.encode() in data
+        assert data.startswith(b"\xff\xfe latin-1 bytes \xe9")  # the other bytes are kept
+        assert proc.returncode == 0
+
+    def test_one_failure_does_not_stop_the_rest(self, tmp_path):
+        missing = tmp_path / "missing.md"
+        later = tmp_path / "later.md"
+        later.write_text(f"key {FAKE['openai_key']}\n")
+        proc = subprocess.run([sys.executable, str(REDACT_PY), str(missing), str(later)],
+                              capture_output=True, text=True)
+        assert FAKE["openai_key"] not in later.read_text()
+        assert proc.returncode != 0 and "missing.md" in proc.stderr
+
+    def test_a_symlink_is_not_written_through(self, tmp_path):
+        target = tmp_path / "target.md"
+        target.write_text(f"key {FAKE['openai_key']}\n")
+        link = tmp_path / "link.md"
+        link.symlink_to(target)
+        proc = subprocess.run([sys.executable, str(REDACT_PY), str(link)],
+                              capture_output=True, text=True)
+        assert link.is_symlink()
+        assert target.read_text() == f"key {FAKE['openai_key']}\n"
+        assert proc.returncode != 0 and "symlink" in proc.stderr
