@@ -22,6 +22,8 @@ from pathlib import Path
 from .schema import is_instance
 
 STATE_DIR_ENV = "CLAUDNA_STATE_DIR"
+#: Set in every process clauDNA spawns (summarizer, its claude -p): nothing under it records.
+CHILD_ENV = "CLAUDNA_SESSION_CHILD"
 DEFAULT_STATE_DIR = "~/.claudna"
 
 #: Opaque, but safe as a single path component: no separators, no leading dot.

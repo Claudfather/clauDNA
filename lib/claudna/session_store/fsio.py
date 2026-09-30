@@ -160,34 +160,22 @@ def read_jsonl(path: Path) -> JsonlRead:
 
 
 @contextlib.contextmanager
-def try_exclusive_lock(path: Path) -> Iterator[bool]:
-    """Try to take an exclusive ``flock`` on ``path`` without waiting; yield whether it was taken.
+def exclusive_lock(path: Path, *, blocking: bool = True) -> Iterator[bool]:
+    """Hold an exclusive ``flock`` on ``path`` for the ``with`` body; yield whether it was taken.
 
-    For single-flight work (one summarizer per segment): a second runner sees
-    ``False`` and leaves the work to the first.
-    """
-    fd = os.open(path, os.O_RDWR | os.O_CREAT, FILE_MODE)
-    try:
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            yield False
-            return
-        yield True
-    finally:
-        os.close(fd)
-
-
-@contextlib.contextmanager
-def exclusive_lock(path: Path) -> Iterator[None]:
-    """Hold an exclusive ``flock`` on ``path`` for the ``with`` body (blocking).
-
+    Blocking by default (always ``True``). With ``blocking=False`` a lock
+    someone else holds yields ``False`` at once — single-flight work (one
+    summarizer per segment, one harvest per host) leaves it to the holder.
     The lock file's directory must already exist: taking a lock never creates
     directories.
     """
     fd = os.open(path, os.O_RDWR | os.O_CREAT, FILE_MODE)
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        yield
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX if blocking else fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            yield False
+            return
+        yield True
     finally:
         os.close(fd)

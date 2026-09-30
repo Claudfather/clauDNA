@@ -24,10 +24,10 @@ from pathlib import Path
 
 import pytest
 
-from claudna.session_store import schema, summarize, transcript
+from conftest import ACTOR, ORIGIN
 
-ACTOR = {"kind": "interactive", "fleet": None, "bot_id": None, "bot_name": None, "model": None, "entrypoint": "cli"}
-ORIGIN = {"cwd": "/work", "repo": None, "branch": None, "head": None}
+from claudna.session_store import schema, summarize, transcript
+from claudna.session_store.fsio import exclusive_lock
 
 GOOD_OUTPUT = {
     "journey": {"title": "Fix the flaky auth test", "intent": "Make CI green", "outcome": "shipped",
@@ -114,6 +114,12 @@ class TestTranscript:
         assert [t.text for t in turns] == []  # "two" starts before the range, "three" ends after it
         assert [t.text for t in transcript.read_range(path, first_end - 1, len(data))] == ["two", "three"]
 
+    def test_a_range_that_starts_on_a_line_boundary_keeps_its_first_line(self, tmp_path):
+        path = tmp_path / "t.jsonl"
+        write_transcript(path, [record("user", "one"), record("user", "two")])
+        boundary = path.read_bytes().index(b"\n") + 1
+        assert [t.text for t in transcript.read_range(path, boundary, None)] == ["two"]
+
     def test_render_keeps_the_most_recent_text(self):
         turns = [transcript.Turn("user", "a" * 50), transcript.Turn("assistant", "b" * 50)]
         out = transcript.render(turns, limit=60)
@@ -128,6 +134,15 @@ class TestTranscript:
 # ── the summarizer ───────────────────────────────────────────────────────────
 
 
+class TestSummarySchema:
+    def test_the_artifacts_summary_fields_are_exactly_the_model_output(self):
+        full = schema.load("segment-summary")
+        model = full["$defs"]["model_output"]
+        assert {k: full["properties"][k] for k in model["properties"]} == model["properties"]
+        assert set(model["required"]) <= set(full["required"])
+        assert "$ref" not in json.dumps(model)  # it goes to claude --json-schema as is
+
+
 class TestSummarize:
     def test_a_sealed_segment_is_summarized_validated_and_recorded(self, sealed):
         runner = FakeRunner()
@@ -138,7 +153,7 @@ class TestSummarize:
         assert call["schema"] == schema.load("segment-summary")["$defs"]["model_output"]
         artifact = json.loads((sealed.paths.segment(1).dir / "summary.json").read_text())
         assert schema.validate(artifact, schema.load("segment-summary")) == []
-        assert artifact["summary"] == GOOD_OUTPUT and artifact["input"]["turns"] == 3
+        assert {k: artifact[k] for k in GOOD_OUTPUT} == GOOD_OUTPUT and artifact["input"]["turns"] == 3
         assert events(sealed)[-2:] == ["summary.requested", "summary.completed"]
         assert summary_status(sealed) == "done"
 
@@ -198,9 +213,7 @@ class TestSummarize:
         assert summarize.summarize(h, 9, env={}, runner=FakeRunner()) == "ignored: no segment 9"
 
     def test_one_summarizer_per_segment(self, sealed):
-        from claudna.session_store.fsio import try_exclusive_lock
-
-        with try_exclusive_lock(sealed.paths.segment(1).dir / ".summarize.lock") as taken:
+        with exclusive_lock(sealed.paths.segment(1).dir / ".summarize.lock", blocking=False) as taken:
             assert taken
             out = summarize.summarize(sealed, 1, env={}, runner=FakeRunner())
         assert out == "ignored: another summarizer holds the segment"

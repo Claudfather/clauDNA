@@ -39,7 +39,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from . import boundaries, summarize
+from . import boundaries
 from . import events as ev
 from . import schema
 from .fsio import append_jsonl, ensure_dir, read_json, read_jsonl
@@ -190,14 +190,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="claudna.session_store", description="clauDNA session store")
     sub = parser.add_subparsers(dest="verb", required=True)
     for verb, text in (("rebuild", "regenerate projections from logs"),
-                       ("check", "validate logs and projections; writes nothing")):
+                       ("check", "validate logs and projections; writes nothing"),
+                       ("summarize", "summarize one sealed segment (the detached worker)")):
         p = sub.add_parser(verb, help=text)
         p.add_argument("sid")
+        if verb == "summarize":
+            p.add_argument("seg", type=int)
         p.add_argument("--root", help="store root (default: $CLAUDNA_STATE_DIR or ~/.claudna)")
-    summ = sub.add_parser("summarize", help="summarize one sealed segment (the detached worker)")
-    summ.add_argument("sid")
-    summ.add_argument("seg", type=int)
-    summ.add_argument("--root", help="store root (default: $CLAUDNA_STATE_DIR or ~/.claudna)")
     hook = sub.add_parser("hook", help="apply one Claude Code hook event (payload on stdin); always exits 0")
     hook.add_argument("event")
     args = parser.parse_args(argv)
@@ -209,6 +208,8 @@ def main(argv: list[str] | None = None) -> int:
     if handle is None:
         return 1
     if args.verb == "summarize":
+        from . import summarize  # off the hook path: it pulls in hashlib, uuid and subprocess
+
         print(summarize.summarize(handle, args.seg))
         return 0
     if args.verb == "rebuild":

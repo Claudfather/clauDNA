@@ -63,25 +63,32 @@ def turn_of(record: object) -> Turn | None:
 def read_range(path: Path, start: int, end: int | None) -> list[Turn]:
     """The prose turns whose lines lie wholly inside ``[start, end)`` of ``path``.
 
-    Raises ``FileNotFoundError`` when the transcript is gone (Claude Code deletes
-    old ones); the caller records that as a skip.
+    Streams line by line up to ``end`` (a segment can be many MB), and only
+    parses lines that can carry prose: a user or assistant record. Raises
+    ``FileNotFoundError`` when the transcript is gone (Claude Code deletes old
+    ones); the caller records that as a skip.
     """
-    with open(path, "rb") as fh:
-        fh.seek(start)
-        data = fh.read() if end is None else fh.read(max(0, end - start))
-    lines = data.split(b"\n")
-    if start > 0:
-        lines = lines[1:]  # the first piece may be the tail of a line before the range
-    if not data.endswith(b"\n"):
-        lines = lines[:-1]  # the last piece may be a line the range cuts
     turns = []
-    for line in lines:
-        try:
-            turn = turn_of(json.loads(line))
-        except (ValueError, UnicodeDecodeError):
-            continue
-        if turn is not None:
-            turns.append(turn)
+    with open(path, "rb") as fh:
+        pos = start
+        if start > 0:
+            fh.seek(start - 1)
+            if fh.read(1) != b"\n":  # the range starts mid-line: skip that line's tail
+                pos += len(fh.readline())
+        fh.seek(pos)
+        for line in fh:
+            pos += len(line)
+            if (end is not None and pos > end) or not line.endswith(b"\n"):
+                break  # a line the range cuts, or one still being written
+            if b'"type":"user"' not in line and b'"type":"assistant"' not in line and \
+                    b'"type": "user"' not in line and b'"type": "assistant"' not in line:
+                continue
+            try:
+                turn = turn_of(json.loads(line))
+            except (ValueError, UnicodeDecodeError):
+                continue
+            if turn is not None:
+                turns.append(turn)
     return turns
 
 

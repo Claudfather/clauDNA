@@ -21,7 +21,9 @@ Guards, in order (each makes the hook record nothing):
 * An event or payload this adapter doesn't know.
 
 After a seal, the adapter starts the summarizer for that segment as a detached
-process (:func:`spawn_summarizer`) and returns at once; clear lineage
+process (:func:`spawn_summarizer`) and returns at once — unless the summary
+gate is closed for the session (private, headless, a bot, switched off), in
+which case it records ``summary.skipped`` itself and starts nothing; clear lineage
 (``parent_sid``) arrives in a later phase. It never prints: SessionStart stdout
 would land in the agent's context.
 """
@@ -34,12 +36,11 @@ from pathlib import Path
 from typing import Callable, Mapping
 
 from . import events as ev
-from .paths import InvalidSessionId
+from .paths import CHILD_ENV, InvalidSessionId
 from .fsio import ensure_dir, file_size
-from .project import SessionFacts, load_lifecycle, session_facts
+from .project import SessionFacts, load_lifecycle, session_facts, summary_gate
 from .store import SessionHandle, SessionStore
 
-CHILD_ENV = "CLAUDNA_SESSION_CHILD"
 _SOURCES = ev.REGISTRY["session.opened"].choices["source"]
 _CLOSE_REASONS = ev.REGISTRY["session.closed"].choices["reason"]
 _TRIGGERS = ev.REGISTRY["segment.sealed"].choices["trigger"]
@@ -128,16 +129,20 @@ def spawn_summarizer(handle: SessionHandle, index: int, env: Mapping[str, str]) 
         )
 
 
-Spawner = Callable[[SessionHandle, int, Mapping[str, str]], None]
-
-
-def _seal(handle: SessionHandle, payload: dict, sealed_by: str, trigger: str | None) -> int | None:
+def _seal(handle: SessionHandle, payload: dict, facts: SessionFacts, env: Mapping[str, str], *,
+          sealed_by: str, trigger: str | None, spawn: Callable[..., None]) -> bool:
+    """Seal the current segment, then summarize it: spawn the worker, or record why not."""
     index = handle.current_segment()
     if index is None:
-        return None
+        return False
     handle.seal_segment(file_size(payload.get("transcript_path")), sealed_by, index=index, trigger=trigger,
                         clamp=True)
-    return index
+    reason = summary_gate(facts, env)
+    if reason:
+        handle.append("summary.skipped", {"reason": reason}, seg=index)
+    else:
+        spawn(handle, index, env)
+    return True
 
 
 def _facts(handle: SessionHandle) -> SessionFacts:
@@ -163,7 +168,7 @@ def _inherited(event: str, payload: dict, facts: SessionFacts, env: Mapping[str,
 
 
 def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str, str],
-           spawn: Spawner = spawn_summarizer) -> str:
+           spawn: Callable[..., None] | None = None) -> str:
     """Apply one hook event to the store; return what happened, for tests and the error log.
 
     Raises only on a store failure (the caller logs it); every guard returns.
@@ -185,18 +190,14 @@ def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str
         return "ignored: nested child with an inherited session id"
     if event == "SessionStart":
         return _session_start(session, payload, env)
+    spawn = spawn or spawn_summarizer
     if event == "PreCompact":
         trigger = payload.get("trigger") if payload.get("trigger") in _TRIGGERS else None
-        index = _seal(session, payload, "precompact", trigger)
-        if index is None:
-            return "ignored: no segment"
-        spawn(session, index, env)
-        return "segment sealed"
+        sealed = _seal(session, payload, facts, env, sealed_by="precompact", trigger=trigger, spawn=spawn)
+        return "segment sealed" if sealed else "ignored: no segment"
     if facts.status != "open":
         return "ignored: no open session"
-    index = _seal(session, payload, "session_end", None)
+    _seal(session, payload, facts, env, sealed_by="session_end", trigger=None, spawn=spawn)
     reason = payload.get("reason") if payload.get("reason") in _CLOSE_REASONS else "other"
     session.close_session(reason)
-    if index is not None:
-        spawn(session, index, env)
     return f"session closed ({reason})"

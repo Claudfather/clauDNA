@@ -11,6 +11,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
 
 from claudna.session_store.store import SessionStore  # noqa: E402
 
+ACTOR = {"kind": "interactive", "fleet": None, "bot_id": None, "bot_name": None, "model": None, "entrypoint": "cli"}
+ORIGIN = {"cwd": "/work", "repo": None, "branch": None, "head": None}
+
 
 @pytest.fixture
 def store(tmp_path: Path) -> SessionStore:

@@ -167,6 +167,26 @@ class SessionFacts:
     private: bool
 
 
+SUMMARY_ENV = "CLAUDNA_SESSION_SUMMARY"
+
+
+def summary_gate(facts: SessionFacts, env) -> str | None:
+    """The ``summary.skipped`` reason for a session's segments, or ``None`` to summarize (spec §7.1).
+
+    Summaries are on for interactive sessions; headless ``claude -p`` and
+    Claudlobby bots are off unless ``CLAUDNA_SESSION_SUMMARY=1``; ``=0`` turns
+    them off everywhere; a private session is never summarized.
+    """
+    if facts.private:
+        return "private"
+    switch = env.get(SUMMARY_ENV)
+    if switch == "0":
+        return "disabled"
+    if switch != "1" and (facts.actor or {}).get("kind") in ("headless", "bot"):
+        return "headless"
+    return None
+
+
 def session_facts(lifecycle: list[dict]) -> SessionFacts:
     actor, private = None, False
     for e in lifecycle:
@@ -227,12 +247,10 @@ def project_session(sid: str, lifecycle: Log, segments: list[dict], *, transcrip
     first = next((e for e in lifecycle.events if e["kind"] == "session.opened"), None)
     status, closed_at, close_reason = session_status(lifecycle.events)
     children: list[str] = []
-    private = False
     for e in lifecycle.events:
         if e["kind"] == "session.child_linked" and e["data"]["child_sid"] not in children:
             children.append(e["data"]["child_sid"])
-        elif e["kind"] == "session.privacy_set":
-            private = e["data"]["private"]
+    private = session_facts(lifecycle.events).private
 
     tally = dict.fromkeys(_SUMMARY_STATUS.values(), 0)
     for s in segments:

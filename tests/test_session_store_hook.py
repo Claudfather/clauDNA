@@ -43,19 +43,12 @@ def transcript(tmp_path: Path) -> Path:
     return path
 
 
-SPAWNED: list[tuple[str, int]] = []
-
-
-def record_spawn(handle, index, env) -> None:
-    """Tests never start a real summarizer: record what would have been spawned."""
-    SPAWNED.append((handle.sid, index))
-
-
 @pytest.fixture(autouse=True)
-def _no_real_summarizer(monkeypatch):
-    SPAWNED.clear()
-    monkeypatch.setattr(boundaries, "spawn_summarizer", record_spawn)
-    monkeypatch.setitem(boundaries.handle.__kwdefaults__, "spawn", record_spawn)
+def spawned(monkeypatch) -> list[tuple[str, int]]:
+    """Tests never start a real summarizer: each spawn is recorded instead."""
+    calls: list[tuple[str, int]] = []
+    monkeypatch.setattr(boundaries, "spawn_summarizer", lambda handle, index, env: calls.append((handle.sid, index)))
+    return calls
 
 
 def fire(store, event: str, transcript: Path, env=CLI_ENV, **fields) -> str:
@@ -99,12 +92,21 @@ class TestBoundaries:
             ("sealed", "precompact", {"start": 100, "end": 150})
         assert (seg2["opened_by"], seg2["transcript"]["range"]["start"]) == ("compact", 150)
 
-    def test_each_seal_starts_the_summarizer_for_that_segment(self, store, transcript):
+    def test_each_seal_starts_the_summarizer_for_that_segment(self, store, transcript, spawned):
         fire(store, "SessionStart", transcript, source="startup")
         fire(store, "PreCompact", transcript, trigger="auto")
         fire(store, "SessionStart", transcript, source="compact")
         fire(store, "SessionEnd", transcript, reason="other")
-        assert SPAWNED == [(SID, 1), (SID, 2)]
+        assert spawned == [(SID, 1), (SID, 2)]
+
+    @pytest.mark.parametrize("env,reason", [({"CLAUDE_CODE_ENTRYPOINT": "sdk-cli"}, "headless"),
+                                            ({**CLI_ENV, "CLAUDNA_SESSION_SUMMARY": "0"}, "disabled")])
+    def test_a_closed_summary_gate_is_recorded_by_the_hook_and_spawns_nothing(self, store, transcript, spawned,
+                                                                             env, reason):
+        fire(store, "SessionStart", transcript, env=env, source="startup")
+        fire(store, "SessionEnd", transcript, env=env, reason="other")
+        last = json.loads(store.session(SID).paths.lifecycle.read_text().splitlines()[-2])
+        assert spawned == [] and (last["kind"], last["data"]) == ("summary.skipped", {"reason": reason})
 
     def test_a_blocked_compaction_reseals_later(self, store, transcript):
         fire(store, "SessionStart", transcript, source="startup")
