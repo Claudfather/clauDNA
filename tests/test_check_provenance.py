@@ -13,6 +13,7 @@ stubbed via a fake gh on PATH.
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -214,3 +215,98 @@ class TestGhEnvironmentCannotForgeTheVerdict:
         assert env.get("GH_TOKEN") == "t"
         assert env.get("GH_CONFIG_DIR") == "/c"
         assert env.get("PATH") == "/usr/bin"
+
+
+def _run_cli(args, gh):
+    env = {"PATH": str(Path(gh).parent) + ":/usr/bin:/bin"}
+    return subprocess.run(
+        [sys.executable, str(SCRIPT), *args],
+        capture_output=True, text=True, env=env,
+    )
+
+
+def _fake_run(monkeypatch, exc=None, rc=0, stdout="MEMBER"):
+    """Replace subprocess.run in the gate; record the call; raise or answer."""
+    calls = {}
+
+    def fake_run(argv, **kw):
+        calls["argv"], calls["kw"] = argv, kw
+        if exc is not None:
+            raise exc
+
+        class R:
+            returncode = rc
+            stderr = ""
+
+        R.stdout = stdout
+        return R()
+
+    monkeypatch.setattr(cp.subprocess, "run", fake_run)
+    return calls
+
+
+class TestEveryFailurePathRefuses:
+    """No failure path may read as trusted: each one answers UNREADABLE."""
+
+    def test_an_os_error_is_unreadable(self, monkeypatch):
+        _fake_run(monkeypatch, exc=PermissionError("denied"))
+        assoc, reason = cp.read_assoc("repos/o/r/issues/1")
+        assert assoc is None and reason
+
+    def test_a_timeout_is_unreadable(self, monkeypatch):
+        _fake_run(monkeypatch, exc=cp.subprocess.TimeoutExpired(["gh"], 30))
+        assoc, reason = cp.read_assoc("repos/o/r/issues/1")
+        assert assoc is None and reason
+
+    def test_a_failed_gh_is_unreadable_whatever_it_printed(self, monkeypatch):
+        _fake_run(monkeypatch, rc=1, stdout="OWNER")
+        assoc, _ = cp.read_assoc("repos/o/r/issues/1")
+        assert assoc is None
+
+    def test_null_is_unreadable(self, monkeypatch):
+        _fake_run(monkeypatch, stdout="null\n")
+        assoc, _ = cp.read_assoc("repos/o/r/issues/1")
+        assert assoc is None
+
+    def test_gh_runs_under_a_time_limit(self, monkeypatch):
+        calls = _fake_run(monkeypatch)
+        cp.read_assoc("repos/o/r/issues/1")
+        assert 0 < calls["kw"].get("timeout", 0) <= 60
+
+
+class TestNothingElseChoosesTheProgram:
+    """The gate runs `gh`, found on PATH, and nothing else: no option and no
+    environment variable of its own names a program."""
+
+    def test_the_program_is_gh_whatever_the_environment_holds(self, monkeypatch):
+        for var in ("GH_BIN", "GH", "GH_PATH", "GH_PROGRAM", "CHECK_PROVENANCE_GH"):
+            monkeypatch.setenv(var, "/elsewhere/prog")
+        calls = _fake_run(monkeypatch)
+        cp.read_assoc("repos/o/r/issues/1")
+        assert calls["argv"][:2] == ["gh", "api"], calls["argv"]
+
+    def test_the_only_option_is_help(self):
+        r = subprocess.run(
+            [sys.executable, str(SCRIPT), "--help"],
+            capture_output=True, text=True, env={"PATH": "/usr/bin:/bin"},
+        )
+        # main() answers 1 for every argparse exit, --help included (fail closed).
+        options = re.findall(r"(?m)^\s+(-[^\s,]+(?:, --[^\s]+)?)", r.stdout)
+        assert options == ["-h, --help"], r.stdout
+
+
+class TestWhatTheGatePrints:
+    """The verdict line reaches the model, so it carries only a known value."""
+
+    def test_output_that_is_not_utf8_is_refused_not_a_crash(self, tmp_path):
+        gh = _fake_gh(tmp_path, r"printf '\377\376OWNER\n'")
+        r = _run_cli(["o", "r", "issue", "1"], gh)
+        assert r.returncode in (2, 3), (r.returncode, r.stderr)
+        assert "Traceback" not in r.stderr
+        assert r.stdout.split()[0] in ("UNTRUSTED", "UNREADABLE"), r.stdout
+
+    def test_an_unrecognized_value_is_not_repeated(self, tmp_path):
+        gh = _fake_gh(tmp_path, "echo 'NONE and some other words'")
+        r = _run_cli(["o", "r", "issue", "1"], gh)
+        assert r.returncode == 2
+        assert "other words" not in r.stdout + r.stderr, r.stdout + r.stderr
