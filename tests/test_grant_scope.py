@@ -133,6 +133,23 @@ REJECTED_FORMS = [
     "Bash(gh workflow *)",
     "Bash(gh run *)",
     "Bash(gh --repo x api *)",
+    # gh whole-verb families and write verbs (vera #360 r3)
+    "Bash(gh pr *)",
+    "Bash(gh issue *)",
+    "Bash(gh label *)",
+    "Bash(gh browse *)",
+    "Bash(gh pr merge *)",
+    "Bash(gh issue create *)",
+    "Bash(gh pr create *)",
+    # git fetch reaches --upload-pack code exec
+    "Bash(git fetch *)",
+    # command runs any program; deno/bun run subcommands execute
+    "Bash(command *)",
+    "Bash(command git status)",
+    "Bash(deno run *)",
+    "Bash(deno task test)",
+    "Bash(bun run *)",
+    "Bash(bun x *)",
 ]
 
 
@@ -159,7 +176,6 @@ ACCEPTED_FORMS = [
     "Bash(git commit *)",
     "Bash(git checkout *)",
     "Bash(git branch *)",
-    "Bash(git fetch *)",
     "Bash(git rev-parse *)",
     "Bash(git mv *)",
     "Bash(git reset *)",
@@ -172,8 +188,10 @@ ACCEPTED_FORMS = [
     "Bash(gh pr view *)",
     "Bash(gh issue view *)",
     "Bash(gh pr list *)",
-    "Bash(gh issue *)",
-    "Bash(gh label *)",
+    "Bash(gh pr diff *)",
+    "Bash(gh issue list *)",
+    "Bash(gh search *)",
+    "Bash(command -v *)",
     # read-only utilities
     "Bash(ls *)",
     "Bash(cat *)",

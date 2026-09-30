@@ -12,7 +12,7 @@ allowed-tools:
   - "Bash(cat *)"
   - "Bash(git status *)"
   - "Bash(git diff *)"
-  - "Bash(gh issue *)"
+  - "Bash(gh issue view *)"
   - "Read(*)"
   - "Write(*)"
   - "Edit(*)"

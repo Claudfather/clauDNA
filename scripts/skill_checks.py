@@ -938,7 +938,7 @@ def check_allowed_tools_usage(fm: dict, body: str) -> list[str]:
 # Interpreters: allowed only to run a fixed script path, never bare / inline / glob.
 _GRANT_INTERPRETERS = {
     "python", "python2", "python3", "node", "nodejs", "ruby", "perl",
-    "bash", "sh", "zsh", "deno", "bun", "rscript",
+    "bash", "sh", "zsh", "rscript",
 }
 _INTERP_INLINE_FLAGS = {"-c", "-e", "--eval", "-"}
 
@@ -962,6 +962,7 @@ _GRANT_REJECT_ALWAYS = {
     "docker", "podman", "kubectl", "terraform", "ansible", "aws", "gcloud", "az",
     "sed", "awk", "find",
     "printenv", "chmod", "chown", "dd", "rm", "tar", "unzip", "zip", "chattr",
+    "deno", "bun",
     "php", "java", "pwsh", "powershell", "osascript", "groovy", "scala",
     "elixir", "lua", "tclsh", "expect",
 }
@@ -973,14 +974,14 @@ _GRANT_SAFE_UTILS = {
     "tr", "comm", "join", "paste", "column", "nl", "fold", "rev", "tac",
     "mkdir", "rmdir", "mv", "cp", "touch", "date", "echo", "printf",
     "basename", "dirname", "realpath", "readlink", "pwd", "whoami", "id",
-    "hostname", "uname", "which", "type", "command", "test", "true", "false",
+    "hostname", "uname", "which", "type", "test", "true", "false",
     "seq", "tee", "jq", "lsof",
 }
 
 # Safe git subcommands: history and worktree only; not config, clone, or a global flag.
 _GRANT_SAFE_GIT_SUB = {
     "status", "diff", "log", "show", "add", "commit", "branch", "checkout",
-    "switch", "restore", "fetch", "rev-parse", "tag", "mv", "reset", "stash",
+    "switch", "restore", "rev-parse", "tag", "mv", "reset", "stash",
     "worktree", "check-ignore", "describe", "blame", "shortlog", "rev-list",
     "ls-files", "cat-file", "symbolic-ref", "name-rev", "merge-base",
     "for-each-ref", "diff-tree",
@@ -988,7 +989,14 @@ _GRANT_SAFE_GIT_SUB = {
 _GRANT_GIT_FORCE_FLAGS = {"--force", "-f", "--force-with-lease"}
 
 # Safe gh subcommands: issues and pull requests only; not the api/auth/repo subcommands.
-_GRANT_SAFE_GH_SUB = {"pr", "issue", "label", "search", "browse"}
+# gh: only read-only verbs of a few subcommands. `pr`/`issue` require a read
+# verb (rest[1]); `search` is read-only and takes no verb gate. `create`,
+# `merge`, `edit`, `label`, `gist`, `api`, `auth`, ... all prompt.
+_GRANT_SAFE_GH_SUB = {"pr", "issue", "search"}
+_GRANT_SAFE_GH_VERBS = {
+    "pr": {"view", "list", "diff", "status", "checks"},
+    "issue": {"view", "list", "status"},
+}
 
 # Safe claudron subcommands (read-only).
 _GRANT_SAFE_CLAUDRON_SUB = {"status", "doctor", "lookup", "recall"}
@@ -1028,6 +1036,22 @@ def _grant_git(entry: str, rest: list[str]) -> str | None:
     return _reject_grant(entry, f"'git {sub}'")
 
 
+def _grant_gh(entry: str, rest: list[str]) -> str | None:
+    if not rest:
+        return _reject_grant(entry, "the whole 'gh' command family")
+    sub = rest[0]
+    if sub.startswith("-"):
+        return _reject_grant(entry, f"a gh global flag {sub!r}")
+    if sub not in _GRANT_SAFE_GH_SUB:
+        return _reject_grant(entry, f"'gh {sub}'")
+    verbs = _GRANT_SAFE_GH_VERBS.get(sub)
+    if verbs is not None:
+        verb = rest[1] if len(rest) > 1 else ""
+        if verb not in verbs:
+            return _reject_grant(entry, f"'gh {sub} {verb or chr(39)+chr(39)}' (only read verbs: {sorted(verbs)})")
+    return None
+
+
 def _grant_sub(entry: str, cmd: str, rest: list[str], safe: set) -> str | None:
     if not rest:
         return _reject_grant(entry, f"the whole '{cmd}' command family")
@@ -1060,9 +1084,15 @@ def _grant_scope_error(entry: str) -> str | None:
     if cmd == "git":
         return _grant_git(entry, rest)
     if cmd == "gh":
-        return _grant_sub(entry, "gh", rest, _GRANT_SAFE_GH_SUB)
+        return _grant_gh(entry, rest)
     if cmd == "claudron":
         return _grant_sub(entry, "claudron", rest, _GRANT_SAFE_CLAUDRON_SUB)
+    if cmd == "command":
+        # `command` runs any program, bypassing functions/aliases; only
+        # `command -v <name>` (a lookup) is safe.
+        if rest[:1] == ["-v"]:
+            return None
+        return _reject_grant(entry, "'command', which runs any program")
     if cmd in _GRANT_INTERPRETERS:
         return _grant_interpreter(entry, cmd, rest)
     if cmd in _GRANT_REJECT_ALWAYS:
