@@ -23,6 +23,7 @@ A scratch plugin logged every payload for UserPromptSubmit, PostToolUse, PostToo
 | What does PostToolUse(Skill) carry? | `tool_input: {skill, args}`, **`tool_response: {success, commandName}`**, **`duration_ms`**. | The real success and duration are both there. `telemetry-emit.sh` guesses success by grepping the output for "error", and always writes `duration_ms: null`. |
 | Is `CLAUDE_PID` on these hooks? | Yes, on every one. | The nested-child guard (#373) covers activity unchanged. |
 | Do command hooks support `async`? | Yes. The schema has `async` ("hook runs in background without blocking") and `asyncTimeout`. An async UserPromptSubmit hook that slept 5 s didn't delay the turn (13 s against a 14 s baseline), still received its stdin payload, and logged mid-turn. | Activity hooks run async, so no prompt waits on the store (§2). |
+| Does an **older** Claude Code accept `async`? | 2.0.77 loaded this repo's real `hooks.json` (with `async: true`), fired SessionStart, and recorded `prompt.submitted` from UserPromptSubmit. That payload has no `prompt_id`. | Old builds ignore the key (and so run the hook synchronously) instead of rejecting the file. `prompt_id` stays optional. |
 | What happens to an async hook when the process ends? | In a `claude -p` that exited before a 5 s async hook finished, the hook never logged. | A short headless run can lose its last activity append. Activity isn't fsynced anyway (§11 item 11: "at most a few tallies"), so this is acceptable and documented. |
 
 ## 1. What gets recorded
@@ -45,7 +46,7 @@ UserPromptSubmit runs before the model sees every prompt. The store's hook costs
   - An activity append that lands after SessionEnd hits a closed session. The store refuses it (§6.3), and the adapter records nothing, silently, since this is expected and not an error.
   - An append that lands after a PreCompact seal goes to the sealed-but-current segment. §6.3 already allows that.
   - One that lands after SessionStart(`compact`) goes to the new segment. That's a prompt counted one segment late, which is acceptable for tallies.
-- **Older Claude Code:** a build without `async` would run these hooks synchronously, if it ignores the unknown key, or reject `hooks.json`. That needs one canary on an older build before merge (§6). If it rejects the file, the async hooks move into their own hooks file or stay out.
+- **Older Claude Code:** 2.0.77 ignores the unknown key (canary above), so on an old build these hooks just run synchronously, as every hook did before.
 - **Cost:** only UserPromptSubmit fires every turn. PostToolUseFailure fires only on failures, and PostToolUse is matched to `Skill` only. The existing guards apply unchanged: `CLAUDNA_SESSION_CHILD`, `CLAUDNA_SESSION_STORE=0`, the `CLAUDE_PID` nested-child check, and no open session means nothing is recorded.
 
 ## 3. Registry and schema changes
@@ -87,7 +88,6 @@ P4 says free text (prompts, stderr) is off unless opted in. `tool.failed.command
 - **The telemetry projection:** golden lines byte-compatible with today's script for the same input, the filter and opt-in, the `bot` default, and pruning in the sweep.
 - **`hooks.json`:** the three activity hooks are `async: true` and wired with the right matchers. The Cursor manifest still has no hooks (`make check-manifest`).
 - **Canaries still needed:**
-  - an **older Claude Code** build with `async` in `hooks.json` (ignored or rejected?);
   - **interactive** timing on a plain machine, to confirm an async UserPromptSubmit adds nothing a person can feel;
   - `PostToolUseFailure` for a **Skill** that fails, and for an MCP tool, to see what their `error` looks like.
 
