@@ -38,7 +38,7 @@ Present findings organized by severity (Blockers, Suggestions, Nits, Questions) 
 
 ### Step 6: Post Review
 
-Ask user: **"Want me to post this review to the PR?"** Options: post as-is, edit first, or keep local. Use `gh pr review <number>` with `--approve`, `--request-changes`, or `--comment`. Post file-level comments via `gh api`. Confirm when posted.
+Ask user: **"Want me to post this review to the PR?"** Options: post as-is, edit first, or keep local. Write the review text to `<review-file>` with the Write tool, then run `gh pr review <number>` with `--approve`, `--request-changes`, or `--comment`, and `--body-file <review-file>`. Post each file-level comment with `gh api repos/<owner>/<repo>/pulls/<number>/comments --input <comment-file>`, where `<comment-file>` is the comment as JSON (`body`, `commit_id`, `path`, `line`) written with the Write tool. Confirm when posted.
 
 ## Notes
 

@@ -56,7 +56,7 @@ Read everything relevant:
 - **PROJECT_MISSION.md** — if it exists in the repo, read it. The plan must align with the north star.
 - **Existing plans** — search for related plans in `documentation/planning/`, `shared/planning/active/`, or `planning/`. Don't duplicate or contradict.
 - **Codebase state** — read the actual code in the target area. Plans based on assumed architecture drift on contact with reality.
-- **Prior art** — `git log --all --oneline --grep="<keywords>"` for past attempts. Check closed issues and merged PRs for context on what was tried before.
+- **Prior art** — write the keywords to `<keywords-file>` with the Write tool, then `git log --all --oneline --grep="$(cat <keywords-file>)"` for past attempts. Check closed issues and merged PRs for context on what was tried before.
 
 ### Step 2: Identify Decision Forks
 

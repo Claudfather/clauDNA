@@ -18,11 +18,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
 
-from skill_checks import validate_skill_md
+from skill_checks import NAME_RE, parse_frontmatter, validate_skill_md
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SKILLS_DIR = REPO_ROOT / "skills"
@@ -211,6 +212,9 @@ def validate_name_collision(manifest: dict) -> CheckResult:
     slug = manifest.get("skill", {}).get("slug", "")
     if not slug:
         result.fail("manifest.skill.slug is missing -- cannot check for collisions")
+        return result
+    if not NAME_RE.match(slug):
+        result.fail(f"manifest.skill.slug {slug!r} is not a valid skill name")
         return result
 
     is_update = manifest.get("claudna", {}).get("is_update", False)
@@ -406,6 +410,64 @@ def validate_telemetry_summary(telemetry_path: Path) -> CheckResult:
     return result
 
 
+def _reject_nonfinite(const: str):
+    """json.loads parse_constant hook: refuse NaN / Infinity. A NaN threshold
+    slips through a `value < minimum` gate (NaN < x is False), so it must never
+    reach the numeric checks."""
+    raise ValueError(f"non-finite JSON constant {const!r} is not allowed in a package")
+
+
+def validate_skill_identity(manifest: dict, skill_md: Path) -> CheckResult:
+    """The slug names the directory the package lands in (SKILLS_DIR / slug), so
+    it must be a plain skill name (no '/', '..', or absolute path) and must equal
+    the SKILL.md frontmatter name, or a package could land outside skills/ or land
+    under another skill's identity."""
+    result = CheckResult("skill_identity")
+    skill = manifest.get("skill", {})
+    slug = skill.get("slug", "")
+    if not isinstance(slug, str) or not slug:
+        result.fail("manifest.skill.slug is missing or not a string")
+        return result
+    if not NAME_RE.match(slug):
+        result.fail(
+            f"manifest.skill.slug {slug!r} is not a valid skill name "
+            "(kebab-case letters/digits/hyphens only; no '/', '..', or absolute path)"
+        )
+        return result
+    parsed = parse_frontmatter(skill_md)
+    if not parsed or not isinstance(parsed[0], dict):
+        result.fail("SKILL.md has no frontmatter to verify the slug against")
+        return result
+    fm_name = parsed[0].get("name") or ""
+    if slug != fm_name:
+        result.fail(
+            f"manifest.skill.slug {slug!r} does not equal the SKILL.md frontmatter "
+            f"name {fm_name!r} -- the package must declare its own skill"
+        )
+    name = skill.get("name")
+    if not isinstance(name, str) or not name.strip():
+        result.fail("manifest.skill.name is missing or empty")
+    return result
+
+
+def validate_package_safety(package_dir: Path) -> CheckResult:
+    """No symlink may ride in the package (a symlink copied into skills/ would
+    point wherever its target says, including outside the tree), and no entry may
+    resolve outside the package directory."""
+    result = CheckResult("package_safety")
+    base = package_dir.resolve()
+    for root, dirs, files in os.walk(package_dir):  # followlinks=False by default
+        for name in list(dirs) + list(files):
+            entry = Path(root) / name
+            if entry.is_symlink():
+                result.fail(f"package contains a symlink ({entry.relative_to(package_dir)}) -- not allowed")
+                continue
+            resolved = entry.resolve()
+            if resolved != base and base not in resolved.parents:
+                result.fail(f"package entry escapes the package directory: {entry}")
+    return result
+
+
 def run_validation(package_dir: Path) -> list[CheckResult]:
     """Run all validation checks on a promotion package directory."""
     results: list[CheckResult] = []
@@ -428,8 +490,8 @@ def run_validation(package_dir: Path) -> list[CheckResult]:
 
     # Load manifest
     try:
-        manifest = json.loads(manifest_path.read_text())
-    except json.JSONDecodeError as e:
+        manifest = json.loads(manifest_path.read_text(), parse_constant=_reject_nonfinite)
+    except (json.JSONDecodeError, ValueError) as e:
         manifest_check = CheckResult("manifest_parse")
         manifest_check.fail(f"manifest.json is not valid JSON: {e}")
         results.append(manifest_check)
@@ -438,6 +500,8 @@ def run_validation(package_dir: Path) -> list[CheckResult]:
     # Run all checks
     results.append(validate_manifest_structure(manifest))
     results.append(validate_content_hash(manifest, skill_md_path))
+    results.append(validate_skill_identity(manifest, skill_md_path))
+    results.append(validate_package_safety(package_dir))
     results.append(validate_skill_content(skill_md_path))
     results.append(validate_name_collision(manifest))
     results.append(validate_criteria_thresholds(manifest))

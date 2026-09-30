@@ -34,11 +34,14 @@ cat > /dev/null 2>&1 || true
 CWD="${PWD}"
 
 # --- Git state (local, fast). Not a repo → minimal briefing, still exit 0.
+# `-c core.fsmonitor=` disables the fsmonitor hook: a repo's own .git/config can
+# set it to a command git would run during `status`, so a git read in a workspace
+# whose .git it did not create could otherwise run that command.
 BRANCH=""
 TREE=""
-if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
-    BRANCH=$(git branch --show-current 2>/dev/null || true)
-    DIRTY=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+if git -c core.fsmonitor= rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+    BRANCH=$(git -c core.fsmonitor= branch --show-current 2>/dev/null || true)
+    DIRTY=$(git -c core.fsmonitor= status --porcelain 2>/dev/null | wc -l | tr -d ' ')
     if [ "${DIRTY:-0}" = "0" ]; then TREE="clean"; else TREE="dirty (${DIRTY} paths)"; fi
 fi
 

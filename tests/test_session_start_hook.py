@@ -103,3 +103,18 @@ class TestSessionStartHook:
         entries = d["hooks"]["SessionStart"]
         assert entries and "session-start.sh" in entries[0]["hooks"][0]["command"]
         assert "compact" not in entries[0]["matcher"], "compact trigger is #176's decision"
+
+
+# ─── automatic git reads disable the fsmonitor code path ─────────────────────
+
+def test_git_reads_disable_fsmonitor():
+    """Every automatic `git` read in the session-start and statusline hooks runs
+    with `-c core.fsmonitor=`, so a workspace whose .git/config sets fsmonitor to
+    a command cannot run on a git read in a workspace whose .git it did not create."""
+    ss = HOOK.read_text()
+    import re
+    # each `git <subcommand>` (not `git -C ...` alone) carries the flag
+    for m in re.finditer(r"\bgit(?: -C [^\n]*?)? ((?:-c core\.fsmonitor= )?)(rev-parse|branch|status|symbolic-ref)", ss):
+        assert m.group(1) == "-c core.fsmonitor= ", f"unguarded git {m.group(2)} in session-start.sh"
+    statusline = (REPO_ROOT / "plugin-hooks" / "statusline.sh").read_text()
+    assert "-c core.fsmonitor=" in statusline, "statusline git read is unguarded"

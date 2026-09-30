@@ -12,10 +12,10 @@ Search the shared vault for existing notes via `claudron lookup`. Read-only. Fol
 ## Step 1: Run the search
 
 ```bash
-claudron lookup <terms...> --json
+claudron lookup --json -- "$(cat <terms-file>)"
 ```
 
-`<terms...>` are positional (one or more words). Optional scoping: `--project <name>`, `--fleet <name>`, `--limit <n>`, `--include-archived`, `--include-expired`.
+Write the search terms, joined by spaces, to `<terms-file>` with the Write tool first; they never go into the command itself. Optional scoping: `--project <name>`, `--fleet <name>`, `--limit <n>`, `--include-archived`, `--include-expired`.
 
 ## Step 2: Envelope + results
 
