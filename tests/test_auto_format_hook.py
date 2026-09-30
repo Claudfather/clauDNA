@@ -280,3 +280,33 @@ class TestJqResolvesToolInputRegardlessOfKeyOrder:
         assert targets(calls) == [real, real], (
             f"jq must resolve tool_input.file_path, not the first match; got {calls}"
         )
+
+
+# ─── formatters must not load repo config / run repo code ───────────────────
+
+class TestFormattersIsolateConfigAndTerminateOptions:
+    """A formatter that loads repo config can run repo code (prettier plugins,
+    sqlfluff templater). Each is run isolated from repo config, and the path is
+    passed after `--` so it is never read as an option."""
+
+    def test_ruff_calls_are_isolated_with_dashdash(self, tmp_path):
+        target = str(tmp_path / "mod.py")
+        rc, err, calls = run_hook(tmp_path, compact(_payload(target)), with_jq=True)
+        assert rc == 0, err
+        assert len(calls) == 2, calls  # ruff format, ruff check --fix
+        for c in calls:
+            assert "--isolated" in c, f"ruff call not isolated: {c}"
+            assert "--" in c, f"ruff call missing --: {c}"
+            # the file is the argument right after `--`
+            assert c[c.index("--") + 1] == target, f"path not after --: {c}"
+
+    def test_source_isolates_every_formatter(self):
+        src = HOOK.read_text()
+        # ruff (both invocations), prettier, sqlfluff
+        assert "ruff format --isolated -- " in src
+        assert "ruff check --fix --isolated -- " in src
+        assert "prettier --write --no-config -- " in src
+        assert "sqlfluff fix --templater raw -- " in src
+        # the bare, config-loading forms are gone
+        assert "prettier --write \"$FILE_PATH\"" not in src
+        assert "sqlfluff fix \"$FILE_PATH\"" not in src
