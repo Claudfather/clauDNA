@@ -29,6 +29,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **clauDNA keeps one state root, `~/.claudna`.** The permission hook's debug log and the pre-compact marker move from `${XDG_STATE_HOME:-~/.local/state}/claudna/` to `${CLAUDNA_STATE_DIR:-~/.claudna}/hooks/`, next to the session store. A relative `CLAUDNA_STATE_DIR` keeps no state instead of writing into the project. The old directory is no longer read or written. Its `permissions.log` holds whole command lines, so delete it by hand (SETUP_GUIDE §3.7). The pre-compact hook now sets `umask 077`, so the state root is `0700` whichever hook creates it first. The store hook rotates its own stderr capture, and a Python 3.9 CI leg (`make test-runtime`) holds the runtime floor.
 
 ### Fixed
+- **`scripts/redact.py` masks current credential shapes ([#356](https://github.com/Claudfather/clauDNA/issues/356)).** It missed several formats in use today. The rules that change:
+  - Vendor prefixes for current formats: `github_pat_`, `sk_live_`/`rk_test_`, `whsec_`, `sk-proj-`/`sk-ant-`/`sk-or-`, `npm_`, `hf_`, `gsk_`, `glpat-`, `ASIA`, `xox?-` and `xapp-`.
+  - Telegram tokens inside a bot URL.
+  - Secret-named assignments whose keyword sits anywhere in the name (`SECRET_KEY`, `GITHUB_PAT`, `DB_PASS`), keeping the name; `tokenizer` and `max_tokens` still pass.
+  - Auth headers, including a quoted header name as a headers dict prints it (`{"Authorization": "Bearer …"}`), `--access-token`/`--api-token`, `-u user:password` on a curl or wget line (elsewhere `-u` is another flag: `date -u`, `docker run -u`, `rsync -u`), and URL passwords with an empty user.
+  - PEM private-key blocks. A block that is cut off (a BEGIN line quoted in prose, or a capture of the first lines of a key file) is masked through its key lines, encryption headers and blank line included, and no further: the text after it survives.
+  - The high-entropy backstop now ends a run at `_` and `-`.
+  - In place, each file is handled on its own: one that fails is reported, the rest are still redacted, and the exit status is non-zero. A file that is not UTF-8 is redacted with its other bytes kept, and a symlink is refused rather than written through.
+  - Coverage is stated as the tested list (`tests/test_redact.py`, one case per shape) in the script and in `orchestration-guide.md`.
 - **`github-activity-report`**: the reference line for `crawl.sh` said to copy the script into a working directory and run it, which contradicted the crawl step. It now says, as the step does, to run the bundled script from the skill's own directory, never a copy.
 
 ## [0.21.1] - 2026-09-30

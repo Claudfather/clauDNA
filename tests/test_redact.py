@@ -227,3 +227,199 @@ class TestInlinedFlagValues:
         out = redact_text(f"Error: command failed: {cmd}")
         assert value not in out
         assert MASK in out
+
+
+# --- #356: current credential shapes --------------------------------------------
+# FAKE values, assembled from fragments like FAKE above, so no contiguous
+# credential sits in the source. One case per shape: the list below IS the
+# redactor's tested coverage.
+FAKE_CURRENT = {
+    "telegram_token_in_bot_url": "https://api.telegram.org/bot" + "8012345678" + ":" + "AA" + "_bC" * 12 + "/sendMessage",
+    "github_fine_grained_pat": "github_pat_" + "11ABCDEFG" + "0" * 13 + "_" + "aB3" * 19 + "cd",
+    "stripe_live_secret": "sk_" + "live_" + "aB3" * 8,
+    "stripe_restricted_test": "rk_" + "test_" + "aB3" * 8,
+    "stripe_webhook_secret": "whsec_" + "aB3" * 11,
+    "openai_project_key": "sk-" + "proj-" + "aB3" * 16 + "_" + "Xy9" * 5,
+    "anthropic_key": "sk-" + "ant-" + "api03-" + "aB3-" * 20 + "AA",
+    "openrouter_key": "sk-" + "or-" + "v1-" + "ab12" * 16,
+    "npm_token": "npm_" + "aB3" * 12,
+    "huggingface_token": "hf_" + "aB3" * 11 + "c",
+    "groq_key": "gsk_" + "aB3" * 16,
+    "gitlab_pat": "glpat-" + "aB3" * 6 + "-_",
+    "aws_temporary_key_id": "ASIA" + "QRST1234UVWX5678",
+    "slack_refresh_token": "xox" + "e-" + "1-" + "aB3" * 8,
+    "slack_app_token": "xapp-" + "1-" + "A0" * 5 + "-" + "1" * 12 + "-" + "ab" * 32,
+}
+
+# Assignments and headers whose VALUE has no vendor shape: the name or the
+# context is the signal. The value after the separator must not survive.
+CONTEXT_SECRETS = [
+    ("SECRET_KEY=", "Fk3" * 8),
+    ("GITHUB_PAT=", "Fk3" * 8),
+    ("DB_PASS=", "Fk3pw" * 3),
+    ("SMTP_PWD: ", "Fk3pw" * 3),
+    ("SIGNING_PRIVATE_KEY=", "Fk3" * 8),
+    ('{"clientSecret": "', "Fk3" * 8),
+    ("Authorization: Bearer ", "aB3" * 10),
+    ("Authorization: Basic ", "dXNlcjpw" + "YXNz" * 4),
+    ("doctl auth init --access-token ", "dop_v1_" + "ab12" * 16),
+    ("gh-cli --api-token ", "Fk3" * 8),
+    ("curl -u admin:", "Fk3pw" * 3),
+    ("curl -sS --user admin:", "Fk3pw" * 3),
+    ("redis://:", "s3Kr3t" + "Pwd0rd"),
+]
+
+# Must survive verbatim: the new rules must not eat ordinary output.
+BENIGN_CURRENT = [
+    "Branch fix/1822-Heavy-Slot-Guard-Classifier-v2 is merged.",
+    "PATH=/usr/local/bin:/usr/bin:/bin",
+    "PWD=/home/user/project",
+    "MY_PATH=/opt/tools/bin",
+    "tokenizer=bert-base-uncased-v2",
+    "max_tokens=4096 and TOKEN_TYPE=bearer",
+    "Compare test_login_flow_Handles_Expired_Session_2 with its sibling.",
+    "git push -u origin feat/add-redactor-rules",
+    # `-u` names a user only on a curl or wget line; elsewhere it is a flag.
+    'TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")',
+    "docker run -u 1000:1000 alpine id",
+    "rsync -u backup-host:/srv/data/ ./data/",
+    # A key that only ends in a header's name is not that header.
+    '"scorecard": {"identity-authorization": 3, "data-isolation": 2}',
+]
+
+
+class TestCurrentShapes:
+    @pytest.mark.parametrize("name", list(FAKE_CURRENT))
+    def test_redacts_current_shape(self, name):
+        value = FAKE_CURRENT[name]
+        out = redact_text(f"captured output with {value} in it")
+        assert _leaked(value, out) is None, out
+        assert MASK in out
+
+    @pytest.mark.parametrize("prefix,value", CONTEXT_SECRETS)
+    def test_redacts_value_by_its_context(self, prefix, value):
+        out = redact_text(f"line: {prefix}{value}@host tail" if prefix.endswith("://:") else f"line: {prefix}{value} tail")
+        assert value not in out, out
+        assert MASK in out
+
+    def test_backstop_catches_a_run_after_an_underscore(self):
+        # No known prefix: only the backstop can catch it, and `_` must end a run.
+        run = "Zx9Kq2Wm7Pn4Rt6Vb1Yc3Df5Gh8Jk0Ll2Mn4"  # FAKE
+        out = redact_text("export VENDOR_SESSION=unknownvendor_" + run)
+        assert run not in out and MASK in out
+
+    def test_keeps_the_name_of_a_masked_assignment(self):
+        out = redact_text("SECRET_KEY=" + "Fk3" * 8)
+        assert out.startswith("SECRET_KEY=") and MASK in out
+
+    def test_redacts_a_pem_private_key_block(self):
+        # Real base64 lines carry + and /, which split them into short runs no
+        # entropy backstop sees: only a block rule can catch the key.
+        body = "MIIEpAIBAAKCAQEA" + "+aB3/" * 9
+        pem = "-----BEGIN " + "RSA PRIVATE KEY-----\n" + body + "\n" + "/Xy9+" * 12 + "\n-----END RSA PRIVATE KEY-----"
+        out = redact_text(f"key file:\n{pem}\nnext line")
+        assert body not in out and "/Xy9+" * 12 not in out
+        assert "next line" in out and MASK in out
+
+    def test_redacts_an_unterminated_pem_block(self):
+        out = redact_text("-----BEGIN " + "OPENSSH PRIVATE KEY-----\n" + "b3Bl" + "+aB3/" * 12)
+        assert "+aB3/" * 12 not in out and MASK in out
+
+    def test_a_cut_off_pem_block_keeps_the_text_after_the_key(self):
+        # A BEGIN line quoted in a finding, or a capture cut off after a few
+        # lines: mask the key's own lines and stop at the first line that is not
+        # key material. The next finding must survive, all of it.
+        key = "b3Bl" + "+aB3/" * 12  # FAKE
+        text = (
+            "F1: config loads twice\n"
+            "F2: the file starts -----BEGIN " + "OPENSSH PRIVATE KEY-----\n" + key + "\n"
+            "F3: README typo\nF4: stale link"
+        )
+        out = redact_text(text)
+        assert key not in out and MASK in out
+        assert out.startswith("F1: config loads twice\nF2: the file starts")
+        assert out.endswith("\nF3: README typo\nF4: stale link")
+
+    def test_a_begin_line_quoted_with_no_key_after_it_is_left_alone(self):
+        text = 'F2: it opens with "-----BEGIN ' + 'RSA PRIVATE KEY-----" and stops\nF3: README typo'
+        assert redact_text(text) == text
+
+    def test_a_cut_off_encrypted_block_is_masked_through_its_headers(self):
+        # Proc-Type/DEK-Info headers and the blank line after them must not stop
+        # the mask before the key body.
+        key = "MIIEpAIBAAKCAQEA" + "+aB3/" * 9  # FAKE
+        text = (
+            "-----BEGIN " + "RSA PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\n"
+            "DEK-Info: AES-128-CBC,00112233445566778899AABBCCDDEEFF\n\n" + key + "\nF3: README typo"
+        )
+        out = redact_text(text)
+        assert key not in out and out.endswith("\nF3: README typo")
+
+    def test_a_key_line_with_trailing_spaces_does_not_end_the_mask(self):
+        first, second = "b3Bl" + "+aB3/" * 12, "/Xy9+" * 12  # FAKE
+        text = "-----BEGIN " + "OPENSSH PRIVATE KEY-----\n" + first + "  \n" + second + "\nF3: README typo"
+        out = redact_text(text)
+        assert first not in out and second not in out and out.endswith("\nF3: README typo")
+
+    def test_a_cut_off_key_inside_a_json_string_keeps_the_rest_of_the_json(self):
+        # Escaped newlines (`\\n`): the mask ends with the key, not with the object.
+        key = "b3Bl" + "+aB3/" * 12  # FAKE
+        text = '{"key": "-----BEGIN ' + 'PRIVATE KEY-----\\n' + key + '\\n", "note": "F3 README typo"}'
+        out = redact_text(text)
+        assert key not in out and out.endswith('", "note": "F3 README typo"}')
+
+    @pytest.mark.parametrize(
+        "text,value",
+        [
+            ('{"Authorization": "Bearer ' + "aB3" * 8 + '"}', "aB3" * 8),
+            ("{'Authorization': 'token " + "0123456789abcdef" * 2 + "01234567'}", "0123456789abcdef" * 2 + "01234567"),
+        ],
+        ids=["json", "python-dict"],
+    )
+    def test_a_quoted_header_name_is_masked_too(self, text, value):
+        # How a headers dict prints: the value has no vendor prefix, and is too
+        # short or too hex-like for the backstop.
+        out = redact_text(text)
+        assert value not in out and "Authorization" in out and MASK in out
+
+    def test_preserves_benign_lines(self):
+        for line in BENIGN_CURRENT:
+            assert redact_text(line) == line, f"over-redacted: {line!r}"
+
+    def test_idempotent_on_current_shapes(self):
+        blob = "\n".join(FAKE_CURRENT.values())
+        once = redact_text(blob)
+        assert redact_text(once) == once
+
+
+class TestInPlaceRobustness:
+    def test_a_file_that_is_not_utf8_is_still_redacted(self, tmp_path):
+        secret = FAKE["github_pat"]
+        f = tmp_path / "mixed.log"
+        f.write_bytes(b"\xff\xfe latin-1 bytes \xe9 then " + secret.encode() + b"\n")
+        proc = subprocess.run([sys.executable, str(REDACT_PY), str(f)],
+                              capture_output=True, text=True)
+        data = f.read_bytes()
+        assert secret.encode() not in data and MASK.encode() in data
+        assert data.startswith(b"\xff\xfe latin-1 bytes \xe9")  # the other bytes are kept
+        assert proc.returncode == 0
+
+    def test_one_failure_does_not_stop_the_rest(self, tmp_path):
+        missing = tmp_path / "missing.md"
+        later = tmp_path / "later.md"
+        later.write_text(f"key {FAKE['openai_key']}\n")
+        proc = subprocess.run([sys.executable, str(REDACT_PY), str(missing), str(later)],
+                              capture_output=True, text=True)
+        assert FAKE["openai_key"] not in later.read_text()
+        assert proc.returncode != 0 and "missing.md" in proc.stderr
+
+    def test_a_symlink_is_not_written_through(self, tmp_path):
+        target = tmp_path / "target.md"
+        target.write_text(f"key {FAKE['openai_key']}\n")
+        link = tmp_path / "link.md"
+        link.symlink_to(target)
+        proc = subprocess.run([sys.executable, str(REDACT_PY), str(link)],
+                              capture_output=True, text=True)
+        assert link.is_symlink()
+        assert target.read_text() == f"key {FAKE['openai_key']}\n"
+        assert proc.returncode != 0 and "symlink" in proc.stderr
