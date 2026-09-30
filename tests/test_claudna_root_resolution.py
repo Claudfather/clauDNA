@@ -127,7 +127,7 @@ def test_every_bundled_script_resolves_and_runs_without_claude_plugin_root(
 ) -> None:
     filled_in, env, owner, cache, expected = CASES[case]
     scripts = _bundled_scripts()
-    assert scripts == {"redact.py", "resolve_memory_dir.py"}
+    assert scripts == {"check_provenance.py", "redact.py", "resolve_memory_dir.py"}
     run_env = {k: v for k, v in os.environ.items() if k not in ("CLAUDE_PLUGIN_ROOT", "CLAUDNA_ROOT")}
     run_env["HOME"] = str(tmp_path / "home")
     layout["work"].mkdir(exist_ok=True)
