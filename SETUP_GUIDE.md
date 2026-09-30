@@ -576,18 +576,24 @@ Declined the seam during init? Re-run `/claudna:init-project` and its seam step 
 
 `/claudna:claudron` is the read/health door to the vault — `lookup` (search it), `status` (vault health, or whether Claudron is installed at all) and `doctor` (check the vault against the installed engine's rules; it applies the engine's migrations, `claudron doctor --fix`, only after you confirm). Saving is `/claudna:capture` (one write door for notes). It shells out to the `claudron` CLI per `skills/_shared/claudron-engine.md` and degrades loudly: with no vault, `lookup` and `status` report the absence as a diagnostic rather than erroring. `/claudna:capture` and `/claudna:publish --to vault` route through the same engine when a vault is present, and fall back to the raw tree otherwise. Neither sets note maturity — the engine stamps `draft`.
 
-**Permissions.** The engine runs `claudron` subcommands plus a detection probe. Add to `permissions.allow` to avoid prompts:
+**Permissions.** The skills run a detection probe and five `claudron` verbs: `status`, `lookup`, `recall`, `capture` (which writes a note to the vault and commits it locally) and `doctor`. To avoid prompts, add one rule per verb to `permissions.allow`:
 
 ```json
 {
   "permissions": {
     "allow": [
-      "Bash(claudron *)",
-      "Bash(command -v claudron)"
+      "Bash(command -v claudron)",
+      "Bash(claudron status *)",
+      "Bash(claudron lookup *)",
+      "Bash(claudron recall *)",
+      "Bash(claudron capture *)",
+      "Bash(claudron doctor --json)"
     ]
   }
 }
 ```
+
+**Do not allow `Bash(claudron *)`, and keep the `doctor` rule exact.** A `*` also matches any flags that follow, so `Bash(claudron *)`, `Bash(claudron doctor *)` and `Bash(claudron doctor --json *)` all approve `claudron doctor --fix`, which migrates and repairs the vault and commits the result. `Bash(claudron *)` also approves every other verb, including `sync`, which commits and pushes, `promote` and `plug`. With any of those rules, the question `/claudna:claudron doctor` asks before `--fix` is the only gate before the write. With the rules above, the diagnosis runs without a prompt and `--fix` still prompts, so the permission prompt stays a second gate. A diagnosis of a vault named with `--vault` prompts too, because the exact rule does not cover it. Claudlobby composes the same four verb rules for a fleet bot, and refuses the wildcard for the same reason.
 
 ### 7.4 Hook stacking with Claudron's session loop
 
