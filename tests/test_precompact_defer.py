@@ -287,7 +287,7 @@ class TestTheMarkerIsPerUser:
         sid = "sess-state-1"
         code, out = run_hook(tmp_path, user_settings=ENGINE_HOOK, engine_version=None, session_id=sid)
         assert prompts(out), (code, out)
-        state = tmp_path / "home" / ".local" / "state" / "claudna"
+        state = tmp_path / "home" / ".claudna" / "hooks"
         marker = state / f"reflected-{sid}"
         assert marker.is_file()
         assert state.stat().st_mode & 0o077 == 0, oct(state.stat().st_mode)
