@@ -18,7 +18,7 @@ These are the three phases the spec lists after activity, built in one pass beca
   - The summarizer refreshes the rollup after every `summary.completed`, under its own lock, so two workers can't write it out of order.
   - **Addition:** retention moves a retired segment's summary to `sessions/<sid>/summaries/seg-NNN.json`, and the rollup reads those too, so knowledge outlives its segment directory and the rollup stays a pure function of the files on disk. §6.7 predates retention and didn't say.
 - **Readers (§8)**, `readers.py`: `list`, `show`, `timeline`, `failures [--group]`, as `session_store` verbs and as `/claudna:session` verbs (`history.md`).
-  - They're read-only. A projection that is missing or fails its schema is folded from its log in memory and never written.
+  - They're read-only. A projection that is missing or fails its schema is folded from its log in memory and never written. `show` also computes a missing rollup in memory; `list` reads the rollup file only, so it stays one read per session.
   - `failures --group` folds by signature across sessions and carries the newest occurrence's `tool_use_id`, so the full error can be read in the transcript. The store keeps a pointer, not a copy (phase 4).
 - **Export (§8)**, `export.py`: `session_store export --consumer <name> [--since-seg N] [--limit N] [--json]`, and `--ack --sid <sid> --through <seg>`.
   - The envelope is `claudna.export/1`: `{consumer, items: [{sid, seg, session, summary}], next: {sid: through}}`. `session` is a fixed subset of `session.json`.
