@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **clauDNA keeps one state root, `~/.claudna`.** The permission hook's debug log and the pre-compact marker move from `${XDG_STATE_HOME:-~/.local/state}/claudna/` to `${CLAUDNA_STATE_DIR:-~/.claudna}/hooks/`, next to the session store. A relative `CLAUDNA_STATE_DIR` keeps no state instead of writing into the project. The old directory is no longer read or written. Its `permissions.log` holds whole command lines, so delete it by hand (SETUP_GUIDE §3.7). The pre-compact hook now sets `umask 077`, so the state root is `0700` whichever hook creates it first. The store hook rotates its own stderr capture, and a Python 3.9 CI leg (`make test-runtime`) holds the runtime floor.
 
+### Fixed
+- **`github-activity-report`**: the reference line for `crawl.sh` said to copy the script into a working directory and run it, which contradicted the crawl step. It now says, as the step does, to run the bundled script from the skill's own directory, never a copy.
+
 ## [0.21.1] - 2026-09-30
 ### Changed
 - **clauDNA is licensed under Apache-2.0 instead of MIT.** `LICENSE` carries the unmodified Apache License 2.0 text, and a new `NOTICE` names the copyright holder, `Copyright 2026 Chris Rogers`, as the MIT notice did. Section 4(d) of the license carries `NOTICE` into every redistribution. Both plugin manifests (`.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`) declare `Apache-2.0`, and the README has a License section. Every commit on `main` is by the copyright holder, so no contributor's MIT notice needs preserving.
