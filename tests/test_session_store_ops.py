@@ -79,6 +79,11 @@ class TestWorkersRecord:
         assert main(["runs", "--kind", "sweep", *root]) == 0 and "sweep" in capsys.readouterr().out
 
 
+def test_runs_rejects_a_bad_since(store, capsys):
+    assert main(["runs", "--since", "yesterday", "--root", str(store.root)]) == 1
+    assert "error:" in capsys.readouterr().err
+
+
 def test_the_hook_path_never_imports_the_ops_log():
     code = "import sys; sys.path.insert(0, 'lib'); import claudna.session_store.cli; " \
            "print('claudna.session_store.ops' in sys.modules)"

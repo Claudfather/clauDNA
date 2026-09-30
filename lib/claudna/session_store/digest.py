@@ -25,6 +25,7 @@ writes, risk tiers, the inbox and ambiguous queues, and ``revert-run``.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -42,6 +43,11 @@ def home(root: Path) -> Path:
 def claim_key(block: dict) -> str:
     """What makes two blocks "the same claim": home + subject + claim, normalized (the rollup's rule)."""
     return dedup_key("blocks", block)
+
+
+def person_item(key: str) -> str:
+    """A held fact's digest id: its claim key joins fields with ``\\x1f``, which no shell argument carries."""
+    return "person:" + hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
 
 
 def record_capture(root: Path, *, sid: str, seg: int, block: dict, title: str, action: str,
@@ -63,7 +69,7 @@ def record_held(root: Path, *, sid: str, seg: int, block: dict, reason: str = "p
 @dataclass(frozen=True)
 class Item:
     kind: str  #: "draft" (a note to promote or discard) or "person" (a held other-person fact)
-    item: str  #: what marks it reviewed: the note's vault path, or the held fact's claim key
+    item: str  #: what marks it reviewed: the note's vault path, or the held fact's :func:`person_item` id
     title: str
     claim: str | None
     vault: str | None
@@ -114,16 +120,16 @@ def items(root: Path, *, limit: int | None = DIGEST_SIZE) -> list[Item]:
     people: dict[str, Item] = {}
     for rec in held:
         key, block = rec.get("key"), rec.get("block") if isinstance(rec.get("block"), dict) else {}
-        if isinstance(key, str) and key not in done:
-            people[key] = Item("person", key, (block.get("subject_hint") or {}).get("name") or "person fact",
-                               block.get("claim"), None, len(seen.get(key, ())), block.get("asserted_by"),
-                               rec.get("ts") or "")
+        if isinstance(key, str) and person_item(key) not in done and key not in done:
+            name = (block.get("subject_hint") or {}).get("name") or "person fact"
+            people[key] = Item("person", person_item(key), name, block.get("claim"), None,
+                               len(seen.get(key, ())), block.get("asserted_by"), rec.get("ts") or "")
     found = ranked + sorted(people.values(), key=lambda i: i.last_ts, reverse=True)
     return found if limit is None else found[:limit]
 
 
 def mark_reviewed(root: Path, item: str, *, outcome: str) -> None:
-    """Take ``item`` (a note path or a held fact's key) out of the digest, recording what the person did."""
+    """Take ``item`` (a note path or a held fact's ``person:`` id) out of the digest, recording what the person did."""
     if outcome not in ("promoted", "discarded", "kept"):
         raise ValueError(f"invalid outcome: {outcome!r}")
     append_jsonl(ensure_dir(home(root)) / "reviewed.jsonl", {"ts": now_ts(), "item": item, "outcome": outcome},

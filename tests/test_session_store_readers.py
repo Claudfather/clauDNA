@@ -82,6 +82,27 @@ class TestRollup:
         assert [b["claim"] for b in doc["fields"]["blocks"]] == [BLOCK_A["claim"], BLOCK_B["claim"]]
         assert doc["segments"] == [1, 2]
 
+    def test_a_stale_summary_is_not_archived_on_retirement(self, store):
+        h = session_with(store, "s1", [{"title": "stale", "blocks": [BLOCK_A]}], close=False)
+        h.seal_segment(150, "precompact")  # re-sealed: the summary covers only [0, 100)
+        h.close_session("other")
+        assert retention.retire(h, [(1, "age")]) == [(1, "age")]
+        assert not h.paths.archived_summary(1).exists() and rollup.refresh(h.paths) is None
+
+    def test_a_segment_a_summarizer_holds_is_left_for_later(self, store):
+        from claudna.session_store.fsio import exclusive_lock
+
+        h = session_with(store, "s1", [{"title": "a", "blocks": [BLOCK_A]}, None])
+        with exclusive_lock(h.paths.segment(1).dir / ".summarize.lock"):
+            assert retention.retire(h, [(1, "acked")]) == []
+        assert h.paths.segment(1).dir.is_dir()
+
+    def test_show_computes_a_missing_rollup_without_writing_it(self, store):
+        h = session_with(store, "s1", [{"title": "t", "blocks": [BLOCK_A]}])
+        rollup.rollup_path(h.paths).unlink(missing_ok=True)
+        assert readers.show(store, "s1")["rollup"]["fields"]["title"] == "t"
+        assert not rollup.rollup_path(h.paths).exists()
+
     def test_the_summarizer_refreshes_it(self, store, tmp_path):
         from claudna.session_store import summarize
         from test_session_store_summarize import DIALOGUE, FakeRunner, OPTED_IN, write_transcript
@@ -173,3 +194,11 @@ class TestCli:
     def test_an_unknown_session_is_an_error(self, store, capsys):
         assert main(["show", "nope", "--root", str(store.root)]) == 1
         assert "no session nope" in capsys.readouterr().err
+
+
+def test_a_summarizer_for_a_retired_segment_is_ignored(store):
+    from claudna.session_store import summarize
+
+    h = session_with(store, "s1", [{"title": "a", "blocks": [BLOCK_A]}])
+    retention.retire(h, [(1, "age")])
+    assert summarize.summarize(h, 1, runner=lambda *a, **k: pytest.fail("no model call")) == "ignored: no segment 1"

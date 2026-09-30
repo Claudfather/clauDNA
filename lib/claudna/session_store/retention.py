@@ -32,7 +32,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Mapping
 
 from . import rollup
-from .fsio import ensure_dir, env_number, epoch_of, read_json
+from .fsio import ensure_dir, env_number, epoch_of, exclusive_lock, read_json
 from .project import load_lifecycle, segment_states
 from .store import SessionHandle, SessionStore
 
@@ -69,19 +69,30 @@ def due(handle: SessionHandle, env: Mapping[str, str], *, now: float | None = No
     return out
 
 
-def retire(handle: SessionHandle, batch: list[tuple[int, str]]) -> None:
-    """Retire ``batch`` (``(index, reason)`` pairs from :func:`due`): archive, log, remove; refresh once."""
+def retire(handle: SessionHandle, batch: list[tuple[int, str]]) -> list[tuple[int, str]]:
+    """Retire ``batch`` (``(index, reason)`` pairs from :func:`due`): archive, log, remove; refresh once.
+
+    Returns the pairs actually retired: a segment whose summarizer holds its lock is left for a later sweep.
+    """
+    done = {s.index for s in segment_states(handle.paths, load_lifecycle(handle.paths).events)
+            if s.summary == "done"}  # only a current summary is archived: a stale one would re-enter the rollup
+    retired = []
     for index, reason in batch:
         seg = handle.paths.segment(index)
-        if seg.summary.is_file():  # the rollup reads a retired segment's summary from the archive
-            archived = handle.paths.archived_summary(index)
-            ensure_dir(archived.parent)
-            os.replace(seg.summary, archived)
-        handle.append("segment.retired", {"reason": reason}, seg=index)
-        shutil.rmtree(seg.dir)
-    if batch:
+        with exclusive_lock(seg.dir / ".summarize.lock", blocking=False) as taken:
+            if not taken:
+                continue  # a summarizer is writing into it: retire it on a later sweep
+            if index in done and seg.summary.is_file():  # the rollup reads a retired summary from the archive
+                archived = handle.paths.archived_summary(index)
+                ensure_dir(archived.parent)
+                os.replace(seg.summary, archived)
+            handle.append("segment.retired", {"reason": reason}, seg=index)
+            shutil.rmtree(seg.dir)
+        retired.append((index, reason))
+    if retired:
         rollup.refresh(handle.paths)
         handle.rebuild()  # the directories are the segment count's truth: one re-fold for the whole batch
+    return retired
 
 
 @dataclass
@@ -103,8 +114,7 @@ def sweep(store: SessionStore, env: Mapping[str, str], *, now: float | None = No
         handle = store.session(sid)
         try:
             batch = due(handle, env, now=now)[:limit - len(report.retired)]
-            retire(handle, batch)
-            report.retired += [f"{sid}/seg-{index:03d} ({reason})" for index, reason in batch]
+            report.retired += [f"{sid}/seg-{index:03d} ({reason})" for index, reason in retire(handle, batch)]
         except Exception as exc:  # noqa: BLE001 — reported, and the sweep goes on
             report.errors.append(f"{sid}: {type(exc).__name__}: {exc}")
     return report

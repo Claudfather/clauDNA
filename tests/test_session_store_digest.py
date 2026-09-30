@@ -66,7 +66,7 @@ class TestDigest:
         found = digest.items(store.root)
         assert [(i.kind, i.item, i.sessions) for i in found] == [
             ("draft", "knowledge/staging.md", 2), ("draft", "knowledge/other.md", 1),
-            ("person", rollup.dedup_key("blocks", PERSON), 1)]
+            ("person", digest.person_item(rollup.dedup_key("blocks", PERSON)), 1)]
 
     def test_a_user_assertion_wins_a_tie(self, store):
         summarized_session(store, "s1", [[OTHER, {**BLOCK, "claim": "Users asked for dark mode."}]])

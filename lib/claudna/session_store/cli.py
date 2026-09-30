@@ -315,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
                          parents=[rooted])
     dig.add_argument("--limit", type=int, default=5)
     dig.add_argument("--json", action="store_true")
-    dig.add_argument("--done", metavar="ITEM", help="take an item (a note path or a held fact's key) off the digest")
+    dig.add_argument("--done", metavar="ITEM", help="take an item (a note path or a held fact's person: id) off")
     dig.add_argument("--outcome", choices=("promoted", "discarded", "kept"), default="kept")
     rns = sub.add_parser("runs", help="the ops log: the store's background runs, newest first", parents=[rooted])
     rns.add_argument("--kind", choices=("summarize", "harvest", "sweep"))
@@ -386,7 +386,12 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         from . import ops, readers
 
-        found = ops.runs(store.root, kind=args.kind, since=readers.since_cutoff(args.since), limit=args.limit)
+        try:
+            since = readers.since_cutoff(args.since)
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        found = ops.runs(store.root, kind=args.kind, since=since, limit=args.limit)
         if args.json:
             print(json.dumps(found, indent=2))
         else:

@@ -18,7 +18,7 @@ from typing import Iterable
 from .fsio import read_json
 from .paths import SessionPaths
 from .project import load_activity, load_lifecycle, segment_docs, session_doc
-from .rollup import ROLLUP_SCHEMA, rollup_path
+from .rollup import ROLLUP_SCHEMA, compute, rollup_path, summaries
 from .store import SessionStore
 
 _SINCE = re.compile(r"^(\d+)([hdw])$")
@@ -38,9 +38,12 @@ def since_cutoff(since: str | None, *, now: float | None = None) -> str | None:
     return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + f"{moment.microsecond // 1000:03d}Z"
 
 
-def _rollup(paths: SessionPaths) -> dict | None:
+def _rollup(paths: SessionPaths, lifecycle: list[dict] | None = None) -> dict | None:
+    """``summary.json``, or the rollup computed in memory when it's missing or foreign (nothing is written)."""
     doc = read_json(rollup_path(paths))
-    return doc if isinstance(doc, dict) and doc.get("schema") == ROLLUP_SCHEMA else None
+    if isinstance(doc, dict) and doc.get("schema") == ROLLUP_SCHEMA:
+        return doc
+    return compute(paths.sid, summaries(paths, lifecycle))
 
 
 def list_sessions(store: SessionStore, *, since: str | None = None, repo: str | None = None,
@@ -82,7 +85,7 @@ def show(store: SessionStore, sid: str) -> dict:
     paths = handle.paths
     lifecycle = load_lifecycle(paths)
     return {"session": session_doc(paths, lifecycle), "segments": segment_docs(paths, lifecycle),
-            "rollup": _rollup(paths)}
+            "rollup": _rollup(paths, lifecycle.events)}
 
 
 def timeline(store: SessionStore, sid: str) -> list[dict]:
