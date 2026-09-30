@@ -31,7 +31,7 @@ The Skills CLI (`npx skills@1.7.0`) is the package manager for the open agent sk
 - `npx skills@1.7.0 find [query]` - Search for skills interactively or by keyword
 - `npx skills@1.7.0 add <package>` - Install a skill from GitHub or other sources
 - `npx skills@1.7.0 check` - Check for skill updates
-- `npx skills@1.7.0 update` - Update all installed skills
+- `npx skills@1.7.0 update` - Update all installed skills (refreshes EVERY installed skill to its repository head; review what changed, and prefer updating a named skill to a reviewed commit over a blanket refresh)
 
 **Browse skills at:** https://skills.sh/
 
@@ -90,13 +90,15 @@ Learn more: https://skills.sh/vercel-labs/agent-skills/vercel-react-best-practic
 
 ### Step 4: Offer to Install
 
-If the user wants to proceed, you can install the skill for them:
+Before installing, **show the user the skill's contents** — fetch and display its `SKILL.md` (and any hook or script it ships) so an install is an informed choice, not a blind fetch. Then:
 
 ```bash
-npx skills@1.7.0 add <owner/repo@skill> -g -y
+npx skills@1.7.0 add <owner/repo@skill>
 ```
 
-The `-g` flag installs globally (user-level) and `-y` skips confirmation prompts.
+- **Keep the confirmation prompt** — do not pass `-y`. The prompt is the user's last look before third-party content lands.
+- **Default to project scope** — omit `-g`. Install globally (`-g`, user-level, every project) only when the user explicitly asks for that reach.
+- **Pin to a reviewed commit, not the moving head** — a bare `owner/repo@skill` takes the repository head at fetch time; where the tool supports a ref, name the commit the user reviewed (see the tool's ref syntax), so a later push to that repo cannot change what is installed.
 
 ## Common Skill Categories
 

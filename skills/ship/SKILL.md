@@ -49,7 +49,7 @@ Example: `feat: add product search functionality`
 7. Stage the appropriate files with `git add`, named explicitly.
 8. Create a commit with a clear, descriptive message following conventional commits format.
 9. Push to the remote branch (create the remote branch if needed with `-u origin <branch>`).
-10. Create a Pull Request using `gh pr create` with:
+10. Create a Pull Request. Write the title and the description to two files in `<scratch>` (`../_shared/orchestration-guide.md` §1) with the Write tool, then run `gh pr create --title "$(cat <title-file>)" --body-file <body-file>`. They hold:
     - A clear title summarizing the changes, under 70 characters
     - A description with:
       - `## Summary` — what changed and why

@@ -86,7 +86,7 @@ The method owns the rigor; do not weaken it — a complete inventory + coverage 
 
 ## Rules
 
-- **Read-only on the target.** The only writes are scratch research artifacts (an ignored/temp dir) and the final Markdown. Never mutate source, config, schemas, data, or external systems.
+- **Read-only on the target.** The only writes are scratch research artifacts (in a private directory made with `mktemp -d`) and the final Markdown. Never mutate source, config, schemas, data, or external systems.
 - **Coverage, not length.** Completion is gate-based. Context pressure means subdivide into another wave — never omit scope.
 - **Hard anonymization.** The deliverable carries no PII, secrets, identity, source paths, symbols, or repo metadata. The private alias ledger is scratch — never shipped with the spec.
 - **Never fabricate.** Uncertain or contradictory behavior is labeled, not invented.

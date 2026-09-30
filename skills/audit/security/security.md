@@ -49,7 +49,7 @@ documentation/planning/security/<session_name>_<YYYY-MM-DD>/
 └── ...
 ```
 
-Plan agents write the family to the session's scratch docs directory (`/tmp/security-audit-<YYYY-MM-DD_HHMMSS>/docs/`); the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/security/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide, Section 3).
+Plan agents write the family to the session's scratch docs directory (`<scratch>/docs/`, with `<scratch>` the private directory made by `mktemp -d "${TMPDIR:-/tmp}/audit-security.XXXXXX"`); the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/security/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide, Section 3).
 
 > **Archive convention:** See orchestration guide, Section 8.
 
@@ -88,7 +88,7 @@ Each doc represents **exactly 1 PR** and must include:
 
 #### Subagent Workflow
 
-Follow Section 9 of the orchestration guide (`../../_shared/orchestration-guide.md`). Plan agents must also read `../../_shared/planning-standard.md` for quality standards and phase doc structure. Scratch directory: `/tmp/security-audit-<YYYY-MM-DD_HHMMSS>/research/`.
+Follow Section 9 of the orchestration guide (`../../_shared/orchestration-guide.md`). Plan agents must also read `../../_shared/planning-standard.md` for quality standards and phase doc structure. Scratch directory: `<scratch>/research/`.
 
 **Security-specific rule:** Never surface a raw secret value. Prose masking is not the mechanism — "show `sk-****`" leaked live tokens twice (a Telegram bot token, then a neon API key) because it relied on the model remembering to mask and only illustrated the `sk-` shape. Each subagent MUST scrub its research/findings file **in place** with the bundled redactor before handoff — `python3 "<claudna-root>/scripts/redact.py" <file>` (`<claudna-root>` per `../../_shared/claudna-root.md`; see `../../_shared/orchestration-guide.md` §7 "Redacting credentials in CLI output"). It masks the known token shapes and `SECRET=value` assignments to `[REDACTED]` while sparing `file:line`, so keep reporting file:line + the variable name for readability; the redactor is the deterministic backstop, not a substitute for it.
 

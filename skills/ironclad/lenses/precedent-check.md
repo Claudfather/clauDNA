@@ -38,7 +38,9 @@ Search these sources (listed in decreasing order of reliability, but all three c
 
 Search the commit log for relevant prior work. Start with recent history (last 12 months) — extend to full history only when the initial search reveals a pattern of repeated churn or yields no hits for a topic that should have prior art.
 
-- `git log --all --oneline --since="12 months ago" --grep="<keyword>"` for each search term from Step 1.
+Write each search term from Step 1 to its own file in `<scratch>/lenses/precedent-check/`, beside your result, with the Write tool (`<term-file>`); a term never goes into a command itself. A path goes on a command line only if it matches `^[A-Za-z0-9._/@+-]+$`; list any other path in the report as not searched.
+
+- `git log --all --oneline --since="12 months ago" --grep="$(cat <term-file>)"` for each search term.
 - `git log --all --oneline --since="12 months ago" -- <path>` for files/directories the plan proposes to create or modify — shows who touched them before and why.
 - `git log --all --oneline --diff-filter=D -- <path>` for deleted files in the plan's target area — reveals abandoned approaches (no date limit here — deletions are inherently worth knowing about).
 
@@ -48,8 +50,8 @@ Look for: refactors, reverts, renames, and repeated touches to the same area. A 
 
 If `gh` CLI is available, search for prior art in the project's PR and issue history:
 
-- `gh pr list --state closed --search "<keyword>" --limit 20` for each search term. Combine related terms into a single query where possible to reduce API calls and deduplicate results.
-- `gh issue list --state closed --search "<keyword>" --limit 20` for related issues.
+- `gh pr list --state closed --search="$(cat <term-file>)" --limit 20` for each search term. Combine related terms into a single query where possible to reduce API calls and deduplicate results.
+- `gh issue list --state closed --search="$(cat <term-file>)" --limit 20` for related issues.
 - For promising hits, read the PR/issue body with `gh pr view <number>` or `gh issue view <number>` to understand context.
 
 Look for: PRs that were merged then reverted, PRs that were closed without merge (abandoned approaches), issues that were closed as "won't fix" or "duplicate."

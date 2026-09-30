@@ -96,7 +96,7 @@ If the system has neither an isolation unit nor any scale-out surface (no replic
 
 ### Phase 1: Parallel discovery
 
-**Scratch directory:** `/tmp/scale-audit-<YYYY-MM-DD_HHMMSS>/research/`
+**Scratch directory:** `<scratch>/research/`, where `<scratch>` is a private directory made with `mktemp -d "${TMPDIR:-/tmp}/audit-scale.XXXXXX"` (orchestration guide §1)
 
 Launch four `general-purpose` subagents in parallel (disk-write pattern per `../../_shared/orchestration-guide.md` — subagents write findings to the scratch dir and return 2-4 line summaries; the orchestrator never reads full research files):
 
@@ -139,7 +139,7 @@ documentation/planning/scale/<session_name>_<YYYY-MM-DD>/
 └── ...
 ```
 
-Plan agents write the family to the session's scratch docs directory (`/tmp/scale-audit-<YYYY-MM-DD_HHMMSS>/docs/`); the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/scale/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide, Section 3).
+Plan agents write the family to the session's scratch docs directory (`<scratch>/docs/`); the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/scale/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide, Section 3).
 
 `00_SCALE_AUDIT.md` is the full Phase 3 report. Each numbered doc is exactly one PR, grouping related findings (e.g., all mandatory-tenant-context changes → one PR; all lease-fencing changes → one PR), ordered P0 first, and must include the required invariants it discharges plus the acceptance-test rows that prove it. Plan agents follow Section 9 of the orchestration guide and `../../_shared/planning-standard.md`.
 

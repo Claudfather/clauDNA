@@ -48,8 +48,10 @@ Do NOT proceed until the user explicitly confirms. If they say no, stop and ask 
 
 **CI mode (streams build logs inline):**
 ```bash
-railway up --ci -m "<descriptive deploy message>"
+railway up --ci -m "$(cat <message-file>)"
 ```
+
+Write the message to `<message-file>`, a file in `<scratch>` (`../_shared/orchestration-guide.md` §1), with the Write tool first; it never goes into the command itself.
 
 Always use `-m` with a meaningful message. Derive it from:
 - The most recent commit message, OR

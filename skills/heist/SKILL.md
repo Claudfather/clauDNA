@@ -4,9 +4,8 @@ user-invocable: true
 description: "Use when you want to raid a GitHub repo for skills, config patterns, or novel approaches worth adopting into clauDNA. For browsing or installing published skills from the open ecosystem, use /claudna:find-skills."
 argument-hint: "[org/repo or GitHub URL]"
 allowed-tools:
-  - Bash(gh *)
-  - Bash(git *)
-  - Bash(rm -rf /tmp/heist-*)
+  - Bash(git diff *)
+  - Bash(git log *)
   - Read
   - Write
   - Edit
@@ -55,7 +54,7 @@ Accept `org/repo` or full GitHub URL (extract `org/repo`). Validate with `gh rep
 
 ### Step 2: Recon
 
-Create scratch dir `/tmp/heist-<YYYY-MM-DD_HHMMSS>/`. Fetch file tree via `gh api repos/<org>/<repo>/git/trees/<default-branch>?recursive=1`.
+Create the scratch dir with `mktemp -d "${TMPDIR:-/tmp}/heist-XXXXXX"` (`<scratch>` below). Fetch file tree via `gh api repos/<org>/<repo>/git/trees/<default-branch>?recursive=1`.
 
 Count interesting files (`SKILL.md`, `CLAUDE.md`, `.claude/**`, `hooks/*`, `agents/*`, `commands/*`, root `*.md`, `settings.json`, etc.). If ≤30 → API browse. If >30 → recommend `git clone --depth 1`; if declined, API browse.
 
@@ -85,7 +84,7 @@ Naming collision on adopt: ask for alternative name.
 
 ### Step 7: Summary & Cleanup
 
-Present target, counts (scanned/selected), actions (ADOPTED with paths, ENHANCED with changes, SKIPPED). Next steps: `git diff`, bump plugin version in `.claude-plugin/plugin.json`, update CHANGELOG.md, push for `/plugin update` to pick up the new version. Cleanup: `rm -rf /tmp/heist-<timestamp>/`
+Present target, counts (scanned/selected), actions (ADOPTED with paths, ENHANCED with changes, SKIPPED). Next steps: `git diff`, bump plugin version in `.claude-plugin/plugin.json`, update CHANGELOG.md, push for `/plugin update` to pick up the new version. Cleanup: `rm -rf <scratch>/`
 
 ---
 

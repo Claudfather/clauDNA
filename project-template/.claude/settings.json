@@ -1,13 +1,28 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git:*)",
-      "Bash(gh:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh issue list:*)",
       "Bash(ls:*)",
       "Bash(cat:*)",
       "Bash(head:*)",
       "Bash(tail:*)",
       "Bash(wc:*)"
+    ],
+    "deny": [
+      "Bash(gh gist:*)",
+      "Bash(gh extension:*)",
+      "Bash(gh alias:*)",
+      "Bash(gh auth token:*)",
+      "Bash(git config:*)",
+      "Bash(git -c:*)"
     ]
   }
 }

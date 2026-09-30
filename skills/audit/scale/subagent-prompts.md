@@ -2,7 +2,7 @@
 
 Reference material for the `/claudna:audit scale` lens. Detailed instructions for the subagents launched during Phases 1–2. All subagents follow the disk-write pattern (`../../_shared/orchestration-guide.md` Sections 2 & 6): write findings to the scratch dir, return a 2-4 line summary, never stream research through the orchestrator. Every research file that captured command output or configuration is scrubbed in place with the redactor (`python3 "<claudna-root>/scripts/redact.py" <file>`, with `<claudna-root>` per `../../_shared/claudna-root.md`) before handoff.
 
-Every prompt receives: the Phase 0 boundary and capacity map, the focus area (if any), and the scratch path `/tmp/scale-audit-<YYYY-MM-DD_HHMMSS>/research/`.
+Every prompt receives: the Phase 0 boundary and capacity map, the focus area (if any), and the scratch path `<scratch>/research/`.
 
 Common rules for all subagents:
 

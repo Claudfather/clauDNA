@@ -29,7 +29,7 @@ Every hit is filled or removed. This catches the failure mode where a protocol s
 
 ## 4. Tracker reconciliation
 
-Reconcile every Part 4 finding and every Part 7 migration stage against the live tracker before filing or presenting — a targeted `gh issue list --repo <owner/repo> --search "<key terms>" --state all --limit 50` per item (`--state all` is mandatory: `gh issue list` defaults to open-only, and a *closed* match means the work landed or the problem regressed). Bucket each item:
+Reconcile every Part 4 finding and every Part 7 migration stage against the live tracker before filing or presenting — a targeted `gh issue list --repo <owner/repo> --search="$(cat <terms-file>)" --state all --limit 50` per item, with the item's key terms written to `<terms-file>` in `<scratch>` by the Write tool (`--state all` is mandatory: `gh issue list` defaults to open-only, and a *closed* match means the work landed or the problem regressed). Bucket each item:
 
 | Bucket | Fate |
 |---|---|

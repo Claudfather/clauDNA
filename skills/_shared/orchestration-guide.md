@@ -6,20 +6,22 @@ Shared reference for skills that use subagent orchestration to produce design do
 
 ## 1. Scratch Directory
 
-At orchestration start, define a scratch directory path for this session:
+At orchestration start, make a private scratch directory for this session, once:
 
-```
-/tmp/<skill-name>-<timestamp>/research/
+```bash
+mktemp -d "${TMPDIR:-/tmp}/<skill-name>.XXXXXX"
 ```
 
 - `<skill-name>` is the slash command name (e.g., `product-enhance`, `audit`)
-- `<timestamp>` is `YYYY-MM-DD_HHMMSS`
-- Research subagents write research files here (use `general-purpose` subagents — Explore agents lack the Write tool)
-- Plan agents read research from here
+- `mktemp -d` makes a new directory that only you can read or write, and prints its path. That path is `<scratch>` in every skill's steps; put it, absolute, into every subagent prompt that reads or writes there.
+- Research subagents write research files to `<scratch>/research/` (use `general-purpose` subagents — Explore agents lack the Write tool)
+- Plan agents read research from there
 
-Example: `/tmp/product-enhance-2026-02-17_143022/research/`
+Never name a scratch path yourself under `/tmp` or `$TMPDIR` (a fixed name, or one built from a timestamp): make it with `mktemp -d`.
 
-**Permissions note:** Do NOT use Bash `mkdir` to create this directory. The Write tool creates parent directories automatically. The first subagent's Write call to this path will create the directory. This avoids any Bash permission prompts — the entire disk-write workflow uses only Read and Write tools, which are blanket-allowed via the `claude-workflow` permission category.
+**Every file a skill writes for its own use goes in `<scratch>`, orchestrated or not:** a file a command takes its text from (a title, a body, search terms, a message, a JSON payload), a draft of a doc to publish, fetched content, a working ledger. A skill that has not made `<scratch>` yet makes it as above before it writes the first such file. Never write one at a name you chose under `/tmp` or `$TMPDIR`, however unlikely the name.
+
+**Permissions note:** this is the one Bash call the pattern needs. If `mktemp -d` is refused, stop and say so; never fall back to a name of your own. After it, subagents write with the Write tool, which creates the subdirectories (`research/`, `docs/`) inside `<scratch>` as it writes, so the rest of the workflow uses only Read and Write.
 
 **Subagent type note:** Explore agents (`subagent_type: "Explore"`) do NOT have the Write tool — they are read-only. For the disk-write pattern, use `general-purpose` subagents (`subagent_type: "general-purpose"`) which have access to all tools including Write. Use Explore agents only when you need fast, read-only codebase searches that don't need to persist results to disk.
 
@@ -34,7 +36,7 @@ Research subagents (`general-purpose` type) write structured research to disk an
 Each research subagent writes a research file to:
 
 ```
-/tmp/<skill-name>-<timestamp>/research/<slug>.md
+<scratch>/research/<slug>.md
 ```
 
 Research file template:
@@ -65,7 +67,7 @@ Scanned authentication flow. Found 3 issues:
 - JWT secret hardcoded (src/auth.ts:12) — CRITICAL
 - No rate limiting on login endpoint — HIGH
 - Session cookies missing secure flag — MEDIUM
-Full research: /tmp/audit-2026-02-17_143022/research/auth-flow.md
+Full research: <scratch>/research/auth-flow.md
 ```
 
 **The orchestrator MUST NOT read the full research files into its context.** The orchestrator uses these summaries for user-facing presentation tables only.
@@ -74,7 +76,7 @@ Full research: /tmp/audit-2026-02-17_143022/research/auth-flow.md
 
 ## 3. Plan Agent → Disk Pattern
 
-Plan agents read research from disk, read this guide for quality standards, and write final docs into the session's **scratch docs directory** (`/tmp/<skill>-<timestamp>/docs/`). The orchestrator then publishes the finished family in one call — placement into `documentation/` is `/claudna:publish`'s job, never the agents' and never the orchestrator's own Write calls.
+Plan agents read research from disk, read this guide for quality standards, and write final docs into the session's **scratch docs directory** (`<scratch>/docs/`). The orchestrator then publishes the finished family in one call — placement into `documentation/` is `/claudna:publish`'s job, never the agents' and never the orchestrator's own Write calls.
 
 ### Launch prompt template for Plan agents
 
@@ -87,13 +89,13 @@ The orchestrator constructs a prompt for each Plan agent that includes the follo
    Standard and Phase Doc Structure exactly (docs are publishable docs:
    output-guide §3 frontmatter + the §4.1 body skeleton; the standard's
    content sections map onto it — see its mapping table).
-2. Read the research file(s) at: /tmp/<skill>-<timestamp>/research/<slug>.md
+2. Read the research file(s) at: <scratch>/research/<slug>.md
 3. [Any skill-specific quality requirements, inlined by the calling skill]
 
 ## Task
 
 Write a phase document for: <enhancement title>
-Output path: /tmp/<skill>-<timestamp>/docs/<NN>_<slug>.md
+Output path: <scratch>/docs/<NN>_<slug>.md
 
 ## When done
 
@@ -114,7 +116,7 @@ Do NOT return the full document content.
 After all Plan agents complete, the **orchestrator composes the `00_` master** from the Plan agents' metadata summaries and writes it to the same scratch docs directory — the sole exception to "never write docs" (§6's read-the-first-15-20-lines allowance exists for exactly this), with output-guide §3 frontmatter like every family member. Then it places the family with one call:
 
 ```
-/claudna:publish /tmp/<skill>-<timestamp>/docs/ --to docs --dir documentation/planning/<subdirectory>/<session_name>_<YYYY-MM-DD>/
+/claudna:publish <scratch>/docs/ --to docs --dir documentation/planning/<subdirectory>/<session_name>_<YYYY-MM-DD>/
 ```
 
 Family mode validates each doc — `NN_*` phase docs against the full §4.1 skeleton, the `00_*` master under the presence-only exemption — and writes nothing on any failure (see `skills/publish/SKILL.md` Step 1b / the docs adapter). The `--dir` value comes from the registry in `../_shared/documentation-standard.md` §2.
@@ -184,10 +186,10 @@ The disk-write workflow is designed to use **only Read and Write tools** for all
 
 Both Read and Write are blanket-allowed via the `claude-workflow` permission category (default in clauDNA). This means:
 
-- Research subagents writing research to `/tmp/` → **no permission prompt**
-- Plan agents reading research from `/tmp/` → **no permission prompt**
+- Research subagents writing research to `<scratch>` → **no permission prompt**
+- Plan agents reading research from `<scratch>` → **no permission prompt**
 - Plan agents reading this guide from `../_shared/` → **no permission prompt**
-- Plan agents writing docs to the scratch docs directory (`/tmp/…/docs/`) → **no permission prompt**
+- Plan agents writing docs to the scratch docs directory (`<scratch>/docs/`) → **no permission prompt**
 - `/claudna:publish --to docs` placing the family under `documentation/planning/` (Read/Write tools) → **no permission prompt**
 
 Subagents launched via the Task tool inherit the parent session's permissions. No additional permission grants are needed.
@@ -202,15 +204,15 @@ Rules for all skills:
 - **For Python virtual environments:** Use the venv's python directly — `./venv/bin/python -m pytest` not `source venv/bin/activate && pytest`.
 - **For `cd`:** Use absolute paths — `python /path/to/app.py` not `cd /path/to && python app.py`.
 
-**No exceptions.** Previous versions of this guide listed `source .env &&` and `cd <worktree> &&` as accepted. Both have clean alternatives — see below.
+**No exceptions.** Previous versions of this guide listed `source .env &&` and `cd <worktree> &&` as accepted, and they are not: both have clean alternatives — see below.
 
 ### Environment variables from `.env`
 
-Skills that need credentials or config from `.env` must NOT use `source .env && command`. Instead:
+Skills that need credentials or config from `.env` must NOT use `source .env && command`. They must not Read `.env` for a credential either, nor put a value into a command. Instead:
 
-1. **Read** `.env` (and `.env.local` if it exists) using the Read tool
-2. **Discover** the needed variable — don't hardcode a specific name. For database URLs, look for `DATABASE_URL`, `NEON_PROD_URL`, `POSTGRES_URL`, `PG_URL`, etc. For API keys, look for common patterns.
-3. **Pass the value inline** in the command: `psql "postgres://discovered-url" -c "SELECT 1"`
+1. **Let the tool read its own credentials** where it has a config: a libpq service or pass file (`psql "service=<name>"`), `~/.snowsql/config` (`snowsql -c <connection>`), `neon auth`, `vercel login`, the Railway CLI's config. CLIs such as `neonctl` and `vercel` also read `NEON_API_KEY` / `VERCEL_TOKEN` from the environment.
+2. **When the value lives only in `.env`, hand it to the one command that needs it** through its environment, with the bundled reader: `python3 "<claudna-root>/scripts/env_from_file.py" .env VERCEL_TOKEN -- vercel whoami` (`<claudna-root>` per `claudna-root.md`). It reads the file as text, never runs it, and never prints the value. `env_from_file.py .env --has DATABASE_URL NEON_PROD_URL` names the first key that is set, without its value, so you can discover the variable name. A Postgres URL takes `=@libpq` (`env_from_file.py .env DATABASE_URL=@libpq -- psql -X -f <sql-file>`), which turns it into libpq's own variables (`PGHOST`, `PGPASSWORD`, …): psql does not read a URL from `PGDATABASE`. `--url-env DATABASE_URL` does the same for a URL already in the environment, and `--url-file <file>` for one a CLI wrote to a file.
+3. **Write SQL, bodies and other text to a file in `<scratch>`** (§1) with the Write tool and pass the file (`psql -f`, `snowsql -f`, `--body-file`).
 
 This eliminates the `&&` operator AND makes skills portable across projects that use different variable names.
 
@@ -334,7 +336,7 @@ The rules above describe planning skills that produce GitHub Issues. Implementat
 - **Implies producing a PR, not an issue.** Does NOT imply `--output github`. The terminal artifact is an open PR on the work item's source branch.
 - **Never merges.** The merge gate is unconditionally skipped in `--auto`. A human ratifies the PR.
 - **Requires a target work item.** `--auto` MUST be invoked with `--source github <#>` or an explicit plan path. Picker / browse modes are disallowed.
-- **Trusts the caller has vetted the plan.** Interactive challenge rounds are replaced by either (a) trust (the upstream planning skill ran adversarial-review at creation time per §5.3 of the design) or (b) machine synthesis via `/claudna:weigh-development-paths --auto` per design §5.5.2. The skill does not stop to ask the user.
+- **Trusts a *collaborator-authored* plan the caller has vetted.** Interactive challenge rounds are replaced by either (a) trust (the upstream planning skill ran adversarial-review at creation time per §5.3 of the design) or (b) machine synthesis via `/claudna:weigh-development-paths --auto` per design §5.5.2. The skill does not stop to ask the user. **This trust presumption holds only when the work item's author is trusted** (`authorAssociation` OWNER/MEMBER/COLLABORATOR — [`./trusted-input.md`](./trusted-input.md)); a work item authored by an untrusted account carries no vetting to presume, so `--auto` refuses it (exit `blocked`) rather than implementing outsider text unattended.
 - **"Feels wrong" exits with `outcome: blocked`** with a populated `blocker_description` field, instead of stopping for user discussion.
 - **Emits the structured result shape (§10.C below)** at the end of the run.
 

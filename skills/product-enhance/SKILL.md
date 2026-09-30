@@ -96,7 +96,7 @@ Ask the user: **"Are you coming in with specific issues, or should we discover e
 
 #### Step 1B: Codebase Reconnaissance
 
-Scratch directory: `/tmp/product-enhance-<YYYY-MM-DD_HHMMSS>/research/`. Launch **Explore subagents** covering structure, modules, entry points, docs, tests, dependencies, recent git history. Do NOT read CLAUDE.md/MEMORY.md in orchestrator. Disk-write per orchestration guide, Section 2. Present a `Codebase Context` summary; ask user to confirm.
+Scratch directory: `<scratch>/research/`, with `<scratch>` a private directory made by `mktemp -d "${TMPDIR:-/tmp}/product-enhance.XXXXXX"`. Launch **Explore subagents** covering structure, modules, entry points, docs, tests, dependencies, recent git history. Do NOT read CLAUDE.md/MEMORY.md in orchestrator. Disk-write per orchestration guide, Section 2. Present a `Codebase Context` summary; ask user to confirm.
 
 ---
 

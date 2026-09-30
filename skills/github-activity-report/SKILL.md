@@ -28,7 +28,7 @@ A markdown report with:
 - **Concentration insight**: who is #1 in which repos, dominant share (>80%), and which repo patterns exist (solo-driven vs lead-with-team vs multi-contributor)
 - Caveats (search-API cap, identity-string fallback for unattributed commits, bot traffic)
 
-Saved to `~/Downloads/<scope>-activity-<since>_to_<until>.md` by default. Raw JSONL data is left in `/tmp/gh-activity-stats/` for further slicing.
+Saved to `~/Downloads/<scope>-activity-<since>_to_<until>.md` by default. Raw JSONL data is left in the scratch directory (`<scratch>`, readable by you alone) for further slicing.
 
 ---
 
@@ -93,21 +93,21 @@ query($endCursor: String) {
 }' --jq '.data.viewer.repositories.nodes[] | select(.isArchived == false) | .name'
 ```
 
-Save to `/tmp/gh-activity-stats/repos.txt`. Show the count and ask the user to confirm before crawling (active repos × 2 endpoints × paged calls = potentially hundreds of API calls).
+Make the scratch directory with `mktemp -d "${TMPDIR:-/tmp}/gh-activity-stats.XXXXXX"` (`<scratch>` below) and save the list to `<scratch>/repos.txt`. Show the count and ask the user to confirm before crawling (active repos × 2 endpoints × paged calls = potentially hundreds of API calls).
 
 ### Step 4: Run the crawl
 
-Copy `crawl.sh` (alongside this skill) into `/tmp/gh-activity-stats/` and run it. Pass the scope, since, until via env vars:
+Run the bundled `crawl.sh` from this skill's own directory, never a copy (`<claudna-root>` per `../_shared/claudna-root.md`). Pass the scratch directory, scope, since and until via env vars:
 
 ```bash
-SCOPE=<scope> SINCE_DATE=<YYYY-MM-DD> UNTIL_DATE=<YYYY-MM-DD> /tmp/gh-activity-stats/crawl.sh
+OUT=<scratch> SCOPE=<scope> SINCE_DATE=<YYYY-MM-DD> UNTIL_DATE=<YYYY-MM-DD> "<claudna-root>/skills/github-activity-report/crawl.sh"
 ```
 
 The script writes:
-- `/tmp/gh-activity-stats/prs.jsonl` — one PR per line, with repo/user/created/merged/state/number
-- `/tmp/gh-activity-stats/commits.jsonl` — one commit per line, with repo/sha/author/date
-- `/tmp/gh-activity-stats/per_repo.tsv` — counts per repo
-- `/tmp/gh-activity-stats/crawl.log` — progress log
+- `<scratch>/prs.jsonl` — one PR per line, with repo/user/created/merged/state/number
+- `<scratch>/commits.jsonl` — one commit per line, with repo/sha/author/date
+- `<scratch>/per_repo.tsv` — counts per repo
+- `<scratch>/crawl.log` — progress log
 
 **Run it in the background** with `run_in_background: true` and use `Monitor` to watch progress (see "Monitoring" below). Crawls can take 5–20 minutes depending on org size.
 
@@ -116,7 +116,7 @@ The script writes:
 Once the crawl finishes, compute aggregates with `jq`:
 
 ```bash
-cd /tmp/gh-activity-stats
+cd <scratch>
 echo "PRs total:    $(wc -l < prs.jsonl)"
 echo "Commits total: $(wc -l < commits.jsonl)"
 echo "Merged PRs:   $(jq -c 'select(.merged != null)' prs.jsonl | wc -l)"
@@ -187,11 +187,11 @@ Always include these four caveats verbatim — they're the gotchas that surprise
 The crawl prints `[N/total] <repo>` to stderr per repo. Use `Monitor` with an `until DONE` loop to get progress pings every 30s without polling:
 
 ```
-until grep -q "^DONE" /tmp/gh-activity-stats/crawl.log; do
-  rows=$(wc -l < /tmp/gh-activity-stats/per_repo.tsv 2>/dev/null)
-  prs=$(wc -l < /tmp/gh-activity-stats/prs.jsonl 2>/dev/null)
-  cms=$(wc -l < /tmp/gh-activity-stats/commits.jsonl 2>/dev/null)
-  last=$(tail -1 /tmp/gh-activity-stats/crawl.log)
+until grep -q "^DONE" <scratch>/crawl.log; do
+  rows=$(wc -l < <scratch>/per_repo.tsv 2>/dev/null)
+  prs=$(wc -l < <scratch>/prs.jsonl 2>/dev/null)
+  cms=$(wc -l < <scratch>/commits.jsonl 2>/dev/null)
+  last=$(tail -1 <scratch>/crawl.log)
   echo "progress: repos_done=$((rows-1)) prs=$prs commits=$cms last=$last"
   sleep 30
 done

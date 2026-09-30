@@ -116,7 +116,7 @@ Execute the user's choices — create or update docs as requested.
 
 Follow `../../_shared/pre-handoff-checklist.md` for the general procedure. The adversarial-review `--dispatch` output is markdown with YAML frontmatter per `../../_shared/contracts/lens-result-contract.md` — parse `status` from frontmatter and findings from body sections. For the docs lens, the workflow is adapted:
 
-1. Write each gap-fix proposal to a temporary scratch file at `/tmp/audit-docs-<timestamp>/proposals/<gap-slug>.md`.
+1. Write each gap-fix proposal to a temporary scratch file at `<scratch>/proposals/<gap-slug>.md`, with `<scratch>` a private directory made by `mktemp -d "${TMPDIR:-/tmp}/audit-docs.XXXXXX"`.
 
 2. Run the pre-handoff checklist against each scratch file.
 

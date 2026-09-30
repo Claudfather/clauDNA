@@ -12,7 +12,7 @@ Planning skills support three output targets. The target controls **where** the 
 
 | Target | Flag | Routing | Behavior |
 |---|---|---|---|
-| `docs` | (default, no flag needed) | `/claudna:publish --to docs --dir <category>/<session>_<date>/` | Author writes the doc (or `00_*` + `NN_*` family) to a scratch directory; publish validates and places it at exactly the `--dir` it receives (registry: documentation-standard §2) |
+| `docs` | (default, no flag needed) | `/claudna:publish --to docs --dir <category>/<session>_<date>/` | Author writes the doc (or `00_*` + `NN_*` family) to `<scratch>` (`../_shared/orchestration-guide.md` §1); publish validates and places it at exactly the `--dir` it receives (registry: documentation-standard §2) |
 | `github` | `--output github` | `/claudna:publish --to github-issue` | Create a GitHub issue from the doc |
 | `session` | `--output session` | `/claudna:publish --to session` | Print the doc body back into the chat, no persistence |
 
@@ -40,7 +40,7 @@ Regardless of output target, every skill must:
 
 1. **Run the full analysis pipeline.** No phases are skipped based on output target. The scan, analysis, and plan generation phases all execute identically.
 2. **Produce a publishable doc.** Each unit of output is a markdown file with the frontmatter (Section 3) and the body skeleton (Section 4) below. Every finding includes before/after code examples, step-by-step instructions, a verification checklist, and "What NOT To Do" guidance.
-3. **Delegate ALL output to `/claudna:publish`.** Never run `gh issue create` / `gh pr create` directly, and never write into `documentation/` directly. For `--output github` or `--output session`, invoke `/claudna:publish <file> --to <edition>` (mapping in Section 1). For the default `docs` target, write the doc(s) to a scratch directory and invoke `/claudna:publish <scratch-file-or-dir> --to docs --dir <category-dir>` — publish handles validation (family mode for `00_*` + `NN_*` directories), dedup, and placement.
+3. **Delegate ALL output to `/claudna:publish`.** Never run `gh issue create` / `gh pr create` directly, and never write into `documentation/` directly. For `--output github` or `--output session`, invoke `/claudna:publish <file> --to <edition>` (mapping in Section 1). For the default `docs` target, write the doc(s) to `<scratch>` (`../_shared/orchestration-guide.md` §1) and invoke `/claudna:publish <scratch-file-or-dir> --to docs --dir <category-dir>` — publish handles validation (family mode for `00_*` + `NN_*` directories), dedup, and placement.
 4. **Use Plan Mode for deliberation.** Enter Plan Mode before analysis begins. Exit Plan Mode when transitioning to writing the doc + publishing.
 
 The output target is a persistence decision, not a quality decision.
@@ -232,8 +232,8 @@ Skipped <M> findings (duplicates of existing issues).
 
 When using subagents to generate plans:
 
-1. **Research agents** write research to a scratch directory and return summaries.
-2. **Plan agents** write each doc (frontmatter + skeleton) to the scratch directory.
+1. **Research agents** write research to `<scratch>/research/` (`../_shared/orchestration-guide.md` §1) and return summaries.
+2. **Plan agents** write each doc (frontmatter + skeleton) to `<scratch>/docs/`.
 3. **The orchestrator** invokes `/claudna:publish <scratch-file> --to github-issue --repo <repo>` per doc — it never reads the full doc or calls `gh` itself.
 
 This preserves context-window management (the orchestrator works from metadata summaries) while routing output through the single publisher.
@@ -282,7 +282,7 @@ In the skill's output section:
 This skill supports `--output github` and `--output session` in addition to the default `docs` target.
 
 Produce each unit of output as a markdown doc with frontmatter + the body skeleton in
-`../_shared/output-guide.md` (written to a scratch directory), then delegate to `/claudna:publish`:
+`../_shared/output-guide.md` (written to `<scratch>`, per `../_shared/orchestration-guide.md` §1), then delegate to `/claudna:publish`:
 - `--output github` → `/claudna:publish <file> --to github-issue --repo <repo>` (Section 4)
 - `--output session` → `/claudna:publish <file> --to session` (Section 5)
 - `docs` (default) → `/claudna:publish <scratch-file-or-dir> --to docs --dir documentation/planning/<skill-category>/<session>_<date>/` (family mode for 00_ + NN_ directories; Section 1)

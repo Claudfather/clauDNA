@@ -400,3 +400,78 @@ class TestFullPipeline:
             assert not hash_check.passed
         finally:
             shutil.rmtree(pkg.parent)
+
+
+# --- untrusted package must not escape skills/ or hide a symlink ---
+
+
+validate_skill_identity = _mod.validate_skill_identity
+validate_package_safety = _mod.validate_package_safety
+
+
+def _write_manifest(pkg: Path, mutate) -> None:
+    m = json.loads((pkg / "manifest.json").read_text())
+    mutate(m)
+    (pkg / "manifest.json").write_text(json.dumps(m))
+
+
+class TestSkillIdentity:
+    def test_valid_fixture_identity_passes(self):
+        m = load_manifest(VALID_PKG)
+        assert validate_skill_identity(m, VALID_PKG / "SKILL.md").passed
+
+    def test_slug_with_parent_traversal_fails(self):
+        pkg = make_temp_package(VALID_PKG)
+        _write_manifest(pkg, lambda m: m["skill"].__setitem__("slug", "../evil"))
+        assert not validate_skill_identity(load_manifest(pkg), pkg / "SKILL.md").passed
+
+    def test_slug_absolute_path_fails(self):
+        pkg = make_temp_package(VALID_PKG)
+        _write_manifest(pkg, lambda m: m["skill"].__setitem__("slug", "/etc/cron.d/x"))
+        assert not validate_skill_identity(load_manifest(pkg), pkg / "SKILL.md").passed
+
+    def test_slug_with_slash_fails(self):
+        pkg = make_temp_package(VALID_PKG)
+        _write_manifest(pkg, lambda m: m["skill"].__setitem__("slug", "a/b"))
+        assert not validate_skill_identity(load_manifest(pkg), pkg / "SKILL.md").passed
+
+    def test_slug_not_matching_frontmatter_name_fails(self):
+        pkg = make_temp_package(VALID_PKG)
+        # a valid kebab slug that is NOT the skill's real name
+        _write_manifest(pkg, lambda m: m["skill"].__setitem__("slug", "totally-different"))
+        assert not validate_skill_identity(load_manifest(pkg), pkg / "SKILL.md").passed
+
+    def test_empty_slug_fails(self):
+        pkg = make_temp_package(VALID_PKG)
+        _write_manifest(pkg, lambda m: m["skill"].__setitem__("slug", ""))
+        assert not validate_skill_identity(load_manifest(pkg), pkg / "SKILL.md").passed
+
+
+class TestPackageSafety:
+    def test_valid_package_has_no_symlinks(self):
+        assert validate_package_safety(VALID_PKG).passed
+
+    def test_symlink_in_package_fails(self):
+        pkg = make_temp_package(VALID_PKG)
+        (pkg / "evil-link").symlink_to("/etc/passwd")
+        assert not validate_package_safety(pkg).passed
+
+    def test_symlinked_support_dir_fails(self):
+        pkg = make_temp_package(VALID_PKG)
+        (pkg / "sub").mkdir()
+        (pkg / "sub" / "link").symlink_to("../../")
+        assert not validate_package_safety(pkg).passed
+
+
+class TestNonFiniteThresholdsRejected:
+    def test_nan_elo_does_not_pass_silently(self):
+        pkg = make_temp_package(VALID_PKG)
+        # NaN < threshold is False, so a naive `< minimum` gate would PASS it.
+        raw = (pkg / "manifest.json").read_text()
+        m = json.loads(raw)
+        m["criteria_snapshot"]["elo_rating"] = 99999
+        (pkg / "manifest.json").write_text(
+            json.dumps(m).replace("99999", "NaN")
+        )
+        results = run_validation(pkg)
+        assert any(not r.passed for r in results), "NaN elo_rating passed validation"

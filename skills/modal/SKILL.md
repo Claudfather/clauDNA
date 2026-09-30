@@ -31,7 +31,7 @@ For the selected verb, read ONLY its depth file in this skill directory and foll
 Run the ladder before any verb, stopping at the first failure with concrete guidance:
 
 1. **CLI installed** — `modal --version`; fallback `python -m modal --version` (separate parallel Bash calls, never chained). If both fail, tell the user to install with `pip install modal`. If only the fallback works, prefix all subsequent `modal` commands with `python -m modal`.
-2. **Authenticated** — `modal token info`. On failure: `modal token new` (opens browser) or `modal token set --token-id <id> --token-secret <secret>` for headless auth; do not continue.
+2. **Authenticated** — `modal token info`. On failure: `modal token new` (opens browser) or, for headless auth, ask the user to set `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET` in the environment the session runs in (the Modal client reads them). Never pass the secret on a command line. Do not continue.
 3. **Target discovery** (deploy and logs need a subject) — remaining args first, then config (`.modal.toml` / `modal.toml`), then the Grep tool with pattern `modal\.App|modal\.Stub|@app\.` and glob `*.py` with `output_mode: files_with_matches`, then ask the user.
 
 Execution, output, and failure conventions are contract §5–§7; the depth files assume them. `deploy` is this engine's destructive verb — its confirmation gate lives in `deploy.md`; `logs` and `status` are read-only and never gate.

@@ -2,7 +2,7 @@
 name: vercel-ops
 description: "SRE agent for Vercel infrastructure. Diagnoses production issues and analyzes deployments."
 background: true
-memory: user
+memory: project
 model: opus
 tools:
   - Bash
@@ -184,28 +184,17 @@ vercel cache invalidate --tag foo        # Invalidate by tag
 
 ### Vercel REST API (Advanced)
 
-For metrics and data not available via CLI, use the Vercel REST API. Auth token location:
+For metrics and data not available via CLI, use the Vercel REST API. The token is the CLI's: `~/.config/com.vercel.cli/auth.json` after `vercel login`, or `VERCEL_TOKEN` in the environment. Check that it exists without reading it (`jq -e '.token | length > 0' ~/.config/com.vercel.cli/auth.json`, or `[ -n "$VERCEL_TOKEN" ]`; exit status only). Never print it and never put it on a command line.
+
+Send each request with the header on stdin (`curl -K -`), so the token reaches curl without appearing in any command line. From the CLI's config:
 
 ```bash
-# Token from CLI auth
-cat ~/.config/com.vercel.cli/auth.json 2>/dev/null | jq -r '.token // empty'
-# Or from environment
-echo "$VERCEL_TOKEN"
+jq -r '"header = \"Authorization: Bearer " + .token + "\""' ~/.config/com.vercel.cli/auth.json | curl -s -K - "https://api.vercel.com/v9/projects/$(jq -r '.projectId // empty' .vercel/project.json)" | jq .
 ```
 
-**Get project details:**
+From the environment (`printf` is a shell builtin, so the token is in no process's argv):
 ```bash
-VERCEL_TOKEN=$(cat ~/.config/com.vercel.cli/auth.json 2>/dev/null | jq -r '.token // empty')
-PROJECT_ID=$(cat .vercel/project.json 2>/dev/null | jq -r '.projectId // empty')
-
-curl -s "https://api.vercel.com/v9/projects/$PROJECT_ID" \
-  -H "Authorization: Bearer $VERCEL_TOKEN" | jq .
-```
-
-**List deployments (JSON):**
-```bash
-curl -s "https://api.vercel.com/v6/deployments?projectId=$PROJECT_ID&limit=10" \
-  -H "Authorization: Bearer $VERCEL_TOKEN" | jq '.deployments[] | {uid, url, state, target, createdAt}'
+printf 'header = "Authorization: Bearer %s"\n' "$VERCEL_TOKEN" | curl -s -K - "https://api.vercel.com/v6/deployments?projectId=$(jq -r '.projectId // empty' .vercel/project.json)&limit=10" | jq '.deployments[] | {uid, url, state, target, createdAt}'
 ```
 
 If the token is missing or queries fail, note: "Vercel API unavailable" and rely on CLI-based investigation.

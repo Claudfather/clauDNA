@@ -2,7 +2,7 @@
 name: modal-ops
 description: "SRE agent for Modal infrastructure. Diagnoses production issues with serverless GPU workloads."
 background: true
-memory: user
+memory: project
 model: opus
 tools:
   - Bash
@@ -33,7 +33,7 @@ modal --version 2>/dev/null || python -m modal --version 2>/dev/null || echo "NO
 ```bash
 modal token info 2>/dev/null || echo "NOT_AUTHENTICATED"
 ```
-→ If not: `modal token new` (opens browser) or `modal token set --token-id <id> --token-secret <secret>`
+→ If not: `modal token new` (opens browser) or, headless, the user sets `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET` in the environment (never the secret on a command line)
 
 **3. Active environment?**
 ```bash

@@ -8,7 +8,7 @@ Reference material for the `/claudna:audit data-model` lens. These are the detai
 
 Launch a general-purpose subagent:
 
-**Prompt:** "Discover the complete data model in this codebase. Create the directory `/tmp/data-model-audit-<YYYY-MM-DD_HHMMSS>/research/` with mkdir -p, then write your findings to `/tmp/data-model-audit-<YYYY-MM-DD_HHMMSS>/research/schema-discovery.md` using the Write tool. Return a 2-4 line summary when done."
+**Prompt:** "Discover the complete data model in this codebase. Create the directory `<scratch>/research/` with mkdir -p, then write your findings to `<scratch>/research/schema-discovery.md` using the Write tool. Return a 2-4 line summary when done."
 
 The subagent should:
 
@@ -40,7 +40,7 @@ The subagent should:
 
 Launch a general-purpose subagent:
 
-**Prompt:** "Trace how this application interacts with its database. Write your findings to `/tmp/data-model-audit-<YYYY-MM-DD_HHMMSS>/research/code-path-tracing.md` using the Write tool (create the directory first with mkdir -p if needed). Return a 2-4 line summary when done."
+**Prompt:** "Trace how this application interacts with its database. Write your findings to `<scratch>/research/code-path-tracing.md` using the Write tool (create the directory first with mkdir -p if needed). Return a 2-4 line summary when done."
 
 The subagent should:
 
@@ -77,7 +77,7 @@ The subagent should:
 
 Launch a third general-purpose subagent that reads both research files and builds the map.
 
-**Prompt:** "Read the schema discovery and code path tracing research files in `/tmp/data-model-audit-<YYYY-MM-DD_HHMMSS>/research/`. Also read the codebase directly to verify and deepen the findings. Build a code-to-schema convergence map and write it to `/tmp/data-model-audit-<YYYY-MM-DD_HHMMSS>/research/convergence.md` using the Write tool. Return a summary of key findings (2-4 lines)."
+**Prompt:** "Read the schema discovery and code path tracing research files in `<scratch>/research/`. Also read the codebase directly to verify and deepen the findings. Build a code-to-schema convergence map and write it to `<scratch>/research/convergence.md` using the Write tool. Return a summary of key findings (2-4 lines)."
 
 The convergence subagent should:
 
