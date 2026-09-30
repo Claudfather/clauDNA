@@ -59,10 +59,25 @@ REFUSE_GH_SUB = [
     "variable", "ruleset", "project", "label", "browse", "attestation",
 ]
 
-# write verbs of an otherwise-allowed subcommand
+# Every WRITE/action verb of an otherwise-allowed subcommand must be refused
+# (the read-verb set must not be wideable to include one). vera #360 round-3.
 REFUSE_GH_VERBS = [
-    "gh pr merge *", "gh pr create *", "gh pr close *", "gh pr edit *",
+    # gh pr <write>
+    "gh pr create *", "gh pr edit *", "gh pr merge *", "gh pr close *",
+    "gh pr comment *", "gh pr review *", "gh pr ready *", "gh pr reopen *",
+    "gh pr lock *", "gh pr unlock *", "gh pr checkout *",
+    # gh issue <write>
     "gh issue create *", "gh issue edit *", "gh issue close *",
+    "gh issue comment *", "gh issue delete *", "gh issue reopen *",
+    "gh issue lock *", "gh issue unlock *", "gh issue pin *",
+    "gh issue unpin *", "gh issue transfer *", "gh issue develop *",
+]
+
+# Every READ verb a skill needs must stay allowed (the set must not be narrowed).
+ALLOW_GH_VERBS = [
+    "gh pr view *", "gh pr list *", "gh pr diff *", "gh pr status *",
+    "gh pr checks *",
+    "gh issue view *", "gh issue list *", "gh issue status *",
 ]
 
 
@@ -84,6 +99,11 @@ def test_risky_gh_subcommands_refused():
 def test_gh_write_verbs_refused():
     missed = [e for e in REFUSE_GH_VERBS if not refused(f"Bash({e})")]
     assert missed == [], f"gh write verb accepted: {missed}"
+
+
+def test_gh_read_verbs_allowed():
+    wrong = [e for e in ALLOW_GH_VERBS if not accepted(f"Bash({e})")]
+    assert wrong == [], f"gh read verb refused: {wrong}"
 
 
 def test_command_refused_except_lookup():
