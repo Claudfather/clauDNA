@@ -42,7 +42,8 @@ USAGE = (
     "       env_from_file.py --url-env <NAME> -- COMMAND [ARGS ...]"
 )
 _LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$")
-_LIBPQ_VARIABLE = re.compile(r"PG[A-Z]+")
+_QUOTED = re.compile(r"""(["'])(.*?)\1(?:\s+#.*)?$""")
+_LIBPQ_VARIABLE = re.compile(r"PG[A-Z_]+")
 # Connection parameters a URL's query string may carry, and libpq's variable for each.
 _QUERY_TO_ENV = {
     "host": "PGHOST",
@@ -72,19 +73,21 @@ class Refused(ValueError):
 
 def parse(path: str) -> dict[str, str]:
     values: dict[str, str] = {}
-    with open(path, encoding="utf-8") as fh:
-        for raw in fh:
-            if not raw.strip() or raw.lstrip().startswith("#"):
-                continue
-            m = _LINE.match(raw.rstrip("\n"))
-            if not m:
-                continue
-            key, value = m.group(1), m.group(2)
-            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-                value = value[1:-1]
-            else:
-                value = value.split(" #", 1)[0].rstrip()
-            values[key] = value
+    try:
+        with open(path, encoding="utf-8-sig") as fh:
+            lines = fh.read().split("\n")
+    except UnicodeDecodeError as err:
+        raise Refused(f"{path} is not UTF-8 text") from err
+    for raw in lines:
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            continue
+        m = _LINE.match(raw)
+        if not m:
+            continue
+        key, value = m.group(1), m.group(2)
+        quoted = _QUOTED.match(value)
+        value = quoted.group(2) if quoted else re.split(r"\s#", value, maxsplit=1)[0].rstrip()
+        values[key] = value
     return values
 
 
@@ -124,6 +127,9 @@ def libpq_env(url: str, source: str) -> dict[str, str]:
 
 
 def _run(additions: dict[str, str], command: list[str], *, url: bool) -> int:
+    held = [name for name, value in additions.items() if "\0" in value]
+    if held:
+        raise Refused(f"{', '.join(held)} holds a NUL byte, which no command can take; the command was not run")
     env = {k: v for k, v in os.environ.items() if not (url and _LIBPQ_VARIABLE.fullmatch(k))}
     env.update(additions)
     try:

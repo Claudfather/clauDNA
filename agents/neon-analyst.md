@@ -51,7 +51,7 @@ A development database (a `DEV`-named variable, or the user says so) takes the s
 
 Run `neon`, or `npx neon@6.2.3` when it is not installed. It reads `NEON_API_KEY` from its environment; never pass `--api-key`. Two more rules:
 
-- Run a Neon `--help` only with the key removed: `env -u NEON_API_KEY neon <cmd> --help`.
+- Run anything that is not a complete verb (a bare `neon`, a command group such as `neon branches`, or any `--help`) with the key removed: `env -u NEON_API_KEY neon ...`. The help those print shows the key's value as a default.
 - Run key-based commands with an empty config directory: when a key is rejected, the CLI deletes the stored `neon auth` login under `$XDG_CONFIG_HOME/neonctl` (default `~/.config/neonctl`).
 
 Make a private directory once with `mktemp -d`; `<scratch>` below is its path. `<NEON>` is:

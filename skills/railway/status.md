@@ -38,11 +38,17 @@ List all environments (production, staging, PR environments, etc.).
 
 ## Step 5: Environment Variables
 
+Its output holds the values, so send it to a file in a private directory (make one with `mktemp -d`; `<scratch>` below) and show only the names:
+
 ```bash
-railway variables list --json
+railway variables list --json > <scratch>/vars.json
 ```
 
-List variable **names only** — never display values. Note any common variables that appear unset.
+```bash
+jq 'keys' <scratch>/vars.json
+```
+
+Then `rm -r <scratch>`. Never display a value. Note any common variables that appear unset.
 
 ## Step 6: Resource Metrics
 
