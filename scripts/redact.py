@@ -22,7 +22,7 @@ review output stays readable.
 WHAT IT COVERS is exactly what ``tests/test_redact.py`` tests, one case per
 shape: vendor-prefixed keys (current and legacy formats), a value named by its
 context (a secret-named assignment, a secret flag, an ``Authorization`` header,
-a ``-u user:password``, a URL password), PEM private-key blocks, and a long
+a ``curl -u user:password``, a URL password), PEM private-key blocks, and a long
 mixed-case token as a backstop. A shape with no test is not covered. A bare
 UUID-shaped or lowercase-hex token with nothing naming it passes through, since
 it cannot be told from a request id or a commit.
@@ -43,10 +43,26 @@ _START = r"(?<![A-Za-z0-9_-])"
 _END = r"(?![A-Za-z0-9_-])"
 
 
+# One line of a PEM key's body, after the line break before it (a real one, or
+# `\n` escaped inside a JSON string): an encryption header, or base64, possibly
+# empty (the blank line after the headers) and possibly with trailing spaces. The
+# lookahead makes the line end where the key's line ends, so the pattern never
+# takes the start of the prose line after a key (the `F3` of `F3: README typo`).
+_KEY_LINE = (
+    r"(?:\r?\n|\\n)"
+    r"(?:(?:Proc-Type|DEK-Info|Comment): (?:(?!\\n)[^\r\n])*|[A-Za-z0-9+/=]*[ \t]*)"
+    r"(?=\r?\n|\\n|\Z|[\"'])"
+)
+
+
 def _pem(m: re.Match) -> str:
-    kind = m.group(1)
-    tail = f"\n-----END {kind}PRIVATE KEY-----" if m.group(2) else ""
-    return f"-----BEGIN {kind}PRIVATE KEY-----\n{MASK}{tail}"
+    kind, whole = m.group(1), m.group(0)
+    begin = f"-----BEGIN {kind}PRIVATE KEY-----"
+    if whole == begin:
+        return whole  # a BEGIN line quoted with no key after it
+    sep = "\n" if "\n" in whole else "\\n"
+    tail = f"{sep}-----END {kind}PRIVATE KEY-----" if m.group(2) else ""
+    return f"{begin}{sep}{MASK}{tail}"
 
 
 # Ordered most-specific → most-general. Each (pattern, replacement) is applied
@@ -55,11 +71,13 @@ def _pem(m: re.Match) -> str:
 # and assignment rules keep what names the value, so output stays readable.
 PATTERNS: list[tuple[re.Pattern[str], object]] = [
     # A PEM private key, whole block. Base64 lines carry `+` and `/`, which split
-    # them into runs too short for the backstop; a block cut off is masked to the end.
+    # them into runs too short for the backstop. A block that is cut off (a
+    # BEGIN line quoted in prose, a capture of the first lines of a key file) is
+    # masked through its key lines and no further: what follows it survives.
     (
         re.compile(
             r"-----BEGIN ((?:[A-Z0-9]+ )*)PRIVATE KEY-----"
-            r"(?:.*?(-----END \1PRIVATE KEY-----)|.*\Z)",
+            r"(?:.*?(-----END \1PRIVATE KEY-----)|(?:" + _KEY_LINE + r")*)",
             re.S,
         ),
         _pem,
@@ -87,7 +105,7 @@ PATTERNS: list[tuple[re.Pattern[str], object]] = [
     (
         re.compile(
             r"(?i)\b((?:proxy-)?authorization|x-api-key|x-auth-token)"
-            r"(\s*:\s*(?:(?:bearer|basic|token|bot|digest)\s+)?)[^\s'\"]+"
+            r"([\"']?\s*:\s*[\"']?(?:(?:bearer|basic|token|bot|digest)\s+)?)[^\s'\"]+"
         ),
         r"\1\2" + MASK,
     ),
@@ -104,8 +122,13 @@ PATTERNS: list[tuple[re.Pattern[str], object]] = [
         ),
         r"\1" + MASK,
     ),
-    # `curl -u user:password` / `--user user:password`: keep the user.
-    (re.compile(r"((?:^|\s)(?:-u|--user)[=\s]*[^:\s]+:)\S+"), r"\1" + MASK),
+    # `curl -u user:password` / `--user user:password`: keep the user. Only on a
+    # curl or wget line: elsewhere `-u` is another flag (`date -u +%H:%M`,
+    # `docker run -u 1000:1000`, `rsync -u host:/path`).
+    (
+        re.compile(r"(\b(?:curl|wget)\b[^\n]*?\s(?:-u|--user)[=\s]*[^:\s]+:)\S+"),
+        r"\1" + MASK,
+    ),
     # Credential in a connection string: scheme://user:PASSWORD@host, the user
     # possibly empty (`redis://:pw@host`). neon's DATABASE_URL is the primary
     # neon credential and matches no vendor prefix. Keep scheme and host.

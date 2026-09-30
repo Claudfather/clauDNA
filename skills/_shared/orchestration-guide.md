@@ -232,7 +232,7 @@ Scrub deterministically with the bundled redactor, `<claudna-root>/scripts/redac
 python3 "<claudna-root>/scripts/redact.py" <findings-file>
 ```
 
-Run it over any research or findings file that captured command output before that file is returned or published. What the redactor masks is exactly what `tests/test_redact.py` tests, one case per shape: vendor-prefixed keys, a value named by its context (a secret-named assignment, a secret flag, an auth header, `-u user:password`, a URL password), PEM private keys, and long mixed-case tokens. It leaves git SHAs, UUIDs, and `file:line` references intact, so a bare UUID-shaped or lowercase-hex token with nothing naming it passes through. It is idempotent — a redundant pass is harmless.
+Run it over any research or findings file that captured command output before that file is returned or published. What the redactor masks is exactly what `tests/test_redact.py` tests, one case per shape: vendor-prefixed keys, a value named by its context (a secret-named assignment, a secret flag, an auth header, `curl -u user:password`, a URL password), PEM private keys, and long mixed-case tokens. It leaves git SHAs, UUIDs, and `file:line` references intact, so a bare UUID-shaped or lowercase-hex token with nothing naming it passes through. It is idempotent — a redundant pass is harmless.
 
 ---
 

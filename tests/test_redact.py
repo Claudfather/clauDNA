@@ -254,6 +254,7 @@ CONTEXT_SECRETS = [
     ("doctl auth init --access-token ", "dop_v1_" + "ab12" * 16),
     ("gh-cli --api-token ", "Fk3" * 8),
     ("curl -u admin:", "Fk3pw" * 3),
+    ("curl -sS --user admin:", "Fk3pw" * 3),
     ("redis://:", "s3Kr3t" + "Pwd0rd"),
 ]
 
@@ -267,6 +268,10 @@ BENIGN_CURRENT = [
     "max_tokens=4096 and TOKEN_TYPE=bearer",
     "Compare test_login_flow_Handles_Expired_Session_2 with its sibling.",
     "git push -u origin feat/add-redactor-rules",
+    # `-u` names a user only on a curl or wget line; elsewhere it is a flag.
+    'TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")',
+    "docker run -u 1000:1000 alpine id",
+    "rsync -u backup-host:/srv/data/ ./data/",
 ]
 
 
@@ -306,6 +311,63 @@ class TestCurrentShapes:
     def test_redacts_an_unterminated_pem_block(self):
         out = redact_text("-----BEGIN " + "OPENSSH PRIVATE KEY-----\n" + "b3Bl" + "+aB3/" * 12)
         assert "+aB3/" * 12 not in out and MASK in out
+
+    def test_a_cut_off_pem_block_keeps_the_text_after_the_key(self):
+        # A BEGIN line quoted in a finding, or a capture cut off after a few
+        # lines: mask the key's own lines and stop at the first line that is not
+        # key material. The next finding must survive, all of it.
+        key = "b3Bl" + "+aB3/" * 12  # FAKE
+        text = (
+            "F1: config loads twice\n"
+            "F2: the file starts -----BEGIN " + "OPENSSH PRIVATE KEY-----\n" + key + "\n"
+            "F3: README typo\nF4: stale link"
+        )
+        out = redact_text(text)
+        assert key not in out and MASK in out
+        assert out.startswith("F1: config loads twice\nF2: the file starts")
+        assert out.endswith("\nF3: README typo\nF4: stale link")
+
+    def test_a_begin_line_quoted_with_no_key_after_it_is_left_alone(self):
+        text = 'F2: it opens with "-----BEGIN ' + 'RSA PRIVATE KEY-----" and stops\nF3: README typo'
+        assert redact_text(text) == text
+
+    def test_a_cut_off_encrypted_block_is_masked_through_its_headers(self):
+        # Proc-Type/DEK-Info headers and the blank line after them must not stop
+        # the mask before the key body.
+        key = "MIIEpAIBAAKCAQEA" + "+aB3/" * 9  # FAKE
+        text = (
+            "-----BEGIN " + "RSA PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\n"
+            "DEK-Info: AES-128-CBC,00112233445566778899AABBCCDDEEFF\n\n" + key + "\nF3: README typo"
+        )
+        out = redact_text(text)
+        assert key not in out and out.endswith("\nF3: README typo")
+
+    def test_a_key_line_with_trailing_spaces_does_not_end_the_mask(self):
+        first, second = "b3Bl" + "+aB3/" * 12, "/Xy9+" * 12  # FAKE
+        text = "-----BEGIN " + "OPENSSH PRIVATE KEY-----\n" + first + "  \n" + second + "\nF3: README typo"
+        out = redact_text(text)
+        assert first not in out and second not in out and out.endswith("\nF3: README typo")
+
+    def test_a_cut_off_key_inside_a_json_string_keeps_the_rest_of_the_json(self):
+        # Escaped newlines (`\\n`): the mask ends with the key, not with the object.
+        key = "b3Bl" + "+aB3/" * 12  # FAKE
+        text = '{"key": "-----BEGIN ' + 'PRIVATE KEY-----\\n' + key + '\\n", "note": "F3 README typo"}'
+        out = redact_text(text)
+        assert key not in out and out.endswith('", "note": "F3 README typo"}')
+
+    @pytest.mark.parametrize(
+        "text,value",
+        [
+            ('{"Authorization": "Bearer ' + "aB3" * 8 + '"}', "aB3" * 8),
+            ("{'Authorization': 'token " + "0123456789abcdef" * 2 + "01234567'}", "0123456789abcdef" * 2 + "01234567"),
+        ],
+        ids=["json", "python-dict"],
+    )
+    def test_a_quoted_header_name_is_masked_too(self, text, value):
+        # How a headers dict prints: the value has no vendor prefix, and is too
+        # short or too hex-like for the backstop.
+        out = redact_text(text)
+        assert value not in out and "Authorization" in out and MASK in out
 
     def test_preserves_benign_lines(self):
         for line in BENIGN_CURRENT:

@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vendor prefixes for current formats: `github_pat_`, `sk_live_`/`rk_test_`, `whsec_`, `sk-proj-`/`sk-ant-`/`sk-or-`, `npm_`, `hf_`, `gsk_`, `glpat-`, `ASIA`, `xox?-` and `xapp-`.
   - Telegram tokens inside a bot URL.
   - Secret-named assignments whose keyword sits anywhere in the name (`SECRET_KEY`, `GITHUB_PAT`, `DB_PASS`), keeping the name; `tokenizer` and `max_tokens` still pass.
-  - Auth headers, `--access-token`/`--api-token`, `-u user:password`, URL passwords with an empty user, and PEM private-key blocks.
+  - Auth headers, including a quoted header name as a headers dict prints it (`{"Authorization": "Bearer …"}`), `--access-token`/`--api-token`, `-u user:password` on a curl or wget line (elsewhere `-u` is another flag: `date -u`, `docker run -u`, `rsync -u`), and URL passwords with an empty user.
+  - PEM private-key blocks. A block that is cut off (a BEGIN line quoted in prose, or a capture of the first lines of a key file) is masked through its key lines, encryption headers and blank line included, and no further: the text after it survives.
   - The high-entropy backstop now ends a run at `_` and `-`.
   - In place, each file is handled on its own: one that fails is reported, the rest are still redacted, and the exit status is non-zero. A file that is not UTF-8 is redacted with its other bytes kept, and a symlink is refused rather than written through.
   - Coverage is stated as the tested list (`tests/test_redact.py`, one case per shape) in the script and in `orchestration-guide.md`.
