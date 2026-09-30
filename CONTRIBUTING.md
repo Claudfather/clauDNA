@@ -127,6 +127,8 @@ Maintainers use `scripts/release.sh` to cut releases:
 
 The script bumps both `plugin.json` manifests together, rewrites the CHANGELOG's `[Unreleased]` section under the new version, commits, and tags. It refuses to start if the two manifests already disagree on the version, so reconcile them first.
 
+**What a marketplace user receives.** The Claude Code marketplace entry (`.claude-plugin/marketplace.json`) names `{"source": "github", "repo": "Claudfather/clauDNA"}` with no `ref` or `sha`, so it **tracks the default branch**: on a version bump a user fetches the head of the default branch at fetch time, not necessarily the exact commit that bumped the version. Nothing binds a release to the reviewed commit. To bind them, set `sha` (a full commit) or a release-tag `ref` on the entry as part of the release change, and protect that tag separately — a pin is only a gate when the ref it names cannot be rewritten by whoever can write the default branch.
+
 Contributors don't need to run this — just add your CHANGELOG entry and bump the version if applicable.
 
 ## Distribution
