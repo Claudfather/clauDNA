@@ -18,7 +18,9 @@ set -eo pipefail
 #   - Loads patterns from ~/.claude/settings.json, .claude/settings.json,
 #     and .claude/settings.local.json
 #   - Falls through (no output) for unrecognized or unparseable commands
-#   - Never returns "deny" — only "allow" or silent pass-through
+#   - Returns "deny" only for the gh read-guard shapes (a granted gh read that
+#     would read the environment or reach a host other than github.com); every
+#     other command is "allow" or silent pass-through
 #   - Debug log: ${XDG_STATE_HOME:-~/.local/state}/claudna/permissions.log,
 #     readable by the user alone
 #
@@ -127,7 +129,7 @@ eval "$JQ_RESULT"
 case "$COMMAND" in
     *gh*)
         case "$COMMAND" in
-            *--jq*|*--template*|*--repo*|*--web*|*" -q"*|*" -t"*|*" -R"*|*" -w"*|*"://"*)
+            *--jq*|*--template*|*--repo*|*--web*|*--hostname*|*[[:space:]]-q*|*[[:space:]]-t*|*[[:space:]]-R*|*[[:space:]]-w*|*"://"*)
                 if command -v python3 &>/dev/null; then
                     # errexit-safe: the decider exits 10 to deny, and an
                     # assignment that inherits that would end the hook here.
