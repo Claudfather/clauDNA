@@ -26,7 +26,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "lib"))
 
 import claudna.session_store.store as store_module  # noqa: E402
-from claudna.session_store import boundaries, paths  # noqa: E402
+from claudna.session_store import boundaries, harvest, paths  # noqa: E402
 from claudna.session_store.cli import run_hook  # noqa: E402
 from claudna.session_store.fsio import append_jsonl  # noqa: E402
 
@@ -49,7 +49,7 @@ def spawned(monkeypatch) -> list[tuple[str, int]]:
     calls: list[tuple[str, int]] = []
     monkeypatch.setattr(boundaries, "spawn_summarizer", lambda handle, index, env: calls.append((handle.sid, index)))
     monkeypatch.setattr(boundaries, "spawn_harvest", lambda root, env: pytest.fail("unexpected harvest spawn"))
-    monkeypatch.setattr(boundaries.harvest, "is_due", lambda root, env: False)  # whatever this machine has installed
+    monkeypatch.setattr(harvest, "is_due", lambda root, env: False)  # whatever this machine has installed
     return calls
 
 
@@ -112,7 +112,7 @@ class TestBoundaries:
 
     def test_a_session_start_starts_a_harvest_when_one_is_due(self, store, transcript, monkeypatch):
         harvests = []
-        monkeypatch.setattr(boundaries.harvest, "is_due", lambda root, env: True)
+        monkeypatch.setattr(harvest, "is_due", lambda root, env: True)
         monkeypatch.setattr(boundaries, "spawn_harvest", lambda root, env: harvests.append(root))
         fire(store, "SessionStart", transcript, source="startup")
         fire(store, "PreCompact", transcript, trigger="auto")

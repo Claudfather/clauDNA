@@ -82,6 +82,7 @@ class TestHarvest:
         ((finding, cwd),) = capture.findings
         assert finding["type"] == "knowledge" and finding["project"] == "webapp" and cwd == "/work"
         assert finding["title"].startswith("staging DB: ") and finding["body"].startswith(BLOCK["claim"])
+        assert "Harvested from session s1, segment 1" in finding["body"]
         assert {"origin:session-harvest", "home:entity", "asserted-by:user", "env:staging"} <= set(finding["tags"])
         assert "maturity" not in finding  # the engine stamps draft; consumers never set it
         assert (report.status, report.created, report.held_back, report.segments) == ("ok", 1, 1, 1)
@@ -97,7 +98,7 @@ class TestHarvest:
     def test_a_long_title_is_cut_at_a_word(self):
         long = {**BLOCK, "claim": "Do not keep persistent test fixtures in the staging database because it is reset "
                                   "every night at two in the morning UTC"}
-        title = harvest.finding_of(long, project=None)["title"]
+        title = harvest.finding_of(long, sid="s1", index=1, project=None)["title"]
         assert len(title) <= 101 and title.endswith("…") and not title[:-1].endswith(" ")
 
     def test_a_segment_is_taken_once(self, store):
@@ -124,6 +125,26 @@ class TestHarvest:
         assert cursor(h) == 1  # segment 2 failed half-way: it is retried whole next run
         line = (store.root / "harvest" / "liveness.txt").read_text()
         assert "FAILED" in line and "vault not found" in line
+
+    def test_a_segment_bigger_than_the_budget_is_still_taken_whole(self, store, monkeypatch):
+        monkeypatch.setattr(harvest, "MAX_CAPTURES", 2)
+        h = summarized_session(store, "s1", [[BLOCK, BLOCK, BLOCK], [BLOCK]])
+        capture = FakeCapture()
+        harvest.harvest(store, env={}, capture=capture)
+        assert len(capture.findings) == 3 and cursor(h) == 1  # never stuck behind its own size
+
+    def test_person_facts_are_queued_for_review(self, store):
+        summarized_session(store, "s1", [[PERSON]])
+        harvest.harvest(store, env={}, capture=FakeCapture())
+        (held,) = [json.loads(line) for line in (store.root / "harvest" / "held.jsonl").read_text().splitlines()]
+        assert (held["sid"], held["seg"], held["reason"], held["block"]) == ("s1", 1, "person", PERSON)
+
+    def test_private_sessions_are_never_harvested(self, store):
+        h = summarized_session(store, "s1", [[BLOCK]])
+        h.set_private(True)
+        capture = FakeCapture()
+        harvest.harvest(store, env={}, capture=capture)
+        assert capture.findings == []
 
     def test_a_run_is_bounded_to_whole_segments(self, store, monkeypatch):
         monkeypatch.setattr(harvest, "MAX_CAPTURES", 3)
@@ -173,8 +194,9 @@ import json, os, sys
 finding = json.loads(sys.stdin.read())
 with open(os.environ["FAKE_LOG"], "w") as fh:
     json.dump({"argv": sys.argv[1:], "finding": finding, "cwd": os.getcwd()}, fh)
-print(json.dumps({"ok": True, "data": {"action": os.environ.get("FAKE_ACTION", "created"), "path": "p.md",
-                                       "reason": None, "written": True}}))
+print(json.dumps({"ok": True, "command": "capture", "errors": [], "warnings": [],
+                  "data": {"action": os.environ.get("FAKE_ACTION", "created"), "path": "p.md", "reason": None,
+                           "written": True}}))
 """
 
 
@@ -192,6 +214,15 @@ class TestRunClaudronCapture:
         seen = json.loads((tmp_path / "log").read_text())
         assert seen["argv"] == ["capture", "--stdin", "--json"] and seen["finding"] == finding
         assert seen["cwd"] == str(tmp_path)
+
+    def test_a_not_ok_envelope_is_an_error(self, tmp_path):
+        fake = tmp_path / "claudron"
+        fake.write_text('#!/bin/sh\necho \'{"ok": false, "command": "capture", "errors": ["vault not found"], '
+                        '"data": null}\'\nexit 3\n')
+        fake.chmod(0o755)
+        with pytest.raises(harvest.CaptureError, match="vault not found"):
+            harvest.run_claudron_capture({"type": "knowledge", "title": "t"}, None,
+                                         {"PATH": os.environ["PATH"], "CLAUDNA_CLAUDRON_BIN": str(fake)})
 
     def test_an_unexpected_answer_is_an_error(self, tmp_path):
         env = {**self.make(tmp_path), "FAKE_ACTION": "exploded"}

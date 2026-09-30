@@ -55,11 +55,21 @@ if TYPE_CHECKING:
     import argparse
 
 
-def _handle(args: argparse.Namespace) -> SessionHandle | None:
+def _store(args: argparse.Namespace) -> SessionStore | None:
     try:
-        store = SessionStore(Path(args.root) if args.root else None)
+        return SessionStore(Path(args.root) if args.root else None)
+    except InvalidStateDir as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return None
+
+
+def _handle(args: argparse.Namespace) -> SessionHandle | None:
+    store = _store(args)
+    if store is None:
+        return None
+    try:
         handle = store.session(args.sid)
-    except (InvalidSessionId, InvalidStateDir) as exc:
+    except InvalidSessionId as exc:
         print(f"error: {exc}", file=sys.stderr)
         return None
     if not handle.exists():
@@ -215,12 +225,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.verb == "harvest":
         from . import harvest
 
-        try:
-            store = SessionStore(Path(args.root) if args.root else None)
-        except InvalidStateDir as exc:
-            print(f"error: {exc}", file=sys.stderr)
+        store = _store(args)
+        if store is None:
             return 1
-        print(json.dumps(harvest.harvest(store, force=args.force).__dict__))
+        print(json.dumps(harvest.harvest(store, force=args.force).as_dict()))
         return 0
     handle = _handle(args)
     if handle is None:

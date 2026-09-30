@@ -18,8 +18,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from . import events as ev
-from .fsio import DIR_MODE, append_jsonl, ensure_dir, exclusive_lock, file_size
-from .paths import SessionPaths, session_paths, state_root, validate_root
+from .fsio import DIR_MODE, append_jsonl, atomic_write_json, ensure_dir, exclusive_lock, file_size, read_json
+from .paths import SessionPaths, session_ids, session_paths, state_root, validate_root
 from .project import (
     SESSION_SCHEMA,
     RebuildReport,
@@ -248,6 +248,28 @@ class SessionHandle:
     def set_private(self, private: bool, *, by: str = "user") -> dict:
         return self.append("session.privacy_set", {"private": private, "by": by})
 
+    def cursor(self, consumer: str) -> int:
+        """How far ``consumer`` has taken this session's segments (``consumers.json``, spec §6.8); 0 if never."""
+        doc = read_json(self.paths.consumers)
+        try:
+            return int(doc["consumers"][consumer]["through_seg"])
+        except (TypeError, KeyError, ValueError):
+            return 0
+
+    def ack(self, consumer: str, through: int) -> None:
+        """Record, under the lock, that ``consumer`` has taken every segment up to ``through``.
+
+        The one writer of ``consumers.json``: harvest and (later) ``session
+        export --ack`` both come through here. A cursor never moves back.
+        """
+        with self._locked():
+            doc = read_json(self.paths.consumers)
+            if not isinstance(doc, dict) or doc.get("schema") != "claudna.consumers/1":
+                doc = {"schema": "claudna.consumers/1", "sid": self.sid, "consumers": {}}
+            if through > self.cursor(consumer):
+                doc["consumers"][consumer] = {"through_seg": through, "acked_at": ev.now_ts()}
+                atomic_write_json(self.paths.consumers, doc)
+
     def rebuild(self) -> RebuildReport:
         """Regenerate projections from the logs (read-only with respect to logs)."""
         with self._locked():
@@ -262,4 +284,7 @@ class SessionStore:
 
     def session(self, sid: str) -> SessionHandle:
         return SessionHandle(session_paths(sid, self.root))
+
+    def session_ids(self) -> list[str]:
+        return session_ids(self.root)
 

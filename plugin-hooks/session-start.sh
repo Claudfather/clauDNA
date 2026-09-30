@@ -91,7 +91,8 @@ fi
 STATE_DIR="$(claudna_state_dir)"
 HARVEST=""
 if [ -n "$STATE_DIR" ] && [ -f "$STATE_DIR/harvest/liveness.txt" ]; then
-    HARVEST=$(head -n 1 "$STATE_DIR/harvest/liveness.txt" 2>/dev/null | cut -c1-240 || true)
+    IFS= read -r HARVEST < "$STATE_DIR/harvest/liveness.txt" 2>/dev/null || true
+    HARVEST="${HARVEST:0:240}"
 fi
 
 # --- Emit. Nothing to say → say nothing.

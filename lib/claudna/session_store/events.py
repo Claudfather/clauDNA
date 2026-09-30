@@ -27,8 +27,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Literal
 
-from claudna.redact import redact_text
-
 from . import schema
 
 ENVELOPE_VERSION = 1
@@ -273,7 +271,12 @@ def cap_text(kind: str, data: dict) -> dict:
     forget it (spec P4).
     """
     out = dict(data)
-    for key, cap in REGISTRY[kind].caps.items():
+    caps = REGISTRY[kind].caps
+    if not caps:
+        return out
+    from claudna.redact import redact_text  # compiles its patterns: only kinds with free text pay for it
+
+    for key, cap in caps.items():
         if isinstance(out.get(key), str):
             out[key] = redact_text(out[key])
             if len(out[key]) > cap:

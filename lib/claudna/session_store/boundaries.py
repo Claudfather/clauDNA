@@ -36,7 +36,6 @@ from pathlib import Path
 from typing import Callable, Mapping
 
 from . import events as ev
-from . import harvest
 from .paths import CHILD_ENV, InvalidSessionId
 from .fsio import ensure_dir, file_size
 from .project import SessionFacts, load_lifecycle, session_facts, summary_gate
@@ -112,6 +111,8 @@ def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str])
                         origin=origin_from_cwd(payload.get("cwd") or os.getcwd()),
                         transcript_path=transcript)
     handle.open_segment("session_open", file_size(transcript))
+    from . import harvest  # only an opening SessionStart asks
+
     if harvest.is_due(handle.paths.root, env):  # spec §7.2: harvest runs at SessionStart, detached
         spawn_harvest(handle.paths.root, env)
     return f"session opened ({source})"
