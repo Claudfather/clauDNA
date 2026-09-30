@@ -437,7 +437,7 @@ Returns an envelope: `{ schema: "claudna.export/1", items: [{ sid, seg, session:
 
 ## 9. Retention
 
-- A segment is deletable once every registered consumer has acked it, or once it passes the hard cap (default 30 days), whichever comes first. **As built (phase 6):** an acked segment also waits a 7-day floor (`CLAUDNA_RETAIN_ACKED_DAYS`), because harvest acks at once and would otherwise erase recent history. The rollup keeps what a retired segment summarized.
+- A segment is deletable once every registered consumer has acked it, or once it passes the hard cap (default 30 days), whichever comes first. **As built (phase 6), owner-approved 2026-09-30:** an acked segment also waits a 7-day floor (`CLAUDNA_RETAIN_ACKED_DAYS`), because harvest acks at once and would otherwise erase recent history. The rollup keeps what a retired segment summarized. A consumer is registered for a session by its first ack, so one that never ran holds nothing back.
 - **An index is never reused.** `open_segment` numbers one past every index the session has ever named (directories *and* `segment.opened` events), so a new segment can't inherit a deleted one's lifecycle events, and export watermarks (`through_seg`) stay monotonic. When retention ships (phase 6) it records each deletion as a `segment.retired` lifecycle event before removing the directory, so a deletion is visible in the log rather than inferred from a missing directory.
 - Sessions with no registered consumers use the age cap alone.
 - Sweeping is started by SessionStart (one marker `stat`), and runs detached and debounced (at most every 6 hours) in the unclosed-session sweep. Never at SessionEnd.

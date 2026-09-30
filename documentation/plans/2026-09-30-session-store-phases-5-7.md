@@ -59,7 +59,7 @@ These are the three phases the spec lists after activity, built in one pass beca
 - Per-session history stays the lifecycle log, which already records every summary job, retirement and close. A run's `sessions` list is the cross-reference.
 - It never loads on the hook path. A test pins that `cli` doesn't import it: `uuid` alone cost ~5 ms, so the run id is `os.urandom`.
 
-## Open questions for the owner
+## Owner decisions (2026-09-30)
 
-1. **The retention floor:** is 7 days right for an acked segment, or should §9's "retire at once" hold?
-2. **Who registers as an export consumer?** Today it's anyone who acks. Claudron's side of the export door is Claudron's to build, against `claudna.export/1`.
+1. **The retention floor:** kept at 7 days for an acked segment. Spec §9 records it as built.
+2. **Export consumers:** anyone who acks a session is registered for it. A consumer that never ran can't hold data back, and one that stops is caught by the 30-day cap. Claudron's side of the export door is Claudron's to build, against `claudna.export/1`.

@@ -55,9 +55,9 @@ A SessionEnd that never ran (a crash, a kill, a laptop lid) leaves a session `op
 - A **plain-machine canary** (macOS and Linux, not this container) for §11.5: does a bare nested `claude -p` inherit the parent's id? It decides whether the entrypoint signal can go.
 - An **interactive `/clear` canary** on a plain machine, confirming the `claude` pid is also stable there. This container's canary was headless.
 
-## Open questions for the owner
+## Owner decisions
 
-The defaults below were built as the plan leaned. They are cheap to change.
+The owner kept the defaults as built on 2026-09-30: a 24 h idle threshold and a sweep at most every 6 h, 5 sessions per run.
 
 1. **The `abandoned` close reason and the 24 h threshold.** Built: 24 h, configurable with `CLAUDNA_UNCLOSED_AFTER_H`.
 2. **Should an abandoned session be summarized?** Built: yes, under the usual gate. The alternative loses the segment, and harvest's drafts are untrusted anyway.
