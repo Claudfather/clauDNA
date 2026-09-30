@@ -23,7 +23,6 @@ directory (the crawl's scratch dir), and `page_name` must match PAGE_NAME.
 from __future__ import annotations
 
 import asyncio
-import http.client
 import json
 import os
 import re
@@ -148,7 +147,7 @@ def links(job: dict) -> str:
                 status = err.code
                 if err.code != 405:
                     break
-            except (urllib.error.URLError, http.client.HTTPException, OSError, ValueError) as err:
+            except Exception as err:  # noqa: BLE001 — every URL gets an entry
                 status = f"error: {err}"
                 break
         results[url] = status
