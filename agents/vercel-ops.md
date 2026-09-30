@@ -2,7 +2,7 @@
 name: vercel-ops
 description: "SRE agent for Vercel infrastructure. Diagnoses production issues and analyzes deployments."
 background: true
-memory: user
+memory: project
 model: opus
 tools:
   - Bash

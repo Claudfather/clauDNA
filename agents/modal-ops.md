@@ -2,7 +2,7 @@
 name: modal-ops
 description: "SRE agent for Modal infrastructure. Diagnoses production issues with serverless GPU workloads."
 background: true
-memory: user
+memory: project
 model: opus
 tools:
   - Bash

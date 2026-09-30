@@ -2,7 +2,7 @@
 name: init-project
 user-invocable: true
 description: "Use when setting up a new project or adding standard Claude Code configuration (CLAUDE.md, CHANGELOG.md, .claude/, documentation/) to an existing project."
-allowed-tools: Read(*), Write(*), Edit(*), Glob(*), Grep(*), Bash(git *), Bash(ls *), Bash(mkdir *), Bash(printenv *), Bash(command -v *), Bash(claudron status *)
+allowed-tools: Read(*), Write(*), Edit(*), Glob(*), Grep(*), Bash(git log *), Bash(git tag *), Bash(ls *), Bash(mkdir *), Bash(command -v *), Bash(claudron status *)
 requires:
   - cli: claudron
     reason: "Optional — Step 6.5 vault detection only; every ladder branch degrades when absent and announces it with the standard notice in ../_shared/claudron-engine.md §3.1 (this is a soft dependency, not a functional requirement)"

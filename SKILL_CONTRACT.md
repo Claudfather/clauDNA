@@ -57,7 +57,7 @@ If none of them contains the file, stop and say so. Never fall back to a path in
 
 | Field | Type | Rules |
 |---|---|---|
-| `allowed-tools` | string OR list | Tool names / Bash patterns. Two equivalent forms are accepted: comma-separated string (`Bash(git *), Bash(gh *), Read`) or YAML list (`- Bash(git *)` / `- Bash(gh *)`). Required for skills that need tool gating beyond the user's default permissions. Patterns must use the canonical form `Bash(cmd *)` — the colon syntax `Bash(cmd:*)` is deprecated and validator-rejected. Unknown tool *names* are not rejected (the surface evolves), but unparseable entries are. |
+| `allowed-tools` | string OR list | Tool names / Bash patterns. Two equivalent forms are accepted: comma-separated string (`Bash(git status *), Bash(git diff *), Read`) or YAML list (`- Bash(git status *)` / `- Bash(gh pr view *)`). Required for skills that need tool gating beyond the user's default permissions. Patterns must use the canonical form `Bash(cmd *)` — the colon syntax `Bash(cmd:*)` is deprecated and validator-rejected. Grants are checked against an allowlist (`check_grant_scope`): an exact command, an interpreter running a fixed script, a read-only git/gh subcommand, or a read-only utility. A whole-command-family wildcard (`Bash(git *)`, `Bash(gh *)`, `Bash(python3 *)`), a package runner, or a project build/test tool is rejected; a skill that must keep one sets `disable-model-invocation: true`. Unknown tool *names* are not rejected (the surface evolves), but unparseable entries are. |
 | `argument-hint` | string | Hint shown to the user when they type `/<skill>`. Convention: `[--flag] [positional-arg]`. Required if the skill accepts arguments. |
 | `requires` | list | External dependencies the skill needs at runtime. Each entry is a mapping with exactly one of `cli` (tool name, optionally with `>=X.Y` version constraint) or `env` (environment variable name), plus an optional `reason` string. Skills with no external dependencies omit the field. See schema below. |
 | `user-invocable` | boolean | Defaults to `true`. Set to `false` for context-only skills (loaded by name reference, not invoked as `/skill`). |
@@ -86,7 +86,7 @@ Cross-references to living skills use the `/claudna:<name>` form. Every `claudna
 name: product-vision
 description: "Use when you want to explore what a codebase could become — candidate features one or two hops from existing infrastructure, compound plays, and a trajectory aligned to the project mission. For triaging known issues in an existing product, use /claudna:product-enhance. Replaces /product-brainstorm."
 argument-hint: "[--auto] [--output github|session] [focus-area]"
-allowed-tools: Bash(git *), Bash(gh *), Edit, Read, Grep, Glob
+allowed-tools: Bash(git status *), Bash(git diff *), Bash(gh pr view *), Edit, Read, Grep, Glob
 requires:
   - cli: gh>=2.0
     reason: "GitHub API operations (issues, PRs)"
