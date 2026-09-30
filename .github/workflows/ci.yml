@@ -27,3 +27,21 @@ jobs:
         run: make check
         env:
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+
+  runtime-floor:
+    # Hooks and lib/claudna run under the user's python3: 3.9 on stock macOS.
+    # The check-set is still the Makefile's; this leg only picks the interpreter.
+    name: runtime on Python 3.9
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Install the runtime test toolchain
+        run: make deps-runtime
+
+      - name: Run the runtime suites
+        run: make test-runtime

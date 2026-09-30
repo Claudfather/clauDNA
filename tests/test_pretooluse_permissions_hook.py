@@ -238,15 +238,20 @@ class TestTheLogIsPerUserAndPrivate:
     def test_the_log_is_in_the_users_state_dir_and_readable_by_the_user_alone(self, tmp_path):
         proc = self._run(tmp_path)
         assert '"permissionDecision":"allow"' in proc.stdout, proc.stdout + proc.stderr
-        log = tmp_path / ".local" / "state" / "claudna" / "permissions.log"
+        log = tmp_path / ".claudna" / "hooks" / "permissions.log"
         assert log.is_file(), proc.stderr
         assert log.stat().st_mode & 0o077 == 0, oct(log.stat().st_mode)
         assert "git status" in log.read_text()
 
-    def test_xdg_state_home_decides_where_it_goes(self, tmp_path):
+    def test_claudna_state_dir_decides_where_it_goes(self, tmp_path):
         state = tmp_path / "state"
-        self._run(tmp_path, {"XDG_STATE_HOME": str(state)})
-        assert (state / "claudna" / "permissions.log").is_file()
+        self._run(tmp_path, {"CLAUDNA_STATE_DIR": str(state)})
+        assert (state / "hooks" / "permissions.log").is_file()
+
+    def test_a_relative_state_dir_keeps_no_log(self, tmp_path):
+        proc = self._run(tmp_path, {"CLAUDNA_STATE_DIR": "relative/state"})
+        assert '"permissionDecision":"allow"' in proc.stdout, proc.stderr
+        assert not (tmp_path / "relative").exists()
 
     def test_the_hook_names_no_path_in_tmp(self):
         assert "/tmp" not in HOOK.read_text()

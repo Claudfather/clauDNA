@@ -161,14 +161,18 @@ if [ -z "$SESSION_ID" ]; then
     exit 0
 fi
 
-# The marker lives in the user's own state directory, which no other user can
-# write, so nobody else can plant or remove it.
-STATE_HOME="${XDG_STATE_HOME:-${HOME:+$HOME/.local/state}}"
+# The marker lives in clauDNA's state directory, which no other user can write,
+# so nobody else can plant or remove it.
+# shellcheck source=lib/state-dir.sh
+. "${BASH_SOURCE[0]%/*}/lib/state-dir.sh"
+STATE_DIR="$(claudna_state_dir)"
 # Nowhere private to keep the marker: fail open, as for a missing session id.
-if [ -z "$STATE_HOME" ]; then
+if [ -z "$STATE_DIR" ]; then
     exit 0
 fi
-MARKER_DIR="${STATE_HOME}/claudna"
+# 077: if this hook creates the state root first, it must still be 0700 (SETUP_GUIDE §3.7).
+umask 077
+MARKER_DIR="${STATE_DIR}/hooks"
 MARKER="${MARKER_DIR}/reflected-${SESSION_ID}"
 
 if [ -f "$MARKER" ]; then

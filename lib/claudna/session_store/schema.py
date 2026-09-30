@@ -5,8 +5,9 @@ no third-party runtime dependencies, so they are checked with this subset
 instead of ``jsonschema``. Supported keywords, and nothing else:
 
 ``type`` (string or list) · ``enum`` · ``const`` · ``required`` · ``properties``
-· ``additionalProperties`` (bool or schema) · ``items`` · ``minimum`` ·
-``minLength`` · ``pattern`` · ``$ref`` (local ``#/$defs/...`` only) · ``$defs``
+· ``additionalProperties`` (bool or schema) · ``items`` · ``maxItems`` ·
+``minimum`` · ``minLength`` · ``maxLength`` · ``pattern`` · ``$ref`` (local
+``#/$defs/...`` only) · ``$defs``
 
 An unsupported keyword in a schema raises, so a schema can never silently ask
 for a check this module doesn't perform.
@@ -24,7 +25,7 @@ SCHEMA_DIR = Path(__file__).resolve().parent / "schemas"
 _SUPPORTED = {
     "$schema", "$id", "$defs", "$ref", "title", "description",
     "type", "enum", "const", "required", "properties", "additionalProperties",
-    "items", "minimum", "minLength", "pattern",
+    "items", "maxItems", "minimum", "minLength", "maxLength", "pattern",
 }
 _TYPES = {
     "object": dict, "array": list, "string": str, "integer": int,
@@ -113,6 +114,8 @@ def validate(instance: object, schema: dict, *, root: dict | None = None, path: 
     if isinstance(instance, str):
         if "minLength" in schema and len(instance) < schema["minLength"]:
             errors.append(f"{path}: shorter than {schema['minLength']}")
+        if "maxLength" in schema and len(instance) > schema["maxLength"]:
+            errors.append(f"{path}: longer than {schema['maxLength']}")
         if "pattern" in schema and not _pattern(schema["pattern"]).search(instance):
             errors.append(f"{path}: does not match {schema['pattern']}")
     if is_instance(instance, (int, float)):
@@ -131,6 +134,8 @@ def validate(instance: object, schema: dict, *, root: dict | None = None, path: 
                 errors.append(f"{path}: unexpected property {key!r}")
             elif isinstance(extra, dict):
                 errors.extend(validate(value, extra, root=root, path=f"{path}.{key}"))
+    if isinstance(instance, list) and "maxItems" in schema and len(instance) > schema["maxItems"]:
+        errors.append(f"{path}: more than {schema['maxItems']} items")
     if isinstance(instance, list) and "items" in schema:
         for i, item in enumerate(instance):
             errors.extend(validate(item, schema["items"], root=root, path=f"{path}[{i}]"))

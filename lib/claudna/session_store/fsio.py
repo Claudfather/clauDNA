@@ -81,14 +81,43 @@ def read_json(path: Path) -> object | None:
         return None
 
 
-def append_jsonl(path: Path, record: dict) -> None:
-    """Append ``record`` as one line to ``path`` (created ``0600``) and fsync it.
+def file_size(path: Path | str | None) -> int:
+    """A file's size in bytes; 0 if there is no path or no file."""
+    try:
+        return os.stat(path).st_size if path else 0
+    except OSError:
+        return 0
+
+
+LOG_LIMIT = 1024 * 1024  #: a log past this size is rotated to ``<name>.old`` (one generation kept)
+
+
+def cap_log(path: Path, limit: int = LOG_LIMIT) -> Path:
+    """Rotate ``path`` to ``<path>.old`` once it passes ``limit`` bytes; return ``path``.
+
+    For the store's own diagnostic logs (hook errors, worker stderr), so a host
+    where something fails on every hook can't grow them without bound.
+    """
+    try:
+        if path.stat().st_size > limit:
+            os.replace(path, path.with_name(path.name + ".old"))
+    except OSError:
+        pass
+    return path
+
+
+def append_jsonl(path: Path, record: dict, *, durable: bool = True) -> None:
+    """Append ``record`` as one line to ``path`` (created ``0600``); fsync it when ``durable``.
 
     If the file ends mid-line (a previous writer was killed), a newline is
     written first so the fragment stays one skippable line and ``record`` lands
     intact. Short writes are retried until the whole line is on disk. Callers
     that need ordering across several files (the store) serialize under their
     own lock; ``path.parent`` must already exist.
+
+    ``durable=False`` skips the fsync: on slow storage it dominates an append
+    (tens of ms on an SD card), and a caller whose records are derivable can
+    trade a crash-lost line for that.
     """
     line = json.dumps(record, sort_keys=True, ensure_ascii=False, separators=(",", ":")) + "\n"
     fd = os.open(path, os.O_RDWR | os.O_APPEND | os.O_CREAT, FILE_MODE)
@@ -99,7 +128,8 @@ def append_jsonl(path: Path, record: dict) -> None:
         view = memoryview(line.encode("utf-8"))
         while view:
             view = view[os.write(fd, view):]
-        os.fsync(fd)
+        if durable:
+            os.fsync(fd)
     finally:
         os.close(fd)
 
@@ -147,15 +177,22 @@ def read_jsonl(path: Path) -> JsonlRead:
 
 
 @contextlib.contextmanager
-def exclusive_lock(path: Path) -> Iterator[None]:
-    """Hold an exclusive ``flock`` on ``path`` for the ``with`` body (blocking).
+def exclusive_lock(path: Path, *, blocking: bool = True) -> Iterator[bool]:
+    """Hold an exclusive ``flock`` on ``path`` for the ``with`` body; yield whether it was taken.
 
+    Blocking by default (always ``True``). With ``blocking=False`` a lock
+    someone else holds yields ``False`` at once — single-flight work (one
+    summarizer per segment, one harvest per host) leaves it to the holder.
     The lock file's directory must already exist: taking a lock never creates
     directories.
     """
     fd = os.open(path, os.O_RDWR | os.O_CREAT, FILE_MODE)
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        yield
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX if blocking else fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            yield False
+            return
+        yield True
     finally:
         os.close(fd)

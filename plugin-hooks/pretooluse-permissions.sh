@@ -21,7 +21,7 @@ set -eo pipefail
 #   - Returns "deny" only for the gh read-guard shapes (a granted gh read that
 #     would read the environment or reach a host other than github.com); every
 #     other command is "allow" or silent pass-through
-#   - Debug log: ${XDG_STATE_HOME:-~/.local/state}/claudna/permissions.log,
+#   - Debug log: ${CLAUDNA_STATE_DIR:-~/.claudna}/hooks/permissions.log,
 #     readable by the user alone
 #
 # Compound-command splitting scope:
@@ -41,10 +41,12 @@ set -eo pipefail
 #     a gh sub-command in which an expansion can form or change an option
 #                word ($'..', ${X-..}, {a,b}, --j${Z}q); see gh_option_expansion
 
-# The log holds whole command lines: it lives in the user's own state directory,
+# The log holds whole command lines: it lives in clauDNA's state directory,
 # and every file the hook creates is readable by the user alone.
-STATE_HOME="${XDG_STATE_HOME:-${HOME:+$HOME/.local/state}}"
-LOG_DIR="${STATE_HOME:+$STATE_HOME/claudna}"
+# shellcheck source=lib/state-dir.sh
+. "${BASH_SOURCE[0]%/*}/lib/state-dir.sh"
+STATE_DIR="$(claudna_state_dir)"
+LOG_DIR="${STATE_DIR:+$STATE_DIR/hooks}"
 LOG="$LOG_DIR/permissions.log"
 MAX_LOG_SIZE=1048576  # 1MB
 umask 077

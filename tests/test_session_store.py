@@ -62,11 +62,6 @@ ACTOR = {"kind": "interactive", "fleet": None, "bot_id": None, "bot_name": None,
 ORIGIN = {"cwd": "/work", "repo": None, "branch": None, "head": None}
 
 
-@pytest.fixture
-def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "state")
-
-
 def opened(store: SessionStore, sid: str = "sess-1"):
     handle = store.session(sid)
     handle.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl")
@@ -940,3 +935,12 @@ class TestPinsForUnheldGuarantees:
         h.open_segment("session_open", 0)
         h.seal_segment(10, "precompact", sha256="ab" * 32)
         assert load(h.paths.segment(1).segment_json)["transcript"]["sha256"] == "ab" * 32
+
+
+class TestWritersRedact:
+    def test_free_text_is_redacted_before_it_is_capped(self):
+        e = ev.make_event("tool.failed", "s1", {"tool": "Bash", "signature": "auth failed",
+                                                "exit_code": 1, "error": None,
+                                                "command": "curl -H 'Authorization: Bearer " + "tok" * 8 + "'"},
+                          seg=1)
+        assert "toktok" not in e["data"]["command"] and "[REDACTED]" in e["data"]["command"]
