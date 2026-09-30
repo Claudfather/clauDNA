@@ -184,6 +184,12 @@ _REPO_POSITIONAL: dict[tuple[str, str], set[str]] = {
     **{(g, v): _SKILL_INSTALL for g in ("skill", "skills") for v in ("install", "add")},
     **{(g, v): set() for g in ("skill", "skills") for v in ("preview", "show")},
 }
+# The verbs that take a second positional after the repository (`gh repo clone
+# <repository> [<directory>]`, a skill name). For every other verb gh refuses a second
+# positional before it sends anything, so a word after a parameter-only word can only be
+# the repository itself (the parameter was empty) and is read as one.
+_SECOND_POSITIONAL = {("repo", "clone")} | {
+    (g, v) for g in ("skill", "skills") for v in ("install", "add", "preview", "show")}
 
 
 def _takes_next(opt: str, value_opts: set[str]) -> bool:
@@ -202,9 +208,9 @@ def _takes_next(opt: str, value_opts: set[str]) -> bool:
 _ONLY_PARAMS = re.compile(r"(?:\$(?:\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*|[0-9@*#?!$-]))+")
 
 
-def _repo_positional(args: list[str]) -> tuple[str, bool] | None:
-    """The repository positional of a verb that takes one, and whether a parameter-only
-    word sat in front of it; ``None`` when there is none. Options and their values are
+def _repo_positional(args: list[str]) -> tuple[str, bool, tuple[str, str]] | None:
+    """The repository positional of a verb that takes one, whether a parameter-only
+    word sat in front of it, and the verb; ``None`` when there is none. Options and their values are
     skipped; after ``--`` every word is positional (``gh repo clone -- HOST/O/R``)."""
     pos: list[str] = []
     value_opts: set[str] = set()
@@ -226,7 +232,7 @@ def _repo_positional(args: list[str]) -> tuple[str, bool] | None:
                     return None
                 value_opts = _REPO_POSITIONAL[(pos[0], pos[1])]
             elif len(pos) == 3:
-                return a, after_param
+                return a, after_param, (pos[0], pos[1])
         i += 1
     return None
 
@@ -369,12 +375,15 @@ def _inspect_gh_args(args: list[str], allowed: set[str]) -> str | None:
     # a HOST/OWNER/REPO positional names its host the way -R does (a URL or an scp form
     # is read below, for every verb; a local path, and --from-local, name no host)
     # A parameter-only word in front of it may be the repository itself (its value comes
-    # from the environment), so a word after one counts only when it names a host outright.
+    # from the environment). Only for a verb with a second positional can the word after
+    # one be something else (clone's directory, a skill name), so only there does it count
+    # just when it names a host outright.
     found = _repo_positional(args)
     if found and "--from-local" not in args:
-        repo, after_param = found
+        repo, after_param, verb = found
         host = None if repo.startswith((".", "/", "~")) or _looks_like_repo_url(repo) else _host_of(repo)
-        if _foreign(host, allowed) and (not after_param or _host_shaped(host)):
+        lenient = after_param and verb in _SECOND_POSITIONAL
+        if _foreign(host, allowed) and (not lenient or _host_shaped(host)):
             return "gh names a repository on a host other than github.com"
     args = _expand_clusters(args)
     words: list[str] = []
