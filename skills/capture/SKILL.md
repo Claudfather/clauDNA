@@ -50,7 +50,7 @@ If a URL fetch or a real file `Read` fails (network, 404, auth wall, missing fil
 
 **Provenance (capability-probed).** For URL/file input the origin matters; how it is recorded depends on the engine Step 0 detected, read from `data.engine_version`:
 
-- **Flags-capable engine** — `engine_version` present and **≥ 0.4.0** (the Claudron C2 release that added `--source-url` / `--source-type`) → carry provenance in **frontmatter**: pass `--source-url <url-or-path>` and `--source-type <url|file>` (URL input → `url`, file input → `file`) on the Step 4 call, plus a discovery tag (the domain, or `source:file`). Do **not** add a `Source:` body line.
+- **Flags-capable engine** — `engine_version` present and **≥ 0.4.0** (the Claudron C2 release that added `--source-url` / `--source-type`) → carry provenance in **frontmatter**: set `source_url` and `source_type` (`url` or `file`) in the finding JSON (Step 4) (URL input → `url`, file input → `file`) on the Step 4 call, plus a discovery tag (the domain, or `source:file`). Do **not** add a `Source:` body line.
 - **Older / absent / unreadable version** — including a between-tags git build reporting a dev version below 0.4.0 → **keep the fold**: record provenance as a **trailing** body line — `Source: <url-or-path> (captured <today>)` — plus the tag. Keep it **last**, never first.
 
 The guard is the version probe, never an install pin (claudron-engine.md §1): a git-installed engine between tags degrades to the fold rather than erroring on a flag it doesn't have. Why the body line must stay last, and why frontmatter is preferred once available: Claudron derives a note's one-line recall summary from the first non-heading body line (`session.py` `_summary`), so a leading `Source:` line hijacks every recall summary — and folding provenance into the body at all couples this skill to how that summary is picked (Claudron `docs/CLI_CONTRACT.md` §capture: *provenance rides in frontmatter, not in the body*). The **0.4.0** floor is the Claudron release that ships the C2 flags and the PreCompact shim removal — the two land together, and the floor must match the release that actually adds the flags. The identical constant gates `plugin-hooks/precompact-reflect.sh`'s capture-prompt defer.
@@ -92,23 +92,13 @@ Decide the fields:
 
 ## Step 4: Build the capture call
 
-Prefer flags (base capture flags verified against v0.2.0):
+Write the finding as JSON to `<finding-file>` with the Write tool, then pass it on stdin. Its fields: `type`, `title`, `body`, `tags`, `owner` (optional), the scope (`project` for repo-scoped, including session mode; `fleet` for fleet-wide; neither for general), and — flags-capable engine only, Step 1 — `source_url` / `source_type`. Text never goes on the command line.
 
 ```bash
-# repo-scoped (incl. session mode): --project <name>; fleet-wide: --fleet <name>; general: omit both
-# provenance (URL/file input, flags-capable engine — Step 1): add --source-url <url-or-path> --source-type <url|file>
 claudron capture --stdin --json < <finding-file>
 ```
 
-`<finding-file>` is the finding as JSON (`type`, `title`, `body`, `tags`, `project` or `fleet`), written with the Write tool. The title and body never go on the command line: a fetched page or a session's text can hold backticks and `$(...)`, which the shell would run.
-
-For a multi-paragraph body awkward to quote inline (session distillations usually are), write the fields to a scratch JSON file (`type`, `title`, `body`, `tags`, `owner`, `project` or `fleet`, and — flags-capable engine only — `source_url` / `source_type`) and pipe it:
-
-```bash
-claudron capture --stdin --json < <scratch-note.json>
-```
-
-`--type` and `--title` are required (the CLI exits 2 without them). `--source-type` (and the `source_type` stdin key) accept only `url|file|inline` — the SCHEMA vocabulary; capture emits `url`/`file`. An engine without the flags rejects them (exit 2), which is why Step 1 gates provenance on the version probe. Do **not** pass `--force` here — dedup routing (Step 5) decides that.
+`type` and `title` are required (the CLI exits 2 without them). `source_type` accepts only `url|file|inline` — the SCHEMA vocabulary; capture emits `url`/`file`. An older engine does not read `source_url` / `source_type`, which is why Step 1 gates provenance on the version probe and keeps the body-line fold for it. Do **not** pass `--force` here — dedup routing (Step 5) decides that.
 
 ## Step 5: Confirmation gate + envelope (contract §5)
 

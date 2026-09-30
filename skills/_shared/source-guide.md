@@ -135,7 +135,7 @@ When updating the issue body during the challenge round, preserve the full struc
 gh issue edit <number> --body-file <file>
 ```
 
-Never put the body into the command itself. Issue text is not yours: inside a command the shell reads its backticks and `$(...)`, and a line that matches a heredoc's delimiter ends the heredoc early.
+Never put the body into the command itself.
 
 **Important:** Always write the complete body, not a partial update. GitHub's issue edit API replaces the entire body.
 

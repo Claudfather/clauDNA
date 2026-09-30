@@ -7,11 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
-- **Commands take their text from files.** Titles, bodies, labels and commit or deploy messages are written to a file with the Write tool. They reach the command through `--body-file`, `claudron capture --stdin`, or `"$(cat <file>)"`, and are never written into the command itself. Inside a command the shell reads backticks and `$(...)`, and a heredoc inside `$(...)` ends at the first line that matches its delimiter.
-  - Applies to `build --source github`'s issue edits, `publish`, `capture`, `file-github-issue`, the worktree subagent template and `railway deploy`.
+- **Commands take their text from files.** Titles, bodies, labels, search terms, and commit, review or deploy messages are written to a file with the Write tool. They reach the command through `--body-file`, `-F body=@<file>`, `--input <file>`, `claudron capture --stdin`, or `"$(cat <file>)"`, and are never written into the command itself.
+  - Applies to `build --source github`'s issue edits, `publish` (issue text, dedup searches, the PR adapter), `capture`, `recall`, `claudron lookup`, `file-github-issue`, `ship`, `review-work`, the prior-art and tracker searches in `ironclad`, `forge`, `adversarial-review` and `audit`, the worktree subagent template and `railway deploy`.
+  - A name a command takes from the project (a dev-server port, an app file's path, a path in `ironclad`'s precedent check, a crawl route's file name) is used only when it matches a stated pattern.
   - `modal deploy`'s syntax check passes the file path as an argument instead of writing it into the program.
-- **The qa crawl runs a bundled script.** `scripts/crawl_page.py` takes each step from a JSON job file: screenshot, console errors, link check, deep interaction and chat simulation. A route found on the site never becomes part of a command line or program text, and every output stays inside the crawl's scratch dir.
-- **Tests.** `tests/test_command_text_by_file.py` fails on the old command shapes. `tests/test_crawl_page.py` pins the runner's job checks and its link check.
+- **The qa crawl runs a bundled script.** `scripts/crawl_page.py` takes each step from a JSON job file: screenshot, console errors, link check, deep interaction and chat simulation. Every output stays inside the crawl's scratch dir, `page_name` must match the runner's pattern, and the link check records a status or an error for every URL it is given.
+- **Tests.** `tests/test_command_text_by_file.py` checks every skill and agent for text passed to a command any other way, and pins its own cases. `tests/test_crawl_page.py` pins the runner's job checks and its link check.
 
 ## [0.20.0] - 2026-09-29
 ### Added

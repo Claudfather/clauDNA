@@ -5,9 +5,8 @@ The qa skill (skills/qa/deep-crawl.md) writes each job with the Write tool and r
 
     python3 <claudna-root>/scripts/crawl_page.py <verb> <job-file>
 
-A route found on the site being crawled is data. It reaches the browser from the
-job file, never from a command line or from program text. Keep it that way: a
-route can hold a quote, a backtick or `$(...)`.
+A route reaches the browser from the job file, never from a command line or from
+program text.
 
 Verbs and the job fields each reads:
 
@@ -18,15 +17,16 @@ Verbs and the job fields each reads:
     chat     base_url, output_dir, path (default "/console"), queries (optional list)
 
 Every output path must resolve inside the directory that holds the job file's
-directory (the crawl's scratch dir), so a file name built from a route cannot
-write anywhere else.
+directory (the crawl's scratch dir), and `page_name` must match PAGE_NAME.
 """
 
 from __future__ import annotations
 
 import asyncio
+import http.client
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -39,6 +39,9 @@ REQUIRED = {
     "deep": ("url", "page_name", "output_dir"),
     "chat": ("base_url", "output_dir"),
 }
+
+# The file-name stem the `deep` verb builds its outputs from.
+PAGE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}")
 
 DEFAULT_CHAT_QUERIES = [
     "What can you help me with?",
@@ -63,6 +66,8 @@ def load_job(verb: str, job_path: Path) -> dict:
     missing = [k for k in REQUIRED[verb] if k not in job]
     if missing:
         raise JobError(f"{verb}: missing field(s) {', '.join(missing)}")
+    if "page_name" in job and not PAGE_NAME.fullmatch(str(job["page_name"])):
+        raise JobError(f"page_name {job['page_name']!r} must match {PAGE_NAME.pattern}")
     root = job_path.resolve().parent.parent
     for key in ("output", "output_dir"):
         if key in job:
@@ -143,7 +148,7 @@ def links(job: dict) -> str:
                 status = err.code
                 if err.code != 405:
                     break
-            except (urllib.error.URLError, OSError, ValueError) as err:
+            except (urllib.error.URLError, http.client.HTTPException, OSError, ValueError) as err:
                 status = f"error: {err}"
                 break
         results[url] = status

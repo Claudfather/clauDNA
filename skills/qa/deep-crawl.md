@@ -31,7 +31,7 @@ For each discovered route, capture screenshots at three viewports:
 
 ### The bundled runner
 
-Every browser step runs one bundled script, `<claudna-root>/scripts/crawl_page.py` (resolve `<claudna-root>` per `../_shared/claudna-root.md`). A route found on the site is data: it goes into a JSON job file, written with the Write tool, and never into a command line or program text, where a quote, a backtick or `$(...)` in it would run. Name job files by number (`<scratch>/jobs/job-001.json`), never after a route. Every output path in a job must stay inside `<scratch>`; the runner refuses any other.
+Every browser step runs one bundled script, `<claudna-root>/scripts/crawl_page.py` (resolve `<claudna-root>` per `../_shared/claudna-root.md`). A route found on the site goes into a JSON job file, written with the Write tool, and never into a command line or program text. Name job files by number (`<scratch>/jobs/job-001.json`), never after a route. Every output path in a job must stay inside `<scratch>`. `<route-slug>`, the name of a route's files and the `deep` verb's `page_name`, must match `^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$`: replace every other character of the route with `-`, drop leading `-` and `.`, cut it to 100 characters, and use `home` for `/`. The runner refuses a job that breaks either rule.
 
 ### Screenshot recipe
 
