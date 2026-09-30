@@ -129,11 +129,13 @@ eval "$JQ_RESULT"
 # The shell removes quotes and backslashes before gh runs, so a flag spelled --j"q" or
 # -\q is the flag. The prefilter reads the command without them; the decider gets the
 # real text. One expansion, no fork.
-NOQ=${COMMAND//[\"\'\\]/}
+NL=$'\n'
+NOQ=${COMMAND//\\"$NL"/}   # bash joins a backslash-newline before it splits words
+NOQ=${NOQ//[\"\'\\]/}
 case "$NOQ" in
     *gh*)
         case "$NOQ" in
-            *--jq*|*--template*|*--repo*|*--web*|*--hostname*|*[[:space:]]-q*|*[[:space:]]-t*|*[[:space:]]-R*|*[[:space:]]-w*|*"://"*|*@*:*)
+            *--jq*|*--template*|*--repo*|*--web*|*--hostname*|*[[:space:]]-q*|*[[:space:]]-t*|*[[:space:]]-R*|*[[:space:]]-w*|*[[:space:]]-[[:alnum:]]*[qtRw]*|*"://"*|*@*:*)
                 if command -v python3 &>/dev/null; then
                     # errexit-safe: the decider exits 10 to deny, and an
                     # assignment that inherits that would end the hook here.

@@ -154,27 +154,64 @@ def _foreign(host: str | None, allowed: set[str]) -> bool:
     return host.split(":")[0].lower() not in allowed
 
 
-def _tokens(command: str) -> list[str]:
-    # bash removes a backslash-newline continuation before it splits words
-    command = re.sub(r"\\\r?\n", "", command)
-    # A heredoc body is NOT skipped. Deciding where a body starts from the text alone is a
-    # second shell parser: a `<<WORD` inside a comment, after a backslash, in a quoted string
-    # or in `$((a << b))` is not a heredoc, and dropping the lines after it hides a real `gh`
-    # call. Measured on 11,222 recorded gh lines (1,863 with a heredoc marker): no denial
-    # without it. The cost is one shape: prose in a real heredoc body that starts a line with
-    # a gh call and a denied flag is denied (use --body-file).
+def _strip_comment(line: str) -> str:
+    """Drop a ``#`` comment the way bash does: only where a word starts, outside quotes.
+
+    shlex starts a comment in the middle of a word and swallows the newline that ends it; with
+    its comments switched off, an apostrophe inside a comment opens a quote that pairs up with
+    one on a later line and hides the lines between them.
+    """
+    quote = None
+    esc = False
+    prev = " "
+    for i, ch in enumerate(line):
+        if esc:
+            esc = False
+        elif ch == "\\" and quote != "'":
+            esc = True
+        elif quote:
+            if ch == quote:
+                quote = None
+        elif ch in "'\"":
+            quote = ch
+        elif ch == "#" and prev in " \t;&|()<>`":
+            return line[:i]
+        prev = ch
+    return line
+
+
+def _lex(text: str) -> list[str]:
     try:
-        lx = shlex.shlex(command, posix=True, punctuation_chars=_PUNCT)
+        lx = shlex.shlex(text, posix=True, punctuation_chars=_PUNCT)
         lx.whitespace_split = True
         lx.whitespace = " \t\r"
-        # shlex treats `#` as a comment and swallows the newline that ends it, which would
-        # join the next line onto this command and hide its `gh`.
-        lx.commenters = ""
+        lx.commenters = ""  # comments are removed by _strip_comment, at a word start only
         return list(lx)
     except ValueError:
         # Quoting we cannot follow: a lenient split that still sees the flags, so a
         # doubt is inspected, not skipped.
-        return [t.strip("'\"") for t in re.findall(r"[;()&|`\n]|[^\s;()&|`]+", command)]
+        return [t.strip("'\"") for t in re.findall(r"[;()&|`\n]|[^\s;()&|`]+", text)]
+
+
+def _readings(command: str) -> list[list[str]]:
+    """The token streams to inspect: the whole text, then every physical line on its own.
+
+    A quote that pairs up across lines (an apostrophe in a comment or in a heredoc body) hides
+    the lines between in the whole-text reading only; each line read alone still shows them.
+    A heredoc body is not skipped: deciding where one starts from the text alone is a second
+    shell parser. Every reading only adds denials, so a doubt is inspected, not skipped.
+    """
+    # bash removes a backslash-newline continuation before it splits words
+    command = re.sub(r"\\\r?\n", "", command)
+    lines = [_strip_comment(ln) for ln in command.split("\n")]
+    out = [_lex("\n".join(lines))]
+    if len(lines) > 1:
+        out.extend(_lex(ln) for ln in lines)
+    return out
+
+
+def _tokens(command: str) -> list[str]:
+    return _readings(command)[0]
 
 
 def _is_separator(tok: str) -> bool:
@@ -222,8 +259,27 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
     return out
 
 
+def _expand_clusters(args: list[str]) -> list[str]:
+    """pflag lets one dash carry several shorthands (``-dq EXPR``, ``-dR HOST/o/r``, ``-iqEXPR``).
+    The four the guard reads (-q -t -R -w) are found wherever they sit in a cluster, and the rest
+    of the token is their value. A superset reading: a shorthand in front of them is dropped."""
+    out: list[str] = []
+    for a in args:
+        m = re.match(r"-([A-Za-z]+)", a) if len(a) > 2 and a[1] != "-" else None
+        k = next((i for i, ch in enumerate(m.group(1)) if ch in "qtRw"), None) if m else None
+        if k is None:
+            out.append(a)
+            continue
+        out.append("-" + m.group(1)[k])
+        rest = a[k + 2 :]
+        if rest:
+            out.append(rest)
+    return out
+
+
 def _inspect_gh_args(args: list[str], allowed: set[str]) -> str | None:
     """Return a deny reason for one gh invocation's argument list, or ``None``."""
+    args = _expand_clusters(args)
     words: list[str] = []
     for a in args:
         if a.startswith("-"):
@@ -300,10 +356,11 @@ def decide(command: str, *, gh_host: str = "") -> tuple[str, str]:
     allowed = set(_ALLOWED_HOSTS)
     if gh_host.strip():
         allowed.add(gh_host.strip().split(":")[0].lower())
-    for args in _gh_command_words(_tokens(command)):
-        reason = _inspect_gh_args(args, allowed)
-        if reason:
-            return ("deny", reason)
+    for tokens in _readings(command):
+        for args in _gh_command_words(tokens):
+            reason = _inspect_gh_args(args, allowed)
+            if reason:
+                return ("deny", reason)
     return ("allow", "")
 
 
