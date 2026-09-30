@@ -26,7 +26,7 @@ from pathlib import Path
 import pytest
 from conftest import CLI_ENV, fire
 
-from claudna.session_store import activity, telemetry, unclosed
+from claudna.session_store import activity, telemetry
 from claudna.session_store.fsio import read_jsonl
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -105,6 +105,11 @@ class TestSignature:
         a = activity.signature("Bash", "Exit code 2\nls: cannot access '/a/b': No such file or directory")
         b = activity.signature("Bash", "Exit code 2\nls: cannot access '/c/d/e': No such file or directory")
         assert a == b
+
+    def test_a_contraction_does_not_pair_with_a_quote(self):
+        a = activity.signature("Bash", "Exit code 1\nerror: can't open 'a.txt'")
+        b = activity.signature("Bash", "Exit code 1\nerror: can't open 'b.txt'")
+        assert a == b == "Bash: error: can't open <str>"
 
     def test_a_secret_in_the_error_line_is_redacted(self):
         sig = activity.signature("Bash", f"curl: auth failed with token {FAKE_TOKEN}")
@@ -203,10 +208,44 @@ class TestTelemetry:
         assert path.read_text() == 'not json\n{"ts":"2999-01-01T00:00:00Z"}\n'
         assert not path.with_name("t.jsonl.pruning").exists()
 
-    def test_the_sweep_prunes_it(self, store, tmp_path):
-        (tmp_path / "t.jsonl").write_text('{"ts":"2000-01-01T00:00:00Z"}\n')
-        unclosed.sweep(store, self.env(tmp_path))
-        assert (tmp_path / "t.jsonl").read_text() == ""
+    def test_prune_with_nothing_due_rewrites_nothing(self, tmp_path):
+        path = tmp_path / "t.jsonl"
+        path.write_text('{"ts":"2999-01-01T00:00:00Z"}\n')
+        inode = path.stat().st_ino
+        assert telemetry.prune(self.env(tmp_path)) == 0
+        assert path.stat().st_ino == inode
+
+    def test_a_killed_prunes_lines_are_put_back_not_overwritten(self, tmp_path):
+        path = tmp_path / "t.jsonl"
+        path.with_name("t.jsonl.pruning").write_text('{"ts":"2998-01-01T00:00:00Z"}\n{"ts":"2000-01-01T00:00:00Z"}\n')
+        path.write_text('{"ts":"2999-01-01T00:00:00Z"}\n')
+        assert telemetry.prune(self.env(tmp_path)) == 1
+        assert sorted(path.read_text().splitlines()) == ['{"ts":"2998-01-01T00:00:00Z"}', '{"ts":"2999-01-01T00:00:00Z"}']
+        assert not path.with_name("t.jsonl.pruning").exists()
+
+    def test_a_failure_is_captured_not_swallowed(self, tmp_path):
+        env = {**self.env(tmp_path), "PATH": os.environ["PATH"], "HOME": str(tmp_path)}
+        proc = subprocess.run(["bash", str(TELEMETRY_HOOK)], input="{not json", capture_output=True,
+                              text=True, env=env, cwd=tmp_path, timeout=20)
+        assert (proc.returncode, proc.stdout, proc.stderr) == (0, "", "")
+        assert "JSONDecodeError" in (tmp_path / "t.jsonl.stderr").read_text()
+
+    def test_the_hook_prunes_at_most_daily_even_with_the_store_off(self, tmp_path):
+        path = tmp_path / "t.jsonl"
+        path.write_text('{"ts":"2000-01-01T00:00:00Z"}\n')
+        env = self.env(tmp_path, CLAUDNA_SESSION_STORE="0")
+        assert telemetry.run_hook(json.dumps(SKILL_CALL), env) == "emitted"
+        (rec,) = self.lines(tmp_path)  # the old line is gone, the new one kept
+        assert rec["data"]["skill_slug"] == "recall"
+        path.write_text(path.read_text() + '{"ts":"2000-01-02T00:00:00Z"}\n')
+        telemetry.run_hook(json.dumps(SKILL_CALL), env)  # within the day: no second prune
+        assert len(self.lines(tmp_path)) == 3
+
+    def test_a_failed_skill_call_reports_success_false_and_an_interrupt_nothing(self, tmp_path):
+        failed = {**SKILL_CALL, "hook_event_name": "PostToolUseFailure", "error": "boom"}
+        failed.pop("tool_response")
+        assert telemetry.record_for(failed, {})["data"]["success"] is False
+        assert telemetry.record_for({**failed, "is_interrupt": True}, {}) is None
 
     def test_its_own_hook_writes_it_even_with_the_store_off(self, tmp_path):
         env = {**self.env(tmp_path, CLAUDNA_SESSION_STORE="0"), "PATH": os.environ["PATH"], "HOME": str(tmp_path)}

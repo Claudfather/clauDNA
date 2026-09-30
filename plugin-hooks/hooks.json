@@ -115,6 +115,16 @@
             "async": true
           }
         ]
+      },
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/plugin-hooks/telemetry-emit.sh",
+            "async": true
+          }
+        ]
       }
     ]
   }

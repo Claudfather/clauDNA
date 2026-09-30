@@ -388,9 +388,10 @@ class TestWiring:
             assert entry.get("matcher") == matcher
             assert h["command"].endswith(f"session-store.sh {event}") and h["async"] is True  # no prompt waits on it
 
-    def test_telemetry_has_its_own_async_hook_on_skill_calls(self):
-        (entry,) = [e for e in json.loads(HOOKS_JSON.read_text())["hooks"]["PostToolUse"] if e.get("matcher") == "Skill"]
-        (h,) = [h for h in entry["hooks"] if "telemetry-emit.sh" in h["command"]]
+    @pytest.mark.parametrize("event", ["PostToolUse", "PostToolUseFailure"])  # a failed Skill call fires the latter
+    def test_telemetry_has_its_own_async_hook_on_skill_calls(self, event):
+        hooks = json.loads(HOOKS_JSON.read_text())["hooks"][event]
+        (h,) = [h for e in hooks if e.get("matcher") == "Skill" for h in e["hooks"] if "telemetry-emit.sh" in h["command"]]
         assert h["async"] is True
 
     def test_the_store_sees_every_session_start_source(self):

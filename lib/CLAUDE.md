@@ -11,7 +11,7 @@
 ## Rules (each enforced by `tests/test_runtime_layout.py`)
 
 1. **Stdlib only.** Imports are the standard library or `claudna.*`. No dev dependency (pyyaml, pytest) may leak into runtime; it would fail inside a hook, silently.
-2. **Imports point downward.** Inside a package, a module imports only strictly lower layers (`session_store`: schema → paths/fsio/transcript → events/lineage → project → store → summarize/unclosed → harvest → boundaries → cli; the ranks are `SESSION_STORE_LAYERS` in the test). Need to call up? Invert it — pass a callback.
+2. **Imports point downward.** Inside a package, a module imports only strictly lower layers (`session_store`: schema → paths/fsio/transcript/activity → events/lineage/telemetry → project → store → summarize/unclosed → harvest → boundaries → cli; the ranks are `SESSION_STORE_LAYERS` in the test). Need to call up? Invert it — pass a callback.
 3. **One `sys.path` shim, at the entry point.** Only `__main__.py` may touch `sys.path`; library modules never do.
 
 ## How it's invoked

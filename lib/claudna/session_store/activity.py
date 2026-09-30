@@ -45,7 +45,9 @@ def _patterns() -> tuple:
     return re.compile(r"^Exit code (-?\d+)\s*$"), (
         # The most specific shapes first, so a UUID isn't read as numbers or a URL as a path.
         (re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b", re.I), "<id>"),
-        (re.compile(r"(['\"`])[^'\"`]*\1"), "<str>"),
+        # A quote opens only after a non-word char, so a contraction's apostrophe ("can't") never pairs
+        # with a real quote and leaves the quoted value in the signature.
+        (re.compile(r"(?<!\w)(['\"`])[^'\"`]*\1"), "<str>"),
         (re.compile(r"\b[a-z][a-z0-9+.-]*://\S+", re.I), "<url>"),
         (re.compile(r"[\w.~@+-]*(?:/[\w.~@+-]+)+/?"), "<path>"),  # absolute or relative: any token with a /segment
         (re.compile(r"\b(?:0x)?[0-9a-f]{12,}\b", re.I), "<id>"),

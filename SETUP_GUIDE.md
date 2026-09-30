@@ -667,7 +667,7 @@ Each `claudna:*` skill call appends one line, in Claudosseum's ingestion format:
 | `bot` | `BOT_NAME` env var, or `"interactive"` |
 | `data.skill_slug` | the skill without its `claudna:` prefix |
 | `data.duration_ms` | how long the Skill call took, from Claude Code |
-| `data.success` | whether the Skill call succeeded, from Claude Code |
+| `data.success` | whether the Skill call succeeded, from Claude Code (a failed call is recorded too, with `false`) |
 | `data.session_id` | Claude Code's session id |
 
 No prompts, tool arguments, file paths, or PII are captured. Since 0.23, `telemetry-emit.sh` hands the payload to the session store's telemetry writer (§3.7). The shape is unchanged, but `duration_ms`, `success` and `session_id` are now the real values. Before, they were `null`, a guess from the skill's output text, and the hook shell's pid. Telemetry keeps working with `CLAUDNA_SESSION_STORE=0`.
@@ -693,7 +693,7 @@ The hook checks `CLAUDNA_TELEMETRY` on every Skill call and writes nothing unles
 
 ### Auto-pruning
 
-Entries older than 30 days are pruned by the session store's background sweep (at most every 6 hours, §3.7), never on the hook path.
+Entries older than 30 days are pruned at most once a day, from the same async hook, so no Skill call waits on it and it works with the session store off.
 
 ### Integration with fleet observability
 

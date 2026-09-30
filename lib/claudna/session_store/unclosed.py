@@ -37,7 +37,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Callable, Mapping
 
-from . import lineage, telemetry
+from . import lineage
 from .fsio import ensure_dir, exclusive_lock, read_json
 from .project import load_lifecycle, session_facts, transcript_path_of
 from .store import SessionHandle, SessionStore, StoreError
@@ -189,8 +189,4 @@ def sweep(store: SessionStore, env: Mapping[str, str], *,
                 break
         if not dry_run:
             lineage.sweep_links(store.root)  # off the hook path; take_link enforces the TTL anyway
-            try:
-                telemetry.prune(env)  # the Claudosseum file's 30-day window, also off the hook path
-            except OSError as exc:
-                report.errors.append(f"telemetry prune: {exc}")
     return report
