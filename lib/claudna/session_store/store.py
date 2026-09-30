@@ -103,7 +103,7 @@ class SessionHandle:
             if seg != current:  # the current segment's directory exists by definition
                 state = "is superseded; its log is frozen" if self.paths.segment(seg).dir.is_dir() else "does not exist"
                 raise StoreError(f"segment {seg} of session {self.sid} {state}")
-            if self._current_session()["status"] == "closed":
+            if self.session_projection()["status"] == "closed":
                 raise StoreError(f"session {self.sid} is closed; its logs are frozen")
             log = self.paths.segment(seg).events
         else:
@@ -111,12 +111,17 @@ class SessionHandle:
                 raise StoreError(f"segment {seg} does not exist for session {self.sid}")
             log = self.paths.lifecycle
         bytes_before = _size(log)
-        append_jsonl(log, event)
+        # Lifecycle events fix byte ranges and are a handful per session: fsynced.
+        # Activity lines are derived tallies: a crash may lose one (spec §11.11).
+        append_jsonl(log, event, durable=log == self.paths.lifecycle)
         refresh(self.paths, event, bytes_before=bytes_before)
         return event
 
-    def _current_session(self) -> dict:
+    def session_projection(self) -> dict:
         """``session.json``, rebuilt first if it doesn't reflect the whole lifecycle log.
+
+        Call it under the lock or on a session no one else is writing; readers
+        that must not write use :func:`project.read_projection` instead.
 
         A stale ``session.json`` means a lifecycle refresh was lost (a killed
         hook), so every projection derived from the lifecycle — including the

@@ -81,14 +81,18 @@ def read_json(path: Path) -> object | None:
         return None
 
 
-def append_jsonl(path: Path, record: dict) -> None:
-    """Append ``record`` as one line to ``path`` (created ``0600``) and fsync it.
+def append_jsonl(path: Path, record: dict, *, durable: bool = True) -> None:
+    """Append ``record`` as one line to ``path`` (created ``0600``); fsync it when ``durable``.
 
     If the file ends mid-line (a previous writer was killed), a newline is
     written first so the fragment stays one skippable line and ``record`` lands
     intact. Short writes are retried until the whole line is on disk. Callers
     that need ordering across several files (the store) serialize under their
     own lock; ``path.parent`` must already exist.
+
+    ``durable=False`` skips the fsync: on slow storage it dominates an append
+    (tens of ms on an SD card), and a caller whose records are derivable can
+    trade a crash-lost line for that.
     """
     line = json.dumps(record, sort_keys=True, ensure_ascii=False, separators=(",", ":")) + "\n"
     fd = os.open(path, os.O_RDWR | os.O_APPEND | os.O_CREAT, FILE_MODE)
@@ -99,7 +103,8 @@ def append_jsonl(path: Path, record: dict) -> None:
         view = memoryview(line.encode("utf-8"))
         while view:
             view = view[os.write(fd, view):]
-        os.fsync(fd)
+        if durable:
+            os.fsync(fd)
     finally:
         os.close(fd)
 

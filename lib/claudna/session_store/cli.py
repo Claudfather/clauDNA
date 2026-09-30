@@ -2,6 +2,7 @@
 
     python3 -m claudna.session_store rebuild <sid> [--root DIR]
     python3 -m claudna.session_store check   <sid> [--root DIR]
+    python3 lib/claudna/session_store hook <event>     (hook payload on stdin)
 
 (with ``lib/`` on ``PYTHONPATH``; ``python3 lib/claudna/session_store …`` also works)
 
@@ -17,6 +18,11 @@ corrupt lines. The one exception is a torn write — an unterminated fragment of
 a JSON object, which the store deliberately keeps as one skippable line and
 no ``rebuild`` can remove. That is crash debris, reported as a warning.
 
+``hook`` is what the hook wrappers call: it applies one Claude Code hook event
+to the store (:mod:`boundaries`) and always exits 0, because a failing hook must
+never break the session. Failures go to ``<root>/hooks/errors.log``, one JSON
+line each, without the payload (it can hold prompt text).
+
 Exit codes: 0 ok (warnings allowed) · 1 not found or check failed · 2 usage.
 """
 
@@ -25,13 +31,16 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import json
+import os
 import sys
+import traceback
 from pathlib import Path
 
+from . import boundaries
 from . import events as ev
 from . import schema
-from .fsio import read_json, read_jsonl
-from .paths import InvalidSessionId, InvalidStateDir
+from .fsio import append_jsonl, ensure_dir, read_json, read_jsonl
+from .paths import InvalidSessionId, InvalidStateDir, state_root
 from .store import SessionHandle, SessionStore
 
 
@@ -134,6 +143,31 @@ def _unparseable_lines(log: Path) -> tuple[int, int]:
     return torn, corrupt
 
 
+def run_hook(event: str, raw: str, env: dict[str, str] | None = None) -> str:
+    """Apply one hook event; never raise. Returns the outcome (``"error: …"`` on failure)."""
+    env = dict(os.environ) if env is None else env
+    try:
+        root = state_root(env)
+        payload = json.loads(raw) if raw.strip() else None
+        return boundaries.handle(event, payload, store=SessionStore(root), env=env)
+    except Exception as exc:  # noqa: BLE001 — a hook must fail open, and say so
+        _log_hook_error(env, event, exc)
+        return f"error: {type(exc).__name__}: {exc}"
+
+
+def _log_hook_error(env: dict[str, str], event: str, exc: BaseException) -> None:
+    try:
+        hooks_dir = state_root(env) / "hooks"
+        ensure_dir(hooks_dir)
+        append_jsonl(hooks_dir / "errors.log", {
+            "ts": ev.now_ts(), "component": "session_store", "event": event,
+            "error": f"{type(exc).__name__}: {exc}",
+            "where": traceback.format_exception(type(exc), exc, exc.__traceback__)[-2].strip()[:300],
+        }, durable=False)
+    except Exception:  # noqa: BLE001 — nowhere to log to; the wrapper's stderr capture is the last resort
+        print(f"session_store hook {event}: {type(exc).__name__}: {exc}", file=sys.stderr)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="claudna.session_store", description="clauDNA session store")
     sub = parser.add_subparsers(dest="verb", required=True)
@@ -142,7 +176,13 @@ def main(argv: list[str] | None = None) -> int:
         p = sub.add_parser(verb, help=text)
         p.add_argument("sid")
         p.add_argument("--root", help="store root (default: $CLAUDNA_STATE_DIR or ~/.claudna)")
+    hook = sub.add_parser("hook", help="apply one Claude Code hook event (payload on stdin); always exits 0")
+    hook.add_argument("event")
     args = parser.parse_args(argv)
+
+    if args.verb == "hook":
+        run_hook(args.event, sys.stdin.read())
+        return 0
 
     handle = _handle(args)
     if handle is None:

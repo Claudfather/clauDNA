@@ -37,8 +37,9 @@ SESSION_STORE_LAYERS = {
     "events": 2,
     "project": 3,
     "store": 4,
-    "cli": 5,
-    "__main__": 6,
+    "boundaries": 5,
+    "cli": 6,
+    "__main__": 7,
 }
 
 
