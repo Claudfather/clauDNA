@@ -104,7 +104,7 @@ PATTERNS: list[tuple[re.Pattern[str], object]] = [
     # An auth header: keep the header's name and scheme.
     (
         re.compile(
-            r"(?i)\b((?:proxy-)?authorization|x-api-key|x-auth-token)"
+            r"(?i)(?<![\w-])((?:proxy-)?authorization|x-api-key|x-auth-token)"
             r"([\"']?\s*:\s*[\"']?(?:(?:bearer|basic|token|bot|digest)\s+)?)[^\s'\"]+"
         ),
         r"\1\2" + MASK,

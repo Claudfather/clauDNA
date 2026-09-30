@@ -283,6 +283,8 @@ BENIGN_CURRENT = [
     'TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")',
     "docker run -u 1000:1000 alpine id",
     "rsync -u backup-host:/srv/data/ ./data/",
+    # A key that only ends in a header's name is not that header.
+    '"scorecard": {"identity-authorization": 3, "data-isolation": 2}',
 ]
 
 
