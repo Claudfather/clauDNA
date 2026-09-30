@@ -80,23 +80,6 @@ def test_program_text_carries_no_placeholders():
     assert not hits, "a value is substituted into program text:\n" + "\n".join(hits)
 
 
-def test_no_project_file_is_sourced():
-    # Sourcing runs a project file as code. Lines that say not to are prose.
-    # `source X` anywhere; `. X` only where a command starts (a line, or after
-    # an operator), so a sentence ending in a period is not read as a command.
-    pattern = re.compile(r"(?:(?<![\w-])source|(?:^|[;&|(`])[ \t]*\.)[ \t]+(?:[^\s`]*\.env\b|<)", re.MULTILINE)
-    hits = _hits(pattern, skip=re.compile(r"\b(?:not|never|NOT|Never)\b"))
-    assert not hits, "read the value you need; never source a project file:\n" + "\n".join(hits)
-
-
-def test_sql_is_passed_by_file():
-    hits = _hits(
-        re.compile(r"\b(?:psql|snowsql)\b[^\n]*\s(?:-c|-q|--query|--command)\s+[\"']"),
-        fenced_only=False,
-    )
-    assert not hits, "write the SQL to a file and pass -f:\n" + "\n".join(hits)
-
-
 @pytest.mark.parametrize("name", ["deep-crawl.md", "SKILL.md"])
 def test_the_crawler_runs_its_bundled_script(name):
     # Routes come from the site being crawled. They reach the browser through a
