@@ -50,7 +50,7 @@ If a URL fetch or a real file `Read` fails (network, 404, auth wall, missing fil
 
 **Provenance (capability-probed).** For URL/file input the origin matters; how it is recorded depends on the engine Step 0 detected, read from `data.engine_version`:
 
-- **Flags-capable engine** — `engine_version` present and **≥ 0.4.0** (the Claudron C2 release that added `--source-url` / `--source-type`) → carry provenance in **frontmatter**: pass `--source-url <url-or-path>` and `--source-type <url|file>` (URL input → `url`, file input → `file`) on the Step 4 call, plus a discovery tag (the domain, or `source:file`). Do **not** add a `Source:` body line.
+- **Flags-capable engine** — `engine_version` present and **≥ 0.4.0** (the Claudron C2 release that added `--source-url` / `--source-type`) → carry provenance in **frontmatter**: set `source_url` and `source_type` (`url` or `file`) in the finding JSON (Step 4) (URL input → `url`, file input → `file`) on the Step 4 call, plus a discovery tag (the domain, or `source:file`). Do **not** add a `Source:` body line.
 - **Older / absent / unreadable version** — including a between-tags git build reporting a dev version below 0.4.0 → **keep the fold**: record provenance as a **trailing** body line — `Source: <url-or-path> (captured <today>)` — plus the tag. Keep it **last**, never first.
 
 The guard is the version probe, never an install pin (claudron-engine.md §1): a git-installed engine between tags degrades to the fold rather than erroring on a flag it doesn't have. Why the body line must stay last, and why frontmatter is preferred once available: Claudron derives a note's one-line recall summary from the first non-heading body line (`session.py` `_summary`), so a leading `Source:` line hijacks every recall summary — and folding provenance into the body at all couples this skill to how that summary is picked (Claudron `docs/CLI_CONTRACT.md` §capture: *provenance rides in frontmatter, not in the body*). The **0.4.0** floor is the Claudron release that ships the C2 flags and the PreCompact shim removal — the two land together, and the floor must match the release that actually adds the flags. The identical constant gates `plugin-hooks/precompact-reflect.sh`'s capture-prompt defer.
@@ -82,7 +82,7 @@ If the content is **skill-shaped** — an imperative how-to, a reusable procedur
 Decide the fields:
 - **type** — from `--type`, else inferred (an article or transcript → `knowledge`; a decision record → `decision`; session distillation → `knowledge`). Required by the CLI.
 - **title** — from `--title`, else derived from the content's own title/heading (session mode: a short topic, e.g. `Session — <what you worked on>`). Required.
-- **body** — the processed content. Default is a tight summary (30–50% length, keep all technical substance, strip boilerplate); `--full` captures verbatim. Provenance for URL/file input follows the Step 1 branch: on a flags-capable engine it rides frontmatter (`--source-url` / `--source-type`, Step 4), **not** the body; on an older engine, **append** the `Source:` line at the end (never first — the first body line becomes the recall summary).
+- **body** — the processed content. Default is a tight summary (30–50% length, keep all technical substance, strip boilerplate); `--full` captures verbatim. Provenance for URL/file input follows the Step 1 branch: on a flags-capable engine it rides frontmatter (the finding file's `source_url` / `source_type`, Step 4), **not** the body; on an older engine, **append** the `Source:` line at the end (never first — the first body line becomes the recall summary).
 - **wikilinks** — if the note relates to one already in the vault (Step 5's dedup surfaces near-matches, or you know its title), link it in the body as `[[Exact Title]]`. This is the vault's authoring convention — **relate** notes, don't duplicate them; capture just writes the `[[Title]]` into the body (Claudron resolves those references on demand, read-side — not at write time).
 - **tags** — from flags or inferred from context.
 - **project / fleet — scope by what the note is *about*, and state the call.** Claudron files by location — there is no `scope:` field; the tier follows the flag you pass, or none. Read the scope from the content, then **say which you chose and why** (`Scoped to project clauDNA — a gotcha in this repo`); the flags are manual overrides on that inference. When genuinely ambiguous, state your reasoning and pick — but **reusable / general knowledge wins `../_shared/` even when it is also repo-flavored** (filing it in a project tier hides it from cross-repo recall); reserve the narrower tier for notes that are genuinely repo- or fleet-bound. The three tiers:
@@ -92,21 +92,13 @@ Decide the fields:
 
 ## Step 4: Build the capture call
 
-Prefer flags (base capture flags verified against v0.2.0):
+Write the finding as JSON to `<finding-file>` with the Write tool, then pass it on stdin. Its fields: `type`, `title`, `body`, `tags`, `owner` (optional), the scope (`project` for repo-scoped, including session mode; `fleet` for fleet-wide; neither for general), and — flags-capable engine only, Step 1 — `source_url` / `source_type`. Text never goes on the command line.
 
 ```bash
-# repo-scoped (incl. session mode): --project <name>; fleet-wide: --fleet <name>; general: omit both
-# provenance (URL/file input, flags-capable engine — Step 1): add --source-url <url-or-path> --source-type <url|file>
-claudron capture --type <type> --title "<title>" --body "<body>" --tags "<a,b>" --project <project> --json
+claudron capture --stdin --json < <finding-file>
 ```
 
-For a multi-paragraph body awkward to quote inline (session distillations usually are), write the fields to a scratch JSON file (`type`, `title`, `body`, `tags`, `owner`, `project` or `fleet`, and — flags-capable engine only — `source_url` / `source_type`) and pipe it:
-
-```bash
-claudron capture --stdin --json < <scratch-note.json>
-```
-
-`--type` and `--title` are required (the CLI exits 2 without them). `--source-type` (and the `source_type` stdin key) accept only `url|file|inline` — the SCHEMA vocabulary; capture emits `url`/`file`. An engine without the flags rejects them (exit 2), which is why Step 1 gates provenance on the version probe. Do **not** pass `--force` here — dedup routing (Step 5) decides that.
+`type` and `title` are required (the CLI exits 2 without them). `source_type` accepts only `url|file|inline` — the SCHEMA vocabulary; capture emits `url`/`file`. An older engine does not read `source_url` / `source_type`, which is why Step 1 gates provenance on the version probe and keeps the body-line fold for it. Do **not** pass `--force` here — dedup routing (Step 5) decides that.
 
 ## Step 5: Confirmation gate + envelope (contract §5)
 
@@ -114,7 +106,7 @@ Validate the envelope (claudron-engine.md §2), then branch on `data.action`:
 
 - **`created`** → done. Report `data.path` (absolute).
 - **`suggest_update`** (a *current* note already covers this) → present `data.reason` and the existing note (`data.path`, vault-relative). Ask: **"A current note already covers this — append to it, create a new note anyway, or cancel? (append/create/cancel)"**
-  - *append* → `claudron capture --update <path> --body "<addendum>" --json` (→ `updated`).
+  - *append* → write the addendum to a file with the Write tool, then `claudron capture --update <path> --body "$(cat <addendum-file>)" --json` (→ `updated`).
   - *create* → re-run Step 4 with `--force` (→ `created`, `-N` slug suffix).
   - *cancel* → stop, nothing written.
 - **`suggest_supersede`** (the near-dup is **stale**) → present `data.reason` (the CLI emits this action when the matched note's status is `stale`). Automatic supersession — marking the old note superseded for you — is Claudron curation, not this skill's job; offer the same three routes: **"A stale note is near this — append, create fresh, or cancel? (append/create/cancel)"**
@@ -123,7 +115,7 @@ Validate the envelope (claudron-engine.md §2), then branch on `data.action`:
 
 **`--auto` (no prompts, never `--force`):**
 - `created` → done.
-- `suggest_update` → take the suggested route: `claudron capture --update <path> --body "<body>" --json`.
+- `suggest_update` → take the suggested route: write the body to a file with the Write tool, then `claudron capture --update <path> --body "$(cat <body-file>)" --json`.
 - `suggest_supersede` → do **not** write (force is forbidden; appending current knowledge to a stale note mislabels it). Record the suggestion in `errors[]`, set `outcome: "needs-input"` naming the stale path.
 - `rejected` → `outcome: "blocked"`, `blocker_description` = the validation reason.
 - anything else (unlisted/absent `action`, partial/unrecognized envelope) → `outcome: "blocked"`, `blocker_description` = the engine failure, the raw envelope + stderr verbatim in `errors[]`. No `artifacts.action`/`artifacts.path` from an unrecognized envelope, and no raw-tree fallback (vault state unknown) — a loud blocked result, never an improvised success.
