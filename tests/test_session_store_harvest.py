@@ -21,9 +21,9 @@ import time
 from pathlib import Path
 
 import pytest
-from conftest import ACTOR, ORIGIN
+from conftest import ACTOR, ORIGIN, rewrite_log, segment_summary
 
-from claudna.session_store import harvest
+from claudna.session_store import harvest, project
 from claudna.session_store.fsio import atomic_write_json, exclusive_lock
 
 BLOCK = {"home": "entity", "subject_hint": {"name": "staging DB", "kind": "service", "aliases": []},
@@ -33,6 +33,7 @@ PERSON = {"home": "person", "subject_hint": {"name": "Dana", "kind": "person"}, 
 
 
 REAL_CAPTURE = harvest.run_claudron_capture  # taken before any stub; only TestRunClaudronCapture calls it
+REAL_VAULT_ROOT = harvest.claudron.vault_root  # likewise: TestRunClaudronCapture drives it against a fake binary
 ON = {"CLAUDNA_HARVEST": "1"}  # the run's own opt-in (each session records its own, too)
 
 
@@ -41,6 +42,8 @@ def _never_the_real_tools(monkeypatch):
     """No test may reach the real summarizer or claudron through a default (#373 review, M1)."""
     monkeypatch.setattr(harvest, "_resummarize", lambda h, i, e: pytest.fail("reached the real summarizer"))
     monkeypatch.setattr(harvest, "run_claudron_capture", lambda *a, **k: pytest.fail("reached the real claudron"))
+    # Vault resolution asks claudron too: a test's recorded vault is its root (the real one resolves symlinks).
+    monkeypatch.setattr(harvest.claudron, "vault_root", lambda cwd, vault, env: Path(vault) if vault else None)
 
 
 class FakeCapture:
@@ -52,7 +55,8 @@ class FakeCapture:
             raise harvest.CaptureError("claudron capture exited 3: vault not found")
         self.findings.append((finding, cwd))
         self.vaults = [*getattr(self, "vaults", []), vault]
-        return self.answers.pop(0) if self.answers else "created"
+        action = self.answers.pop(0) if self.answers else "created"
+        return {"action": action, "path": f"knowledge/note-{len(self.findings)}.md"}
 
 
 def summarized_session(store, sid: str, blocks_per_segment: list[list[dict]], *, repo="webapp", done=True,
@@ -77,15 +81,7 @@ def summarized_session(store, sid: str, blocks_per_segment: list[list[dict]], *,
 
 def artifact(sid: str, index: int, blocks: list[dict], *, start: int = 0, end: int = 1) -> dict:
     """A schema-valid seg-NNN/summary.json carrying ``blocks``, summarizing ``[start, end)``."""
-    return {
-        "schema": "claudna.segment-summary/1", "sid": sid, "index": index,
-        "input": {"transcript_path": "/t.jsonl", "range": {"start": start, "end": end}, "sha256": "0" * 64,
-                  "turns": 1},
-        "producer": {"model": "haiku", "prompt_version": "segment-summary/1", "duration_ms": 1, "cost_usd": None},
-        "journey": {"title": "t", "intent": "i", "outcome": "shipped", "arc": [], "done": [], "in_progress": [],
-                    "next": []},
-        "blocks": blocks, "procedures": [],
-    }
+    return segment_summary(sid, index, blocks, start=start, end=end)
 
 
 def cursor(handle) -> int:
@@ -206,11 +202,30 @@ class TestHarvest:
         assert len(capture.findings) == 2 and cursor(h) == 1
 
 
-    def test_an_unreadable_summary_holds_the_cursor_and_is_reported(self, store):
+    def test_an_unreadable_summary_is_summarized_again_not_held_for_a_month(self, store):
+        """#387 review S3: a done segment whose summary.json is missing or invalid is rebuilt, like a stale one."""
         h = summarized_session(store, "s1", [[BLOCK], [BLOCK]])
         atomic_write_json(h.paths.segment(2).dir / "summary.json", {"summary": {"blocks": [BLOCK]}})  # old shape
-        report = harvest.harvest(store, env=ON, capture=FakeCapture())
-        assert cursor(h) == 1 and "seg-002/summary.json is missing or invalid" in report.errors[0]
+        calls = []
+
+        def resummarize(handle, index, env):
+            calls.append(index)
+            atomic_write_json(handle.paths.segment(index).summary, artifact("s1", index, [BLOCK], start=20, end=25))
+            return "summarized"
+
+        harvest.harvest(store, env=ON, capture=FakeCapture(), resummarize=resummarize)
+        assert calls == [2] and cursor(h) == 2
+
+    def test_an_unreadable_summary_is_given_up_on_after_its_attempts(self, store):
+        h = summarized_session(store, "s1", [[BLOCK], [BLOCK]])
+        atomic_write_json(h.paths.segment(2).dir / "summary.json", {"broken": True})
+        for n in range(project.MAX_ATTEMPTS):  # every rebuild came back unwritable
+            h.append("summary.requested", {"job_id": f"r{n}"}, seg=2)
+            h.append("summary.completed", {"job_id": f"r{n}", "artifact": "seg-002/summary.json",
+                                           "input_sha256": "0" * 64, "duration_ms": 1}, seg=2)
+        calls = []
+        harvest.harvest(store, env=ON, capture=FakeCapture(), resummarize=lambda *a: calls.append(a) or "x")
+        assert calls == [] and cursor(h) == 2  # no model call; the cursor moves past it
 
     def test_a_skipped_segment_never_holds_the_cursor(self, store):
         h = summarized_session(store, "s1", [[BLOCK], [BLOCK]])
@@ -243,10 +258,7 @@ class TestStrandedSummaries:
                 h.append("summary.failed", {"job_id": f"r{n}", "error": "claude timed out", "retryable": retryable},
                          seg=2)
         if kind == "pending" and age_s:
-            lines = h.paths.lifecycle.read_text().splitlines()
-            last = json.loads(lines[-1])
-            last["ts"] = "2000-01-01T00:00:00.000Z"
-            h.paths.lifecycle.write_text("\n".join([*lines[:-1], json.dumps(last)]) + "\n")
+            rewrite_log(h.paths.lifecycle, lambda es: [*es[:-1], {**es[-1], "ts": "2000-01-01T00:00:00.000Z"}])
         h.rebuild()
         return h
 
@@ -264,6 +276,16 @@ class TestStrandedSummaries:
         report = harvest.harvest(store, env=ON, capture=FakeCapture(), resummarize=resummarize)
         assert calls == [2] and report.retried == 1 and cursor(h) == 2
 
+    def test_a_just_abandoned_session_is_not_retried_alongside_the_worker_its_close_spawned(self, store):
+        """The sweep's close summarizes a segment a PreCompact sealed long ago, spawning the worker just
+        after: until that worker records its request, the old seal must not read as a dead summary."""
+        h = summarized_session(store, "s1", [[BLOCK], [BLOCK]], closed=False)
+        h.append("summary.failed", {"job_id": "r0", "error": "claude timed out", "retryable": True}, seg=2)
+        h.append("session.closed", {"reason": "abandoned"})
+        calls = []
+        harvest.harvest(store, env=ON, capture=FakeCapture(), resummarize=lambda *a: calls.append(a) or "x")
+        assert calls == [] and cursor(h) == 1  # seg-001 taken; seg-002 waits for the spawned worker
+
     def test_a_pending_summary_whose_worker_died_is_retried_but_a_fresh_one_is_left(self, store):
         calls = []
         self.stranded(store, "pending")
@@ -279,7 +301,7 @@ class TestStrandedSummaries:
         assert report.retried == 0 and report.segments == 1
 
     def test_after_the_last_attempt_harvest_gives_up_and_moves_on(self, store):
-        h = self.stranded(store, "failed", attempts=harvest.MAX_ATTEMPTS)
+        h = self.stranded(store, "failed", attempts=project.MAX_ATTEMPTS)
         report = harvest.harvest(store, env=ON, capture=FakeCapture(), resummarize=lambda h, i, e: pytest.fail("retried"))
         assert report.gave_up == 1 and cursor(h) == 2 and "never summarized" in report.errors[0]
 
@@ -332,17 +354,25 @@ class TestScheduling:
 
 FAKE_CLAUDRON = """#!/usr/bin/env python3
 import json, os, sys
+if "status" in sys.argv:  # vault resolution: the root FAKE_ROOT names, as claudron reports it
+    print(json.dumps({"ok": True, "command": "status", "data": {"root": os.environ.get("FAKE_ROOT")}}))
+    sys.exit(0 if os.environ.get("FAKE_ROOT") else 3)
 finding = json.loads(sys.stdin.read())
 with open(os.environ["FAKE_LOG"], "w") as fh:
     json.dump({"argv": sys.argv[1:], "finding": finding, "cwd": os.getcwd(),
                "env_vault": os.environ.get("CLAUDRON_VAULT_PATH")}, fh)
 print(json.dumps({"ok": True, "command": "capture", "errors": [], "warnings": [],
-                  "data": {"action": os.environ.get("FAKE_ACTION", "created"), "path": "p.md", "reason": None,
+                  "data": {"action": os.environ.get("FAKE_ACTION", "created"), "path": os.environ.get("FAKE_PATH", "p.md"),
+                           "reason": None,
                            "written": True}}))
 """
 
 
 class TestRunClaudronCapture:
+    @pytest.fixture(autouse=True)
+    def _real_vault_resolution(self, monkeypatch):
+        monkeypatch.setattr(harvest.claudron, "vault_root", REAL_VAULT_ROOT)
+
     def make(self, tmp_path: Path) -> dict:
         fake = tmp_path / "claudron"
         fake.write_text(FAKE_CLAUDRON)
@@ -352,7 +382,7 @@ class TestRunClaudronCapture:
     def test_the_finding_goes_on_stdin_as_json_never_as_an_argument(self, tmp_path):
         env = self.make(tmp_path)
         finding = {"type": "knowledge", "title": "t", "body": "has $(rm -rf) and `quotes`", "tags": []}
-        assert REAL_CAPTURE(finding, str(tmp_path), env) == "created"
+        assert REAL_CAPTURE(finding, str(tmp_path), env)["action"] == "created"
         seen = json.loads((tmp_path / "log").read_text())
         assert seen["argv"] == ["capture", "--stdin", "--json"] and seen["finding"] == finding
         assert seen["cwd"] == str(tmp_path)
@@ -362,6 +392,41 @@ class TestRunClaudronCapture:
         REAL_CAPTURE({"type": "knowledge", "title": "t"}, str(tmp_path), env, "/vaults/work")
         seen = json.loads((tmp_path / "log").read_text())
         assert seen["argv"][:2] == ["--vault", "/vaults/work"] and seen["env_vault"] is None
+
+    def test_an_absolute_note_path_is_made_relative_to_the_root_claudron_reports(self, tmp_path):
+        harvest._ROOTS.clear()
+        real = tmp_path / "real-vault"
+        (real / "projects").mkdir(parents=True)
+        (tmp_path / "link").symlink_to(real)  # the session named its vault through a symlink
+        env = {**self.make(tmp_path), "FAKE_ROOT": str(real), "FAKE_PATH": str(real / "projects" / "n.md")}
+        answer = REAL_CAPTURE({"type": "knowledge", "title": "t"}, str(tmp_path), env, str(tmp_path / "link"))
+        assert (answer["path"], answer["vault"]) == ("projects/n.md", str(real))  # what `promote` takes
+
+    def test_without_a_root_the_path_is_kept_as_given(self, tmp_path):
+        harvest._ROOTS.clear()
+        env = {**self.make(tmp_path), "FAKE_PATH": str(tmp_path / "n.md")}  # status fails: no FAKE_ROOT
+        answer = REAL_CAPTURE({"type": "knowledge", "title": "t"}, str(tmp_path), env)
+        assert (answer["path"], answer["vault"]) == (str(tmp_path / "n.md"), None)
+
+    def test_a_failed_status_call_is_not_remembered(self, tmp_path):
+        harvest._ROOTS.clear()
+        env = {**self.make(tmp_path), "FAKE_PATH": str(tmp_path / "n.md")}  # status fails: no FAKE_ROOT
+        REAL_CAPTURE({"type": "knowledge", "title": "t"}, str(tmp_path), env, "/v")
+        assert harvest._ROOTS == {}  # the next capture asks again
+
+    def test_a_relative_answer_with_a_recorded_vault_needs_no_status_call(self, tmp_path):
+        harvest._ROOTS.clear()
+        answer = REAL_CAPTURE({"type": "knowledge", "title": "t"}, str(tmp_path), self.make(tmp_path), "/vaults/w")
+        assert harvest._ROOTS == {} and (answer["path"], answer["vault"]) == ("p.md", "/vaults/w")
+
+    def test_a_relative_answer_without_a_recorded_vault_still_names_its_vault(self, tmp_path):
+        """Otherwise the digest item has vault None and `promote` resolves against the reviewer's cwd."""
+        harvest._ROOTS.clear()
+        real = tmp_path / "real-vault"
+        real.mkdir()
+        answer = REAL_CAPTURE({"type": "knowledge", "title": "t"}, str(tmp_path),
+                              {**self.make(tmp_path), "FAKE_ROOT": str(real)})
+        assert (answer["path"], answer["vault"]) == ("p.md", str(real))
 
     def test_a_not_ok_envelope_is_an_error(self, tmp_path):
         fake = tmp_path / "claudron"
@@ -398,21 +463,19 @@ class TestReviewRound373:
             ts = time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime(now - 1))
             events = [{"kind": "segment.sealed", "ts": ts, "data": {}},
                       {"kind": "summary.requested", "ts": ts, "data": {"job_id": "j"}}]
-            assert harvest._stranded(events, now) is None  # 1 s old, not 3,601
+            assert project.summary_verdict(events, now) is None  # 1 s old, not 3,601
         finally:
             monkeypatch.delenv("TZ")
             time.tzset()
 
     def test_a_sealed_segment_never_summarized_is_retried_after_its_grace(self, store):
         h = summarized_session(store, "s1", [[BLOCK], [BLOCK]])
-        lines = h.paths.lifecycle.read_text().splitlines()
-        # drop seg 2's summary.completed: the spawn died, the status stayed "none"
-        kept = [ln for ln in lines if not (json.loads(ln)["kind"] == "summary.completed" and json.loads(ln)["seg"] == 2)]
-        old = [json.loads(ln) for ln in kept]
-        for e in old:
-            if e["kind"] == "segment.sealed" and e["seg"] == 2:
-                e["ts"] = "2000-01-01T00:00:00.000Z"
-        h.paths.lifecycle.write_text("".join(json.dumps(e) + "\n" for e in old))
+        def died(events):  # drop seg 2's summary.completed (the spawn died, the status stayed "none"); age its seal
+            kept = [e for e in events if not (e["kind"] == "summary.completed" and e["seg"] == 2)]
+            return [{**e, "ts": "2000-01-01T00:00:00.000Z"} if e["kind"] == "segment.sealed" and e["seg"] == 2 else e
+                    for e in kept]
+
+        rewrite_log(h.paths.lifecycle, died)
         h.rebuild()
         calls = []
         harvest.harvest(store, env=ON, capture=FakeCapture(), resummarize=lambda hh, i, e: calls.append(i) or "x")
@@ -429,12 +492,12 @@ class TestReviewRound373:
         seal = {"kind": "segment.sealed", "ts": "2000-01-01T00:00:00.000Z", "data": {}}
         failed = [{"kind": "summary.requested", "ts": seal["ts"], "data": {"job_id": f"j{n}"}} for n in range(3)] + \
             [{"kind": "summary.failed", "ts": seal["ts"], "data": {"job_id": "j2", "error": "x", "retryable": True}}]
-        assert harvest._stranded([seal, *failed], time.time()) == "give up"
-        assert harvest._stranded([seal, *failed, seal, failed[0], failed[-1]], time.time()) == "retry"
+        assert project.summary_verdict([seal, *failed], time.time()) == "give up"
+        assert project.summary_verdict([seal, *failed, seal, failed[0], failed[-1]], time.time()) == "retry"
 
     def test_a_crash_in_one_session_still_leaves_the_run_record(self, store, monkeypatch):
         summarized_session(store, "s1", [[BLOCK]])
-        monkeypatch.setattr(harvest, "_latest_origin", lambda lifecycle: 1 / 0)
+        monkeypatch.setattr(harvest, "harvest_skip", lambda facts, lifecycle: 1 / 0)
         report = harvest.harvest(store, env=ON, capture=FakeCapture())
         last = json.loads((store.root / "harvest" / "last_run.json").read_text())
         assert "ZeroDivisionError" in report.errors[0] and last["errors"] == report.errors

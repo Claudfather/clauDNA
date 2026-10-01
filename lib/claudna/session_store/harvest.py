@@ -30,8 +30,6 @@ The ``claudron`` call is behind ``capture`` so tests never touch a vault.
 
 from __future__ import annotations
 
-import calendar
-import json
 import os
 import shutil
 import time
@@ -39,28 +37,24 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Mapping
 
-from . import events as ev
 from claudna.redact import redact_strings
 
 from . import schema
-from .fsio import append_jsonl, atomic_write_json, ensure_dir, exclusive_lock, read_json, utc_seconds
-from .project import by_segment, load_lifecycle, session_facts
+from .fsio import atomic_write_json, atomic_write_text, ensure_dir, exclusive_lock, read_json, utc_seconds
+from . import claudron
+from .claudron import _ROOTS, CLAUDRON_ENV, CaptureError, claudron_bin  # noqa: F401 (re-exported)
+from .project import (HARVEST_CONSUMER, MAX_ATTEMPTS, abandoned_at, by_segment, harvest_skip, latest_origin,
+                      load_lifecycle, session_facts, summary_verdict)
 from .store import SessionStore
 
 ENABLE_ENV = "CLAUDNA_HARVEST"
 INTERVAL_ENV = "CLAUDNA_HARVEST_INTERVAL_H"
-CLAUDRON_ENV = "CLAUDNA_CLAUDRON_BIN"
 DEFAULT_INTERVAL_H = 6.0
 MAX_CAPTURES = 10
-CONSUMER = "harvest"
+CONSUMER = HARVEST_CONSUMER
 #: Block homes → Claudron note types. ``person`` is held back (see module doc).
 NOTE_TYPES = {"entity": "knowledge", "concept": "knowledge", "project": "knowledge",
               "practice": "knowledge", "decision": "decision"}
-TIMEOUT_S = 30
-#: A summary still ``pending`` this long after its request lost its worker (killed, machine asleep).
-STALE_PENDING_S = 15 * 60
-#: Summarizer attempts per segment before harvest gives up on it and moves on.
-MAX_ATTEMPTS = 3
 #: Stranded summaries harvest re-runs per run (each is one model call, in this detached process).
 MAX_RETRIES_PER_RUN = 2
 LAST_RUN = "harvest/last_run.json"
@@ -70,50 +64,7 @@ IDLE_INTERVAL_H = 1.0
 DRAFT_BANNER = "(unverified) "
 
 
-class CaptureError(RuntimeError):
-    """``claudron capture`` failed outright (not a dedup answer)."""
-
-
-_ACTIONS = ("created", "updated", "suggest_update", "suggest_supersede", "rejected")
-
-
-def run_claudron_capture(finding: dict, cwd: str | None, env: Mapping[str, str], vault: str | None = None) -> str:
-    """One ``claudron capture --stdin --json``; returns ``data.action``.
-
-    The vault is the *session's*, never the harvest process's: ``--vault`` when
-    the session recorded one, else a walk-up from the session's ``cwd`` — with
-    ``$CLAUDRON_VAULT_PATH`` removed from the child's environment either way, so
-    whichever session happened to start this run can't redirect another's
-    drafts into its vault (#373 review, B2).
-
-    Content goes on stdin as JSON — never as a shell argument — and the
-    envelope is validated per ``skills/_shared/claudron-engine.md`` §2: exit 0,
-    ``ok``, ``command == "capture"``, a known ``data.action``. A ``rejected``
-    write exits 1 with a well-formed envelope; that is an answer, not a failure.
-    """
-    import subprocess  # imported here: the hook imports this module for is_due alone
-
-    cmd = [claudron_bin(env), *(["--vault", vault] if vault else []), "capture", "--stdin", "--json"]
-    child_env = {k: v for k, v in env.items() if k != "CLAUDRON_VAULT_PATH"}
-    try:
-        proc = subprocess.run(cmd, input=json.dumps(finding), capture_output=True, text=True,
-                              timeout=TIMEOUT_S, env=child_env, cwd=cwd if cwd and os.path.isdir(cwd) else None)
-        envelope = json.loads(proc.stdout)
-    except (OSError, subprocess.SubprocessError, ValueError) as exc:
-        raise CaptureError(f"claudron capture: {str(exc)[:150]}") from exc
-    if not isinstance(envelope, dict):
-        raise CaptureError(f"claudron capture exited {proc.returncode}: the output is not a JSON object")
-    data = envelope.get("data")
-    action = data.get("action") if isinstance(data, dict) else None
-    if envelope.get("command") != "capture" or action not in _ACTIONS or \
-            (proc.returncode != 0 and action != "rejected") or (not envelope.get("ok") and action != "rejected"):
-        errors = envelope.get("errors")
-        raise CaptureError(f"claudron capture exited {proc.returncode}: {str(errors or data)[:150]}")
-    return action
-
-
-def claudron_bin(env: Mapping[str, str]) -> str:
-    return env.get(CLAUDRON_ENV) or "claudron"
+run_claudron_capture = claudron.capture  #: the default capture (tests replace it)
 
 
 def _skip_reason(root: Path, env: Mapping[str, str], now: float) -> str | None:
@@ -196,6 +147,7 @@ class RunReport:
     gave_up: int = 0
     idle: bool = False
     errors: list[str] = field(default_factory=list)
+    sessions: list[str] = field(default_factory=list)  #: sessions a segment was taken from (the ops log's)
 
     @property
     def captures(self) -> int:
@@ -209,55 +161,27 @@ class RunReport:
         return {**self.__dict__, "started_at": self.started_at}
 
 
-def _epoch(ts: str) -> float:
-    """An envelope timestamp (UTC, ``…Z``) as epoch seconds — ``timegm``, never ``mktime``: no local DST."""
-    return calendar.timegm(time.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S"))
-
-
-def _stranded(events: list[dict], now: float) -> str | None:
-    """Does a final segment's summary need another attempt (``"retry"``), or has it had its last (``"give up"``)?
-
-    Only events since the segment's **last seal** count: a re-seal starts a
-    fresh budget. Stranded means ``none`` or ``pending`` long past the seal or
-    the request (the spawn or the worker died), or a retryable failure; each
-    gets another attempt, up to :data:`MAX_ATTEMPTS`. A permanent failure, or
-    the last attempt spent, is given up so the session isn't stuck.
-    """
+def _since_last_seal(events: list[dict]) -> list[dict]:
     seals = [n for n, e in enumerate(events) if e["kind"] == "segment.sealed"]
-    if not seals:
-        return None
-    since = events[seals[-1]:]
-    summary = [e for e in since if e["kind"].startswith("summary.")]
-    requested = {e["data"]["job_id"] for e in summary if e["kind"] == "summary.requested"}
-    attempts = len(requested) + sum(e["kind"] == "summary.failed" and e["data"]["job_id"] not in requested
-                                    for e in summary)
-    last = summary[-1] if summary else since[0]  # the seal itself when nothing followed it
-    if last["kind"] in ("summary.completed", "summary.skipped"):
-        return None
-    if last["kind"] == "summary.failed" and not last["data"]["retryable"]:
-        return "give up"
-    if last["kind"] in ("segment.sealed", "summary.requested") and now - _epoch(last["ts"]) < STALE_PENDING_S:
-        return None  # a worker may still be on it
-    return "give up" if attempts >= MAX_ATTEMPTS else "retry"
+    return events[seals[-1]:] if seals else events
 
 
 def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: Callable[..., str],
-                     env: Mapping[str, str], held_log: Path, resummarize: Callable[..., str]) -> None:
+                     env: Mapping[str, str], resummarize: Callable[..., str]) -> None:
     handle = store.session(sid)
     through = handle.cursor(CONSUMER)
     if through >= max(handle.paths.segment_indices(), default=0):
         return  # nothing new: skip the lifecycle read (most sessions, most runs)
+    from . import digest  # here, not at the top: SessionStart imports this module for is_due alone (#387 S5)
+
     lifecycle = load_lifecycle(handle.paths).events
     facts = session_facts(lifecycle)
-    if facts.private or not (facts.harvest or {}).get("enabled"):
-        return  # private, or this session never opted in: never harvested
-    origin = _latest_origin(lifecycle)
-    if not origin.get("repo"):
-        return  # no repo, no project scope: its drafts would land in the vault's shared tree (#373, M4)
-    vault = facts.harvest.get("vault")
-    if not vault and not (origin.get("cwd") and os.path.isdir(origin["cwd"])):
+    skip = harvest_skip(facts, lifecycle)
+    if skip == "no vault":
         report.errors.append(f"{sid}: no vault to route to (none recorded, and its cwd is gone)")
+    if skip:
         return
+    origin, vault = latest_origin(lifecycle), facts.harvest.get("vault")
     indices = handle.paths.segment_indices()
     for index in indices:
         if index <= through:
@@ -270,8 +194,18 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
         valid = isinstance(summary, dict) and not schema.validate(summary, schema.load("segment-summary"))
         if status == "done" and valid and summary["input"]["range"]["end"] != boundary.last_seal["data"]["end"]:
             status = "stale"  # summarized before a later re-seal: its range misses the tail
+        unreadable = status == "done" and not valid  # summary.json missing or invalid: rebuild it (#387 review S3)
+        if unreadable:
+            status = "stale"
         if status in ("none", "pending", "failed", "stale"):
-            verdict = "retry" if status == "stale" else _stranded(by_segment(lifecycle)[index], report.started_epoch)
+            if unreadable:  # bounded like any retry: a summary that can never be written mustn't cost a call a run
+                attempts = sum(e["kind"] == "summary.requested" for e in _since_last_seal(by_segment(lifecycle)[index]))
+                verdict = "give up" if attempts >= MAX_ATTEMPTS else "retry"
+            elif status == "stale":
+                verdict = "retry"
+            else:
+                verdict = summary_verdict(by_segment(lifecycle)[index], report.started_epoch,
+                                          abandoned_at=abandoned_at(lifecycle))
             if verdict == "give up":
                 report.gave_up += 1
                 report.errors.append(f"{sid}: seg-{index:03d} was never summarized; skipped by harvest")
@@ -299,8 +233,11 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
         wanted = [f for _, f in findings if f is not None]
         if report.captures and report.captures + len(wanted) > MAX_CAPTURES:
             return  # out of budget: the whole segment waits for the next run (a first one always fits)
-        for finding in wanted:
-            action = capture(finding, origin.get("cwd"), env, vault)
+        for block, finding in ((b, f) for b, f in findings if f is not None):
+            answer = capture(finding, origin.get("cwd"), env, vault)
+            action = answer["action"]
+            digest.record_capture(store.root, sid=sid, seg=index, block=block, title=finding["title"],
+                                  action=action, path=answer["path"], vault=answer.get("vault", vault))
             if action in ("created", "updated"):
                 report.created += 1
             elif action == "rejected":
@@ -308,16 +245,13 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
             else:
                 report.known += 1
         for block, _ in (pair for pair in findings if pair[1] is None):
-            append_jsonl(held_log, {"ts": ev.now_ts(), "sid": sid, "seg": index, "reason": "person",
-                                    "block": block}, durable=False)
+            root = claudron.vault_root(origin.get("cwd"), vault, env)  # the root captures record: one name per vault
+            digest.record_held(store.root, sid=sid, seg=index, block=block, vault=str(root) if root else vault)
             report.held_back += 1
         report.segments += 1
+        if sid not in report.sessions:
+            report.sessions.append(sid)
         handle.ack(CONSUMER, index)
-
-
-def _latest_origin(lifecycle: list[dict]) -> dict:
-    opened = [e for e in lifecycle if e["kind"] == "session.opened"]
-    return opened[-1]["data"].get("origin") or {} if opened else {}
 
 
 def _resummarize(handle, index: int, env: Mapping[str, str]) -> str:
@@ -352,7 +286,7 @@ def harvest(store: SessionStore, *, env: Mapping[str, str] = os.environ,
         try:
             for sid in store.session_ids():
                 try:
-                    _harvest_session(store, sid, report, capture, env, home / "held.jsonl", resummarize)
+                    _harvest_session(store, sid, report, capture, env, resummarize)
                 except CaptureError as exc:
                     report.status = "error"
                     report.errors.append(f"{sid}: {exc}")
@@ -362,9 +296,15 @@ def harvest(store: SessionStore, *, env: Mapping[str, str] = os.environ,
                 if report.captures >= MAX_CAPTURES:
                     break
         finally:  # every run leaves its record, so a crash is seen and the debounce still holds
+            try:  # the digest's own SessionStart line (phase 5): its failure is this run's error, not every run's
+                from . import digest
+
+                digest.write_review_line(store.root)
+            except Exception as exc:  # noqa: BLE001 — recorded in last_run.json, which still gets written below
+                report.errors.append(f"review line: {type(exc).__name__}: {str(exc)[:120]}")
             report.idle = report.segments == 0 and not report.errors
             atomic_write_json(store.root / LAST_RUN, report.as_dict())
-            (home / "liveness.txt").write_text(liveness_line(report) + "\n")
+            atomic_write_text(home / "liveness.txt", liveness_line(report) + "\n")
     return report
 
 

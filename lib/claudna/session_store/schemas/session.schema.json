@@ -5,7 +5,8 @@
   "type": "object",
   "required": [
     "schema", "sid", "parent_sid", "chain_id", "children", "status", "private", "actor", "origin",
-    "transcript_path", "opened_at", "opened_by", "closed_at", "close_reason", "segments", "summary"
+    "transcript_path", "opened_at", "opened_by", "closed_at", "close_reason", "segments", "summary",
+    "projected_from"
   ],
   "additionalProperties": false,
   "properties": {
@@ -29,7 +30,8 @@
       "additionalProperties": false,
       "properties": {
         "count": { "type": "integer", "minimum": 0 },
-        "open": { "type": ["integer", "null"], "minimum": 1 }
+        "open": { "type": ["integer", "null"], "minimum": 1 },
+        "retired": { "type": "integer", "minimum": 0 }
       }
     },
     "summary": {

@@ -48,3 +48,35 @@ CLI_ENV = {"CLAUDE_CODE_ENTRYPOINT": "cli"}
 
 def session_doc(store: SessionStore, sid: str) -> dict:
     return json.loads(store.session(sid).paths.session_json.read_text())
+
+
+def segment_summary(sid: str, index: int, blocks=(), *, title: str = "t", start: int = 0, end: int = 1,
+                    done=(), next_=(), outcome: str = "shipped") -> dict:
+    """A schema-valid ``seg-NNN/summary.json`` summarizing ``[start, end)`` and carrying ``blocks``."""
+    return {
+        "schema": "claudna.segment-summary/1", "sid": sid, "index": index,
+        "input": {"transcript_path": "/t.jsonl", "range": {"start": start, "end": end}, "sha256": "0" * 64,
+                  "turns": 1},
+        "producer": {"model": "haiku", "prompt_version": "segment-summary/1", "duration_ms": 1, "cost_usd": None},
+        "journey": {"title": title, "intent": "i", "outcome": outcome, "arc": [{"step": "s", "result": "r"}],
+                    "done": [{"text": t} for t in done], "in_progress": [], "next": [{"text": t} for t in next_]},
+        "blocks": list(blocks), "procedures": [],
+    }
+
+
+def complete_segment(handle, index: int, doc: dict) -> None:
+    """Write ``doc`` as segment ``index``'s summary and log its ``summary.completed``."""
+    from claudna.session_store.fsio import atomic_write_json
+
+    atomic_write_json(handle.paths.segment(index).summary, doc)
+    handle.append("summary.completed", {"job_id": f"j{index}", "artifact": f"seg-{index:03d}/summary.json",
+                                        "input_sha256": "0" * 64, "duration_ms": 1}, seg=index)
+
+
+def rewrite_log(path: Path, edit) -> None:
+    """Rewrite a JSONL log in place through ``edit(events) -> events``: backdate, drop or pin events in a test.
+
+    Writes the file directly, so projections are not refreshed: call ``rebuild()`` after when a test needs them.
+    """
+    events = [json.loads(line) for line in path.read_text().splitlines()]
+    path.write_text("".join(json.dumps(e) + "\n" for e in edit(events)))

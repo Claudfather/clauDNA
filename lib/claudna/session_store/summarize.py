@@ -3,11 +3,12 @@
 Runs out of band, as its own process (``session_store summarize <sid> <seg>``),
 spawned detached by the hook that sealed the segment. One run:
 
-1. **Gates.** Records ``summary.skipped`` and stops when the session is
-   private, summaries are switched off (``CLAUDNA_SESSION_SUMMARY=0``), the
-   session isn't interactive and summaries weren't switched on for it
-   (``CLAUDNA_SESSION_SUMMARY=1`` — headless ``claude -p`` and Claudlobby bots
-   are off by default), the transcript is gone, or the slice holds no prose.
+1. **Gates.** Records ``summary.skipped`` and stops when
+   :func:`project.summary_gate` says so — the session is private, summaries
+   are switched off (``CLAUDNA_SESSION_SUMMARY=0``), or, unless
+   ``CLAUDNA_SESSION_SUMMARY=1`` switches them on, it is headless or a bot or
+   didn't opt into harvest when it opened — or when the transcript is gone, or
+   the slice holds no prose.
 2. **Idempotence.** Stops without an event when a ``done`` summary already
    covers the same transcript range with the same prompt version — checked
    before anything is read, since the transcript is append-only. One runner
@@ -40,8 +41,8 @@ from typing import Callable, Mapping
 
 from claudna.redact import redact_strings, redact_text
 
-from . import schema
-from .fsio import atomic_write_json, exclusive_lock, read_json
+from . import rollup, schema
+from .fsio import atomic_write_json, read_json
 from .paths import CHILD_ENV
 from .project import load_lifecycle, segment_transcript_paths, session_facts, summary_gate
 from .store import SessionHandle
@@ -99,14 +100,19 @@ def run_claude(system_prompt: str, dialogue: str, output_schema: dict, model: st
     return envelope["structured_output"], envelope.get("total_cost_usd")
 
 
+def _open_request(handle: SessionHandle, index: int) -> str | None:
+    """The job id of segment ``index``'s request no ``completed``/``failed``/``skipped`` has answered yet."""
+    summary = handle.boundary(index).summary
+    return summary.get("job_id") if summary["status"] == "pending" else None
+
+
 def summarize(handle: SessionHandle, index: int, *, env: Mapping[str, str] = os.environ,
               runner: Callable[..., tuple[dict, float | None]] = run_claude) -> str:
     """Summarize sealed segment ``index``; return what happened (see the module doc)."""
-    seg = handle.paths.segment(index)
-    if not seg.dir.is_dir():
-        return f"ignored: no segment {index}"
-    with exclusive_lock(seg.dir / ".summarize.lock", blocking=False) as taken:
-        if not taken:
+    with handle.segment_lock(index) as lock:
+        if lock == "missing":
+            return f"ignored: no segment {index}"
+        if lock == "busy":
             return "ignored: another summarizer holds the segment"
         # A re-seal while this run holds the lock (a blocked compaction, then
         # /compact again) starts a worker that finds the lock taken and leaves.
@@ -116,8 +122,10 @@ def summarize(handle: SessionHandle, index: int, *, env: Mapping[str, str] = os.
             try:
                 outcome, end = _summarize_once(handle, index, env=env, runner=runner)
             except Exception as exc:  # noqa: BLE001 — any worker failure is recorded, so harvest can retry it
-                handle.append("summary.failed", {"job_id": "worker-error", "error": f"{type(exc).__name__}: {exc}",
-                                                 "retryable": True}, seg=index)
+                # Under the request it ends, if one is open: a separate id would count as another attempt and
+                # give up after 2 real tries instead of MAX_ATTEMPTS (#387 review).
+                handle.append("summary.failed", {"job_id": _open_request(handle, index) or "worker-error",
+                                                 "error": f"{type(exc).__name__}: {exc}", "retryable": True}, seg=index)
                 return f"failed: {type(exc).__name__}: {exc}"
             if end is None or handle.boundary(index).last_seal["data"]["end"] == end:
                 break
@@ -141,7 +149,8 @@ def _summarize_once(handle: SessionHandle, index: int, *, env: Mapping[str, str]
     previous = read_json(seg.dir / "summary.json")
     if boundary.summary["status"] == "done" and isinstance(previous, dict) and \
             previous.get("producer", {}).get("prompt_version") == PROMPT_VERSION and \
-            {k: previous.get("input", {}).get(k) for k in wanted} == wanted:
+            {k: previous.get("input", {}).get(k) for k in wanted} == wanted and \
+            not schema.validate(previous, schema.load("segment-summary")):  # an invalid one is rebuilt (harvest S3)
         return "ignored: already summarized", end  # the transcript is append-only: same range, same input
     if not path:
         return _skip(handle, index, "no_transcript"), end
@@ -188,8 +197,14 @@ def _summarize_once(handle: SessionHandle, index: int, *, env: Mapping[str, str]
                       seg=index)
         return f"failed: {exc}", end
     atomic_write_json(seg.dir / "summary.json", artifact)
+    logged = time.time()  # a rollup written after this counts the summary: discard() keeps it
     handle.append("summary.completed", {"job_id": job_id, "artifact": f"{seg.dir.name}/summary.json",
                                         "input_sha256": sha, "duration_ms": duration_ms}, seg=index)
+    try:
+        rollup.refresh(handle.paths)  # §6.7: the session rollup follows every completed segment
+    except Exception:  # noqa: BLE001 — the summary is done; a failed rollup must not log summary.failed after it
+        # Stale now: `session show` computes a missing rollup, `rebuild` rewrites it.
+        rollup.discard(handle.paths, written_before=logged)
     return f"summarized: {len(artifact['blocks'])} block(s)", end
 
 

@@ -36,7 +36,7 @@ sys.path.insert(0, str(LIB))
 
 from claudna.session_store import events as ev  # noqa: E402
 from claudna.session_store import schema  # noqa: E402
-from claudna.session_store.cli import check_session  # noqa: E402
+from claudna.session_store.cli import check_session, main  # noqa: E402
 from claudna.session_store.fsio import (  # noqa: E402
     append_jsonl,
     atomic_write_json,
@@ -52,7 +52,7 @@ from claudna.session_store.paths import (  # noqa: E402
     state_root,
     validate_sid,
 )
-from claudna.session_store.store import SessionStore, StoreError  # noqa: E402
+from claudna.session_store.store import NotAppendable, SessionStore, StoreError  # noqa: E402
 
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "session-store" / "basic"
 FIXTURE_SID = "5f0c2d1e-0000-4000-8000-000000000001"
@@ -379,7 +379,7 @@ class TestStore:
         s2 = h.open_segment("compact", 100)
         h.append("tool.failed", {"tool": "Bash", "signature": "sig", "exit_code": 1}, seg=s2)
         live = load(h.paths.session_json)
-        assert live["status"] == "open" and live["segments"] == {"count": 2, "open": 2}
+        assert live["status"] == "open" and live["segments"] == {"count": 2, "open": 2, "retired": 0}
 
         h.seal_segment(300, "session_end")
         h.link_child("child-1")
@@ -388,7 +388,7 @@ class TestStore:
         h.close_session("clear")
         done = load(h.paths.session_json)
         assert done["status"] == "closed" and done["close_reason"] == "clear"
-        assert done["segments"] == {"count": 2, "open": None}
+        assert done["segments"] == {"count": 2, "open": None, "retired": 0}
         assert done["children"] == ["child-1"] and done["private"] is True
         assert done["chain_id"] == h.sid  # no parent: its own chain root
         assert load(h.paths.segment(1).segment_json)["counts"] == {"prompts": 1, "skills": 1, "failures": 0, "interrupts": 0,
@@ -488,7 +488,7 @@ class TestStore:
         seg = load(h.paths.segment(new).segment_json)
         assert new == 4 and seg["status"] == "open"
         assert seg["transcript"]["range"] == {"start": 400, "end": None}
-        assert load(h.paths.session_json)["segments"] == {"count": 1, "open": 4}
+        assert load(h.paths.session_json)["segments"] == {"count": 1, "open": 4, "retired": 0}
 
     def test_foreign_session_events_do_not_fold(self, store):
         h = opened(store)
@@ -940,3 +940,50 @@ class TestWritersRedact:
                                                      "text": "curl -H 'Authorization: Bearer " + "tok" * 8 + "'"},
                           seg=1)
         assert "toktok" not in e["data"]["text"] and "[REDACTED]" in e["data"]["text"]
+
+
+class TestRejectedFirstWrites:
+    """A refused call on a session the store doesn't have leaves nothing behind (no phantom directory)."""
+
+    @pytest.mark.parametrize("call, error", [
+        (lambda h: h.seal_segment(10, "precompact"), StoreError),
+        (lambda h: h.append("prompt.submitted", {"prompt_id": None, "chars": 1}), NotAppendable),
+        (lambda h: h.append("summary.skipped", {"reason": "trivial"}, seg=1), StoreError),
+        (lambda h: h.close_session("not-a-reason"), ev.EventError),
+        (lambda h: h.close_abandoned(), StoreError),
+    ], ids=["seal", "activity", "segment-event", "bad-close", "abandon"])
+    def test_nothing_is_created(self, store, call, error):
+        h = store.session("fresh")
+        with pytest.raises(error):
+            call(h)
+        assert not h.paths.dir.exists() and store.session_ids() == []
+
+    def test_a_refused_call_on_an_existing_session_keeps_it(self, store):
+        h = opened(store, "s1")
+        with pytest.raises(ev.EventError):
+            h.close_session("not-a-reason")
+        assert h.paths.lifecycle.is_file()
+
+
+def test_check_reports_a_projection_missing_projected_from(store, capsys):
+    """A hand-edited projection without its watermark is an error for ``check``, never a KeyError."""
+    h = opened(store, "s1")
+    doc = load(h.paths.session_json)
+    del doc["projected_from"]
+    h.paths.session_json.write_text(json.dumps(doc))
+    assert main(["check", "s1", "--root", str(store.root)]) != 0
+    assert "projected_from" in capsys.readouterr().out
+
+
+def test_check_writes_nothing(store):
+    """``check`` is read-only: a stale projection is reported, never rewritten."""
+    h = opened(store, "s1")
+    h.open_segment("session_open", 0)
+    h.paths.session_json.unlink()  # a lost projection: check must not rebuild it
+
+    def files():
+        return sorted((p.relative_to(store.root), p.stat().st_mtime_ns) for p in store.root.rglob("*") if p.is_file())
+
+    before = files()
+    main(["check", "s1", "--root", str(store.root)])
+    assert files() == before

@@ -19,12 +19,13 @@ resurrect it, and nothing here ever creates a directory.
 
 from __future__ import annotations
 
+import os
 from collections import defaultdict
 from dataclasses import dataclass
 
 from . import events as ev
 from . import schema
-from .fsio import atomic_write_json, read_json, read_jsonl
+from .fsio import atomic_write_json, epoch_of, file_size, read_json, read_jsonl
 from .schema import is_instance
 from .paths import SessionPaths
 
@@ -171,6 +172,91 @@ class SessionFacts:
     harvest: dict | None = None  # the latest session.opened's {enabled, vault}: its own consumer choice
 
 
+def latest_origin(lifecycle: list[dict]) -> dict:
+    """The latest ``session.opened``'s origin (a resume can move the session to another cwd)."""
+    opened = [e for e in lifecycle if e["kind"] == "session.opened"]
+    return opened[-1]["data"].get("origin") or {} if opened else {}
+
+
+def harvest_skip(facts: SessionFacts, lifecycle: list[dict]) -> str | None:
+    """Why harvest never takes this session (``off``, ``no repo``, ``no vault``), or ``None`` if it does.
+
+    The one test: harvest skips on it, and export uses it to know whether
+    anyone will ever retry this session's summaries (only harvest does).
+    """
+    if facts.private or not (facts.harvest or {}).get("enabled"):
+        return "off"  # private, or this session never opted in
+    origin = latest_origin(lifecycle)
+    if not origin.get("repo"):
+        return "no repo"  # no project scope: its drafts would land in the vault's shared tree (#373, M4)
+    if not facts.harvest.get("vault") and not (origin.get("cwd") and os.path.isdir(origin["cwd"])):
+        return "no vault"  # none recorded, and the cwd it would be found from is gone
+    return None
+
+
+HARVEST_CONSUMER = "harvest"  #: harvest's cursor name: one constant for harvest, retention and export
+
+
+def retired_indices(lifecycle: list[dict]) -> set[int]:
+    """The segments the log records as retired: the log, not a directory, says what's retired."""
+    return {e["seg"] for e in lifecycle if e["kind"] == "segment.retired"}
+
+
+#: A summary still ``pending`` this long after its request lost its worker (killed, machine asleep).
+STALE_PENDING_S = 15 * 60
+#: Summarizer attempts per segment before it is given up on (harvest stops retrying; export passes it).
+MAX_ATTEMPTS = 3
+
+
+def abandoned_at(lifecycle: list[dict]) -> str | None:
+    """When the session was closed as ``abandoned``, if that is how it is closed now."""
+    _, closed_at, reason = session_status(lifecycle)
+    return closed_at if reason == "abandoned" else None
+
+
+def summary_verdict(events: list[dict], now: float, *, abandoned_at: str | None = None) -> str | None:
+    """Does a final segment's summary need another attempt (``"retry"``), or has it had its last (``"give up"``)?
+
+    The one rule for "settled": harvest retries on ``"retry"`` and moves past
+    on ``"give up"``; export passes a ``"give up"`` segment (no item) so one
+    summary that will never come can't hold a consumer's cursor for good.
+
+    Only events since the segment's **last seal** count: a re-seal starts a
+    fresh budget. Stranded means ``none`` or ``pending`` long past the seal or
+    the request (the spawn or the worker died), or a retryable failure; each
+    gets another attempt, up to :data:`MAX_ATTEMPTS`. A permanent failure, or
+    the last attempt spent, is given up so the session isn't stuck.
+
+    ``abandoned_at`` is when the session was closed as ``abandoned`` (the
+    sweep, ``seal``): that close summarizes a segment a PreCompact may have
+    sealed long before, spawning the worker just after, before it records its
+    request — so the seal's age says nothing. Within :data:`STALE_PENDING_S`
+    of such a close the summary is waited for rather than retried, by harvest
+    and export alike. (Every other close seals at that moment, and the seal's
+    own age already covers it.)
+    """
+    seals = [n for n, e in enumerate(events) if e["kind"] == "segment.sealed"]
+    if not seals:
+        return None
+    since = events[seals[-1]:]
+    summary = [e for e in since if e["kind"].startswith("summary.")]
+    requested = {e["data"]["job_id"] for e in summary if e["kind"] == "summary.requested"}
+    attempts = len(requested) + sum(e["kind"] == "summary.failed" and e["data"]["job_id"] not in requested
+                                    for e in summary)
+    last = summary[-1] if summary else since[0]  # the seal itself when nothing followed it
+    if last["kind"] in ("summary.completed", "summary.skipped"):
+        return None
+    if last["kind"] == "summary.failed" and not last["data"]["retryable"]:
+        return "give up"
+    if last["kind"] in ("segment.sealed", "summary.requested") and now - epoch_of(last["ts"]) < STALE_PENDING_S:
+        return None  # a worker may still be on it
+    if attempts >= MAX_ATTEMPTS:
+        return "give up"
+    if abandoned_at and now - epoch_of(abandoned_at) < STALE_PENDING_S:
+        return None  # the worker the close spawned may not have recorded its request yet
+    return "retry"
+
+
 SUMMARY_ENV = "CLAUDNA_SESSION_SUMMARY"
 
 
@@ -265,6 +351,8 @@ def project_session(sid: str, lifecycle: Log, segments: list[dict], *, transcrip
             children.append(e["data"]["child_sid"])
     private = session_facts(lifecycle.events).private
 
+    retired = retired_indices(lifecycle.events)
+    segments = [s for s in segments if s["index"] not in retired]  # the log, not a directory, says what's retired
     tally = dict.fromkeys(_SUMMARY_STATUS.values(), 0)
     for s in segments:
         if s["summary"]["status"] in tally:
@@ -286,7 +374,8 @@ def project_session(sid: str, lifecycle: Log, segments: list[dict], *, transcrip
         "opened_by": first["data"]["source"] if first else None,
         "closed_at": closed_at,
         "close_reason": close_reason,
-        "segments": {"count": len(segments), "open": max(open_segments) if open_segments else None},
+        "segments": {"count": len(segments), "open": max(open_segments) if open_segments else None,
+                     "retired": len(retired)},
         "summary": {f"segments_{k}": n for k, n in tally.items()},
         "projected_from": lifecycle.projected_from,
     }
@@ -393,3 +482,79 @@ def _refresh_activity(paths: SessionPaths, event: dict, *, bytes_before: int) ->
     projected["projected_from"] = {"lines": pf["lines"] + 1, "bytes": paths.segment(seg).events.stat().st_size,
                                    "skipped": pf["skipped"]}
     atomic_write_json(paths.segment(seg).segment_json, projected)
+
+
+# ── shared reads for the phase 6 consumers (readers, export, retention, rollup) ──
+
+
+@dataclass(frozen=True)
+class SegmentState:
+    """One segment as every consumer judges it: final or not, and where its summary stands.
+
+    ``summary`` is ``done`` only for a valid summary that covers the last seal;
+    ``stale`` is a done summary the segment has since outgrown (it was re-sealed),
+    and ``unreadable`` a done one whose file is missing or invalid. Otherwise
+    it is the lifecycle status (``none``/``pending``/``failed``/``skipped``).
+    """
+
+    index: int
+    final: bool  #: sealed, and superseded or in a closed session: it can't change any more
+    summary: str
+    doc: dict | None  #: the summary itself, when ``done``
+    sealed_at: str | None
+
+
+def segment_states(paths: SessionPaths, lifecycle: list[dict]) -> list[SegmentState]:
+    """Every existing segment's :class:`SegmentState`, in index order — the one place this rule lives."""
+    indices = paths.segment_indices()
+    closed = session_status(lifecycle)[0] == "closed"
+    buckets = by_segment(lifecycle)
+    full = schema.load("segment-summary")
+    out = []
+    for index in indices:
+        boundary = fold_boundary(buckets.get(index, []))
+        seal = boundary.last_seal
+        status, doc = boundary.summary["status"], None
+        if status == "done":
+            doc = read_json(paths.segment(index).summary)
+            if not isinstance(doc, dict) or schema.validate(doc, full):
+                status, doc = "unreadable", None
+            elif seal is None or doc["input"]["range"]["end"] != seal["data"]["end"]:
+                status, doc = "stale", None
+        out.append(SegmentState(index, seal is not None and (closed or index < indices[-1]), status, doc,
+                                seal["ts"] if seal else None))
+    return out
+
+
+def _current_session_json(paths: SessionPaths) -> dict | None:
+    return read_projection(paths.session_json, SESSION_SCHEMA, bytes_before=file_size(paths.lifecycle))
+
+
+def segment_docs(paths: SessionPaths, lifecycle: Log, *, trusted: bool | None = None) -> list[dict]:
+    """Each segment's ``segment.json``, or the same document folded from its logs when the file can't be trusted.
+
+    A ``segment.json`` folds two logs, but its watermark covers only its
+    activity log. :func:`refresh` writes the segments before ``session.json``,
+    so a current ``session.json`` vouches for every segment's lifecycle side;
+    when it isn't current (``trusted`` False: a lost refresh after a seal or a
+    summary event), every segment is folded from its logs.
+    """
+    trusted = _current_session_json(paths) is not None if trusted is None else trusted
+    buckets, transcripts = by_segment(lifecycle.events), segment_transcript_paths(lifecycle.events)
+    out = []
+    for index in paths.segment_indices():
+        doc = read_projection(paths.segment(index).segment_json, SEGMENT_SCHEMA,
+                              bytes_before=file_size(paths.segment(index).events)) if trusted else None
+        out.append(doc if doc is not None else project_segment(
+            paths.sid, index, buckets.get(index, []), load_activity(paths, index), transcript_path=transcripts[index]))
+    return out
+
+
+def session_doc(paths: SessionPaths, lifecycle: Log | None = None) -> dict:
+    """``session.json``, or the same document folded from the log when the file can't be trusted. Writes nothing."""
+    doc = _current_session_json(paths)
+    if doc is not None:
+        return doc  # valid and current: it covers every byte of its log (a lost refresh falls through)
+    lifecycle = load_lifecycle(paths) if lifecycle is None else lifecycle
+    return project_session(paths.sid, lifecycle, segment_docs(paths, lifecycle, trusted=False),
+                           transcript_path=transcript_path_of(lifecycle.events))

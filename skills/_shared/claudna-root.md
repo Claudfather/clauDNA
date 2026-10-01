@@ -2,7 +2,7 @@
 
 Shared reference for skills that run a bundled script, or that forward a `_shared` path to another agent. Skills reference this file at `../_shared/claudna-root.md`.
 
-`<claudna-root>` stands for the directory that holds this plugin's `skills/` and `scripts/`. A bundled script is written `<claudna-root>/scripts/<name>`. A `_shared` doc named in text that leaves its file before anyone reads it is written `<claudna-root>/skills/_shared/<path>`. Resolve it before you run or forward anything:
+`<claudna-root>` stands for the directory that holds this plugin's `skills/`, `scripts/` and `lib/`. A bundled script is written `<claudna-root>/scripts/<name>`, and a `lib/` entry point `<claudna-root>/lib/<path>`. A `_shared` doc named in text that leaves its file before anyone reads it is written `<claudna-root>/skills/_shared/<path>`. Resolve it before you run or forward anything:
 
 <!-- claudna-root:begin -->
 Use the first of these candidates that contains the file you need:

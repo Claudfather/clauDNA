@@ -165,6 +165,16 @@ class TestSummarize:
         assert summarize.summarize(sealed, 1, env={}, runner=runner) == "ignored: already summarized"
         assert runner.calls == []
 
+    def test_an_invalid_summary_over_the_same_input_is_rebuilt_not_ignored(self, sealed):
+        """Else harvest's retry of an unreadable summary is a no-op forever: no new request, so no attempt cap."""
+        summarize.summarize(sealed, 1, env={}, runner=FakeRunner())
+        path = sealed.paths.segment(1).dir / "summary.json"
+        doc = json.loads(path.read_text())
+        path.write_text(json.dumps({**doc, "blocks": [{"home": "galaxy", "claim": "x"}]}))  # provenance intact
+        runner = FakeRunner()
+        assert summarize.summarize(sealed, 1, env={}, runner=runner).startswith("summarized")
+        assert len(runner.calls) == 1
+
     def test_an_invalid_result_is_a_failure_and_writes_nothing(self, sealed):
         bad = {**GOOD_OUTPUT, "blocks": [{"home": "galaxy", "claim": "x"}]}
         out = summarize.summarize(sealed, 1, env={}, runner=FakeRunner(output=bad))
@@ -216,7 +226,7 @@ class TestSummarize:
         assert summarize.summarize(h, 9, env={}, runner=FakeRunner()) == "ignored: no segment 9"
 
     def test_one_summarizer_per_segment(self, sealed):
-        with exclusive_lock(sealed.paths.segment(1).dir / ".summarize.lock", blocking=False) as taken:
+        with exclusive_lock(sealed.paths.segment(1).summarize_lock, blocking=False) as taken:
             assert taken
             out = summarize.summarize(sealed, 1, env={}, runner=FakeRunner())
         assert out == "ignored: another summarizer holds the segment"
@@ -402,3 +412,24 @@ class TestRegressionsThatBite:
         out = summarize.summarize(h, 1, env={}, runner=FakeRunner(output={**GOOD_OUTPUT, **oversize}))
         assert out.startswith("failed: invalid summary")
         assert not (h.paths.segment(1).dir / "summary.json").exists()
+
+
+
+def test_a_worker_crash_is_logged_under_its_own_request(store, tmp_path):
+    """#387 review: a crash after summary.requested ends that request, not a second phantom attempt."""
+    from claudna.session_store import project, summarize
+
+    path = tmp_path / "t.jsonl"
+    write_transcript(path, DIALOGUE)
+    h = store.session("s1")
+    h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path=str(path), harvest=OPTED_IN)
+    h.open_segment("session_open", 0)
+    h.seal_segment(path.stat().st_size, "precompact")
+
+    def crash(*a, **k):
+        raise KeyError("boom")  # not a SummarizerError
+
+    summarize.summarize(h, 1, env={}, runner=crash)
+    events = [e for e in project.load_lifecycle(h.paths).events if e["kind"].startswith("summary.")]
+    assert [e["kind"] for e in events] == ["summary.requested", "summary.failed"]
+    assert events[0]["data"]["job_id"] == events[1]["data"]["job_id"]

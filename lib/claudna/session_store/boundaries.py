@@ -88,12 +88,16 @@ def origin_from_cwd(cwd: str) -> dict:
 
     repo = branch = head = None
     try:
-        out = subprocess.run(
+        proc = subprocess.run(
             ["git", "-c", "core.fsmonitor=", "rev-parse", "--show-toplevel", "HEAD", "--abbrev-ref", "HEAD"],
-            cwd=cwd, capture_output=True, text=True, timeout=1, check=True,
-        ).stdout.splitlines()
-        if len(out) == 3:  # the top level, the sha, then the branch (--abbrev-ref applies to later args only)
+            cwd=cwd, capture_output=True, text=True, timeout=1,
+        )
+        out = proc.stdout.splitlines()
+        # The top level comes first and is printed even when HEAD can't resolve (a repo with no
+        # commits yet): the repo is known then, its sha and branch aren't.
+        if out and os.path.isabs(out[0]):
             repo = os.path.basename(out[0]) or None
+        if proc.returncode == 0 and len(out) == 3:  # then the sha, then the branch (--abbrev-ref: later args)
             head = out[1]
             branch = None if out[2] == "HEAD" else out[2]  # "HEAD" means detached
     except (OSError, subprocess.SubprocessError):
@@ -281,24 +285,26 @@ def _facts(handle: SessionHandle) -> SessionFacts:
 
 
 def _inherited(event: str, payload: dict, facts: SessionFacts, env: Mapping[str, str]) -> bool:
-    """Is this hook a nested ``claude`` reusing an open session's id? (spec §11.5)
+    """Is this hook a nested ``claude`` reusing an existing session's id? (spec §11.5)
 
     A nested child inherits ``CLAUDE_CODE_SESSION_ID`` — and its entrypoint,
     except that a ``cli`` parent's child reports ``sdk-cli`` — so its hooks can
-    look like the parent's. Three checks, any one enough:
+    look like the parent's. Three checks, any one enough, whether the parent is
+    still open or already closed (a child can outlive its parent's SessionEnd):
 
     * **Another Claude Code process.** Claude Code exports ``CLAUDE_PID`` to
-      what it runs; a hook whose ``CLAUDE_PID`` differs from the one the open
+      what it runs; a hook whose ``CLAUDE_PID`` differs from the one the
       session recorded belongs to someone else.
-    * **A fresh start of an open session.** ``startup``, ``clear`` or ``fork``
-      never reopens a session that is already open — only a child can.
+    * **A fresh start of an existing session.** ``startup``, ``clear`` and
+      ``fork`` each begin a new session id, so one naming a session the store
+      already has can only be a child.
     * **Another entrypoint** (the phase 2 check; kept for sessions opened
       before ``claude_pid`` was recorded).
 
-    A ``resume`` is always let through: ``claude --resume`` of a session a crash
-    left open must reopen it, from whatever process.
+    A ``resume`` is always let through: ``claude --resume`` must reopen the
+    session, from whatever process, whether a crash left it open or it closed.
     """
-    if facts.status != "open" or (event == "SessionStart" and payload.get("source") == "resume"):
+    if facts.status == "unknown" or (event == "SessionStart" and payload.get("source") == "resume"):
         return False
     pid = claude_pid_of(env)
     if facts.claude_pid and pid and pid != facts.claude_pid:
@@ -335,14 +341,18 @@ def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str
 
     spawn = spawn or spawn_summarizer
     find_pid = find_pid or (lambda: claude_pid_of(env) or lineage.claude_pid())  # $CLAUDE_PID, else the walk
+    if event == "SessionStart" and payload.get("source") != "compact":
+        return _session_start(session, payload, env, spawn=spawn, find_pid=find_pid)
+    # A closed session's segments are final: never re-sealed, re-closed or extended by a compaction.
+    # A session the store never opened (enabled mid-session) gets no phantom segment either.
+    if facts.status != "open":
+        return "ignored: no open session"
     if event == "SessionStart":
         return _session_start(session, payload, env, spawn=spawn, find_pid=find_pid)
     if event == "PreCompact":  # seal only: the summary waits for SessionStart(compact) or SessionEnd
         trigger = payload.get("trigger") if payload.get("trigger") in _TRIGGERS else None
         return "segment sealed" if _seal(session, payload, sealed_by="precompact", trigger=trigger) is not None \
             else "ignored: no segment"
-    if facts.status != "open":
-        return "ignored: no open session"
     index = _seal(session, payload, sealed_by="session_end", trigger=None)
     reason = payload.get("reason") if payload.get("reason") in _CLOSE_REASONS else "other"
     session.close_session(reason)  # closed before anything that could fail after it (#373, M2)

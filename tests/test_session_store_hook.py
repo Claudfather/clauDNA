@@ -156,7 +156,7 @@ class TestBoundaries:
         assert segment(store, 1)["transcript"]["range"] == {"start": 100, "end": 100}
 
     def test_a_precompact_without_a_segment_records_nothing(self, store, transcript):
-        assert fire(store, "PreCompact", transcript, trigger="auto") == "ignored: no segment"
+        assert fire(store, "PreCompact", transcript, trigger="auto") == "ignored: no open session"
         assert not store.session(SID).paths.lifecycle.exists()
 
     def test_a_fork_opens_a_session(self, store, transcript):
@@ -209,6 +209,14 @@ class TestActorAndOrigin:
         subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "c"], check=True)
         origin = boundaries.origin_from_cwd(str(repo))
         assert (origin["repo"], origin["branch"], len(origin["head"])) == ("repo", "trunk", 40)
+
+    def test_a_repo_with_no_commits_yet_still_has_a_name(self, tmp_path):
+        """A fresh ``git init``: HEAD can't resolve, but the repo is known (harvest scopes drafts to it)."""
+        repo = tmp_path / "fresh"
+        repo.mkdir()
+        subprocess.run(["git", "-C", str(repo), "init", "-q"], check=True)
+        assert boundaries.origin_from_cwd(str(repo)) == {"cwd": str(repo), "repo": "fresh", "branch": None,
+                                                         "head": None}
 
     def test_the_origin_outside_a_repo_has_no_branch(self, tmp_path):
         assert boundaries.origin_from_cwd(str(tmp_path)) == {"cwd": str(tmp_path), "repo": None,
@@ -451,6 +459,46 @@ class TestNestedChildren:
         assert fire(store, "SessionStart", transcript, env=self.env("cli", 300), source="resume") == \
             "session opened (resume)"
         assert session(store)["status"] == "open" and store.session(SID).paths.segment_indices() == [1, 2]
+
+    @pytest.mark.parametrize("source", ["startup", "clear", "fork"])
+    def test_a_child_outliving_its_parent_cannot_reopen_it(self, store, transcript, source):
+        parent, child = self.env("cli", 100), self.env("sdk-cli", 200)
+        fire(store, "SessionStart", transcript, env=parent, source="startup")
+        fire(store, "SessionEnd", transcript, env=parent, reason="other")
+        assert fire(store, "SessionStart", transcript, env=child, source=source).startswith("ignored: nested")
+        assert session(store)["status"] == "closed" and store.session(SID).paths.segment_indices() == [1]
+
+    def test_a_child_outliving_its_parent_cannot_reseal_it(self, store, transcript):
+        parent, child = self.env("cli", 100), self.env("cli", 200)
+        fire(store, "SessionStart", transcript, env=parent, source="startup")
+        fire(store, "SessionEnd", transcript, env=parent, reason="other")
+        sealed = len(store.session(SID).paths.lifecycle.read_text().splitlines())
+        assert fire(store, "PreCompact", transcript, env=child, trigger="auto").startswith("ignored: nested")
+        assert fire(store, "SessionStart", transcript, env=child, source="compact").startswith("ignored: nested")
+        assert len(store.session(SID).paths.lifecycle.read_text().splitlines()) == sealed
+
+    def test_a_closed_sessions_precompact_never_reseals_even_without_pids(self, store, transcript):
+        fire(store, "SessionStart", transcript, source="startup")
+        fire(store, "SessionEnd", transcript, reason="other")
+        assert fire(store, "PreCompact", transcript, trigger="auto") == "ignored: no open session"
+
+    def test_a_compaction_never_opens_a_segment_in_a_closed_session(self, store, transcript):
+        fire(store, "SessionStart", transcript, source="startup")
+        fire(store, "SessionEnd", transcript, reason="other")
+        assert fire(store, "SessionStart", transcript, source="compact") == "ignored: no open session"
+        assert store.session(SID).paths.segment_indices() == [1]
+
+    def test_a_compaction_of_a_session_the_store_never_opened_makes_no_directory(self, store, transcript):
+        assert fire(store, "SessionStart", transcript, source="compact") == "ignored: no open session"
+        assert not store.session(SID).exists()
+
+    def test_a_resume_of_a_closed_session_from_another_process_reopens_it(self, store, transcript):
+        fire(store, "SessionStart", transcript, env=self.env("cli", 100), source="startup")
+        fire(store, "SessionEnd", transcript, env=self.env("cli", 100), reason="other")
+        assert fire(store, "SessionStart", transcript, env=self.env("cli", 300), source="resume") == \
+            "session opened (resume)"
+        assert fire(store, "SessionEnd", transcript, env=self.env("cli", 300), reason="other") == \
+            "session closed (other)"
 
     def test_the_owning_claude_pid_is_recorded(self, store, transcript):
         fire(store, "SessionStart", transcript, env=self.env("cli", 4242), source="startup")

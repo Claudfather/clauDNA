@@ -15,7 +15,12 @@ Hook adapters call this module; they never write store files themselves.
 
 from __future__ import annotations
 
+import contextlib
+import errno
+import os
+import shutil
 from pathlib import Path
+from typing import Iterator
 
 from . import events as ev
 from .fsio import DIR_MODE, append_jsonl, atomic_write_json, ensure_dir, exclusive_lock, file_size, read_json
@@ -69,9 +74,66 @@ class SessionHandle:
     # ── generic append ──────────────────────────────────────────────────────
 
     def _locked(self):
-        """The session lock — creating the session directory on first write."""
+        """The session lock — creating the session directory on first write.
+
+        The lock file lives in that directory and is never removed, so every
+        writer contends on one inode. A call that would be refused therefore
+        checks before it gets here when the session doesn't exist yet
+        (:meth:`_refuse_first_write`): a refused call never makes a directory.
+        """
         ensure_dir(self.paths.dir)
         return exclusive_lock(self.paths.lock)
+
+    @contextlib.contextmanager
+    def segment_lock(self, index: int) -> Iterator[str]:
+        """Try segment ``index``'s single-flight lock without waiting: yield ``taken``, ``busy`` or ``missing``.
+
+        The summarizer holds it while it works, and retention holds it while it
+        retires the segment, removing the directory (and so the lock file) under
+        it. ``missing`` covers both orders: the directory was already gone, or
+        it went while this caller waited to open the lock.
+        """
+        seg = self.paths.segment(index)
+        with contextlib.ExitStack() as stack:
+            try:
+                taken = stack.enter_context(exclusive_lock(seg.summarize_lock, blocking=False))
+            except OSError as exc:  # the directory went (or is going) as the lock was opened
+                if exc.errno not in (errno.ENOENT, errno.EINVAL, errno.ENOTDIR):
+                    raise
+                taken = None
+            yield "missing" if taken is None or (taken and not seg.dir.is_dir()) else "taken" if taken else "busy"
+
+    def retire_segment(self, index: int, reason: str, *, logged: bool = False) -> bool:
+        """Retire segment ``index`` (retention): log ``segment.retired``, take its directory out of the namespace.
+
+        The caller holds the segment's lock (no summarizer is writing) and has
+        already archived its summary, durably. Under the session lock, so no
+        hook's refresh can recreate a file in the directory as it goes: the
+        event is logged unless ``logged`` (the caller's snapshot shows an
+        interrupted earlier retirement), then the directory is renamed (atomic)
+        to a husk, deleted after the lock is released. Returns whether this
+        call logged the retirement.
+        """
+        seg = self.paths.segment(index)
+        with self._locked():
+            if not seg.dir.is_dir():
+                return False
+            if not logged:
+                self._append_locked("segment.retired", {"reason": reason}, seg=index)
+            husk = self.paths.husk(index, os.urandom(4).hex())
+            os.replace(seg.dir, husk)
+        shutil.rmtree(husk, ignore_errors=True)  # a failure leaves a husk outside the namespace: swept later
+        return not logged
+
+    def _refuse_first_write(self, kind: str, data: dict, *, seg: int | None) -> None:
+        """For a session with no directory: raise now whatever the locked append would refuse."""
+        if self.exists():
+            return  # decided under the lock, as always
+        if ev.REGISTRY[kind].seg:  # a session with no directory has no segment
+            if seg is None or ev.REGISTRY[kind].log == ev.ACTIVITY:
+                raise NotAppendable(f"session {self.sid} has no segment for {kind}")
+            raise StoreError(f"segment {seg} does not exist for session {self.sid}")
+        ev.check_data(kind, ev.cap_text(kind, data))
 
     def append(self, kind: str, data: dict, *, seg: int | None = None) -> dict:
         """Append one event to the log its kind belongs to, then re-project.
@@ -82,6 +144,7 @@ class SessionHandle:
         spec = ev.REGISTRY.get(kind)
         if spec is None:
             raise ev.EventError(f"unknown event kind: {kind}")
+        self._refuse_first_write(kind, data, seg=seg)
         with self._locked():
             current = None
             if spec.seg and (seg is None or spec.log == ev.ACTIVITY):
@@ -202,6 +265,8 @@ class SessionHandle:
         ev.check_data("segment.opened", {"opened_by": opened_by, "start": start})  # before any side effect
         with self._locked():
             lifecycle = load_lifecycle(self.paths).events
+            if session_facts(lifecycle).status == "closed":  # the root of the 0.22 bug: a closed session's segments
+                raise StoreError(f"session {self.sid} is closed; a resume reopens it first")  # are final
             previous = self.current_segment()
             if previous is not None:
                 before = self.boundary(previous, lifecycle)
@@ -238,6 +303,8 @@ class SessionHandle:
         summarizer nonsense. ``clamp=True`` raises ``end`` to the start instead
         of refusing: for a hook whose transcript size is unknown or behind.
         """
+        if not self.exists():
+            raise StoreError(f"session {self.sid} has no segment to seal")
         with self._locked():
             target = index if index is not None else self.current_segment()
             if target is None:
@@ -264,6 +331,8 @@ class SessionHandle:
         still owned by that (dead) process. Returns the index it sealed, or
         ``None`` when no segment was left unsealed.
         """
+        if not self.exists():
+            raise StoreError(f"session {self.sid} is not open")
         with self._locked():
             lifecycle = load_lifecycle(self.paths).events
             facts = session_facts(lifecycle)
@@ -271,17 +340,36 @@ class SessionHandle:
                 raise StoreError(f"session {self.sid} is not open")
             if owner_pid is not None and facts.claude_pid != owner_pid:
                 raise StoreError(f"session {self.sid} was resumed by another process; left open")
-            index = self.current_segment()
-            sealed = None
-            if index is not None:
-                boundary = self.boundary(index, lifecycle)
-                if not boundary.sealed:
-                    end = max(file_size(segment_transcript_paths(lifecycle)[index]), boundary.start or 0)
-                    self._append_locked("segment.sealed", {"end": end, "sealed_by": "abandoned", "trigger": None},
-                                        seg=index)
-                    sealed = index
+            sealed = self._seal_open_locked(lifecycle)
             self._append_locked("session.closed", {"reason": "abandoned"}, seg=None)
             return sealed
+
+    def _seal_open_locked(self, lifecycle: list[dict]) -> int | None:
+        """Seal the current segment at its transcript's size as ``abandoned``, if it is unsealed; the lock is held."""
+        index = self.current_segment()
+        if index is None:
+            return None
+        boundary = self.boundary(index, lifecycle)
+        if boundary.sealed:
+            return None
+        end = max(file_size(segment_transcript_paths(lifecycle)[index]), boundary.start or 0)
+        self._append_locked("segment.sealed", {"end": end, "sealed_by": "abandoned", "trigger": None}, seg=index)
+        return index
+
+    def seal_after_close(self) -> int | None:
+        """Seal, as ``abandoned``, a *closed* session's last segment left unsealed; the index sealed, or ``None``.
+
+        A repair: 0.22 could open a segment after a close (since refused), and
+        such a segment is never final, so it would never be summarized,
+        exported or retired. Decided under the lock; idempotent.
+        """
+        if not self.exists():
+            return None
+        with self._locked():
+            lifecycle = load_lifecycle(self.paths).events
+            if session_facts(lifecycle).status != "closed":
+                return None
+            return self._seal_open_locked(lifecycle)
 
     def link_child(self, child_sid: str) -> dict:
         return self.append("session.child_linked", {"child_sid": child_sid})
@@ -300,8 +388,10 @@ class SessionHandle:
     def ack(self, consumer: str, through: int) -> None:
         """Record, under the lock, that ``consumer`` has taken every segment up to ``through``.
 
-        The one writer of ``consumers.json``: harvest and (later) ``session
-        export --ack`` both come through here. A cursor never moves back.
+        The one writer of ``consumers.json``: harvest and ``session export
+        --ack`` both come through here. A cursor never moves back. The write is
+        fsynced: the acks are the one file ``rebuild`` can't regenerate (no log
+        records them), and a lost ack re-exports or re-harvests work.
         """
         with self._locked():
             doc = read_json(self.paths.consumers)
@@ -309,7 +399,7 @@ class SessionHandle:
                 doc = {"schema": "claudna.consumers/1", "sid": self.sid, "consumers": {}}
             if through > self.cursor(consumer):
                 doc["consumers"][consumer] = {"through_seg": through, "acked_at": ev.now_ts()}
-                atomic_write_json(self.paths.consumers, doc)
+                atomic_write_json(self.paths.consumers, doc, durable=True)
 
     def rebuild(self) -> RebuildReport:
         """Regenerate projections from the logs (read-only with respect to logs)."""

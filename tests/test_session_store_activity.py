@@ -12,7 +12,7 @@ What these guard:
 * **Async-safe.** An activity hook with no open session (it raced SessionEnd)
   records nothing and logs nothing; a nested child's is ignored.
 * **Telemetry** keeps Claudosseum's line shape, with real values, independent of
-  the store, and is pruned by the sweep.
+  the store, and prunes itself from its own hook (at most once a day), not the sweep.
 """
 
 from __future__ import annotations

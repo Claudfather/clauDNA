@@ -207,6 +207,60 @@ def _log_hook_error(root: Path | None, event: str, exc: BaseException) -> None:
         print(f"session_store hook {event}: {type(exc).__name__}: {exc}", file=sys.stderr)
 
 
+def _export(args) -> int:
+    """The export door (spec §8): the envelope, or an ack."""
+    from . import export
+
+    store = _store(args)
+    if store is None:
+        return 1
+    try:
+        if args.ack:
+            if args.sid is None or args.through is None:
+                raise ValueError("--ack needs --sid and --through")
+            cursor = export.ack(store, args.consumer, args.sid, args.through)
+            print(json.dumps({"consumer": args.consumer, "sid": args.sid, "through_seg": cursor}))
+        else:
+            print(json.dumps(export.export(store, args.consumer, since_seg=args.since_seg, limit=args.limit)))
+    except (LookupError, InvalidSessionId, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _read(args) -> int:
+    """The reader verbs (spec §8): data from readers.py, printed as text or JSON."""
+    from . import readers
+
+    store = _store(args)
+    if store is None:
+        return 1
+    unreadable: list[str] = []
+    try:
+        if args.verb == "list":
+            data = readers.list_sessions(store, since=args.since, repo=args.repo, bot=args.bot, limit=args.limit,
+                                         include_private=args.include_private, unreadable=unreadable)
+        elif args.verb == "show":
+            data = readers.show(store, args.sid)
+        elif args.verb == "timeline":
+            data = readers.timeline(store, args.sid)
+        else:
+            data = readers.failures(store, args.sid, group=args.group, since=args.since,
+                                    include_private=args.include_private, unreadable=unreadable)
+    except (LookupError, InvalidSessionId, ValueError, OSError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    if unreadable:
+        print(f"warning: {len(unreadable)} session(s) could not be read (permissions?): {', '.join(unreadable[:5])}",
+              file=sys.stderr)
+    if args.json:
+        print(json.dumps(data, indent=2, sort_keys=True))
+    else:
+        for line in readers.render(args.verb, data, group=getattr(args, "group", False)):
+            print(readers.printable(line))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if argv[:1] == ["hook"] and len(argv) == 2:  # the hot path: no argparse
@@ -237,6 +291,49 @@ def main(argv: list[str] | None = None) -> int:
     swp = sub.add_parser("sweep", help="close unclosed sessions (open, idle, claude gone), oldest first",
                          parents=[rooted])
     swp.add_argument("--dry-run", action="store_true", help="list what would be closed; write nothing")
+    lst = sub.add_parser("list", help="sessions, newest first", parents=[rooted])
+    lst.add_argument("--since", help="7d, 12h, 2w, or an ISO date")
+    lst.add_argument("--repo")
+    lst.add_argument("--bot", help="a bot name or id")
+    lst.add_argument("--limit", type=int, default=50)
+    lst.add_argument("--json", action="store_true")
+    lst.add_argument("--include-private", action="store_true", help="also list private sessions (marked)")
+    for verb, text in (("show", "one session: its projection, segments, rollup and lineage"),
+                       ("timeline", "one session's lifecycle and activity, in time order")):
+        p = sub.add_parser(verb, help=text, parents=[rooted])
+        p.add_argument("sid")
+        p.add_argument("--json", action="store_true")
+    fails = sub.add_parser("failures", help="tool.failed events, newest first; --group folds by signature",
+                           parents=[rooted])
+    fails.add_argument("sid", nargs="?")
+    fails.add_argument("--group", action="store_true")
+    fails.add_argument("--since", help="7d, 12h, 2w, or an ISO date")
+    fails.add_argument("--json", action="store_true")
+    fails.add_argument("--include-private", action="store_true",
+                       help="across sessions, also fold in private ones (a named sid is always read)")
+    exp = sub.add_parser("export", help="what a consumer hasn't taken yet (claudna.export/1), or --ack",
+                         parents=[rooted])
+    exp.add_argument("--consumer", required=True)
+    exp.add_argument("--since-seg", type=int)
+    exp.add_argument("--limit", type=int, default=100)
+    exp.add_argument("--json", action="store_true", help="the envelope is always JSON; accepted for the contract")
+    exp.add_argument("--ack", action="store_true", help="record that the consumer took --sid through --through")
+    exp.add_argument("--sid")
+    exp.add_argument("--through", type=int)
+    dig = sub.add_parser("digest", help="drafts and held person facts awaiting a person's review",
+                         parents=[rooted])
+    dig.add_argument("--limit", type=int, default=5)
+    dig.add_argument("--json", action="store_true")
+    act = dig.add_mutually_exclusive_group()
+    act.add_argument("--promote", metavar="ITEM", help="promote a draft to verified (runs claudron), then take it off")
+    act.add_argument("--done", metavar="ITEM", help="take an item (a note path or a held fact's person: id) off")
+    dig.add_argument("--vault", help="with --promote/--done: the item's vault, as the digest gave it")
+    dig.add_argument("--outcome", choices=("promoted", "discarded", "kept"), help="with --done: what the person did")
+    rns = sub.add_parser("runs", help="the ops log: the store's background runs, newest first", parents=[rooted])
+    rns.add_argument("--kind", choices=("summarize", "harvest", "sweep"))
+    rns.add_argument("--since", help="7d, 12h, 2w, or an ISO date")
+    rns.add_argument("--limit", type=int, default=50)
+    rns.add_argument("--json", action="store_true")
     harv = sub.add_parser("harvest", help="write summarized blocks to the vault as drafts (via claudron)",
                           parents=[rooted])
     harv.add_argument("--force", action="store_true", help="run even if the last run is recent")
@@ -253,8 +350,17 @@ def main(argv: list[str] | None = None) -> int:
         store = _store(args)
         if store is None:
             return 1
-        print(json.dumps(harvest.harvest(store, force=args.force).as_dict()))
+        from . import ops
+
+        with ops.run(store.root, "harvest") as rec:
+            report = harvest.harvest(store, force=args.force).as_dict()
+            rec["outcome"], rec["sessions"] = report.get("status") or "done", report.get("sessions") or []
+            rec["detail"] = {k: report.get(k) for k in ("created", "known", "held_back", "rejected", "retried",
+                                                        "gave_up", "segments", "errors")}
+        print(json.dumps(report))
         return 0
+    if args.verb in ("list", "show", "timeline", "failures"):
+        return _read(args)
     if args.verb == "sweep":
         from . import unclosed
 
@@ -265,9 +371,100 @@ def main(argv: list[str] | None = None) -> int:
         # The sweep acts for every session, so no session's summary override applies to the others:
         # each abandoned session is summarized only by its own recorded opt-in (the #373 B2 rule).
         own = {k: v for k, v in env.items() if k != SUMMARY_ENV}
-        report = unclosed.sweep(store, env, dry_run=args.dry_run,
-                                close=lambda h, pid: boundaries.abandon_session(h, own, owner_pid=pid))
-        print(json.dumps(report.as_dict()))
+        from . import ops
+
+        def close(h, pid):
+            return boundaries.abandon_session(h, own, owner_pid=pid)
+
+        if args.dry_run:
+            report = unclosed.sweep(store, env, dry_run=True, close=close).as_dict()
+        else:
+            from . import retention
+
+            with unclosed.sweep_lock(store.root) as taken:
+                if not taken:  # another sweep is running: neither half runs twice (#387 review S1)
+                    print(json.dumps({"status": "skipped", "reason": "another sweep is running"}))
+                    return 0
+                with ops.run(store.root, "sweep") as rec:
+                    report = unclosed.sweep(store, env, close=close, locked=True).as_dict()
+                    # retention (spec §9) rides the same detached, debounced worker, under the same lock
+                    report["retention"] = retention.sweep(store, env).as_dict()
+                    retired = report["retention"]["retired"]
+                    errors = report["errors"] + report["retention"]["errors"]
+                    rec.update(outcome="error" if errors else "done",
+                               sessions=report["closed"] + [r.split("/", 1)[0] for r in retired],
+                               detail={"closed": len(report["closed"]), "retired": len(retired),
+                                       "repaired": len(report["retention"]["repaired"]), "errors": errors[:5]})
+        print(json.dumps(report))
+        return 0
+    if args.verb == "runs":
+        store = _store(args)
+        if store is None:
+            return 1
+        from . import ops, readers
+
+        try:
+            since = readers.since_cutoff(args.since)
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        found = ops.runs(store.root, kind=args.kind, since=since, limit=args.limit)
+        if args.json:
+            print(json.dumps(found, indent=2))
+        else:
+            for r in found:
+                who = f"  {len(r['sessions'])} session(s)" if r["sessions"] else ""
+                print(f"{r['started_at']}  {r['kind']:9} {r['duration_ms']:>7} ms  {r['outcome']}{who}")
+            if not found:
+                print("no runs")
+        return 0
+    if args.verb == "export":
+        return _export(args)
+    if args.verb == "digest":
+        from . import digest, readers
+
+        store = _store(args)
+        if store is None:
+            return 1
+        item = args.promote or args.done
+        if args.vault and not item:
+            print("error: --vault only goes with --promote or --done", file=sys.stderr)
+            return 2
+        if args.done and not args.outcome:
+            print("error: --done needs --outcome (promoted, discarded or kept)", file=sys.stderr)
+            return 2
+        if item:
+            try:
+                match = digest.find(store.root, item, args.vault)
+            except LookupError as exc:
+                print(f"error: {exc}", file=sys.stderr)
+                return 1
+            outcome = "promoted" if args.promote else args.outcome
+            if args.promote:
+                if match.kind != "draft":
+                    print("error: only a draft is promoted; a person fact is captured, then --done", file=sys.stderr)
+                    return 1
+                from . import claudron
+
+                try:
+                    claudron.promote(item, args.vault, os.environ)
+                except claudron.PromoteError as exc:
+                    print(f"error: {exc}", file=sys.stderr)  # not marked reviewed: it stays in the digest
+                    return 1
+            digest.mark_reviewed(store.root, item, outcome=outcome, vault=args.vault)
+            print(json.dumps({"item": item, "vault": args.vault, "outcome": outcome}))
+            return 0
+        found = [i.as_dict() for i in digest.items(store.root, limit=args.limit)]
+        if args.json:
+            print(json.dumps(found, indent=2))
+        else:
+            for n, i in enumerate(found, 1):
+                seen = f"{i['sessions']} session(s)" + (", user-asserted" if i["asserted_by"] == "user" else "")
+                title, claim = readers.printable(i["title"]), readers.printable(i["claim"] or "")
+                print(f"{n}. [{i['kind']}] {title}  ({seen})\n   {claim}\n   item: {i['item']}"
+                      + (f"  vault: {i['vault']}" if i["vault"] else ""))
+            if not found:
+                print("nothing to review")
         return 0
     handle = _handle(args)
     if handle is None:
@@ -285,12 +482,18 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{args.sid}: {'not ' if args.off else ''}private")
         return 0
     if args.verb == "summarize":
-        from . import summarize  # off the hook path: it pulls in hashlib, uuid and subprocess
+        from . import ops, summarize  # off the hook path: summarize pulls in hashlib, uuid and subprocess
 
-        print(summarize.summarize(handle, args.seg))
+        with ops.run(handle.paths.root, "summarize") as rec:
+            rec.update(sessions=[handle.sid], detail={"seg": args.seg})
+            outcome = rec["outcome"] = summarize.summarize(handle, args.seg)
+        print(outcome)
         return 0
     if args.verb == "rebuild":
+        from . import rollup  # the rollup is derived from summaries, not logs: rebuild regenerates it too
+
         report = handle.rebuild()
+        rollup.refresh(handle.paths)
         print(json.dumps(dataclasses.asdict(report)))
         return 0
     report = check_session(handle)

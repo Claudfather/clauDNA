@@ -1,6 +1,6 @@
 # Pre-registration: session-end summarizer comparison
 
-**Status:** proposed, 2026-09-30. The owner ratifies it (or edits it) **before** the observation period starts; after that it is frozen, and any change is a new pre-registration with its own date.
+**Status:** ratified by the owner as written, 2026-09-30, and frozen: any change is a new pre-registration with its own date. Arm B is therefore pinned to Claudlobby `main` as of 2026-09-30; its SHA goes in the results doc. The 3 battery bots are still to be named before the period starts.
 **Context:** session store spec §1.1 rule 4; [Claudlobby#1961](https://github.com/Claudfather/Claudlobby/issues/1961).
 
 ## Why pre-register

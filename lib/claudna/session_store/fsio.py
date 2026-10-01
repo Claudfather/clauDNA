@@ -2,8 +2,11 @@
 
 Everything the store writes is private to the user (dirs ``0700``, files
 ``0600``). Projections are written temp-then-``os.replace`` so a reader never
-sees a torn file; they are rebuildable, so they are not fsynced. Logs
-are the truth: appended one JSON object per line and fsynced. A reader tolerates
+sees a torn file; they are rebuildable, so they are not fsynced (``consumers.json``,
+which no log can regenerate, is written ``durable=True``). Logs are the truth:
+appended one JSON object per line, fsynced by default. Callers whose lines are
+derivable pass ``durable=False``: the store's activity logs (only lifecycle
+events are fsynced), telemetry and the runs log. A reader tolerates
 a torn final line (a writer killed mid-append) by skipping it, and the next
 append first terminates that fragment so the torn write can't swallow a good one.
 
@@ -20,6 +23,8 @@ from __future__ import annotations
 import contextlib
 import fcntl
 import json
+import calendar
+import math
 import os
 import time
 import tempfile
@@ -29,6 +34,24 @@ from pathlib import Path
 
 DIR_MODE = 0o700
 FILE_MODE = 0o600
+
+
+def epoch_of(ts: str) -> float:
+    """An envelope timestamp (UTC, ``…Z``) as epoch seconds: ``timegm``, never ``mktime``, so no local DST."""
+    return calendar.timegm(time.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S"))
+
+
+def env_number(env, name: str, default: float, *, minimum: float = 0.0) -> float:
+    """A float setting from ``env``, never below ``minimum``.
+
+    Unset, unparseable, negative or non-finite is the default: a typo must never
+    become 0 (a retention cap of 0 days would retire everything at once).
+    """
+    try:
+        value = float(env.get(name) or default)
+    except ValueError:
+        return default
+    return max(value, minimum) if math.isfinite(value) and value >= 0 else default
 
 
 def utc_seconds(epoch: float | None = None) -> str:
@@ -58,25 +81,38 @@ def ensure_dir(path: Path) -> Path:
     return path
 
 
-def atomic_write_json(path: Path, obj: object) -> None:
-    """Write ``obj`` as pretty JSON to ``path`` atomically, mode ``0600``.
+def atomic_write_text(path: Path, text: str, *, durable: bool = False) -> None:
+    """Write ``text`` to ``path`` atomically (temp file + ``os.replace``), mode ``0600``.
 
-    Atomic for readers, not crash-durable (no ``fsync``) — right for
-    projections, which ``rebuild`` regenerates. A file that must survive a
-    crash (e.g. export acks) should add a durable variant with its first caller.
-    ``path.parent`` must already exist.
+    Atomic for readers. Not crash-durable by default (no ``fsync``) — right for
+    projections, which ``rebuild`` regenerates. ``durable=True`` fsyncs the file
+    and its directory, for state no log can regenerate (``consumers.json``, an
+    archived summary). ``path.parent`` must already exist.
     """
     fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump(obj, fh, indent=2, sort_keys=True, ensure_ascii=False)
-            fh.write("\n")
+            fh.write(text)
+            if durable:
+                fh.flush()
+                os.fsync(fh.fileno())
         os.chmod(tmp, FILE_MODE)
         os.replace(tmp, path)
     except BaseException:
         with contextlib.suppress(FileNotFoundError):
             os.unlink(tmp)
         raise
+    if durable:
+        dfd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(dfd)
+        finally:
+            os.close(dfd)
+
+
+def atomic_write_json(path: Path, obj: object, *, durable: bool = False) -> None:
+    """Write ``obj`` as pretty JSON to ``path`` atomically (:func:`atomic_write_text`)."""
+    atomic_write_text(path, json.dumps(obj, indent=2, sort_keys=True, ensure_ascii=False) + "\n", durable=durable)
 
 
 def read_json(path: Path) -> object | None:
@@ -98,6 +134,11 @@ def file_size(path: Path | str | None) -> int:
 LOG_LIMIT = 1024 * 1024  #: a log past this size is rotated to ``<name>.old`` (one generation kept)
 
 
+def rotated(path: Path) -> Path:
+    """The one generation :func:`cap_log` keeps: ``<path>.old``."""
+    return path.with_name(path.name + ".old")
+
+
 def cap_log(path: Path, limit: int = LOG_LIMIT) -> Path:
     """Rotate ``path`` to ``<path>.old`` once it passes ``limit`` bytes; return ``path``.
 
@@ -106,7 +147,7 @@ def cap_log(path: Path, limit: int = LOG_LIMIT) -> Path:
     """
     try:
         if path.stat().st_size > limit:
-            os.replace(path, path.with_name(path.name + ".old"))
+            os.replace(path, rotated(path))
     except OSError:
         pass
     return path

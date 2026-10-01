@@ -109,6 +109,11 @@ class SegmentPaths:
     def summary(self) -> Path:
         return self.dir / "summary.json"
 
+    @property
+    def summarize_lock(self) -> Path:
+        """The segment's single-flight lock: one summarizer at a time, and retention waits for it."""
+        return self.dir / ".summarize.lock"
+
 
 @dataclass(frozen=True)
 class SessionPaths:
@@ -128,6 +133,26 @@ class SessionPaths:
     @property
     def session_json(self) -> Path:
         return self.dir / "session.json"
+
+    def archived_indices(self) -> list[int]:
+        """The indices of retired segments whose summary was archived, ascending (a directory listing, no reads)."""
+        archive = self.dir / "summaries"
+        if not archive.is_dir():
+            return []
+        found = (parse_seg_dirname(p.stem) for p in archive.iterdir() if p.suffix == ".json")
+        return sorted(i for i in found if i is not None)
+
+    HUSK_PREFIX = ".retired-"  #: a retired segment's directory, renamed out of the namespace until it is deleted
+
+    def husk(self, index: int, tag: str) -> Path:
+        return self.dir / f"{self.HUSK_PREFIX}{seg_dirname(index)}-{tag}"
+
+    def husks(self) -> list[Path]:
+        return sorted(self.dir.glob(f"{self.HUSK_PREFIX}seg-*")) if self.dir.is_dir() else []
+
+    def archived_summary(self, index: int) -> Path:
+        """Where a retired segment's summary is kept (retention, phase 6): the rollup reads it from here."""
+        return self.dir / "summaries" / f"{seg_dirname(index)}.json"
 
     @property
     def consumers(self) -> Path:

@@ -14,7 +14,8 @@
     "sealed_by",
     "transcript",
     "counts",
-    "summary"
+    "summary",
+    "projected_from"
   ],
   "additionalProperties": false,
   "properties": {

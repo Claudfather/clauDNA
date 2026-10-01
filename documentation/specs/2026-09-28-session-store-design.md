@@ -75,7 +75,7 @@ Not yet verified (open, §11): that PreCompact's transcript byte offset lines up
 
 ## 3. Principles
 
-- **P1 — Logs are truth; JSON files are projections.** Every `.json` in the store is rebuildable from the `.jsonl` logs beside it (`session rebuild <sid>`). A torn or deleted projection is a cache miss, never data loss.
+- **P1 — Logs are truth; JSON files are projections.** Every `.json` in the store is rebuildable from the `.jsonl` logs beside it (`session rebuild <sid>`). A torn or deleted projection is a cache miss, never data loss. **One exception:** `consumers.json` (§6.8). No log records an ack, so `rebuild` can't regenerate it; `SessionHandle.ack` writes it fsynced (file and directory) instead, since a lost ack re-harvests or re-exports work.
 - **P2 — One writer per file.** Hooks append events. The projector (same process, right after the append) rewrites projections via temp + `os.replace`. The summarizer writes only its own artifact, then appends an event announcing it.
 - **P3 — Reference, don't copy.** The transcript is never copied into the store. Segments point at it by path + byte range + content hash.
 - **P4 — Metadata by default.** Free text (prompts, stderr) is off unless opted in, and when on is scrubbed (`scripts/redact.py` rules) and capped. Capping happens in `make_event`, so no caller can forget it; redaction joins it there — one choke point — when free-text capture ships (phase 2 moves `redact.py` into `lib/claudna/`).
@@ -107,7 +107,7 @@ Identity hierarchy, each level stable across a different boundary:
 
 | Hook event | Store action |
 |---|---|
-| SessionStart `startup` / `resume` | `session.opened` (resume: reopen existing dir, open a new segment); `segment.opened`. If the previous segment is unsealed (a lost SessionEnd), `open_segment` seals it first at the new start, `sealed_by: "resume"`. |
+| SessionStart `startup` / `resume` | `session.opened` (resume: reopen existing dir, open a new segment); `segment.opened`. If the previous segment is unsealed (a lost SessionEnd), `open_segment` seals it first, `sealed_by: "resume"`: at the new segment's start when the transcript is the same file, at the old transcript's size when the resume moved to a new one. That seal is then summarized like any other (§7.1). |
 | SessionStart `clear` | `session.opened` with `parent_sid` from the clear link (§4.3); `segment.opened` |
 | SessionStart `fork` | `session.opened` for the new session id (`--fork-session`, `/fork`, `/branch`; Claude Code before v2.1.214 reported these as `resume`); `segment.opened`. Lineage to the source session is a phase 3 canary. |
 | UserPromptSubmit | `prompt.submitted` (segment events) |
@@ -123,7 +123,7 @@ Identity hierarchy, each level stable across a different boundary:
 
 ### 4.3 Clear lineage
 
-SessionEnd(`reason=clear`) writes `links/<claude-pid>.json` naming the ending session. The pid is `$CLAUDE_PID`, which Claude Code exports to its hooks; an ancestor walk to the process named `claude` is the fallback where it's missing. The next SessionStart(`source=clear`) from the same pid consumes it (reads, then deletes) and records `parent_sid`. The parent's `session.json` learns its child through a `session.child_linked` event appended to the parent's log. A link older than 60 s is ignored (stale). If no link is found, `parent_sid` is `null` — lineage is best-effort, never guessed.
+SessionEnd(`reason=clear`) writes `links/<claude-pid>.json` naming the ending session. The pid is `$CLAUDE_PID`, which Claude Code exports to its hooks; an ancestor walk to the first process whose name contains `claude` is the fallback where it's missing. The next SessionStart(`source=clear`) from the same pid consumes it (reads, then deletes) and records `parent_sid`. The parent's `session.json` learns its child through a `session.child_linked` event appended to the parent's log. A link older than 60 s is ignored (stale). If no link is found, `parent_sid` is `null` — lineage is best-effort, never guessed.
 
 Worker identity across a chain of sessions is `(actor.fleet, actor.bot_id)`. Clear links order sessions within a repo switch; restarts (process relaunch, SessionEnd without `reason=clear`) produce unlinked sessions, ordered by `opened_at` within the same bot. The store never guesses a `parent_sid` for a restart.
 
@@ -133,16 +133,16 @@ Worker identity across a chain of sessions is `(actor.fleet, actor.bot_id)`. Cle
 
 | Role | Content class | Owner | Events |
 |---|---|---|---|
-| `R-record` — the session store: boundaries, activity, segment summaries | behavior | **The front-end (clauDNA).** | SessionStart, PreCompact, PostToolUseFailure, UserPromptSubmit, SessionEnd |
+| `R-record` — the session store: boundaries, activity, segment summaries | behavior | **The front-end (clauDNA).** | SessionStart, PreCompact, UserPromptSubmit, PostToolUse (Skill), PostToolUseFailure, SessionEnd |
 
-Phase 2 wires SessionStart (every source), PreCompact and SessionEnd (with a 5 s `timeout`). UserPromptSubmit and PostToolUseFailure follow with activity (phase 4).
+SessionStart (every source), PreCompact and SessionEnd (with a 5 s `timeout`) run synchronously. The three activity hooks — UserPromptSubmit, PostToolUse (matcher `Skill`) and PostToolUseFailure — run `async`. Skill telemetry (`telemetry-emit.sh`) is a separate async entry on PostToolUse and PostToolUseFailure, both matcher `Skill`.
 
 `R-record` holds four invariants, so it can never collide with `R-sync` or `R-capture-prompt`:
 
 1. **Never touches the vault or git itself.** No store hook runs `claudron`, sync or capture, so there is no race with Claudron's bounded `sync --push` at SessionEnd. The one path to the vault is the harvest a SessionStart hook may start, detached (§7.2). It writes only through `claudron capture`, which Claudron serializes with its own `sync`: every vault mutator holds Claudron's cross-process flock (`docs/CLI_CONTRACT.md`, concurrency). Claudron reads the store only by pulling through `session export`, on its own schedule.
 2. **Never prompts, never blocks, emits no stdout.** The store's PreCompact handler is separate from `precompact-reflect.sh` (which holds `R-capture-prompt`) and only records a seal.
 3. **Returns in < 100 ms.** Anything heavier (the summarizer) detaches. Claude Code does not reliably wait for SessionEnd hooks, so a slow hook is a lost one.
-4. **Silent in children.** Exits 0 immediately under `CLAUDNA_SESSION_CHILD=1` (and Claudlobby's child marker once one ships — `CLAUDLOBBY_HOOK_CHILD` is proposed in [Claudlobby#1961](https://github.com/Claudfather/Claudlobby/issues/1961); none exists today), so no `claude -p` child records into — or summarizes — its parent. A nested `claude` that *inherits* its parent's session id (canary §11.5) can't touch the parent's session either. The open session records the `claude` process that opened it (`CLAUDE_PID`, which Claude Code exports to its hooks), and a hook from any other process is ignored, except a `resume`. A `startup`, `clear` or `fork` SessionStart never reopens an open session, and an entrypoint that differs from the recorded one still marks a child when no pid was recorded. A real child marker would still be the stronger signal where it exists.
+4. **Silent in children.** Exits 0 immediately under `CLAUDNA_SESSION_CHILD=1` (and Claudlobby's child marker once one ships — `CLAUDLOBBY_HOOK_CHILD` is proposed in [Claudlobby#1961](https://github.com/Claudfather/Claudlobby/issues/1961); none exists today), so no `claude -p` child records into — or summarizes — its parent. A nested `claude` that *inherits* its parent's session id (canary §11.5) can't touch the parent's session either. The open session records the `claude` process that opened it (`CLAUDE_PID`, which Claude Code exports to its hooks), and a hook from any other process is ignored, except a `resume`. A `startup`, `clear` or `fork` SessionStart that names a session the store already has, open or closed, is a child's and never reopens it; a `resume` always reopens, from any process. An entrypoint that differs from the recorded one still marks a child when no pid was recorded. A real child marker would still be the stronger signal where it exists.
 
 ## 5. Layout
 
@@ -214,22 +214,23 @@ Every line in every log:
 
 | kind | data |
 |---|---|
-| `session.opened` | `{ source: "startup"\|"clear"\|"resume"\|"fork", parent_sid: SessionId\|null, chain_id: SessionId, actor: Actor, origin: Origin, transcript_path: string\|null }` |
+| `session.opened` | `{ source: "startup"\|"clear"\|"resume"\|"fork", parent_sid: SessionId\|null, chain_id: SessionId, actor: Actor, origin: Origin, transcript_path: string\|null, claude_pid?: int ≥ 1\|null, harvest?: { enabled: bool, vault: string\|null } }`. `claude_pid` is the owning Claude Code process (§4.4 invariant 4); `harvest` is the session's own opt-in and vault, recorded at open (§7.2) |
 | `session.child_linked` | `{ child_sid: SessionId }` |
 | `session.privacy_set` | `{ private: bool, by: "user"\|"policy" }` |
 | `segment.opened` | `{ opened_by: "session_open"\|"compact", start: int }` |
-| `segment.sealed` | `{ end: int ≥ start, sealed_by: "precompact"\|"compact"\|"session_end"\|"resume", trigger: "manual"\|"auto"\|null, sha256?: hex64\|null }` |
+| `segment.sealed` | `{ end: int ≥ start, sealed_by: "precompact"\|"compact"\|"session_end"\|"resume"\|"abandoned", trigger: "manual"\|"auto"\|null, sha256?: hex64\|null }` |
+| `segment.retired` | `{ reason: "acked"\|"age" }` — appended by retention (§9) before the segment's directory is removed |
 | `summary.requested` | `{ job_id: string }` |
 | `summary.completed` | `{ job_id: string, artifact: "seg-NNN/summary.json", input_sha256: string, duration_ms: int }` |
 | `summary.failed` | `{ job_id: string, error: string (≤200), retryable: bool }` |
 | `summary.skipped` | `{ reason: "private"\|"disabled"\|"trivial"\|"headless"\|"no_transcript" }` |
-| `session.closed` | `{ reason: "clear"\|"resume"\|"logout"\|"prompt_input_exit"\|"other" }` |
+| `session.closed` | `{ reason: "clear"\|"resume"\|"logout"\|"prompt_input_exit"\|"other"\|"abandoned" }`. `abandoned` is the store's own (`seal`, the sweep: a session whose SessionEnd never ran); a SessionEnd payload can't claim it |
 
 **Activity kinds** (`seg-NNN/events.jsonl`):
 
 | kind | data |
 |---|---|
-| `prompt.submitted` | `{ prompt_id: string\|null, chars: int, text: Text (≤500, off by default) }` |
+| `prompt.submitted` | `{ prompt_id: string\|null, chars: int, text?: Text (≤500, off by default) }` |
 | `skill.invoked` | `{ skill: string, args_chars: int, ok?: bool\|null, duration_ms?: int\|null, prompt_id?, tool_use_id? }` |
 | `tool.failed` | `{ tool: string, signature: string (≤200), exit_code: int\|null, duration_ms?, prompt_id?, tool_use_id? }`. `signature` is a stable grouping key (tool + the first real error line, normalized and redacted), computed at write time so readers group without re-parsing. **No copy of the command or its stderr** (phase 4 decision): `tool_use_id` points at the call in the transcript, which holds both. |
 | `tool.interrupted` | `{ tool: string, duration_ms?, prompt_id?, tool_use_id? }`. The user stopped the call: counted as `interrupts`, never as a failure. |
@@ -255,13 +256,13 @@ Every line in every log:
   "transcript_path": "/…/3fbb….jsonl",
   "opened_at": "…", "opened_by": "clear",
   "closed_at": null, "close_reason": null,
-  "segments": { "count": 2, "open": 2 },
+  "segments": { "count": 2, "open": 2, "retired": 0 },
   "summary": { "segments_done": 1, "segments_pending": 1, "segments_failed": 0, "segments_skipped": 0 },
   "projected_from": { "lines": 7, "bytes": 1432, "skipped": 0 }
 }
 ```
 
-`status`: `open` → `closed`. `segments.open` is the open segment's index or `null`. `projected_from` is a watermark: `session.json` carries the lifecycle log's (lines, bytes, skipped), each `segment.json` its activity log's. Before re-folding, a write compares the watermark with the log's size before its append; a mismatch means an earlier refresh never ran (a killed hook), and the store rebuilds. Every write checks `session.json` against the lifecycle log — activity appends included — so a lost lifecycle refresh is healed by the next write to either log; a lost activity refresh is healed by the next activity append. Until a write comes, `check` reports each projection whose watermark lags its log as a warning.
+`status`: `open` → `closed`. `segments.open` is the open segment's index or `null`; `segments.retired` counts segments retention has removed (§9). `projected_from` is a watermark: `session.json` carries the lifecycle log's (lines, bytes, skipped), each `segment.json` its activity log's. Before re-folding, a write compares the watermark with the log's size before its append; a mismatch means an earlier refresh never ran (a killed hook), and the store rebuilds. Every write checks `session.json` against the lifecycle log — activity appends included — so a lost lifecycle refresh is healed by the next write to either log; a lost activity refresh is healed by the next activity append. Until a write comes, `check` reports each projection whose watermark lags its log as a warning.
 
 ### 6.5 `segment.json` — projection
 
@@ -274,7 +275,7 @@ Every line in every log:
   "opened_at": "…", "opened_by": "compact",
   "sealed_at": "…", "sealed_by": "session_end",
   "transcript": { "path": "/…/3fbb….jsonl", "range": { "start": 48211, "end": 90377 }, "sha256": "…" },
-  "counts": { "prompts": 4, "skills": 2, "failures": 1, "checkpoints": 0 },
+  "counts": { "prompts": 4, "skills": 2, "failures": 1, "interrupts": 0, "checkpoints": 0 },
   "summary": { "status": "done", "job_id": "…" }
 }
 ```
@@ -337,12 +338,14 @@ No LLM. Recomputed from the `done` segment summaries on every `summary.completed
 | Field | Rule |
 |---|---|
 | `journey.title`, `journey.intent`, `journey.outcome` | latest segment's |
-| `journey.arc`, `journey.done`, `blocks`, `procedures`, `artifacts.*` | union across segments, dedup on normalized text (blocks: on `home` + subject + claim), keep `from_seg` |
+| `journey.arc`, `journey.done`, `blocks`, `procedures` | union across segments, dedup on normalized text (blocks: on `home` + subject + claim), keep `from_seg` |
 | `journey.in_progress`, `journey.next` | latest segment's only |
 
 ```json
 { "schema": "claudna.session-summary/2", "sid": "…", "through_seg": 2, "fields": { … }, "segments": [1, 2] }
 ```
+
+**As built (phase 6):** it's also recomputed on every retirement (a retired segment's summary is archived in `sessions/<sid>/summaries/` and still counts) and by `session_store rebuild <sid>`. With nothing left to roll up, the file is removed rather than left stale. `session show` computes a missing rollup in memory; `session list` reads the file only.
 
 ### 6.8 `consumers.json` — export cursors
 
@@ -361,10 +364,10 @@ Written only through the store's `SessionHandle.ack(consumer, through)`, under t
 ### 6.9 `links/<pid>.json` — clear handoff (ephemeral)
 
 ```json
-{ "schema": "claudna.clear-link/1", "pid": 4242, "sid": "533c…", "chain_id": "533c…", "ts": "…" }
+{ "schema": "claudna.clear-link/1", "pid": 4242, "sid": "533c…", "chain_id": "533c…", "ts": 1790615045.123 }
 ```
 
-Consumed and deleted by the next SessionStart(clear) from that pid; ignored after 60 s; stale links are deleted by the detached unclosed-session sweep.
+`ts` is a float epoch (`time.time()`), not a `Timestamp`: the link only needs an age check. Consumed and deleted by the next SessionStart(clear) from that pid; ignored after 60 s; stale links are deleted by the detached unclosed-session sweep.
 
 ## 7. Summarizer and harvest
 
@@ -372,12 +375,12 @@ Consumed and deleted by the next SessionStart(clear) from that pid; ignored afte
 
 A pure function of `(segment range, prior rollup) → segment summary`, run out of band.
 
-- **When:** once per seal, from the hook that knows the seal is final. SessionEnd spawns for its own seal. A PreCompact seal is spawned from the SessionStart(`compact`) that follows, because the capture hook blocks the first PreCompact attempt of each compaction and both attempts seal: spawning at PreCompact paid twice. A seal the store made itself (a resume after a crash, a missed PreCompact) is also spawned from SessionStart. In each case, only a sealed segment whose summary status is still `none` is spawned.
+- **When:** once per seal, from the hook that knows the seal is final. SessionEnd spawns for its own seal. A PreCompact seal is spawned from the SessionStart(`compact`) that follows, because the capture hook blocks the first PreCompact attempt of each compaction and both attempts seal: spawning at PreCompact paid twice. A seal the store made itself (a resume after a crash, a missed PreCompact) is also spawned from SessionStart. An `abandoned` seal is spawned by whoever closed the session: the sweep, or `session_store seal <sid>`, which applies the gates below with the environment of the shell that ran it (its `CLAUDNA_SESSION_SUMMARY` counts; the harvest opt-in is still the one the session recorded at open). In each case, only a sealed segment whose summary status is still `none` is spawned.
 - **How it runs:** the hook applies the gates below. If one is closed, it records `summary.skipped` itself and starts nothing. Otherwise it spawns a detached worker (`session_store summarize <sid> <seg>`) in its own session (Python's `start_new_session`, which works on macOS; the `setsid` binary does not ship there), so a group kill of the hook tree doesn't reap it. The hook returns immediately. The worker, not the hook, appends `summary.requested` when it starts the model call, so a skip never passes through `pending`.
 - **Child isolation:** the worker runs `claude -p` with an explicit fresh `--session-id` and `--no-session-persistence`. It passes `--setting-sources ""`, so no settings-registered hook fires in the child, clauDNA's or any other plugin's (Claudron's SessionEnd sync included). It also passes `--tools ""` and `--strict-mcp-config`, and sets `CLAUDNA_SESSION_CHILD=1`. The instructions go in `--system-prompt` and the transcript on stdin as untrusted data. `--json-schema` holds the output to `$defs.model_output`, the result is validated again before the write, and a hard timeout applies. `--bare` would isolate further but refuses OAuth, which breaks subscription users.
 - **Input:** the segment's transcript range, streamed and reduced to user/assistant prose (tool I/O, thinking and sidechains dropped), with injected context blocks stripped (including `<bash-input>`/`<bash-stdout>`/`<bash-stderr>`, which is how Claude Code records `!cmd` I/O as user text), redacted with `claudna.redact` turn by turn before the input cut, and framed as untrusted data. Phase 2 sends no prior rollup; it arrives with §6.7.
 - **Idempotent:** skips, before reading anything, when a `done` summary already covers the same transcript range with the same prompt version (the transcript is append-only). One worker per segment: a second finds the segment's lock taken.
-- **Gates:** skipped (`summary.status: skipped`) if the session is private, if `CLAUDNA_SESSION_SUMMARY=0`, if it is headless or a bot (unless `CLAUDNA_SESSION_SUMMARY=1`), if it didn't opt into harvest at open (`disabled`: in phase 2 a summary has no other reader), if the transcript is gone (`no_transcript`), or if the slice holds no user turn (`trivial`).
+- **Gates:** skipped (`summary.status: skipped`) if the session is private, if `CLAUDNA_SESSION_SUMMARY=0`, if it is headless or a bot, if it didn't opt into harvest at open (`disabled`: in phase 2 a summary has no other reader), if the transcript is gone (`no_transcript`), or if the slice holds no user turn (`trivial`). `CLAUDNA_SESSION_SUMMARY=1` overrides both the headless/bot gate and the harvest opt-in; only privacy, a missing transcript and a trivial slice still skip.
 - **Default:** off until a reader exists: on only for interactive sessions (`cli`, `claude-vscode`, `claude-desktop`; an allowlist, so any new automation entrypoint is headless) that opened with `CLAUDNA_HARVEST=1`. **Off for headless sessions** either way — every script, CI job, and other tool's `claude -p` would otherwise spawn a Haiku call at exit. Claudlobby sets `CLAUDNA_SESSION_SUMMARY` per bot (bots compact after every task, so they pay per task).
 - **Output:** the model's part is validated against `$defs.model_output` on its own, every string in it is redacted (the model can echo a secret the input redaction missed), and provenance (`sid`, `index`, `input`, `producer`) is merged last, so no key the model returns can stand in for it. Any worker exception is recorded as `summary.failed` (retryable), so harvest can retry it.
 
@@ -410,7 +413,7 @@ Harvest is the librarian: it turns segment **blocks** into vault notes organized
 
 Since the #373 review, harvest is also **per session**: it runs only for sessions that opened with `CLAUDNA_HARVEST=1`, captures each into the vault that session recorded (`--vault`, with `$CLAUDRON_VAULT_PATH` removed from the child), skips sessions outside a git repo (Claudron would file them in `vault.shared`), and prefixes each draft's title with `(unverified)`, since Claudron's own SessionStart brief shows drafts with only a `(knowledge, draft)` label. A run that found nothing debounces for 1 hour, not the full interval, and every run writes `last_run.json` even when a session raises.
 
-**Scheduling:** SessionStart, detached, after Claudron's `sync --pull` (fresh vault; outside SessionEnd's push window). Guards: a non-blocking `flock` on `~/.claudna/harvest/lock` (single-flight per host), a debounce in `~/.claudna/harvest/last_run.json` (run only if ≥ N hours since the last run **and** sealed unharvested segments exist), and a cursor per segment. On demand: `/claudna:capture --harvest`. Liveness — last run, last error — is shown on every SessionStart.
+**Scheduling:** SessionStart, detached, after Claudron's `sync --pull` (fresh vault; outside SessionEnd's push window). Guards: a non-blocking `flock` on `~/.claudna/harvest/lock` (single-flight per host), a debounce in `~/.claudna/harvest/last_run.json` (run only if ≥ `CLAUDNA_HARVEST_INTERVAL_H` hours, default 6, since the last run started; 1 hour when that run found nothing to take), and a cursor per segment. The SessionStart also needs `CLAUDNA_HARVEST=1` in its own environment and `claudron` on `PATH`. It doesn't check for unharvested segments first; the detached run finds out, and an empty run is what earns the short debounce. There is no harvest skill verb: the run is the detached `session_store harvest` worker the SessionStart starts when one is due, and `session_store harvest --force` runs it by hand, past the debounce. `/claudna:capture --review` is the person's step after it, over the digest. Liveness — last run, last error — is shown on every SessionStart.
 
 ## 8. Readers and the export door
 
@@ -436,10 +439,10 @@ Returns an envelope: `{ schema: "claudna.export/1", items: [{ sid, seg, session:
 
 ## 9. Retention
 
-- A segment is deletable once every registered consumer has acked it, or once it passes the hard cap (default 30 days), whichever comes first.
+- A segment is deletable once every registered consumer has acked it, or once it passes the hard cap (default 30 days), whichever comes first. **As built (phase 6), owner-approved 2026-09-30:** an acked segment also waits a 7-day floor (`CLAUDNA_RETAIN_ACKED_DAYS`), because harvest acks at once and would otherwise erase recent history. The rollup keeps what a retired segment summarized. A consumer is registered for a session by its first ack, so one that never ran holds nothing back. The exception, owner-decided 2026-10-01: a session opened with harvest enabled registers harvest from its first segment, so its segments wait for harvest even before harvest's first ack.
 - **An index is never reused.** `open_segment` numbers one past every index the session has ever named (directories *and* `segment.opened` events), so a new segment can't inherit a deleted one's lifecycle events, and export watermarks (`through_seg`) stay monotonic. When retention ships (phase 6) it records each deletion as a `segment.retired` lifecycle event before removing the directory, so a deletion is visible in the log rather than inferred from a missing directory.
 - Sessions with no registered consumers use the age cap alone.
-- Sweeping runs at SessionStart (bounded to a few ms of `stat` calls), never at SessionEnd.
+- Sweeping is started by SessionStart (one marker `stat`), and runs detached and debounced (at most every 6 hours) in the unclosed-session sweep. Never at SessionEnd.
 - Private sessions are swept on the same rules; they are never exported.
 
 ## 10. Implementation shape
@@ -448,7 +451,7 @@ Returns an envelope: `{ schema: "claudna.export/1", items: [{ sid, seg, session:
 - **Hosts:** the core (`paths`, `fsio`, `events`, `project`, `store`) is host-agnostic; only the hook adapter that maps a host's events onto store events is Claude Code-specific. The Cursor manifest ships no hooks, so on Cursor nothing is recorded — readers and harvest report "no session store on this host" rather than failing. A Cursor adapter can land later without touching the core.
 - **Modules:** `paths` (layout, id validation) · `fsio` (private dirs, atomic JSON, JSONL append/read, locks) · `transcript` (a transcript range as prose) · `schema` (stdlib JSON Schema subset) · `events` (kind registry) · `project` (log → projections, `rebuild`, `refresh`, session facts and the summary gate) · `store` (the write API) · `summarize` (the worker, phase 2) · `harvest` (the thin slice, phase 2) · `boundaries` (hook → action table in §4.2, phase 2) · `cli`. The redactor is `lib/claudna/redact.py`, shared with `scripts/redact.py`. Later phases add `readers` and `export`. Each module owns one concern; the hook table is data, not branching.
 - **Validation:** JSON Schemas in `lib/claudna/session_store/schemas/`, checked by `schema.py` — a stdlib JSON Schema subset that raises on any keyword it doesn't implement, so a schema can't silently ask for an unchecked rule. Tests pin a golden fixture byte-for-byte, a rebuild round trip, and incremental-equals-full refresh; drift gates keep the schemas and the registry in step (every kind fits the envelope's kind pattern, projection vocabularies match registry choices, one timestamp pattern everywhere, only supported keywords at every schema node). `check <sid>` runs the same validation on a live store, including placement (each event in the right session, log, and segment).
-- **`telemetry-emit.sh`:** migrates onto `skill.invoked` events; the old path stays as a deprecated alias for one release.
+- **`telemetry-emit.sh`:** stays as the telemetry gate. It checks `CLAUDNA_TELEMETRY=1` and calls the store's `telemetry` verb (`telemetry.py`), which decodes the Skill payload with the same code as `skill.invoked` and prunes its own file. It has its own hook entry so it works with the store off (phase 4 plan, decision 2).
 
 ## 11. Open questions and decisions
 
@@ -472,6 +475,6 @@ The loop closes first; everything else broadens a loop that already works.
 2. **Thin vertical slice** (shipped 2026-09-30) — the minimum that proves the loop end to end: SessionStart / PreCompact / SessionEnd boundaries → segment summary with `journey` + `blocks` → harvest (one capture per block; the plan model waits on Claudron#200) → one draft note written through Claudron (today's `claudron capture` until [Claudron#200](https://github.com/Claudfather/Claudron/issues/200)'s pipes land) → visible in the recall brief's Unverified block. Ugly is fine; closed is required. Includes the liveness line.
 3. **Boundaries, complete** — clear lineage, `chain_id`, child isolation (done early, in #373), unclosed sessions closed as `abandoned` by `session seal <sid>` and a detached `session sweep`. Canaries for §11.3–11.4. Plan: `documentation/plans/2026-09-30-session-store-phase-3.md`.
 4. **Activity** — `prompt.submitted`, `skill.invoked`, `tool.failed`, `tool.interrupted`; `telemetry-emit.sh` migrated into the store (`telemetry.py`). Plan: `documentation/plans/2026-09-30-session-store-phase-4.md`.
-5. **Harvest, complete** — risk tiers, inbox + ambiguous queues, evidence counting, `revert-run`, the promotion digest (`/claudna:capture --review`).
-6. **Readers + export** — `list`, `show`, `timeline`, `failures`; the export envelope and acks; retention sweep.
-7. **Ops log** — `~/.claudna/runs/` and per-session ops records, mirroring `.claudron/`.
+5. **Harvest, complete** — risk tiers, inbox + ambiguous queues, evidence counting, `revert-run`, the promotion digest (`/claudna:capture --review`). **Built, the clauDNA side:** the harvest ledger, evidence counting and the promotion digest. Still blocked on Claudron#200: subjects, the plan model, section writes, `revert-run`, risk tiers and the queues. Plan: `documentation/plans/2026-09-30-session-store-phases-5-7.md`.
+6. **Readers + export** — `list`, `show`, `timeline`, `failures`; the export envelope and acks; retention sweep. **Built**, with the §6.7 rollup.
+7. **Ops log** — `~/.claudna/runs/` and per-session ops records, mirroring `.claudron/`. **Built:** `runs/runs.jsonl`, one record per background run. Per-session history is the lifecycle log.

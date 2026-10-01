@@ -56,7 +56,8 @@ class KindSpec:
     a field to a closed vocabulary; ``caps`` bounds free-text fields (writers
     truncate, readers reject); ``constraints`` maps a field to a JSON Schema
     fragment its value must satisfy. ``seg`` says whether the envelope's ``seg``
-    must be set (``True``) or null (``False``).
+    must be set (``True``) or null (``False``). ``opens`` orders the kind
+    before same-millisecond activity in a timeline.
     """
 
     log: Literal["lifecycle", "activity"]
@@ -66,6 +67,9 @@ class KindSpec:
     choices: dict[str, tuple[object, ...]] = field(default_factory=dict)
     caps: dict[str, int] = field(default_factory=dict)
     constraints: dict[str, dict] = field(default_factory=dict)
+    #: A lifecycle kind that starts something: on a timestamp tie it precedes the activity it opens (the
+    #: timeline). Every other lifecycle kind (a seal, a close, a summary job) follows the activity it ends.
+    opens: bool = False
 
 
 _SESSION_DEFS = schema.load("session")["$defs"]
@@ -76,6 +80,7 @@ REGISTRY: dict[str, KindSpec] = {
     # ── lifecycle.jsonl: session scope ──────────────────────────────────────
     "session.opened": KindSpec(
         log=LIFECYCLE,
+        opens=True,
         seg=False,
         fields={
             "source": _STR,
@@ -96,9 +101,10 @@ REGISTRY: dict[str, KindSpec] = {
                                  "properties": {"enabled": {"type": "boolean"},
                                                 "vault": {"type": ["string", "null"], "minLength": 1}}}},
     ),
-    "session.child_linked": KindSpec(log=LIFECYCLE, seg=False, fields={"child_sid": _STR}),
+    "session.child_linked": KindSpec(log=LIFECYCLE, seg=False, fields={"child_sid": _STR}, opens=True),
     "session.privacy_set": KindSpec(
         log=LIFECYCLE,
+        opens=True,
         seg=False,
         fields={"private": _BOOL, "by": _STR},
         choices={"by": ("user", "policy")},
@@ -113,11 +119,16 @@ REGISTRY: dict[str, KindSpec] = {
     # ── lifecycle.jsonl: segment boundaries and summary jobs ────────────────
     "segment.opened": KindSpec(
         log=LIFECYCLE,
+        opens=True,
         seg=True,
         fields={"opened_by": _STR, "start": _INT},
         choices={"opened_by": ("session_open", "compact")},
         constraints={"start": _NON_NEGATIVE},
     ),
+    # Retention (spec §9): recorded before the segment's directory is removed, so a
+    # deletion is visible in the log rather than inferred from a missing directory.
+    "segment.retired": KindSpec(log=LIFECYCLE, seg=True, fields={"reason": _STR},
+                                choices={"reason": ("acked", "age")}),
     "segment.sealed": KindSpec(
         log=LIFECYCLE,
         seg=True,
