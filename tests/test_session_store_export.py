@@ -136,13 +136,22 @@ class TestRetention:
         retention.sweep(store, {}, now=self.later(31))
         assert h.open_segment("compact", 200) == 3
 
-    def test_a_time_budget_bounds_a_run_and_the_next_run_resumes(self, store):
-        for sid in ("s1", "s2"):
+    def test_a_time_budget_bounds_a_run_and_the_next_run_resumes_where_it_stopped(self, store, monkeypatch):
+        for sid in ("s1", "s2", "s3"):
             session_with(store, sid, ["done"])
-        ticks = iter([0.0, 0.0, 99.0])  # start, s1 within budget, s2 past it
-        report = retention.sweep(store, {}, now=self.later(31), budget_s=10, clock=lambda: next(ticks))
-        assert report.retired == ["s1/seg-001 (age)"] and "time budget" in report.errors[-1]
-        assert retention.sweep(store, {}, now=self.later(31)).retired == ["s2/seg-001 (age)"]
+        now, real = [0.0], retention.retire
+
+        def retire_then_run_out(handle, batch, **kw):
+            out = real(handle, batch, **kw)
+            now[0] = 99.0  # the first session's retirement spends the whole budget
+            return out
+
+        monkeypatch.setattr(retention, "retire", retire_then_run_out)
+        report = retention.sweep(store, {}, now=self.later(31), budget_s=10, clock=lambda: now[0])
+        assert report.retired == ["s1/seg-001 (age)"] and report.budget_spent and report.errors == []
+        monkeypatch.undo()
+        report = retention.sweep(store, {}, now=self.later(31))  # resumes at s2, not at the head of the list
+        assert report.retired == ["s2/seg-001 (age)", "s3/seg-001 (age)"] and not report.budget_spent
 
     def test_a_closed_session_left_with_an_unsealed_segment_is_repaired(self, store):
         """0.22 could open a segment after a close; never final, it would never be summarized or retired."""
@@ -271,7 +280,7 @@ class TestReviewRound387:
         h = session_with(store, "s1", ["done"])
         export.ack(store, "claudron", "s1", 1)
         retention.retire(h, [(1, "acked")])
-        monkeypatch.setattr(export, "_archived", lambda *a: pytest.fail("read an archive it didn't need"))
+        monkeypatch.setattr(export, "read_archived", lambda *a: pytest.fail("read an archive it didn't need"))
         assert export.export(store, "claudron")["items"] == []
 
     def test_an_ack_cannot_pass_the_open_segment(self, store):
@@ -307,3 +316,13 @@ def test_claim_keys_are_unicode_normalized():
         return rollup.dedup_key("blocks", {"home": "entity", "subject_hint": {"name": "x"}, "claim": claim})
 
     assert key(nfc) == key(nfd)
+
+
+
+def test_a_retired_segment_with_no_archive_passes_rather_than_vanishing(store):
+    """Retired with no summary to archive (skipped or never summarized): the log still says it's retired, so the
+    cursor passes it instead of the segment silently dropping out of the walk."""
+    h = session_with(store, "s1", ["skipped", "done"])
+    retention.retire(h, [(1, "age")])
+    env = export.export(store, "claudron")
+    assert [i["seg"] for i in env["items"]] == [2] and env["next"] == {"s1": 2}

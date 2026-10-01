@@ -29,7 +29,7 @@ writes, risk tiers, the inbox and ambiguous queues, and ``revert-run``.
 from __future__ import annotations
 
 import hashlib
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from claudna.redact import redact_strings
@@ -125,7 +125,16 @@ def evidence(root: Path, ledger: list[dict] | None = None,
 
 
 def items(root: Path, *, limit: int | None = DIGEST_SIZE) -> list[Item]:
-    """The digest: unreviewed drafts, most-reinforced first, then held person facts."""
+    """The digest: unreviewed drafts, most-reinforced first, then held person facts — redacted as they leave.
+
+    Redacted again here (a line written before a newer pattern, or by 0.22),
+    and only what is returned: never every ledger line.
+    """
+    return [replace(i, title=redact_strings(i.title), claim=redact_strings(i.claim)) for i in _pending(root, limit)]
+
+
+def _pending(root: Path, limit: int | None) -> list[Item]:
+    """:func:`items` before the read-side redaction (counting needs no redaction)."""
     ledger, held, done = _records(root)
     seen = evidence(root, ledger, held)
     drafts: dict[tuple[str | None, str], dict] = {}
@@ -133,8 +142,7 @@ def items(root: Path, *, limit: int | None = DIGEST_SIZE) -> list[Item]:
         path, vault = rec.get("path"), rec.get("vault")
         if rec.get("action") not in ("created", "updated") or not isinstance(path, str) or (vault, path) in done:
             continue  # a note is (vault, path): the same relative path in two vaults is two notes
-        d = drafts.setdefault((vault, path), {"title": redact_strings(rec.get("title") or path),
-                                              "claim": redact_strings(rec.get("claim")),  # again on read: old lines
+        d = drafts.setdefault((vault, path), {"title": rec.get("title") or path, "claim": rec.get("claim"),
                                               "vault": vault, "sessions": 0, "user": False, "last_ts": ""})
         d["sessions"] = max(d["sessions"], len(seen.get((vault, rec.get("key")), ())))
         d["user"] = d["user"] or rec.get("asserted_by") == "user"
@@ -148,15 +156,27 @@ def items(root: Path, *, limit: int | None = DIGEST_SIZE) -> list[Item]:
         key, block = rec.get("key"), rec.get("block") if isinstance(rec.get("block"), dict) else {}
         if not isinstance(key, str) or (None, item := person_item(key)) in done:
             continue
-        block = redact_strings(block)  # again on read: 0.22 held the block as summarized
         name = (block.get("subject_hint") or {}).get("name") or "person fact"
         people[key] = Item("person", item, name, block.get("claim"), None,
                            len(seen.get((rec.get("vault"), key), ())), block.get("asserted_by"), rec.get("ts") or "")
     persons = sorted(people.values(), key=lambda i: i.last_ts, reverse=True)
     if limit is not None and persons and len(ranked) >= limit:
-        return ranked[:limit - 1] + persons[:1]  # person facts are §7.2's high-risk items: one always shows
-    found = ranked + persons
-    return found if limit is None else found[:limit]
+        found = ranked[:limit - 1] + persons[:1]  # person facts are §7.2's high-risk items: one always shows
+    else:
+        found = ranked + persons if limit is None else (ranked + persons)[:limit]
+    return found
+
+
+def find(root: Path, item: str, vault: str | None) -> Item:
+    """The digest item ``item`` in ``vault``; ``LookupError`` naming the ``--vault`` it is under when that's wrong."""
+    pending = _pending(root, limit=None)  # matched on item and vault, which redaction never touches
+    match = next((i for i in pending if (i.item, i.vault) == (item, vault)), None)
+    if match is not None:
+        return match
+    vaults = sorted({"no vault (omit --vault)" if i.vault is None else f"--vault {i.vault}"
+                     for i in pending if i.item == item})
+    raise LookupError(f"no digest item {item!r} in vault {vault!r}" + (f"; it is under {', '.join(vaults)}" if vaults
+                                                                        else ""))
 
 
 def mark_reviewed(root: Path, item: str, *, outcome: str, vault: str | None = None) -> None:
@@ -175,7 +195,7 @@ def mark_reviewed(root: Path, item: str, *, outcome: str, vault: str | None = No
 
 def review_line(root: Path) -> str:
     """SessionStart's line about the digest, or ``""`` when there's nothing to review."""
-    pending = items(root, limit=None)
+    pending = _pending(root, limit=None)  # counted, never shown: no redaction pass
     drafts = [i for i in pending if i.kind == "draft"]
     if not pending:
         return ""

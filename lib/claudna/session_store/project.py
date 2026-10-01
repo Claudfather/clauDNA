@@ -194,6 +194,14 @@ def harvest_skip(facts: SessionFacts, lifecycle: list[dict]) -> str | None:
     return None
 
 
+HARVEST_CONSUMER = "harvest"  #: harvest's cursor name: one constant for harvest, retention and export
+
+
+def retired_indices(lifecycle: list[dict]) -> set[int]:
+    """The segments the log records as retired: the log, not a directory, says what's retired."""
+    return {e["seg"] for e in lifecycle if e["kind"] == "segment.retired"}
+
+
 #: A summary still ``pending`` this long after its request lost its worker (killed, machine asleep).
 STALE_PENDING_S = 15 * 60
 #: Summarizer attempts per segment before it is given up on (harvest stops retrying; export passes it).
@@ -343,7 +351,7 @@ def project_session(sid: str, lifecycle: Log, segments: list[dict], *, transcrip
             children.append(e["data"]["child_sid"])
     private = session_facts(lifecycle.events).private
 
-    retired = {e["seg"] for e in lifecycle.events if e["kind"] == "segment.retired"}
+    retired = retired_indices(lifecycle.events)
     segments = [s for s in segments if s["index"] not in retired]  # the log, not a directory, says what's retired
     tally = dict.fromkeys(_SUMMARY_STATUS.values(), 0)
     for s in segments:

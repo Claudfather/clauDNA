@@ -139,8 +139,16 @@ class SessionPaths:
         archive = self.dir / "summaries"
         if not archive.is_dir():
             return []
-        found = (parse_seg_dirname(p.name[:-5]) for p in archive.iterdir() if p.name.endswith(".json"))
+        found = (parse_seg_dirname(p.stem) for p in archive.iterdir() if p.suffix == ".json")
         return sorted(i for i in found if i is not None)
+
+    HUSK_PREFIX = ".retired-"  #: a retired segment's directory, renamed out of the namespace until it is deleted
+
+    def husk(self, index: int, tag: str) -> Path:
+        return self.dir / f"{self.HUSK_PREFIX}{seg_dirname(index)}-{tag}"
+
+    def husks(self) -> list[Path]:
+        return sorted(self.dir.glob(f"{self.HUSK_PREFIX}seg-*")) if self.dir.is_dir() else []
 
     def archived_summary(self, index: int) -> Path:
         """Where a retired segment's summary is kept (retention, phase 6): the rollup reads it from here."""

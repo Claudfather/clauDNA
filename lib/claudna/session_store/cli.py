@@ -434,27 +434,23 @@ def main(argv: list[str] | None = None) -> int:
             print("error: --done needs --outcome (promoted, discarded or kept)", file=sys.stderr)
             return 2
         if item:
-            pending = digest.items(store.root, limit=None)
-            match = next((i for i in pending if (i.item, i.vault) == (item, args.vault)), None)
-            if match is None:
-                vaults = sorted({"no vault (omit --vault)" if i.vault is None else f"--vault {i.vault}"
-                                 for i in pending if i.item == item})
-                hint = f"; it is under {', '.join(vaults)}" if vaults else ""
-                print(f"error: no digest item {item!r} in vault {args.vault!r}{hint}", file=sys.stderr)
+            try:
+                match = digest.find(store.root, item, args.vault)
+            except LookupError as exc:
+                print(f"error: {exc}", file=sys.stderr)
                 return 1
-            outcome = args.outcome
+            outcome = "promoted" if args.promote else args.outcome
             if args.promote:
                 if match.kind != "draft":
                     print("error: only a draft is promoted; a person fact is captured, then --done", file=sys.stderr)
                     return 1
-                from . import harvest
+                from . import claudron
 
                 try:
-                    harvest.run_claudron_promote(item, args.vault, os.environ)
-                except harvest.PromoteError as exc:
+                    claudron.promote(item, args.vault, os.environ)
+                except claudron.PromoteError as exc:
                     print(f"error: {exc}", file=sys.stderr)  # not marked reviewed: it stays in the digest
                     return 1
-                outcome = "promoted"
             digest.mark_reviewed(store.root, item, outcome=outcome, vault=args.vault)
             print(json.dumps({"item": item, "vault": args.vault, "outcome": outcome}))
             return 0

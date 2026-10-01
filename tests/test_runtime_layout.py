@@ -34,6 +34,7 @@ SESSION_STORE_LAYERS = {
     "schema": 0,
     "paths": 1,
     "fsio": 1,
+    "claudron": 1,
     "transcript": 1,
     "lineage": 2,
     "events": 2,

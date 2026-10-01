@@ -66,19 +66,15 @@ def list_sessions(store: SessionStore, *, since: str | None = None, repo: str | 
             if cutoff and _older_than(paths.lifecycle, cutoff):
                 continue  # its log hasn't changed since before the cutoff, so it opened before it too
             doc = session_doc(paths)
-            roll = _rollup(paths)
+            actor, origin = doc.get("actor") or {}, doc.get("origin") or {}
+            if (doc.get("private") and not include_private) or (cutoff and (doc.get("opened_at") or "") < cutoff) \
+                    or (repo and origin.get("repo") != repo) or (bot and bot not in (actor.get("bot_name"),
+                                                                                       actor.get("bot_id"))):
+                continue
+            roll = _rollup(paths)  # only for a row that is kept
         except OSError:
             if unreadable is not None:
                 unreadable.append(sid)
-            continue
-        if doc.get("private") and not include_private:
-            continue
-        actor, origin = doc.get("actor") or {}, doc.get("origin") or {}
-        if cutoff and (doc.get("opened_at") or "") < cutoff:
-            continue
-        if repo and origin.get("repo") != repo:
-            continue
-        if bot and bot not in (actor.get("bot_name"), actor.get("bot_id")):
             continue
         rows.append({
             "sid": sid, "opened_at": doc.get("opened_at"), "status": doc.get("status"),
@@ -154,12 +150,11 @@ def _failures(store: SessionStore, sids: Iterable[str], cutoff: str | None, *, s
     for sid in sids:
         paths = store.session(sid).paths
         try:
-            if skip_private and session_doc(paths).get("private"):
+            indices = [i for i in paths.segment_indices()  # untouched since before the cutoff: one stat, no read
+                       if not (cutoff and _older_than(paths.segment(i).events, cutoff))]
+            if not indices or (skip_private and session_doc(paths).get("private")):
                 continue  # signatures carry hosts, paths, repo URLs: never folded into another session's view
-            for index in paths.segment_indices():
-                events = paths.segment(index).events
-                if cutoff and _older_than(events, cutoff):
-                    continue  # untouched since before the cutoff: nothing in it can pass (one stat, no read)
+            for index in indices:
                 out += [{"sid": sid, "seg": index, "ts": e["ts"], **e["data"]}
                         for e in load_activity(paths, index).events if e["kind"] == "tool.failed"]
         except OSError:

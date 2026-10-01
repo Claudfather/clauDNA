@@ -102,8 +102,8 @@ def run_claude(system_prompt: str, dialogue: str, output_schema: dict, model: st
 
 def _open_request(handle: SessionHandle, index: int) -> str | None:
     """The job id of segment ``index``'s request no ``completed``/``failed``/``skipped`` has answered yet."""
-    events = [e for e in load_lifecycle(handle.paths).events if e["seg"] == index and e["kind"].startswith("summary.")]
-    return events[-1]["data"]["job_id"] if events and events[-1]["kind"] == "summary.requested" else None
+    summary = handle.boundary(index).summary
+    return summary.get("job_id") if summary["status"] == "pending" else None
 
 
 def summarize(handle: SessionHandle, index: int, *, env: Mapping[str, str] = os.environ,

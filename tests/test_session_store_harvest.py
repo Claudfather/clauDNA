@@ -213,6 +213,17 @@ class TestHarvest:
         harvest.harvest(store, env=ON, capture=FakeCapture(), resummarize=resummarize)
         assert calls == [2] and cursor(h) == 2
 
+    def test_an_unreadable_summary_is_given_up_on_after_its_attempts(self, store):
+        h = summarized_session(store, "s1", [[BLOCK], [BLOCK]])
+        atomic_write_json(h.paths.segment(2).dir / "summary.json", {"broken": True})
+        for n in range(project.MAX_ATTEMPTS):  # every rebuild came back unwritable
+            h.append("summary.requested", {"job_id": f"r{n}"}, seg=2)
+            h.append("summary.completed", {"job_id": f"r{n}", "artifact": "seg-002/summary.json",
+                                           "input_sha256": "0" * 64, "duration_ms": 1}, seg=2)
+        calls = []
+        harvest.harvest(store, env=ON, capture=FakeCapture(), resummarize=lambda *a: calls.append(a) or "x")
+        assert calls == [] and cursor(h) == 2  # no model call; the cursor moves past it
+
     def test_a_skipped_segment_never_holds_the_cursor(self, store):
         h = summarized_session(store, "s1", [[BLOCK], [BLOCK]])
         h.append("summary.skipped", {"reason": "trivial"}, seg=1)  # final: nothing will summarize it again

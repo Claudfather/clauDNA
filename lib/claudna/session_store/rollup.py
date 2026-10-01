@@ -76,13 +76,18 @@ def summaries(paths: SessionPaths, lifecycle: list[dict] | None = None) -> dict[
     """``index -> summary``: each live segment's current ``done`` summary, and each retired one's archive."""
     lifecycle = load_lifecycle(paths).events if lifecycle is None else lifecycle
     out = {s.index: s.doc for s in segment_states(paths, lifecycle) if s.summary == "done"}
-    full = schema.load("segment-summary")
-    archive = paths.dir / "summaries"
-    for path in sorted(archive.glob("seg-*.json")) if archive.is_dir() else []:
-        doc = read_json(path)
-        if isinstance(doc, dict) and not schema.validate(doc, full) and doc["index"] not in out:
-            out[doc["index"]] = doc
+    for index in paths.archived_indices():
+        if index not in out and (doc := read_archived(paths, index)) is not None:
+            out[index] = doc
     return out
+
+
+def read_archived(paths: SessionPaths, index: int) -> dict | None:
+    """Retired segment ``index``'s archived summary, if it is a valid one for that index."""
+    doc = read_json(paths.archived_summary(index))
+    if isinstance(doc, dict) and not schema.validate(doc, schema.load("segment-summary")) and doc["index"] == index:
+        return doc
+    return None
 
 
 def compute(sid: str, by_index: dict[int, dict]) -> dict | None:

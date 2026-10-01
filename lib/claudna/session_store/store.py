@@ -103,32 +103,27 @@ class SessionHandle:
                 taken = None
             yield "missing" if taken is None or (taken and not seg.dir.is_dir()) else "taken" if taken else "busy"
 
-    def retire_segment(self, index: int, reason: str, *, archive: dict | None = None) -> bool:
-        """Retire segment ``index`` (retention): archive its summary, log ``segment.retired``, take its directory.
+    def retire_segment(self, index: int, reason: str, *, logged: bool = False) -> bool:
+        """Retire segment ``index`` (retention): log ``segment.retired``, take its directory out of the namespace.
 
-        All under the session lock, so no hook's refresh can recreate a file in
-        the directory as it goes: the archive is written durably first (after
-        this, it is the summary's only copy), the event is logged once, and the
-        directory is renamed out of the segment namespace (atomic). The renamed
-        husk is deleted after the lock is released. Returns whether this call
-        retired it (``False``: already retired, or no such segment).
+        The caller holds the segment's lock (no summarizer is writing) and has
+        already archived its summary, durably. Under the session lock, so no
+        hook's refresh can recreate a file in the directory as it goes: the
+        event is logged unless ``logged`` (the caller's snapshot shows an
+        interrupted earlier retirement), then the directory is renamed (atomic)
+        to a husk, deleted after the lock is released. Returns whether this
+        call logged the retirement.
         """
         seg = self.paths.segment(index)
         with self._locked():
             if not seg.dir.is_dir():
                 return False
-            if archive is not None:
-                target = self.paths.archived_summary(index)
-                ensure_dir(target.parent)
-                atomic_write_json(target, archive, durable=True)
-            lifecycle = load_lifecycle(self.paths).events
-            fresh = not any(e["kind"] == "segment.retired" and e["seg"] == index for e in lifecycle)
-            if fresh:
+            if not logged:
                 self._append_locked("segment.retired", {"reason": reason}, seg=index)
-            husk = self.paths.dir / f".retired-{seg.dir.name}-{os.urandom(4).hex()}"
+            husk = self.paths.husk(index, os.urandom(4).hex())
             os.replace(seg.dir, husk)
         shutil.rmtree(husk, ignore_errors=True)  # a failure leaves a husk outside the namespace: swept later
-        return fresh
+        return not logged
 
     def _refuse_first_write(self, kind: str, data: dict, *, seg: int | None) -> None:
         """For a session with no directory: raise now whatever the locked append would refuse."""
@@ -270,6 +265,8 @@ class SessionHandle:
         ev.check_data("segment.opened", {"opened_by": opened_by, "start": start})  # before any side effect
         with self._locked():
             lifecycle = load_lifecycle(self.paths).events
+            if session_facts(lifecycle).status == "closed":  # the root of the 0.22 bug: a closed session's segments
+                raise StoreError(f"session {self.sid} is closed; a resume reopens it first")  # are final
             previous = self.current_segment()
             if previous is not None:
                 before = self.boundary(previous, lifecycle)
@@ -343,17 +340,36 @@ class SessionHandle:
                 raise StoreError(f"session {self.sid} is not open")
             if owner_pid is not None and facts.claude_pid != owner_pid:
                 raise StoreError(f"session {self.sid} was resumed by another process; left open")
-            index = self.current_segment()
-            sealed = None
-            if index is not None:
-                boundary = self.boundary(index, lifecycle)
-                if not boundary.sealed:
-                    end = max(file_size(segment_transcript_paths(lifecycle)[index]), boundary.start or 0)
-                    self._append_locked("segment.sealed", {"end": end, "sealed_by": "abandoned", "trigger": None},
-                                        seg=index)
-                    sealed = index
+            sealed = self._seal_open_locked(lifecycle)
             self._append_locked("session.closed", {"reason": "abandoned"}, seg=None)
             return sealed
+
+    def _seal_open_locked(self, lifecycle: list[dict]) -> int | None:
+        """Seal the current segment at its transcript's size as ``abandoned``, if it is unsealed; the lock is held."""
+        index = self.current_segment()
+        if index is None:
+            return None
+        boundary = self.boundary(index, lifecycle)
+        if boundary.sealed:
+            return None
+        end = max(file_size(segment_transcript_paths(lifecycle)[index]), boundary.start or 0)
+        self._append_locked("segment.sealed", {"end": end, "sealed_by": "abandoned", "trigger": None}, seg=index)
+        return index
+
+    def seal_after_close(self) -> int | None:
+        """Seal, as ``abandoned``, a *closed* session's last segment left unsealed; the index sealed, or ``None``.
+
+        A repair: 0.22 could open a segment after a close (since refused), and
+        such a segment is never final, so it would never be summarized,
+        exported or retired. Decided under the lock; idempotent.
+        """
+        if not self.exists():
+            return None
+        with self._locked():
+            lifecycle = load_lifecycle(self.paths).events
+            if session_facts(lifecycle).status != "closed":
+                return None
+            return self._seal_open_locked(lifecycle)
 
     def link_child(self, child_sid: str) -> dict:
         return self.append("session.child_linked", {"child_sid": child_sid})

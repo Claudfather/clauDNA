@@ -243,3 +243,17 @@ class TestPromoteVerb:
         out = capsys.readouterr().out
         assert "\x1b" not in out and [ln for ln in out.splitlines() if ln.strip().startswith("item:")] == [
             "   item: projects/n.md  vault: /v"]
+
+
+
+def test_a_promote_reply_that_is_not_an_object_is_an_error_not_a_crash(store, tmp_path, monkeypatch, capsys):
+    from claudna.session_store.cli import main
+
+    fake = tmp_path / "claudron"
+    fake.write_text("#!/bin/sh\necho '[1, 2]'\n")
+    fake.chmod(0o755)
+    monkeypatch.setenv("CLAUDNA_CLAUDRON_BIN", str(fake))
+    digest.record_capture(store.root, sid="s1", seg=1, block=BLOCK, title="t", action="created",
+                          path="projects/n.md", vault="/v")
+    assert main(["digest", "--promote", "projects/n.md", "--vault", "/v", "--root", str(store.root)]) == 1
+    assert "not a JSON object" in capsys.readouterr().err and len(digest.items(store.root)) == 1

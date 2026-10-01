@@ -21,7 +21,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
-from .fsio import append_jsonl, cap_log, ensure_dir, exclusive_lock, read_jsonl, utc_seconds
+from .fsio import append_jsonl, cap_log, ensure_dir, exclusive_lock, read_jsonl, rotated, utc_seconds
 
 KINDS = ("summarize", "harvest", "sweep")
 
@@ -70,7 +70,7 @@ def run(root: Path, kind: str) -> Iterator[dict]:
 
 def runs(root: Path, *, kind: str | None = None, since: str | None = None, limit: int = 50) -> list[dict]:
     """Run records, newest first, optionally one kind and on or after ``since`` (an ISO timestamp)."""
-    old = log_path(root).with_name("runs.jsonl.old")  # the generation the last rotation kept
+    old = rotated(log_path(root))  # the generation the last rotation kept
     out = [r for r in [*read_jsonl(old).records, *read_jsonl(log_path(root)).records]
            if (kind is None or r.get("kind") == kind) and (since is None or (r.get("started_at") or "") >= since)]
     out.sort(key=lambda r: r.get("started_at") or "", reverse=True)

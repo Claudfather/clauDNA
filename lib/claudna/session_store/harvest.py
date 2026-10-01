@@ -30,7 +30,6 @@ The ``claudron`` call is behind ``capture`` so tests never touch a vault.
 
 from __future__ import annotations
 
-import json
 import os
 import shutil
 import time
@@ -42,20 +41,20 @@ from claudna.redact import redact_strings
 
 from . import schema
 from .fsio import atomic_write_json, atomic_write_text, ensure_dir, exclusive_lock, read_json, utc_seconds
-from .project import (abandoned_at, by_segment, harvest_skip, latest_origin, load_lifecycle, session_facts,
-                      summary_verdict)
+from . import claudron
+from .claudron import _ROOTS, CLAUDRON_ENV, CaptureError, claudron_bin  # noqa: F401 (re-exported)
+from .project import (HARVEST_CONSUMER, MAX_ATTEMPTS, abandoned_at, by_segment, harvest_skip, latest_origin,
+                      load_lifecycle, session_facts, summary_verdict)
 from .store import SessionStore
 
 ENABLE_ENV = "CLAUDNA_HARVEST"
 INTERVAL_ENV = "CLAUDNA_HARVEST_INTERVAL_H"
-CLAUDRON_ENV = "CLAUDNA_CLAUDRON_BIN"
 DEFAULT_INTERVAL_H = 6.0
 MAX_CAPTURES = 10
-CONSUMER = "harvest"
+CONSUMER = HARVEST_CONSUMER
 #: Block homes → Claudron note types. ``person`` is held back (see module doc).
 NOTE_TYPES = {"entity": "knowledge", "concept": "knowledge", "project": "knowledge",
               "practice": "knowledge", "decision": "decision"}
-TIMEOUT_S = 30
 #: Stranded summaries harvest re-runs per run (each is one model call, in this detached process).
 MAX_RETRIES_PER_RUN = 2
 LAST_RUN = "harvest/last_run.json"
@@ -65,116 +64,7 @@ IDLE_INTERVAL_H = 1.0
 DRAFT_BANNER = "(unverified) "
 
 
-class CaptureError(RuntimeError):
-    """``claudron capture`` failed outright (not a dedup answer)."""
-
-
-_ACTIONS = ("created", "updated", "suggest_update", "suggest_supersede", "rejected")
-
-
-def run_claudron_capture(finding: dict, cwd: str | None, env: Mapping[str, str], vault: str | None = None) -> dict:
-    """One ``claudron capture --stdin --json``; returns ``{"action", "path"}`` from ``data``.
-
-    The vault is the *session's*, never the harvest process's: ``--vault`` when
-    the session recorded one, else a walk-up from the session's ``cwd`` — with
-    ``$CLAUDRON_VAULT_PATH`` removed from the child's environment either way, so
-    whichever session happened to start this run can't redirect another's
-    drafts into its vault (#373 review, B2).
-
-    Content goes on stdin as JSON — never as a shell argument — and the
-    envelope is validated per ``skills/_shared/claudron-engine.md`` §2: exit 0,
-    ``ok``, ``command == "capture"``, a known ``data.action``. A ``rejected``
-    write exits 1 with a well-formed envelope; that is an answer, not a failure.
-    """
-    import subprocess  # imported here: the hook imports this module for is_due alone
-
-    cmd = [claudron_bin(env), *(["--vault", vault] if vault else []), "capture", "--stdin", "--json"]
-    child_env = {k: v for k, v in env.items() if k != "CLAUDRON_VAULT_PATH"}
-    try:
-        proc = subprocess.run(cmd, input=json.dumps(finding), capture_output=True, text=True,
-                              timeout=TIMEOUT_S, env=child_env, cwd=cwd if cwd and os.path.isdir(cwd) else None)
-        envelope = json.loads(proc.stdout)
-    except (OSError, subprocess.SubprocessError, ValueError) as exc:
-        raise CaptureError(f"claudron capture: {str(exc)[:150]}") from exc
-    if not isinstance(envelope, dict):
-        raise CaptureError(f"claudron capture exited {proc.returncode}: the output is not a JSON object")
-    data = envelope.get("data")
-    action = data.get("action") if isinstance(data, dict) else None
-    if envelope.get("command") != "capture" or action not in _ACTIONS or \
-            (proc.returncode != 0 and action != "rejected") or (not envelope.get("ok") and action != "rejected"):
-        errors = envelope.get("errors")
-        raise CaptureError(f"claudron capture exited {proc.returncode}: {str(errors or data)[:150]}")
-    path = data.get("path") if isinstance(data.get("path"), str) and data.get("path") else None
-    # The root is asked for when the path needs it, or when the session recorded no vault: without one,
-    # the digest item would carry vault None and `promote` would resolve against the reviewer's cwd.
-    root = _vault_root(cwd, vault, child_env) if path and (os.path.isabs(path) or not vault) else None
-    if root and os.path.isabs(path):
-        try:  # created/updated answer with an absolute path; promote takes a vault-relative one (contract §2)
-            path = Path(os.path.realpath(path)).relative_to(root).as_posix()
-        except ValueError:
-            pass  # outside the vault claudron reports: keep it as given
-    return {"action": action, "path": path, "vault": str(root) if root else vault}
-
-
-_ROOTS: dict[tuple[str | None, str | None], Path] = {}  #: one ``status`` per vault per run (a short process)
-
-
-def _vault_root(cwd: str | None, vault: str | None, env: Mapping[str, str]) -> Path | None:
-    """The vault root Claudron itself reports (``status --json``'s ``data.root``) for this session, or ``None``.
-
-    Vault resolution is Claudron's contract (claudron-engine.md §2): ask it,
-    with the same ``--vault``/``cwd`` the capture used, rather than re-deriving it.
-    """
-    import subprocess
-
-    key = (cwd, vault)
-    if key in _ROOTS:
-        return _ROOTS[key]
-    cmd = [claudron_bin(env), *(["--vault", vault] if vault else []), "status", "--json"]
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT_S, env=dict(env),
-                              cwd=cwd if cwd and os.path.isdir(cwd) else None)
-        root = (json.loads(proc.stdout).get("data") or {}).get("root") if proc.returncode == 0 else None
-    except (OSError, subprocess.SubprocessError, ValueError, AttributeError):
-        root = None
-    if not (isinstance(root, str) and root):
-        return None  # not cached: one failed call (a timeout, a busy index) mustn't decide the rest of the run
-    _ROOTS[key] = Path(os.path.realpath(root))
-    return _ROOTS[key]
-
-
-class PromoteError(RuntimeError):
-    """``claudron promote`` didn't promote: its error, for the person reviewing."""
-
-
-def run_claudron_promote(item: str, vault: str | None, env: Mapping[str, str]) -> dict:
-    """``claudron [--vault V] promote ITEM --to verified --by user --json`` as an argv list; the envelope's data.
-
-    The deterministic half of ``/claudna:capture --review`` (the person chose;
-    nothing here is left to a model): no shell, so a vault path with spaces is
-    one argument; success is the envelope's own ``ok`` + ``data.action``
-    (``promoted``, or ``unchanged`` for a note already verified), never a reading of prose.
-    """
-    import subprocess
-
-    cmd = [claudron_bin(env), *(["--vault", vault] if vault else []), "promote", item, "--to", "verified",
-           "--by", "user", "--json"]
-    child_env = {k: v for k, v in env.items() if k != "CLAUDRON_VAULT_PATH"}  # the item's vault, not this shell's
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT_S, env=child_env)
-        envelope = json.loads(proc.stdout)
-    except (OSError, subprocess.SubprocessError, ValueError) as exc:
-        raise PromoteError(f"claudron promote: {str(exc)[:150]}") from exc
-    data = envelope.get("data") if isinstance(envelope, dict) else None
-    if proc.returncode != 0 or not envelope.get("ok") or envelope.get("command") != "promote" or \
-            not isinstance(data, dict) or data.get("action") not in ("promoted", "unchanged"):
-        errors = envelope.get("errors") if isinstance(envelope, dict) else None
-        raise PromoteError(f"claudron promote exited {proc.returncode}: {str(errors or data)[:200]}")
-    return data
-
-
-def claudron_bin(env: Mapping[str, str]) -> str:
-    return env.get(CLAUDRON_ENV) or "claudron"
+run_claudron_capture = claudron.capture  #: the default capture (tests replace it)
 
 
 def _skip_reason(root: Path, env: Mapping[str, str], now: float) -> str | None:
@@ -271,6 +161,11 @@ class RunReport:
         return {**self.__dict__, "started_at": self.started_at}
 
 
+def _since_last_seal(events: list[dict]) -> list[dict]:
+    seals = [n for n, e in enumerate(events) if e["kind"] == "segment.sealed"]
+    return events[seals[-1]:] if seals else events
+
+
 def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: Callable[..., str],
                      env: Mapping[str, str], resummarize: Callable[..., str]) -> None:
     handle = store.session(sid)
@@ -299,12 +194,18 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
         valid = isinstance(summary, dict) and not schema.validate(summary, schema.load("segment-summary"))
         if status == "done" and valid and summary["input"]["range"]["end"] != boundary.last_seal["data"]["end"]:
             status = "stale"  # summarized before a later re-seal: its range misses the tail
-        if status == "done" and not valid:
-            status = "stale"  # summary.json missing or invalid: the summarizer rebuilds it (#387 review S3)
+        unreadable = status == "done" and not valid  # summary.json missing or invalid: rebuild it (#387 review S3)
+        if unreadable:
+            status = "stale"
         if status in ("none", "pending", "failed", "stale"):
-            verdict = "retry" if status == "stale" else \
-                summary_verdict(by_segment(lifecycle)[index], report.started_epoch,
-                                abandoned_at=abandoned_at(lifecycle))
+            if unreadable:  # bounded like any retry: a summary that can never be written mustn't cost a call a run
+                attempts = sum(e["kind"] == "summary.requested" for e in _since_last_seal(by_segment(lifecycle)[index]))
+                verdict = "give up" if attempts >= MAX_ATTEMPTS else "retry"
+            elif status == "stale":
+                verdict = "retry"
+            else:
+                verdict = summary_verdict(by_segment(lifecycle)[index], report.started_epoch,
+                                          abandoned_at=abandoned_at(lifecycle))
             if verdict == "give up":
                 report.gave_up += 1
                 report.errors.append(f"{sid}: seg-{index:03d} was never summarized; skipped by harvest")

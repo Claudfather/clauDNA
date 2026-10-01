@@ -81,33 +81,18 @@ def ensure_dir(path: Path) -> Path:
     return path
 
 
-def atomic_write_text(path: Path, text: str) -> None:
-    """Write ``text`` to ``path`` atomically (temp file + ``os.replace``), mode ``0600``; ``path.parent`` must exist."""
-    fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(text)
-        os.chmod(tmp, FILE_MODE)
-        os.replace(tmp, path)
-    except BaseException:
-        with contextlib.suppress(FileNotFoundError):
-            os.unlink(tmp)
-        raise
-
-
-def atomic_write_json(path: Path, obj: object, *, durable: bool = False) -> None:
-    """Write ``obj`` as pretty JSON to ``path`` atomically, mode ``0600``.
+def atomic_write_text(path: Path, text: str, *, durable: bool = False) -> None:
+    """Write ``text`` to ``path`` atomically (temp file + ``os.replace``), mode ``0600``.
 
     Atomic for readers. Not crash-durable by default (no ``fsync``) — right for
     projections, which ``rebuild`` regenerates. ``durable=True`` fsyncs the file
-    and its directory, for the one state no log can regenerate: the export
-    acks in ``consumers.json``. ``path.parent`` must already exist.
+    and its directory, for state no log can regenerate (``consumers.json``, an
+    archived summary). ``path.parent`` must already exist.
     """
     fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump(obj, fh, indent=2, sort_keys=True, ensure_ascii=False)
-            fh.write("\n")
+            fh.write(text)
             if durable:
                 fh.flush()
                 os.fsync(fh.fileno())
@@ -123,6 +108,11 @@ def atomic_write_json(path: Path, obj: object, *, durable: bool = False) -> None
             os.fsync(dfd)
         finally:
             os.close(dfd)
+
+
+def atomic_write_json(path: Path, obj: object, *, durable: bool = False) -> None:
+    """Write ``obj`` as pretty JSON to ``path`` atomically (:func:`atomic_write_text`)."""
+    atomic_write_text(path, json.dumps(obj, indent=2, sort_keys=True, ensure_ascii=False) + "\n", durable=durable)
 
 
 def read_json(path: Path) -> object | None:
@@ -144,6 +134,11 @@ def file_size(path: Path | str | None) -> int:
 LOG_LIMIT = 1024 * 1024  #: a log past this size is rotated to ``<name>.old`` (one generation kept)
 
 
+def rotated(path: Path) -> Path:
+    """The one generation :func:`cap_log` keeps: ``<path>.old``."""
+    return path.with_name(path.name + ".old")
+
+
 def cap_log(path: Path, limit: int = LOG_LIMIT) -> Path:
     """Rotate ``path`` to ``<path>.old`` once it passes ``limit`` bytes; return ``path``.
 
@@ -152,7 +147,7 @@ def cap_log(path: Path, limit: int = LOG_LIMIT) -> Path:
     """
     try:
         if path.stat().st_size > limit:
-            os.replace(path, path.with_name(path.name + ".old"))
+            os.replace(path, rotated(path))
     except OSError:
         pass
     return path
