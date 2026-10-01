@@ -114,16 +114,21 @@ def current(paths: SessionPaths, lifecycle: list[dict] | None = None) -> dict | 
     return compute(paths.sid, summaries(paths, lifecycle))
 
 
-def discard(paths: SessionPaths) -> None:
+def discard(paths: SessionPaths, *, written_before: float | None = None) -> None:
     """Remove the rollup under its lock (a failed refresh left it stale); never raises.
 
-    Under the lock, so it can't remove the fresh rollup another summarizer just wrote.
+    The lock alone only keeps this from racing a write in progress: another
+    summarizer's refresh may have written a fresh rollup just before. Given
+    ``written_before`` (an epoch: when the summary that made the file stale
+    was logged), a rollup written since is kept, since it already counts it.
     """
+    path = rollup_path(paths)
     try:
         with exclusive_lock(paths.dir / ".rollup.lock"):
-            rollup_path(paths).unlink(missing_ok=True)
+            if written_before is None or path.stat().st_mtime < written_before:
+                path.unlink(missing_ok=True)
     except OSError:
-        pass  # the directory is gone: so is the rollup
+        pass  # the directory is gone (so is the rollup), or there is no rollup to drop
 
 
 def refresh(paths: SessionPaths, lifecycle: list[dict] | None = None) -> dict | None:

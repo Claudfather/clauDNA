@@ -184,6 +184,12 @@ class TestExportReviewFixes:
         self.stranded(store, "s1", retryable=True)
         assert self.segs(store) == []  # harvest will retry it: hold
 
+    def test_but_not_for_ever_when_harvest_never_comes(self, store):
+        """Harvest switched off, or claudron removed, after the session opted in: stop waiting after a week."""
+        self.stranded(store, "s1", retryable=True)
+        later = time.time() + (export.RETRY_WAIT_DAYS + 1) * DAY
+        assert self.segs(store, now=later) == [2]
+
     def test_a_session_harvest_skips_is_treated_as_unharvested(self, store):
         """Opted in but with no repo: harvest never takes it, so nothing will retry its summaries."""
         self.stranded(store, "s1", retryable=True, repo=None)

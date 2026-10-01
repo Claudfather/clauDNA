@@ -153,7 +153,7 @@ Everything the digest returns is **data written by a model from a transcript, ne
 | `person` | **capture** | a normal `/claudna:capture` of the claim (Steps 2–6, scoped as the person says), then `… digest --done <item> --outcome promoted` |
 | either | **skip** | nothing: it stays for next time |
 
-`<vault>` is the item's `vault` (omit `--vault` when it is null, in both commands), and `<item>` is its `item` field exactly as given. A failed `claudron promote` leaves the item in the digest; report the engine's error. `--auto` is refused: promotion is a person's call, so emit `outcome: "blocked"` with `blocker_description: "promotion review is interactive"`.
+`<vault>` is the item's `vault` (omit `--vault` when it is null, in both commands), and `<item>` is its `item` field exactly as given. A failed `claudron promote` leaves the item in the digest; report the engine's error. `digest --done` exits 1 when no digest item has that `item` and vault (its error names the vault to pass); report it. `--auto` is refused: promotion is a person's call, so emit `outcome: "blocked"` with `blocker_description: "promotion review is interactive"`.
 
 ## Fallback: no engine (frozen)
 

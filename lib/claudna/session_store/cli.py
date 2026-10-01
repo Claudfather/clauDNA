@@ -414,6 +414,13 @@ def main(argv: list[str] | None = None) -> int:
             print("error: --vault only goes with --done", file=sys.stderr)
             return 2
         if args.done:
+            pending = digest.items(store.root, limit=None)
+            if not any((i.item, i.vault) == (args.done, args.vault) for i in pending):
+                vaults = sorted({"no vault (omit --vault)" if i.vault is None else f"--vault {i.vault}"
+                                 for i in pending if i.item == args.done})
+                hint = f"; it is under {', '.join(vaults)}" if vaults else ""
+                print(f"error: no digest item {args.done!r} in vault {args.vault!r}{hint}", file=sys.stderr)
+                return 1
             digest.mark_reviewed(store.root, args.done, outcome=args.outcome, vault=args.vault)
             print(json.dumps({"item": args.done, "vault": args.vault, "outcome": args.outcome}))
             return 0
@@ -423,7 +430,8 @@ def main(argv: list[str] | None = None) -> int:
         else:
             for n, i in enumerate(found, 1):
                 seen = f"{i['sessions']} session(s)" + (", user-asserted" if i["asserted_by"] == "user" else "")
-                print(f"{n}. [{i['kind']}] {i['title']}  ({seen})\n   {i['claim'] or ''}\n   item: {i['item']}")
+                print(f"{n}. [{i['kind']}] {i['title']}  ({seen})\n   {i['claim'] or ''}\n   item: {i['item']}"
+                      + (f"  vault: {i['vault']}" if i["vault"] else ""))
             if not found:
                 print("nothing to review")
         return 0

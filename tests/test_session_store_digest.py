@@ -128,3 +128,15 @@ class TestTwoVaults:
         assert sorted(i.vault for i in found) == [str(tmp_path / "a"), str(tmp_path / "b")]
         digest.mark_reviewed(store.root, "projects/n.md", outcome="promoted", vault=str(tmp_path / "a"))
         assert [i.vault for i in digest.items(store.root)] == [str(tmp_path / "b")]
+
+    def test_done_without_the_items_vault_is_refused_not_silently_kept(self, store, tmp_path, capsys):
+        from claudna.session_store.cli import main
+
+        digest.record_capture(store.root, sid="s-a", seg=1, block=BLOCK, title="a", action="created",
+                              path="projects/n.md", vault=str(tmp_path / "a"))
+        root = ["--root", str(store.root)]
+        assert main(["digest", "--done", "projects/n.md", *root]) == 1
+        assert f"--vault {tmp_path / 'a'}" in capsys.readouterr().err
+        assert [i.item for i in digest.items(store.root)] == ["projects/n.md"]  # still there
+        assert main(["digest", "--done", "projects/n.md", "--vault", str(tmp_path / "a"), *root]) == 0
+        assert digest.items(store.root) == []

@@ -106,8 +106,10 @@ def run_claudron_capture(finding: dict, cwd: str | None, env: Mapping[str, str],
         errors = envelope.get("errors")
         raise CaptureError(f"claudron capture exited {proc.returncode}: {str(errors or data)[:150]}")
     path = data.get("path") if isinstance(data.get("path"), str) and data.get("path") else None
-    root = _vault_root(cwd, vault, child_env) if path and os.path.isabs(path) else None
-    if root:
+    # The root is asked for when the path needs it, or when the session recorded no vault: without one,
+    # the digest item would carry vault None and `promote` would resolve against the reviewer's cwd.
+    root = _vault_root(cwd, vault, child_env) if path and (os.path.isabs(path) or not vault) else None
+    if root and os.path.isabs(path):
         try:  # created/updated answer with an absolute path; promote takes a vault-relative one (contract §2)
             path = Path(os.path.realpath(path)).relative_to(root).as_posix()
         except ValueError:
@@ -115,7 +117,7 @@ def run_claudron_capture(finding: dict, cwd: str | None, env: Mapping[str, str],
     return {"action": action, "path": path, "vault": str(root) if root else vault}
 
 
-_ROOTS: dict[tuple[str | None, str | None], Path | None] = {}  #: one ``status`` per vault per run (a short process)
+_ROOTS: dict[tuple[str | None, str | None], Path] = {}  #: one ``status`` per vault per run (a short process)
 
 
 def _vault_root(cwd: str | None, vault: str | None, env: Mapping[str, str]) -> Path | None:
@@ -127,15 +129,18 @@ def _vault_root(cwd: str | None, vault: str | None, env: Mapping[str, str]) -> P
     import subprocess
 
     key = (cwd, vault)
-    if key not in _ROOTS:
-        cmd = [claudron_bin(env), *(["--vault", vault] if vault else []), "status", "--json"]
-        try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT_S, env=dict(env),
-                                  cwd=cwd if cwd and os.path.isdir(cwd) else None)
-            root = (json.loads(proc.stdout).get("data") or {}).get("root") if proc.returncode == 0 else None
-        except (OSError, subprocess.SubprocessError, ValueError, AttributeError):
-            root = None
-        _ROOTS[key] = Path(os.path.realpath(root)) if isinstance(root, str) and root else None
+    if key in _ROOTS:
+        return _ROOTS[key]
+    cmd = [claudron_bin(env), *(["--vault", vault] if vault else []), "status", "--json"]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT_S, env=dict(env),
+                              cwd=cwd if cwd and os.path.isdir(cwd) else None)
+        root = (json.loads(proc.stdout).get("data") or {}).get("root") if proc.returncode == 0 else None
+    except (OSError, subprocess.SubprocessError, ValueError, AttributeError):
+        root = None
+    if not (isinstance(root, str) and root):
+        return None  # not cached: one failed call (a timeout, a busy index) mustn't decide the rest of the run
+    _ROOTS[key] = Path(os.path.realpath(root))
     return _ROOTS[key]
 
 

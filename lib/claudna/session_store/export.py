@@ -28,6 +28,7 @@ from __future__ import annotations
 import re
 import time
 
+from .fsio import epoch_of
 from .project import (abandoned_at, by_segment, harvest_skip, load_lifecycle, next_segment_index, segment_states,
                       session_doc, session_facts, summary_verdict)
 from .store import SessionStore
@@ -36,6 +37,9 @@ EXPORT_SCHEMA = "claudna.export/1"
 CONSUMER = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
 #: Consumers the store runs itself, which acks only through their own code: an export ack must not move them.
 RESERVED = frozenset({"harvest"})
+#: How long a summary due a retry holds a session's export when harvest should run it but doesn't: the
+#: acked-retention floor, so the wait never outlasts what retention would keep anyway.
+RETRY_WAIT_DAYS = 7
 SESSION_FIELDS = ("sid", "status", "opened_at", "closed_at", "close_reason", "chain_id", "parent_sid", "actor",
                   "origin")
 
@@ -54,12 +58,15 @@ def _settled(summary: str, events: list[dict], *, retried: bool, abandoned: str 
     Its summary has had its last attempt (:func:`project.summary_verdict`),
     or it is due a retry that nothing will run: only harvest retries
     summaries, and ``retried`` says whether harvest takes this session
-    (:func:`project.harvest_skip`). A stale or unreadable summary is still
-    waited for.
+    (:func:`project.harvest_skip`) — or would, but a retry has been due for
+    :data:`RETRY_WAIT_DAYS` without one running (harvest since switched off,
+    or ``claudron`` gone). A stale or unreadable summary is still waited for.
     """
     if summary not in ("none", "pending", "failed"):
         return False
     verdict = summary_verdict(events, now, abandoned_at=abandoned)
+    if verdict == "retry" and retried and events and now - epoch_of(events[-1]["ts"]) > RETRY_WAIT_DAYS * 86400:
+        return True  # harvest was to retry it but hasn't in a week (turned off, claudron gone): stop waiting
     return verdict == "give up" or (verdict == "retry" and not retried)
 
 

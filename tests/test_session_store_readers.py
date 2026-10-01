@@ -278,3 +278,20 @@ def test_a_lost_refresh_after_a_seal_refolds_the_segments_too(store):
                                                                            "trigger": "auto"}, seg=2))  # no refresh
     assert json.loads(h.paths.segment(2).segment_json.read_text())["status"] == "open"  # stale on disk
     assert [s["status"] for s in readers.show(store, "s1")["segments"]] == ["sealed", "sealed"]
+
+
+def test_a_tie_keeps_each_logs_own_order(store):
+    """One step can seal a segment and open the next on one millisecond: the seal still shows first, the
+    sealed segment's last activity before it, and the new segment's activity after its opening."""
+    h = store.session("s1")
+    h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl")
+    h.open_segment("session_open", 0)
+    h.append("tool.failed", {"tool": "Bash", "signature": "Bash: x", "exit_code": 1})
+    h.open_segment("compact", 100)  # seals seg-001 (its PreCompact missed) and opens seg-002 under one lock
+    h.append("tool.failed", {"tool": "Bash", "signature": "Bash: y", "exit_code": 1})
+    ts = "2026-01-01T00:00:00.000Z"
+    for log in (h.paths.lifecycle, h.paths.segment(1).events, h.paths.segment(2).events):
+        rewrite_log(log, lambda events: [{**e, "ts": ts} for e in events])
+    rows = [(e["kind"], e["seg"]) for e in readers.timeline(store, "s1")]
+    assert rows == [("session.opened", None), ("segment.opened", 1), ("tool.failed", 1), ("segment.sealed", 1),
+                    ("segment.opened", 2), ("tool.failed", 2)]

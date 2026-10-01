@@ -382,10 +382,25 @@ class TestRunClaudronCapture:
         answer = REAL_CAPTURE({"type": "knowledge", "title": "t"}, str(tmp_path), env)
         assert (answer["path"], answer["vault"]) == (str(tmp_path / "n.md"), None)
 
-    def test_a_relative_answer_needs_no_status_call(self, tmp_path):
+    def test_a_failed_status_call_is_not_remembered(self, tmp_path):
         harvest._ROOTS.clear()
-        REAL_CAPTURE({"type": "knowledge", "title": "t"}, str(tmp_path), self.make(tmp_path))
-        assert harvest._ROOTS == {}
+        env = {**self.make(tmp_path), "FAKE_PATH": str(tmp_path / "n.md")}  # status fails: no FAKE_ROOT
+        REAL_CAPTURE({"type": "knowledge", "title": "t"}, str(tmp_path), env, "/v")
+        assert harvest._ROOTS == {}  # the next capture asks again
+
+    def test_a_relative_answer_with_a_recorded_vault_needs_no_status_call(self, tmp_path):
+        harvest._ROOTS.clear()
+        answer = REAL_CAPTURE({"type": "knowledge", "title": "t"}, str(tmp_path), self.make(tmp_path), "/vaults/w")
+        assert harvest._ROOTS == {} and (answer["path"], answer["vault"]) == ("p.md", "/vaults/w")
+
+    def test_a_relative_answer_without_a_recorded_vault_still_names_its_vault(self, tmp_path):
+        """Otherwise the digest item has vault None and `promote` resolves against the reviewer's cwd."""
+        harvest._ROOTS.clear()
+        real = tmp_path / "real-vault"
+        real.mkdir()
+        answer = REAL_CAPTURE({"type": "knowledge", "title": "t"}, str(tmp_path),
+                              {**self.make(tmp_path), "FAKE_ROOT": str(real)})
+        assert (answer["path"], answer["vault"]) == ("p.md", str(real))
 
     def test_a_not_ok_envelope_is_an_error(self, tmp_path):
         fake = tmp_path / "claudron"

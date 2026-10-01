@@ -89,28 +89,42 @@ def show(store: SessionStore, sid: str) -> dict:
             "rollup": _rollup(paths) or current(paths, lifecycle.events)}  # missing or foreign: computed
 
 
-#: Tie ranks on a shared millisecond: what opens, then activity, then what ends or follows it.
-_OPENS, _ACTIVITY, _FOLLOWS = 0, 1, 2
+def _lifecycle_first(life: dict, act: dict) -> bool:
+    """On a millisecond tie, does the lifecycle event go before the activity one?
+
+    What opens (a session, a segment) precedes the activity it opens; what
+    ends or follows (a seal, a close, a summary job) comes after the activity
+    it ends, unless that activity is already in a later segment.
+    """
+    return REGISTRY[life["kind"]].opens or (life["seg"] is not None and act["seg"] > life["seg"])
 
 
 def timeline(store: SessionStore, sid: str) -> list[dict]:
     """Every lifecycle and activity event of one session, in time order.
 
-    The two logs share no sequence number, so a tie on the millisecond is
-    broken by meaning: opening events, then activity, then the events that
-    end or follow it. Within one log, the log's own order holds.
+    The two logs share no sequence number, so they are merged: each keeps
+    its own order (a seal and the next segment's opening share a millisecond
+    when one step writes both), and a tie across the two is broken by meaning
+    (:func:`_lifecycle_first`).
     """
     handle = store.session(sid)
     if not handle.exists():
         raise LookupError(f"no session {sid}")
     paths = handle.paths
-    merged = [(e["ts"], _OPENS if REGISTRY[e["kind"]].opens else _FOLLOWS, n, "lifecycle", e)
-              for n, e in enumerate(load_lifecycle(paths).events)]
-    for index in paths.segment_indices():
-        merged += [(e["ts"], _ACTIVITY, n, "activity", e) for n, e in enumerate(load_activity(paths, index).events)]
-    merged.sort(key=lambda row: row[:3])
+    life = sorted(load_lifecycle(paths).events, key=lambda e: e["ts"])  # stable: the log's order on a tie
+    act = sorted((e for index in paths.segment_indices() for e in load_activity(paths, index).events),
+                 key=lambda e: e["ts"])
+    merged, i, j = [], 0, 0
+    while i < len(life) or j < len(act):
+        if j == len(act) or (i < len(life) and (life[i]["ts"] < act[j]["ts"] or (
+                life[i]["ts"] == act[j]["ts"] and _lifecycle_first(life[i], act[j])))):
+            merged.append(("lifecycle", life[i]))
+            i += 1
+        else:
+            merged.append(("activity", act[j]))
+            j += 1
     return [{"ts": e["ts"], "log": log, "seg": e["seg"], "kind": e["kind"], "data": e["data"]}
-            for _, _, _, log, e in merged]
+            for log, e in merged]
 
 
 def _failures(store: SessionStore, sids: Iterable[str], cutoff: str | None) -> list[dict]:
