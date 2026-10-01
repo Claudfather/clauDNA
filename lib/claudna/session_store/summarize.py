@@ -149,7 +149,8 @@ def _summarize_once(handle: SessionHandle, index: int, *, env: Mapping[str, str]
     previous = read_json(seg.dir / "summary.json")
     if boundary.summary["status"] == "done" and isinstance(previous, dict) and \
             previous.get("producer", {}).get("prompt_version") == PROMPT_VERSION and \
-            {k: previous.get("input", {}).get(k) for k in wanted} == wanted:
+            {k: previous.get("input", {}).get(k) for k in wanted} == wanted and \
+            not schema.validate(previous, schema.load("segment-summary")):  # an invalid one is rebuilt (harvest S3)
         return "ignored: already summarized", end  # the transcript is append-only: same range, same input
     if not path:
         return _skip(handle, index, "no_transcript"), end

@@ -245,7 +245,8 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
             else:
                 report.known += 1
         for block, _ in (pair for pair in findings if pair[1] is None):
-            digest.record_held(store.root, sid=sid, seg=index, block=block, vault=vault)
+            root = claudron.vault_root(origin.get("cwd"), vault, env)  # the root captures record: one name per vault
+            digest.record_held(store.root, sid=sid, seg=index, block=block, vault=str(root) if root else vault)
             report.held_back += 1
         report.segments += 1
         if sid not in report.sessions:

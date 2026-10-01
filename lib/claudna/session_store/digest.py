@@ -160,7 +160,7 @@ def _pending(root: Path, limit: int | None) -> list[Item]:
         people[key] = Item("person", item, name, block.get("claim"), None,
                            len(seen.get((rec.get("vault"), key), ())), block.get("asserted_by"), rec.get("ts") or "")
     persons = sorted(people.values(), key=lambda i: i.last_ts, reverse=True)
-    if limit is not None and persons and len(ranked) >= limit:
+    if limit is not None and limit > 0 and persons and len(ranked) >= limit:
         found = ranked[:limit - 1] + persons[:1]  # person facts are §7.2's high-risk items: one always shows
     else:
         found = ranked + persons if limit is None else (ranked + persons)[:limit]

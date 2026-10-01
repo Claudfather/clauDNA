@@ -83,6 +83,7 @@ class TestReviewRound387:
         run(store)
         found = digest.items(store.root)
         assert len(found) == digest.DIGEST_SIZE and found[-1].kind == "person"
+        assert digest.items(store.root, limit=0) == []  # the slot never turns a zero limit into ranked[:-1]
 
 
 class TestDigest:
@@ -257,3 +258,15 @@ def test_a_promote_reply_that_is_not_an_object_is_an_error_not_a_crash(store, tm
                           path="projects/n.md", vault="/v")
     assert main(["digest", "--promote", "projects/n.md", "--vault", "/v", "--root", str(store.root)]) == 1
     assert "not a JSON object" in capsys.readouterr().err and len(digest.items(store.root)) == 1
+
+
+def test_held_facts_share_evidence_with_captures_under_the_vault_claudron_reports(store, monkeypatch, tmp_path):
+    """A session that recorded no vault, or another spelling of it, still pools evidence in one vault."""
+    from claudna.session_store import claudron
+
+    monkeypatch.setattr(claudron, "vault_root", lambda cwd, vault, env: Path("/real/vault"))
+    summarized_session(store, "s1", [[PERSON]], vault=None, cwd=str(tmp_path))  # found from its cwd
+    summarized_session(store, "s2", [[PERSON]], vault="/link/to/vault")
+    run(store)
+    (item,) = [i for i in digest.items(store.root) if i.kind == "person"]
+    assert item.sessions == 2

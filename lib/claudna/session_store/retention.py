@@ -186,6 +186,9 @@ def sweep(store: SessionStore, env: Mapping[str, str], *, now: float | None = No
             batch = due(handle, env, now=now, lifecycle=lifecycle)
             report.retired += [f"{sid}/seg-{index:03d} ({reason})"
                                for index, reason in retire(handle, batch, deadline=spent)]
+            if spent():  # cut off inside this session's batch: the next run starts here, not after it
+                stopped_at = sid
+                break
         except Exception as exc:  # noqa: BLE001 — reported, and the sweep goes on
             report.errors.append(f"{sid}: {type(exc).__name__}: {exc}")
     report.budget_spent = stopped_at is not None or spent()

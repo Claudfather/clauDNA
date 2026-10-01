@@ -165,6 +165,16 @@ class TestSummarize:
         assert summarize.summarize(sealed, 1, env={}, runner=runner) == "ignored: already summarized"
         assert runner.calls == []
 
+    def test_an_invalid_summary_over_the_same_input_is_rebuilt_not_ignored(self, sealed):
+        """Else harvest's retry of an unreadable summary is a no-op forever: no new request, so no attempt cap."""
+        summarize.summarize(sealed, 1, env={}, runner=FakeRunner())
+        path = sealed.paths.segment(1).dir / "summary.json"
+        doc = json.loads(path.read_text())
+        path.write_text(json.dumps({**doc, "blocks": [{"home": "galaxy", "claim": "x"}]}))  # provenance intact
+        runner = FakeRunner()
+        assert summarize.summarize(sealed, 1, env={}, runner=runner).startswith("summarized")
+        assert len(runner.calls) == 1
+
     def test_an_invalid_result_is_a_failure_and_writes_nothing(self, sealed):
         bad = {**GOOD_OUTPUT, "blocks": [{"home": "galaxy", "claim": "x"}]}
         out = summarize.summarize(sealed, 1, env={}, runner=FakeRunner(output=bad))

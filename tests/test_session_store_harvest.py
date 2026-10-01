@@ -33,6 +33,7 @@ PERSON = {"home": "person", "subject_hint": {"name": "Dana", "kind": "person"}, 
 
 
 REAL_CAPTURE = harvest.run_claudron_capture  # taken before any stub; only TestRunClaudronCapture calls it
+REAL_VAULT_ROOT = harvest.claudron.vault_root  # likewise: TestRunClaudronCapture drives it against a fake binary
 ON = {"CLAUDNA_HARVEST": "1"}  # the run's own opt-in (each session records its own, too)
 
 
@@ -41,6 +42,8 @@ def _never_the_real_tools(monkeypatch):
     """No test may reach the real summarizer or claudron through a default (#373 review, M1)."""
     monkeypatch.setattr(harvest, "_resummarize", lambda h, i, e: pytest.fail("reached the real summarizer"))
     monkeypatch.setattr(harvest, "run_claudron_capture", lambda *a, **k: pytest.fail("reached the real claudron"))
+    # Vault resolution asks claudron too: a test's recorded vault is its root (the real one resolves symlinks).
+    monkeypatch.setattr(harvest.claudron, "vault_root", lambda cwd, vault, env: Path(vault) if vault else None)
 
 
 class FakeCapture:
@@ -366,6 +369,10 @@ print(json.dumps({"ok": True, "command": "capture", "errors": [], "warnings": []
 
 
 class TestRunClaudronCapture:
+    @pytest.fixture(autouse=True)
+    def _real_vault_resolution(self, monkeypatch):
+        monkeypatch.setattr(harvest.claudron, "vault_root", REAL_VAULT_ROOT)
+
     def make(self, tmp_path: Path) -> dict:
         fake = tmp_path / "claudron"
         fake.write_text(FAKE_CLAUDRON)
