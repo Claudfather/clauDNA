@@ -251,3 +251,22 @@ def test_a_valid_projection_behind_its_log_is_refolded(store):
     assert json.loads(h.paths.session_json.read_text())["status"] == "open"  # the file is stale
     assert readers.show(store, "s1")["session"]["status"] == "closed"
     assert [r["status"] for r in readers.list_sessions(store)] == ["closed"]
+
+
+def test_a_timestamp_tie_is_broken_by_meaning_not_by_log(store):
+    """The two logs share no sequence number: on a millisecond tie, openings come first, then activity,
+    then what ends it — so a close never shows before the last thing done in the session."""
+    from claudna.session_store import events as ev
+    from claudna.session_store.fsio import append_jsonl
+
+    h = session_with(store, "s1", [None], close=False)
+    ts = "2026-01-01T00:00:00.000Z"
+    for path, kind, data, seg in [
+        (h.paths.lifecycle, "session.closed", {"reason": "other"}, None),
+        (h.paths.segment(1).events, "tool.failed", {"tool": "Bash", "signature": "Bash: x", "exit_code": 1}, 1),
+    ]:
+        append_jsonl(path, ev.make_event(kind, "s1", data, seg=seg, ts=ts))
+    rewritten = [{**json.loads(line), "ts": ts} for line in h.paths.lifecycle.read_text().splitlines()]
+    h.paths.lifecycle.write_text("".join(json.dumps(e) + "\n" for e in rewritten))
+    kinds = [e["kind"] for e in readers.timeline(store, "s1")]
+    assert kinds == ["session.opened", "segment.opened", "tool.failed", "segment.sealed", "session.closed"]

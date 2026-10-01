@@ -24,6 +24,7 @@ from claudna.session_store import export, fsio, retention, rollup
 from claudna.session_store.cli import check_session, main
 
 DAY = 86400
+LATER = time.time() + DAY  #: past the stale-pending window after a session's close
 
 
 def session_with(store, sid, statuses, *, close=True, private=False):
@@ -162,7 +163,7 @@ class TestExportReviewFixes:
     def failed_for_good(self, store, sid, *, harvest_on=True):
         h = store.session(sid)
         h.open_session("startup", actor=ACTOR, origin={**ORIGIN, "repo": "webapp"}, transcript_path="/t.jsonl",
-                       harvest={"enabled": harvest_on, "vault": None})
+                       harvest={"enabled": harvest_on, "vault": "/v"})
         for i in (1, 2):
             h.open_segment("session_open" if i == 1 else "compact", (i - 1) * 100)
             h.seal_segment(i * 100, "precompact")
@@ -173,18 +174,36 @@ class TestExportReviewFixes:
 
     def test_a_summary_that_failed_for_good_is_stepped_over(self, store):
         self.failed_for_good(store, "s1")
-        env = export.export(store, "claudron")
+        env = export.export(store, "claudron", now=LATER)
         assert [(i["sid"], i["seg"]) for i in env["items"]] == [("s1", 2)] and env["next"] == {"s1": 2}
 
     def test_a_retryable_failure_waits_for_harvest_when_harvest_runs(self, store):
         h = self.failed_for_good(store, "s1")
         h.append("summary.failed", {"job_id": "j2", "error": "net", "retryable": True}, seg=1)
-        assert export.export(store, "claudron")["items"] == []  # harvest will retry it: hold
+        assert export.export(store, "claudron", now=LATER)["items"] == []  # harvest will retry it: hold
+
+    def test_a_session_harvest_skips_is_treated_as_unharvested(self, store):
+        """Opted in but with no repo: harvest never takes it, so nothing will retry its summaries."""
+        h = store.session("s1")
+        h.open_session("startup", actor=ACTOR, origin={**ORIGIN, "repo": None}, transcript_path="/t.jsonl",
+                       harvest={"enabled": True, "vault": "/v"})
+        for i in (1, 2):
+            h.open_segment("session_open" if i == 1 else "compact", (i - 1) * 100)
+            h.seal_segment(i * 100, "precompact")
+        h.append("summary.failed", {"job_id": "j1", "error": "net", "retryable": True}, seg=1)
+        complete_segment(h, 2, segment_summary("s1", 2, [BLOCK_A], end=200))
+        h.close_session("other")
+        assert [i["seg"] for i in export.export(store, "claudron", now=LATER)["items"]] == [2]
 
     def test_without_harvest_nothing_retries_so_it_is_stepped_over(self, store):
         h = self.failed_for_good(store, "s1", harvest_on=False)
         h.append("summary.failed", {"job_id": "j2", "error": "net", "retryable": True}, seg=1)
-        assert [i["seg"] for i in export.export(store, "claudron")["items"]] == [2]
+        assert [i["seg"] for i in export.export(store, "claudron", now=LATER)["items"]] == [2]
+
+    def test_a_just_closed_session_still_waits_for_its_summarizer(self, store):
+        """Closing an abandoned session spawns its summarizer just after: don't step over it meanwhile."""
+        self.failed_for_good(store, "s1", harvest_on=False)
+        assert export.export(store, "claudron")["items"] == []
 
     def test_the_stores_own_consumer_names_are_reserved(self, store):
         session_with(store, "s1", ["done"])

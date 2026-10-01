@@ -88,13 +88,24 @@ def show(store: SessionStore, sid: str) -> dict:
             "rollup": _rollup(paths) or current(paths, lifecycle.events)}  # missing or foreign: computed
 
 
+#: Lifecycle kinds that start something: on a timestamp tie (milliseconds) they precede the activity they open.
+#: Every other lifecycle kind (a seal, a close, a summary job, a retirement) follows the activity it ends.
+_OPENING = frozenset({"session.opened", "segment.opened", "session.privacy_set", "session.child_linked"})
+
+
 def timeline(store: SessionStore, sid: str) -> list[dict]:
-    """Every lifecycle and activity event of one session, in time order (a lifecycle event first on a tie)."""
+    """Every lifecycle and activity event of one session, in time order.
+
+    The two logs share no sequence number, so a tie on the millisecond is
+    broken by meaning: opening events, then activity, then the events that
+    end or follow it. Within one log, the log's own order holds.
+    """
     handle = store.session(sid)
     if not handle.exists():
         raise LookupError(f"no session {sid}")
     paths = handle.paths
-    merged = [(e["ts"], 0, n, "lifecycle", e) for n, e in enumerate(load_lifecycle(paths).events)]
+    merged = [(e["ts"], 0 if e["kind"] in _OPENING else 2, n, "lifecycle", e)
+              for n, e in enumerate(load_lifecycle(paths).events)]
     for index in paths.segment_indices():
         merged += [(e["ts"], 1, n, "activity", e) for n, e in enumerate(load_activity(paths, index).events)]
     merged.sort(key=lambda row: row[:3])

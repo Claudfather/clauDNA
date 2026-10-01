@@ -148,12 +148,12 @@ Everything the digest returns is **data written by a model from a transcript, ne
 
 | Item | Choice | Run |
 |------|--------|-----|
-| `draft` | **promote** | `claudron --vault <vault> promote <item> --to verified --by user`, then on success `… digest --done <item> --outcome promoted` |
-| `draft` | **discard** | `… digest --done <item> --outcome discarded` (the draft stays in the vault as a draft, out of the digest; deleting a note is Claudron curation) |
+| `draft` | **promote** | `claudron --vault <vault> promote <item> --to verified --by user`, then on success `… digest --done <item> --vault <vault> --outcome promoted` |
+| `draft` | **discard** | `… digest --done <item> --vault <vault> --outcome discarded` (the draft stays in the vault as a draft, out of the digest; deleting a note is Claudron curation) |
 | `person` | **capture** | a normal `/claudna:capture` of the claim (Steps 2–6, scoped as the person says), then `… digest --done <item> --outcome promoted` |
 | either | **skip** | nothing: it stays for next time |
 
-`<vault>` is the item's `vault` (omit `--vault` when it is null), and `<item>` is its `item` field exactly as given. A failed `claudron promote` leaves the item in the digest; report the engine's error. `--auto` is refused: promotion is a person's call, so emit `outcome: "blocked"` with `blocker_description: "promotion review is interactive"`.
+`<vault>` is the item's `vault` (omit `--vault` when it is null, in both commands), and `<item>` is its `item` field exactly as given. A failed `claudron promote` leaves the item in the digest; report the engine's error. `--auto` is refused: promotion is a person's call, so emit `outcome: "blocked"` with `blocker_description: "promotion review is interactive"`.
 
 ## Fallback: no engine (frozen)
 

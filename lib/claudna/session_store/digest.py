@@ -54,24 +54,31 @@ def person_item(key: str) -> str:
 VAULT_MARKER = ".claudron-vault"
 
 
+def _real(path: str) -> Path:
+    return Path(os.path.realpath(os.path.expanduser(path)))
+
+
 def vault_note(path: str | None, vault: str | None) -> tuple[str | None, str | None]:
     """``(vault root, vault-relative note path)`` for a note path ``capture`` returned.
 
     ``capture`` answers ``created``/``updated`` with an absolute path, but
     ``claudron promote`` takes a vault-relative one (engine contract §2), so
-    the digest keeps the relative path and the root it is relative to: the
-    session's recorded vault, else the nearest ancestor holding the vault
-    marker. A path it can't place is kept as given.
+    the digest keeps the relative path and the root it is relative to. The
+    root is the session's recorded vault when the note lies under it, else
+    the nearest ancestor holding the vault marker. Both sides are compared as
+    real paths (``~`` expanded, symlinks and ``..`` resolved: a vault named
+    through a symlink is still the vault). A path it can't place is kept as given.
     """
     if not path or not os.path.isabs(path):
         return vault, path
-    note = Path(path)
-    candidates = [Path(vault)] if vault else [d for d in note.parents if (d / VAULT_MARKER).is_file()][:1]
+    note = _real(path)
+    candidates = [_real(vault)] if vault else []
+    candidates += [d for d in note.parents if (d / VAULT_MARKER).is_file()][:1]
     for base in candidates:
         try:
             return str(base), note.relative_to(base).as_posix()
         except ValueError:
-            pass
+            continue
     return vault, path
 
 
@@ -107,10 +114,11 @@ class Item:
         return asdict(self)
 
 
-def _records(root: Path) -> tuple[list[dict], list[dict], set[str]]:
-    """``(ledger, held, reviewed items)``, each file read once."""
+def _records(root: Path) -> tuple[list[dict], list[dict], set[tuple[str | None, str]]]:
+    """``(ledger, held, reviewed (vault, item) pairs)``, each file read once."""
     h = home(root)
-    reviewed = {r["item"] for r in read_jsonl(h / "reviewed.jsonl").records if isinstance(r.get("item"), str)}
+    reviewed = {(r.get("vault"), r["item"]) for r in read_jsonl(h / "reviewed.jsonl").records
+                if isinstance(r.get("item"), str)}
     return read_jsonl(h / "ledger.jsonl").records, read_jsonl(h / "held.jsonl").records, reviewed
 
 
@@ -131,22 +139,23 @@ def items(root: Path, *, limit: int | None = DIGEST_SIZE) -> list[Item]:
     seen = evidence(root, ledger, held)
     drafts: dict[str, dict] = {}
     for rec in ledger:
-        path = rec.get("path")
-        if rec.get("action") not in ("created", "updated") or not isinstance(path, str) or path in done:
-            continue
-        d = drafts.setdefault(path, {"title": rec.get("title") or path, "claim": rec.get("claim"),
-                                     "vault": rec.get("vault"), "sessions": 0, "user": False, "last_ts": ""})
+        path, vault = rec.get("path"), rec.get("vault")
+        if rec.get("action") not in ("created", "updated") or not isinstance(path, str) or \
+                (vault, path) in done or (None, path) in done:
+            continue  # a note is (vault, path); a review that named no vault covers the path in any vault
+        d = drafts.setdefault((vault, path), {"title": rec.get("title") or path, "claim": rec.get("claim"),
+                                              "vault": vault, "sessions": 0, "user": False, "last_ts": ""})
         d["sessions"] = max(d["sessions"], len(seen.get(rec.get("key"), ())))
         d["user"] = d["user"] or rec.get("asserted_by") == "user"
         d["last_ts"] = max(d["last_ts"], rec.get("ts") or "")
     newest = sorted(drafts.items(), key=lambda kv: kv[1]["last_ts"], reverse=True)  # stable: the tiebreak below
     ranked = [Item("draft", path, d["title"], d["claim"], d["vault"], d["sessions"],
                    "user" if d["user"] else "agent", d["last_ts"])
-              for path, d in sorted(newest, key=lambda kv: (-kv[1]["sessions"], not kv[1]["user"]))]
+              for (_, path), d in sorted(newest, key=lambda kv: (-kv[1]["sessions"], not kv[1]["user"]))]
     people: dict[str, Item] = {}
     for rec in held:
         key, block = rec.get("key"), rec.get("block") if isinstance(rec.get("block"), dict) else {}
-        if not isinstance(key, str) or (item := person_item(key)) in done:
+        if not isinstance(key, str) or (None, item := person_item(key)) in done:
             continue
         name = (block.get("subject_hint") or {}).get("name") or "person fact"
         people[key] = Item("person", item, name, block.get("claim"), None, len(seen.get(key, ())),
@@ -155,12 +164,17 @@ def items(root: Path, *, limit: int | None = DIGEST_SIZE) -> list[Item]:
     return found if limit is None else found[:limit]
 
 
-def mark_reviewed(root: Path, item: str, *, outcome: str) -> None:
-    """Take ``item`` (a note path or a held fact's ``person:`` id) out of the digest, recording what the person did."""
+def mark_reviewed(root: Path, item: str, *, outcome: str, vault: str | None = None) -> None:
+    """Take ``item`` out of the digest, recording what the person did.
+
+    ``item`` and ``vault`` are the digest item's own fields: a note's
+    vault-relative path and its vault, or a held fact's ``person:`` id (no
+    vault). With no ``vault``, a note path is taken out in every vault.
+    """
     if outcome not in ("promoted", "discarded", "kept"):
         raise ValueError(f"invalid outcome: {outcome!r}")
-    append_jsonl(ensure_dir(home(root)) / "reviewed.jsonl", {"ts": now_ts(), "item": item, "outcome": outcome},
-                 durable=False)
+    append_jsonl(ensure_dir(home(root)) / "reviewed.jsonl",
+                 {"ts": now_ts(), "item": item, "vault": vault, "outcome": outcome}, durable=False)
     write_review_line(root)
 
 

@@ -43,7 +43,7 @@ from claudna.redact import redact_strings
 
 from . import schema
 from .fsio import atomic_write_json, ensure_dir, exclusive_lock, read_json, utc_seconds
-from .project import by_segment, load_lifecycle, session_facts, summary_verdict
+from .project import by_segment, harvest_skip, latest_origin, load_lifecycle, session_facts, summary_verdict
 from .store import SessionStore
 
 ENABLE_ENV = "CLAUDNA_HARVEST"
@@ -213,15 +213,12 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
         return  # nothing new: skip the lifecycle read (most sessions, most runs)
     lifecycle = load_lifecycle(handle.paths).events
     facts = session_facts(lifecycle)
-    if facts.private or not (facts.harvest or {}).get("enabled"):
-        return  # private, or this session never opted in: never harvested
-    origin = _latest_origin(lifecycle)
-    if not origin.get("repo"):
-        return  # no repo, no project scope: its drafts would land in the vault's shared tree (#373, M4)
-    vault = facts.harvest.get("vault")
-    if not vault and not (origin.get("cwd") and os.path.isdir(origin["cwd"])):
+    skip = harvest_skip(facts, lifecycle)
+    if skip == "no vault":
         report.errors.append(f"{sid}: no vault to route to (none recorded, and its cwd is gone)")
+    if skip:
         return
+    origin, vault = latest_origin(lifecycle), facts.harvest.get("vault")
     indices = handle.paths.segment_indices()
     for index in indices:
         if index <= through:
@@ -280,11 +277,6 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
             report.held_back += 1
         report.segments += 1
         handle.ack(CONSUMER, index)
-
-
-def _latest_origin(lifecycle: list[dict]) -> dict:
-    opened = [e for e in lifecycle if e["kind"] == "session.opened"]
-    return opened[-1]["data"].get("origin") or {} if opened else {}
 
 
 def _resummarize(handle, index: int, env: Mapping[str, str]) -> str:

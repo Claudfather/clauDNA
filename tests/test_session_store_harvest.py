@@ -427,7 +427,7 @@ class TestReviewRound373:
 
     def test_a_crash_in_one_session_still_leaves_the_run_record(self, store, monkeypatch):
         summarized_session(store, "s1", [[BLOCK]])
-        monkeypatch.setattr(harvest, "_latest_origin", lambda lifecycle: 1 / 0)
+        monkeypatch.setattr(harvest, "harvest_skip", lambda facts, lifecycle: 1 / 0)
         report = harvest.harvest(store, env=ON, capture=FakeCapture())
         last = json.loads((store.root / "harvest" / "last_run.json").read_text())
         assert "ZeroDivisionError" in report.errors[0] and last["errors"] == report.errors

@@ -19,6 +19,7 @@ resurrect it, and nothing here ever creates a directory.
 
 from __future__ import annotations
 
+import os
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -169,6 +170,28 @@ class SessionFacts:
     chain_id: str | None = None  # the first session.opened's, as session.json has it: a resume records its own sid
     claude_pid: int | None = None  # the latest session.opened's owning Claude Code process
     harvest: dict | None = None  # the latest session.opened's {enabled, vault}: its own consumer choice
+
+
+def latest_origin(lifecycle: list[dict]) -> dict:
+    """The latest ``session.opened``'s origin (a resume can move the session to another cwd)."""
+    opened = [e for e in lifecycle if e["kind"] == "session.opened"]
+    return opened[-1]["data"].get("origin") or {} if opened else {}
+
+
+def harvest_skip(facts: SessionFacts, lifecycle: list[dict]) -> str | None:
+    """Why harvest never takes this session (``off``, ``no repo``, ``no vault``), or ``None`` if it does.
+
+    The one test: harvest skips on it, and export uses it to know whether
+    anyone will ever retry this session's summaries (only harvest does).
+    """
+    if facts.private or not (facts.harvest or {}).get("enabled"):
+        return "off"  # private, or this session never opted in
+    origin = latest_origin(lifecycle)
+    if not origin.get("repo"):
+        return "no repo"  # no project scope: its drafts would land in the vault's shared tree (#373, M4)
+    if not facts.harvest.get("vault") and not (origin.get("cwd") and os.path.isdir(origin["cwd"])):
+        return "no vault"  # none recorded, and the cwd it would be found from is gone
+    return None
 
 
 #: A summary still ``pending`` this long after its request lost its worker (killed, machine asleep).

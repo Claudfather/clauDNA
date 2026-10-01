@@ -316,6 +316,7 @@ def main(argv: list[str] | None = None) -> int:
     dig.add_argument("--limit", type=int, default=5)
     dig.add_argument("--json", action="store_true")
     dig.add_argument("--done", metavar="ITEM", help="take an item (a note path or a held fact's person: id) off")
+    dig.add_argument("--vault", help="with --done: the item's vault, as the digest gave it")
     dig.add_argument("--outcome", choices=("promoted", "discarded", "kept"), default="kept")
     rns = sub.add_parser("runs", help="the ops log: the store's background runs, newest first", parents=[rooted])
     rns.add_argument("--kind", choices=("summarize", "harvest", "sweep"))
@@ -410,8 +411,8 @@ def main(argv: list[str] | None = None) -> int:
         if store is None:
             return 1
         if args.done:
-            digest.mark_reviewed(store.root, args.done, outcome=args.outcome)
-            print(json.dumps({"item": args.done, "outcome": args.outcome}))
+            digest.mark_reviewed(store.root, args.done, outcome=args.outcome, vault=args.vault)
+            print(json.dumps({"item": args.done, "vault": args.vault, "outcome": args.outcome}))
             return 0
         found = [i.as_dict() for i in digest.items(store.root, limit=args.limit)]
         if args.json:

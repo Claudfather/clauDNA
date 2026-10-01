@@ -18,14 +18,14 @@ These are the three phases the spec lists after activity, built in one pass beca
   - The summarizer refreshes the rollup after every `summary.completed`, under its own lock, so two workers can't write it out of order.
   - **Addition:** retention moves a retired segment's summary to `sessions/<sid>/summaries/seg-NNN.json`, and the rollup reads those too, so knowledge outlives its segment directory and the rollup stays a pure function of the files on disk. §6.7 predates retention and didn't say.
 - **Readers (§8)**, `readers.py`: `list`, `show`, `timeline`, `failures [--group]`, as `session_store` verbs and as `/claudna:session` verbs (`history.md`).
-  - They're read-only. A projection that is missing or fails its schema is folded from its log in memory and never written. `show` also computes a missing rollup in memory; `list` reads the rollup file only, so it stays one read per session.
+  - They're read-only. A projection that is missing, fails its schema, or is behind its log is folded from its log in memory and never written. `show` also computes a missing rollup in memory; `list` reads the rollup file only, so it stays one read per session.
   - `failures --group` folds by signature across sessions and carries the newest occurrence's `tool_use_id`, so the full error can be read in the transcript. The store keeps a pointer, not a copy (phase 4).
 - **Export (§8)**, `export.py`: `session_store export --consumer <name> [--since-seg N] [--limit N] [--json]`, and `--ack --sid <sid> --through <seg>`.
   - The envelope is `claudna.export/1`: `{consumer, items: [{sid, seg, session, summary}], next: {sid: through}}`. `session` is a fixed subset of `session.json`.
-  - Per session, a final `done` segment is an item, a `skipped` one passes, and anything still in flight stops that session. This is harvest's rule, so a cursor never skips work still coming.
-  - Private sessions are never exported. Acks go through `SessionHandle.ack`, so there's one writer and a cursor never moves back.
+  - Per session, a final `done` segment is an item, a `skipped` one passes, and so does one whose summary will never come (its last attempt spent, or a retry in a session harvest never runs for). Anything still in flight stops that session. The verdict is harvest's own (`project.summary_verdict`), so a cursor never skips work still coming and never waits on work that isn't.
+  - Private sessions are never exported. Acks go through `SessionHandle.ack`, so there's one writer and a cursor never moves back. An ack can't go past the session's last segment, and `harvest` is a reserved consumer name.
 - **Retention (§9)**, `retention.py`, run by the detached sweep (at most every 6 hours, bounded per run):
-  - A final segment is retired once every *registered* consumer (anyone who has acked the session) acked it, or past `CLAUDNA_RETAIN_DAYS` (30).
+  - A final segment is retired once every *registered* consumer (anyone who has acked the session) acked it, or past `CLAUDNA_RETAIN_DAYS` (30; `0` turns the age cap off).
   - Retiring archives the summary, appends `segment.retired {reason: acked|age}` and removes the directory; then, once per session per run, it refreshes the rollup and rebuilds the projections. `session.json.segments.retired` counts retirements.
   - **Deviation from §9: a floor for acked segments,** `CLAUDNA_RETAIN_ACKED_DAYS` (7). §9 retires an acked segment at once. Harvest acks as soon as it captures, so without a floor a harvested segment would disappear minutes after its session ended, taking `timeline` and `show` with it. The age cap is unchanged.
 
@@ -33,7 +33,7 @@ These are the three phases the spec lists after activity, built in one pass beca
 
 §7.2's full pipeline needs Claudron pipes that don't exist yet. Claudron 0.6.1 has no `subjects`, `resolve`, `revert-run` or `--include-drafts` ([Claudron#200](https://github.com/Claudfather/Claudron/issues/200)). What doesn't need them is built:
 
-- **The ledger**, `harvest/ledger.jsonl`: one line per capture. Each line has the session, the segment, the note's vault path (`claudron capture --json`'s `data.path`), the vault, who asserted it, and a **claim key** (the rollup's block key). Held person facts carry the key too.
+- **The ledger**, `harvest/ledger.jsonl`: one line per capture. Each line has the session, the segment, the note's path made vault-relative (`capture` answers with an absolute `data.path`; `claudron promote` takes a vault-relative one), the vault root, who asserted it, and a **claim key** (the rollup's block key). Held person facts carry the key too.
 - **Evidence**: the distinct sessions per claim key. That is §7.2's "recurring across ≥ 2 sessions" signal, counted locally.
 - **The promotion digest** (§7.2, "a digest capped at ~5 items, most-reinforced first, surfaced as one SessionStart line, never blocking"): `digest.py`, `session_store digest`, and `/claudna:capture --review`.
   - It lists unreviewed drafts by sessions of evidence, user-asserted first on a tie, then the most recent. Held person facts come after.

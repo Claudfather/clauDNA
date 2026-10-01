@@ -142,3 +142,28 @@ class TestVaultRelativeItems:
                               path=str(vault / "projects" / "n.md"), vault=str(vault))
         (item,) = digest.items(store.root)
         assert (item.item, item.vault) == ("projects/n.md", str(vault))
+
+    def test_a_vault_named_through_a_symlink_is_still_the_vault(self, tmp_path):
+        real = tmp_path / "real-vault"
+        (real / "projects").mkdir(parents=True)
+        (tmp_path / "link").symlink_to(real)
+        note = str(real / "projects" / "n.md")  # capture answers with the real path
+        assert digest.vault_note(note, str(tmp_path / "link")) == (str(real), "projects/n.md")
+        assert digest.vault_note(note, str(tmp_path / "link" / ".." / "real-vault")) == (str(real), "projects/n.md")
+
+    def test_a_recorded_vault_that_doesnt_contain_the_note_falls_back_to_the_marker(self, tmp_path):
+        vault = tmp_path / "vault"
+        (vault / "projects").mkdir(parents=True)
+        (vault / digest.VAULT_MARKER).write_text("")
+        assert digest.vault_note(str(vault / "projects" / "n.md"), str(tmp_path / "elsewhere")) == \
+            (str(vault), "projects/n.md")
+
+    def test_the_same_path_in_two_vaults_is_two_items(self, store, tmp_path):
+        for name in ("a", "b"):
+            vault = tmp_path / name
+            digest.record_capture(store.root, sid=f"s-{name}", seg=1, block=BLOCK, title=name, action="created",
+                                  path=str(vault / "projects" / "n.md"), vault=str(vault))
+        found = digest.items(store.root)
+        assert sorted(i.vault for i in found) == [str(tmp_path / "a"), str(tmp_path / "b")]
+        digest.mark_reviewed(store.root, "projects/n.md", outcome="promoted", vault=str(tmp_path / "a"))
+        assert [i.vault for i in digest.items(store.root)] == [str(tmp_path / "b")]
