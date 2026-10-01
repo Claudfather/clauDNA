@@ -210,6 +210,14 @@ class TestActorAndOrigin:
         origin = boundaries.origin_from_cwd(str(repo))
         assert (origin["repo"], origin["branch"], len(origin["head"])) == ("repo", "trunk", 40)
 
+    def test_a_repo_with_no_commits_yet_still_has_a_name(self, tmp_path):
+        """A fresh ``git init``: HEAD can't resolve, but the repo is known (harvest scopes drafts to it)."""
+        repo = tmp_path / "fresh"
+        repo.mkdir()
+        subprocess.run(["git", "-C", str(repo), "init", "-q"], check=True)
+        assert boundaries.origin_from_cwd(str(repo)) == {"cwd": str(repo), "repo": "fresh", "branch": None,
+                                                         "head": None}
+
     def test_the_origin_outside_a_repo_has_no_branch(self, tmp_path):
         assert boundaries.origin_from_cwd(str(tmp_path)) == {"cwd": str(tmp_path), "repo": None,
                                                               "branch": None, "head": None}

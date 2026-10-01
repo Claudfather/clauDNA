@@ -117,3 +117,28 @@ class TestCliAndBriefing:
                               capture_output=True, text=True, cwd=tmp_path, timeout=20,
                               env={"HOME": str(tmp_path / "home"), "PATH": "/usr/bin:/bin"})
         assert "Memory, to review: 2 draft(s)" in proc.stdout
+
+
+class TestVaultRelativeItems:
+    """``capture`` answers with an absolute path; ``claudron promote`` takes a vault-relative one."""
+
+    def test_a_path_under_the_recorded_vault(self, tmp_path):
+        vault = tmp_path / "vault"
+        assert digest.vault_note(str(vault / "projects" / "w" / "n.md"), str(vault)) == (str(vault), "projects/w/n.md")
+
+    def test_the_vault_is_found_by_its_marker_when_none_was_recorded(self, tmp_path):
+        vault = tmp_path / "vault"
+        (vault / "projects").mkdir(parents=True)
+        (vault / digest.VAULT_MARKER).write_text("")
+        assert digest.vault_note(str(vault / "projects" / "n.md"), None) == (str(vault), "projects/n.md")
+
+    def test_a_relative_or_unplaceable_path_is_kept(self, tmp_path):
+        assert digest.vault_note("knowledge/n.md", None) == (None, "knowledge/n.md")
+        assert digest.vault_note(str(tmp_path / "n.md"), None) == (None, str(tmp_path / "n.md"))
+
+    def test_the_ledger_and_digest_carry_the_relative_path(self, store, tmp_path):
+        vault = tmp_path / "vault"
+        digest.record_capture(store.root, sid="s1", seg=1, block=BLOCK, title="t", action="created",
+                              path=str(vault / "projects" / "n.md"), vault=str(vault))
+        (item,) = digest.items(store.root)
+        assert (item.item, item.vault) == ("projects/n.md", str(vault))

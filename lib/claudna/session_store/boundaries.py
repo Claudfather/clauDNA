@@ -88,12 +88,16 @@ def origin_from_cwd(cwd: str) -> dict:
 
     repo = branch = head = None
     try:
-        out = subprocess.run(
+        proc = subprocess.run(
             ["git", "-c", "core.fsmonitor=", "rev-parse", "--show-toplevel", "HEAD", "--abbrev-ref", "HEAD"],
-            cwd=cwd, capture_output=True, text=True, timeout=1, check=True,
-        ).stdout.splitlines()
-        if len(out) == 3:  # the top level, the sha, then the branch (--abbrev-ref applies to later args only)
+            cwd=cwd, capture_output=True, text=True, timeout=1,
+        )
+        out = proc.stdout.splitlines()
+        # The top level comes first and is printed even when HEAD can't resolve (a repo with no
+        # commits yet): the repo is known then, its sha and branch aren't.
+        if out and os.path.isabs(out[0]):
             repo = os.path.basename(out[0]) or None
+        if proc.returncode == 0 and len(out) == 3:  # then the sha, then the branch (--abbrev-ref: later args)
             head = out[1]
             branch = None if out[2] == "HEAD" else out[2]  # "HEAD" means detached
     except (OSError, subprocess.SubprocessError):

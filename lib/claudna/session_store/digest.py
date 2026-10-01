@@ -26,6 +26,7 @@ writes, risk tiers, the inbox and ambiguous queues, and ``revert-run``.
 from __future__ import annotations
 
 import hashlib
+import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -50,9 +51,34 @@ def person_item(key: str) -> str:
     return "person:" + hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
 
 
+VAULT_MARKER = ".claudron-vault"
+
+
+def vault_note(path: str | None, vault: str | None) -> tuple[str | None, str | None]:
+    """``(vault root, vault-relative note path)`` for a note path ``capture`` returned.
+
+    ``capture`` answers ``created``/``updated`` with an absolute path, but
+    ``claudron promote`` takes a vault-relative one (engine contract §2), so
+    the digest keeps the relative path and the root it is relative to: the
+    session's recorded vault, else the nearest ancestor holding the vault
+    marker. A path it can't place is kept as given.
+    """
+    if not path or not os.path.isabs(path):
+        return vault, path
+    note = Path(path)
+    candidates = [Path(vault)] if vault else [d for d in note.parents if (d / VAULT_MARKER).is_file()][:1]
+    for base in candidates:
+        try:
+            return str(base), note.relative_to(base).as_posix()
+        except ValueError:
+            pass
+    return vault, path
+
+
 def record_capture(root: Path, *, sid: str, seg: int, block: dict, title: str, action: str,
                    path: str | None, vault: str | None) -> None:
-    """One ledger line for one ``claudron capture`` answer."""
+    """One ledger line for one ``claudron capture`` answer, its note path made vault-relative."""
+    vault, path = vault_note(path, vault)
     append_jsonl(ensure_dir(home(root)) / "ledger.jsonl", {
         "ts": now_ts(), "sid": sid, "seg": seg, "key": claim_key(block), "title": title, "claim": block.get("claim"),
         "asserted_by": block.get("asserted_by"), "action": action, "path": path, "vault": vault,

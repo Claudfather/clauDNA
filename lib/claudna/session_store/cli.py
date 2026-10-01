@@ -398,7 +398,8 @@ def main(argv: list[str] | None = None) -> int:
             for r in found:
                 who = f"  {len(r['sessions'])} session(s)" if r["sessions"] else ""
                 print(f"{r['started_at']}  {r['kind']:9} {r['duration_ms']:>7} ms  {r['outcome']}{who}")
-            print("no runs" if not found else "")
+            if not found:
+                print("no runs")
         return 0
     if args.verb == "export":
         return _export(args)
@@ -419,7 +420,8 @@ def main(argv: list[str] | None = None) -> int:
             for n, i in enumerate(found, 1):
                 seen = f"{i['sessions']} session(s)" + (", user-asserted" if i["asserted_by"] == "user" else "")
                 print(f"{n}. [{i['kind']}] {i['title']}  ({seen})\n   {i['claim'] or ''}\n   item: {i['item']}")
-            print("nothing to review" if not found else "")
+            if not found:
+                print("nothing to review")
         return 0
     handle = _handle(args)
     if handle is None:
