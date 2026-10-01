@@ -6,7 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.23.0] - 2026-10-01
 ### Added
+- **Heads-up: the session store now deletes old raw data.** The background sweep retires a segment's directory (its event log and projection) 30 days after it was sealed, or 7 days after it was sealed once every registered consumer (harvest, an `export --ack` caller) has acked it. `timeline` and `failures` no longer see its events. A segment that had a summary (opt-in) keeps it in `sessions/<sid>/summaries/` and the session's rollup, so `show` and `export` still carry what it said; with summaries off, the default, nothing of it is kept but its boundaries in the session log. `CLAUDNA_RETAIN_DAYS=0` turns the age cap off; `CLAUDNA_RETAIN_ACKED_DAYS` sets the 7-day floor. See SETUP_GUIDE §3.7.
 - **The session store can be read (phase 6).**
   - `session_store list|show|timeline|failures`, also as `/claudna:session` verbs: sessions newest first, one session with its lineage and segments, a merged event timeline, and tool failures grouped by signature across sessions. They're read-only: an untrusted projection is folded from its log, never written. Cross-session views (`list`, `failures` with no session) leave private sessions out unless `--include-private`; a session that can't be read is skipped and named, not fatal; model-written text is printed without control characters.
   - Each session gets a deterministic rollup, `sessions/<sid>/summary.json` (spec §6.7), refreshed after every segment summary.
