@@ -43,7 +43,8 @@ from claudna.redact import redact_strings
 
 from . import schema
 from .fsio import atomic_write_json, ensure_dir, exclusive_lock, read_json, utc_seconds
-from .project import by_segment, harvest_skip, latest_origin, load_lifecycle, session_facts, summary_verdict
+from .project import (abandoned_at, by_segment, harvest_skip, latest_origin, load_lifecycle, session_facts,
+                      summary_verdict)
 from .store import SessionStore
 
 ENABLE_ENV = "CLAUDNA_HARVEST"
@@ -104,8 +105,38 @@ def run_claudron_capture(finding: dict, cwd: str | None, env: Mapping[str, str],
             (proc.returncode != 0 and action != "rejected") or (not envelope.get("ok") and action != "rejected"):
         errors = envelope.get("errors")
         raise CaptureError(f"claudron capture exited {proc.returncode}: {str(errors or data)[:150]}")
-    path = data.get("path")
-    return {"action": action, "path": path if isinstance(path, str) and path else None}
+    path = data.get("path") if isinstance(data.get("path"), str) and data.get("path") else None
+    root = _vault_root(cwd, vault, child_env) if path and os.path.isabs(path) else None
+    if root:
+        try:  # created/updated answer with an absolute path; promote takes a vault-relative one (contract §2)
+            path = Path(os.path.realpath(path)).relative_to(root).as_posix()
+        except ValueError:
+            pass  # outside the vault claudron reports: keep it as given
+    return {"action": action, "path": path, "vault": str(root) if root else vault}
+
+
+_ROOTS: dict[tuple[str | None, str | None], Path | None] = {}  #: one ``status`` per vault per run (a short process)
+
+
+def _vault_root(cwd: str | None, vault: str | None, env: Mapping[str, str]) -> Path | None:
+    """The vault root Claudron itself reports (``status --json``'s ``data.root``) for this session, or ``None``.
+
+    Vault resolution is Claudron's contract (claudron-engine.md §2): ask it,
+    with the same ``--vault``/``cwd`` the capture used, rather than re-deriving it.
+    """
+    import subprocess
+
+    key = (cwd, vault)
+    if key not in _ROOTS:
+        cmd = [claudron_bin(env), *(["--vault", vault] if vault else []), "status", "--json"]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT_S, env=dict(env),
+                                  cwd=cwd if cwd and os.path.isdir(cwd) else None)
+            root = (json.loads(proc.stdout).get("data") or {}).get("root") if proc.returncode == 0 else None
+        except (OSError, subprocess.SubprocessError, ValueError, AttributeError):
+            root = None
+        _ROOTS[key] = Path(os.path.realpath(root)) if isinstance(root, str) and root else None
+    return _ROOTS[key]
 
 
 def claudron_bin(env: Mapping[str, str]) -> str:
@@ -233,7 +264,8 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
             status = "stale"  # summarized before a later re-seal: its range misses the tail
         if status in ("none", "pending", "failed", "stale"):
             verdict = "retry" if status == "stale" else \
-                summary_verdict(by_segment(lifecycle)[index], report.started_epoch)
+                summary_verdict(by_segment(lifecycle)[index], report.started_epoch,
+                                abandoned_at=abandoned_at(lifecycle))
             if verdict == "give up":
                 report.gave_up += 1
                 report.errors.append(f"{sid}: seg-{index:03d} was never summarized; skipped by harvest")
@@ -265,7 +297,7 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
             answer = capture(finding, origin.get("cwd"), env, vault)
             action = answer["action"]
             digest.record_capture(store.root, sid=sid, seg=index, block=block, title=finding["title"],
-                                  action=action, path=answer["path"], vault=vault)
+                                  action=action, path=answer["path"], vault=answer.get("vault", vault))
             if action in ("created", "updated"):
                 report.created += 1
             elif action == "rejected":

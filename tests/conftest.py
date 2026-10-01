@@ -71,3 +71,12 @@ def complete_segment(handle, index: int, doc: dict) -> None:
     atomic_write_json(handle.paths.segment(index).summary, doc)
     handle.append("summary.completed", {"job_id": f"j{index}", "artifact": f"seg-{index:03d}/summary.json",
                                         "input_sha256": "0" * 64, "duration_ms": 1}, seg=index)
+
+
+def rewrite_log(path: Path, edit) -> None:
+    """Rewrite a JSONL log in place through ``edit(events) -> events``: backdate, drop or pin events in a test.
+
+    Writes the file directly, so projections are not refreshed: call ``rebuild()`` after when a test needs them.
+    """
+    events = [json.loads(line) for line in path.read_text().splitlines()]
+    path.write_text("".join(json.dumps(e) + "\n" for e in edit(events)))

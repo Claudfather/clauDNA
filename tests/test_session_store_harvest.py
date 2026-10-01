@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 
 import pytest
-from conftest import ACTOR, ORIGIN, segment_summary
+from conftest import ACTOR, ORIGIN, rewrite_log, segment_summary
 
 from claudna.session_store import harvest, project
 from claudna.session_store.fsio import atomic_write_json, exclusive_lock
@@ -236,10 +236,7 @@ class TestStrandedSummaries:
                 h.append("summary.failed", {"job_id": f"r{n}", "error": "claude timed out", "retryable": retryable},
                          seg=2)
         if kind == "pending" and age_s:
-            lines = h.paths.lifecycle.read_text().splitlines()
-            last = json.loads(lines[-1])
-            last["ts"] = "2000-01-01T00:00:00.000Z"
-            h.paths.lifecycle.write_text("\n".join([*lines[:-1], json.dumps(last)]) + "\n")
+            rewrite_log(h.paths.lifecycle, lambda es: [*es[:-1], {**es[-1], "ts": "2000-01-01T00:00:00.000Z"}])
         h.rebuild()
         return h
 
@@ -256,6 +253,16 @@ class TestStrandedSummaries:
 
         report = harvest.harvest(store, env=ON, capture=FakeCapture(), resummarize=resummarize)
         assert calls == [2] and report.retried == 1 and cursor(h) == 2
+
+    def test_a_just_abandoned_session_is_not_retried_alongside_the_worker_its_close_spawned(self, store):
+        """The sweep's close summarizes a segment a PreCompact sealed long ago, spawning the worker just
+        after: until that worker records its request, the old seal must not read as a dead summary."""
+        h = summarized_session(store, "s1", [[BLOCK], [BLOCK]], closed=False)
+        h.append("summary.failed", {"job_id": "r0", "error": "claude timed out", "retryable": True}, seg=2)
+        h.append("session.closed", {"reason": "abandoned"})
+        calls = []
+        harvest.harvest(store, env=ON, capture=FakeCapture(), resummarize=lambda *a: calls.append(a) or "x")
+        assert calls == [] and cursor(h) == 1  # seg-001 taken; seg-002 waits for the spawned worker
 
     def test_a_pending_summary_whose_worker_died_is_retried_but_a_fresh_one_is_left(self, store):
         calls = []
@@ -325,12 +332,16 @@ class TestScheduling:
 
 FAKE_CLAUDRON = """#!/usr/bin/env python3
 import json, os, sys
+if "status" in sys.argv:  # vault resolution: the root FAKE_ROOT names, as claudron reports it
+    print(json.dumps({"ok": True, "command": "status", "data": {"root": os.environ.get("FAKE_ROOT")}}))
+    sys.exit(0 if os.environ.get("FAKE_ROOT") else 3)
 finding = json.loads(sys.stdin.read())
 with open(os.environ["FAKE_LOG"], "w") as fh:
     json.dump({"argv": sys.argv[1:], "finding": finding, "cwd": os.getcwd(),
                "env_vault": os.environ.get("CLAUDRON_VAULT_PATH")}, fh)
 print(json.dumps({"ok": True, "command": "capture", "errors": [], "warnings": [],
-                  "data": {"action": os.environ.get("FAKE_ACTION", "created"), "path": "p.md", "reason": None,
+                  "data": {"action": os.environ.get("FAKE_ACTION", "created"), "path": os.environ.get("FAKE_PATH", "p.md"),
+                           "reason": None,
                            "written": True}}))
 """
 
@@ -355,6 +366,26 @@ class TestRunClaudronCapture:
         REAL_CAPTURE({"type": "knowledge", "title": "t"}, str(tmp_path), env, "/vaults/work")
         seen = json.loads((tmp_path / "log").read_text())
         assert seen["argv"][:2] == ["--vault", "/vaults/work"] and seen["env_vault"] is None
+
+    def test_an_absolute_note_path_is_made_relative_to_the_root_claudron_reports(self, tmp_path):
+        harvest._ROOTS.clear()
+        real = tmp_path / "real-vault"
+        (real / "projects").mkdir(parents=True)
+        (tmp_path / "link").symlink_to(real)  # the session named its vault through a symlink
+        env = {**self.make(tmp_path), "FAKE_ROOT": str(real), "FAKE_PATH": str(real / "projects" / "n.md")}
+        answer = REAL_CAPTURE({"type": "knowledge", "title": "t"}, str(tmp_path), env, str(tmp_path / "link"))
+        assert (answer["path"], answer["vault"]) == ("projects/n.md", str(real))  # what `promote` takes
+
+    def test_without_a_root_the_path_is_kept_as_given(self, tmp_path):
+        harvest._ROOTS.clear()
+        env = {**self.make(tmp_path), "FAKE_PATH": str(tmp_path / "n.md")}  # status fails: no FAKE_ROOT
+        answer = REAL_CAPTURE({"type": "knowledge", "title": "t"}, str(tmp_path), env)
+        assert (answer["path"], answer["vault"]) == (str(tmp_path / "n.md"), None)
+
+    def test_a_relative_answer_needs_no_status_call(self, tmp_path):
+        harvest._ROOTS.clear()
+        REAL_CAPTURE({"type": "knowledge", "title": "t"}, str(tmp_path), self.make(tmp_path))
+        assert harvest._ROOTS == {}
 
     def test_a_not_ok_envelope_is_an_error(self, tmp_path):
         fake = tmp_path / "claudron"
@@ -398,14 +429,12 @@ class TestReviewRound373:
 
     def test_a_sealed_segment_never_summarized_is_retried_after_its_grace(self, store):
         h = summarized_session(store, "s1", [[BLOCK], [BLOCK]])
-        lines = h.paths.lifecycle.read_text().splitlines()
-        # drop seg 2's summary.completed: the spawn died, the status stayed "none"
-        kept = [ln for ln in lines if not (json.loads(ln)["kind"] == "summary.completed" and json.loads(ln)["seg"] == 2)]
-        old = [json.loads(ln) for ln in kept]
-        for e in old:
-            if e["kind"] == "segment.sealed" and e["seg"] == 2:
-                e["ts"] = "2000-01-01T00:00:00.000Z"
-        h.paths.lifecycle.write_text("".join(json.dumps(e) + "\n" for e in old))
+        def died(events):  # drop seg 2's summary.completed (the spawn died, the status stayed "none"); age its seal
+            kept = [e for e in events if not (e["kind"] == "summary.completed" and e["seg"] == 2)]
+            return [{**e, "ts": "2000-01-01T00:00:00.000Z"} if e["kind"] == "segment.sealed" and e["seg"] == 2 else e
+                    for e in kept]
+
+        rewrite_log(h.paths.lifecycle, died)
         h.rebuild()
         calls = []
         harvest.harvest(store, env=ON, capture=FakeCapture(), resummarize=lambda hh, i, e: calls.append(i) or "x")

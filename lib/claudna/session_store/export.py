@@ -28,9 +28,8 @@ from __future__ import annotations
 import re
 import time
 
-from .fsio import epoch_of
-from .project import (STALE_PENDING_S, by_segment, harvest_skip, load_lifecycle, next_segment_index, segment_states,
-                      session_doc, session_facts, session_status, summary_verdict)
+from .project import (abandoned_at, by_segment, harvest_skip, load_lifecycle, next_segment_index, segment_states,
+                      session_doc, session_facts, summary_verdict)
 from .store import SessionStore
 
 EXPORT_SCHEMA = "claudna.export/1"
@@ -49,23 +48,19 @@ def check_consumer(name: str) -> str:
     return name
 
 
-def _settled(state, events: list[dict], facts, lifecycle: list[dict], now: float) -> bool:
+def _settled(summary: str, events: list[dict], *, retried: bool, abandoned: str | None, now: float) -> bool:
     """Is a final segment with no usable summary past waiting for, so export may step over it (no item)?
 
     Its summary has had its last attempt (:func:`project.summary_verdict`),
-    or it is merely due a retry in a session harvest never takes
-    (:func:`project.harvest_skip`): only harvest retries summaries, so
-    nothing else is coming. A stale or unreadable summary is still waited
-    for, and so is anything within :data:`STALE_PENDING_S` of the session's
-    close: closing an abandoned session spawns its summarizer just after.
+    or it is due a retry that nothing will run: only harvest retries
+    summaries, and ``retried`` says whether harvest takes this session
+    (:func:`project.harvest_skip`). A stale or unreadable summary is still
+    waited for.
     """
-    if state.summary not in ("none", "pending", "failed"):
+    if summary not in ("none", "pending", "failed"):
         return False
-    closed_at = session_status(lifecycle)[1]
-    if closed_at and now - epoch_of(closed_at) < STALE_PENDING_S:
-        return False  # a summarizer started at the close may not have recorded its request yet
-    verdict = summary_verdict(events, now)
-    return verdict == "give up" or (verdict == "retry" and harvest_skip(facts, lifecycle) is not None)
+    verdict = summary_verdict(events, now, abandoned_at=abandoned)
+    return verdict == "give up" or (verdict == "retry" and not retried)
 
 
 def export(store: SessionStore, consumer: str, *, since_seg: int | None = None, limit: int = 100,
@@ -87,14 +82,15 @@ def export(store: SessionStore, consumer: str, *, since_seg: int | None = None, 
         facts = session_facts(lifecycle.events)
         if not lifecycle.events or facts.private:
             continue
-        through, subset, buckets = start, None, None
+        through, subset = start, None
+        buckets, abandoned = by_segment(lifecycle.events), abandoned_at(lifecycle.events)
+        retried = harvest_skip(facts, lifecycle.events) is None
         for state in (s for s in segment_states(handle.paths, lifecycle.events) if s.index > start):
             if not state.final or len(items) >= limit:
                 break
-            if state.summary not in ("done", "skipped"):
-                buckets = buckets if buckets is not None else by_segment(lifecycle.events)
-                if not _settled(state, buckets.get(state.index, []), facts, lifecycle.events, now):
-                    break  # still in flight, stale or unreadable: the session's cursor holds here
+            if state.summary not in ("done", "skipped") and not _settled(
+                    state.summary, buckets.get(state.index, []), retried=retried, abandoned=abandoned, now=now):
+                break  # still in flight, stale or unreadable: the session's cursor holds here
             if state.summary == "done":
                 if subset is None:
                     doc = session_doc(handle.paths, lifecycle)

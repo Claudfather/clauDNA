@@ -82,7 +82,7 @@ class TestDigest:
         summarized_session(store, "s1", [[BLOCK, OTHER]])
         run(store)
         first = digest.items(store.root)[0]
-        digest.mark_reviewed(store.root, first.item, outcome="promoted")
+        digest.mark_reviewed(store.root, first.item, outcome="promoted", vault=first.vault)
         assert first.item not in [i.item for i in digest.items(store.root)]
         assert len(digest.items(store.root, limit=1)) == 1
         with pytest.raises(ValueError):
@@ -94,7 +94,7 @@ class TestDigest:
         line = (store.root / "harvest" / "review.txt").read_text()
         assert "1 draft(s)" in line and "1 person fact(s)" in line and "/claudna:capture --review" in line
         for item in digest.items(store.root):
-            digest.mark_reviewed(store.root, item.item, outcome="kept")
+            digest.mark_reviewed(store.root, item.item, outcome="kept", vault=item.vault)
         assert (store.root / "harvest" / "review.txt").read_text() == ""
 
 
@@ -105,7 +105,7 @@ class TestCliAndBriefing:
         root = ["--root", str(store.root)]
         assert main(["digest", "--json", *root]) == 0
         (item,) = json.loads(capsys.readouterr().out)
-        assert main(["digest", "--done", item["item"], "--outcome", "promoted", *root]) == 0
+        assert main(["digest", "--done", item["item"], "--vault", item["vault"], "--outcome", "promoted", *root]) == 0
         capsys.readouterr()
         assert main(["digest", *root]) == 0 and "nothing to review" in capsys.readouterr().out
 
@@ -119,50 +119,11 @@ class TestCliAndBriefing:
         assert "Memory, to review: 2 draft(s)" in proc.stdout
 
 
-class TestVaultRelativeItems:
-    """``capture`` answers with an absolute path; ``claudron promote`` takes a vault-relative one."""
-
-    def test_a_path_under_the_recorded_vault(self, tmp_path):
-        vault = tmp_path / "vault"
-        assert digest.vault_note(str(vault / "projects" / "w" / "n.md"), str(vault)) == (str(vault), "projects/w/n.md")
-
-    def test_the_vault_is_found_by_its_marker_when_none_was_recorded(self, tmp_path):
-        vault = tmp_path / "vault"
-        (vault / "projects").mkdir(parents=True)
-        (vault / digest.VAULT_MARKER).write_text("")
-        assert digest.vault_note(str(vault / "projects" / "n.md"), None) == (str(vault), "projects/n.md")
-
-    def test_a_relative_or_unplaceable_path_is_kept(self, tmp_path):
-        assert digest.vault_note("knowledge/n.md", None) == (None, "knowledge/n.md")
-        assert digest.vault_note(str(tmp_path / "n.md"), None) == (None, str(tmp_path / "n.md"))
-
-    def test_the_ledger_and_digest_carry_the_relative_path(self, store, tmp_path):
-        vault = tmp_path / "vault"
-        digest.record_capture(store.root, sid="s1", seg=1, block=BLOCK, title="t", action="created",
-                              path=str(vault / "projects" / "n.md"), vault=str(vault))
-        (item,) = digest.items(store.root)
-        assert (item.item, item.vault) == ("projects/n.md", str(vault))
-
-    def test_a_vault_named_through_a_symlink_is_still_the_vault(self, tmp_path):
-        real = tmp_path / "real-vault"
-        (real / "projects").mkdir(parents=True)
-        (tmp_path / "link").symlink_to(real)
-        note = str(real / "projects" / "n.md")  # capture answers with the real path
-        assert digest.vault_note(note, str(tmp_path / "link")) == (str(real), "projects/n.md")
-        assert digest.vault_note(note, str(tmp_path / "link" / ".." / "real-vault")) == (str(real), "projects/n.md")
-
-    def test_a_recorded_vault_that_doesnt_contain_the_note_falls_back_to_the_marker(self, tmp_path):
-        vault = tmp_path / "vault"
-        (vault / "projects").mkdir(parents=True)
-        (vault / digest.VAULT_MARKER).write_text("")
-        assert digest.vault_note(str(vault / "projects" / "n.md"), str(tmp_path / "elsewhere")) == \
-            (str(vault), "projects/n.md")
-
+class TestTwoVaults:
     def test_the_same_path_in_two_vaults_is_two_items(self, store, tmp_path):
         for name in ("a", "b"):
-            vault = tmp_path / name
             digest.record_capture(store.root, sid=f"s-{name}", seg=1, block=BLOCK, title=name, action="created",
-                                  path=str(vault / "projects" / "n.md"), vault=str(vault))
+                                  path="projects/n.md", vault=str(tmp_path / name))
         found = digest.items(store.root)
         assert sorted(i.vault for i in found) == [str(tmp_path / "a"), str(tmp_path / "b")]
         digest.mark_reviewed(store.root, "projects/n.md", outcome="promoted", vault=str(tmp_path / "a"))

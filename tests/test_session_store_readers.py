@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from conftest import ACTOR, ORIGIN, complete_segment, segment_summary
+from conftest import ACTOR, ORIGIN, complete_segment, rewrite_log, segment_summary
 
 from claudna.session_store import readers, retention, rollup
 from claudna.session_store.cli import main
@@ -256,17 +256,25 @@ def test_a_valid_projection_behind_its_log_is_refolded(store):
 def test_a_timestamp_tie_is_broken_by_meaning_not_by_log(store):
     """The two logs share no sequence number: on a millisecond tie, openings come first, then activity,
     then what ends it — so a close never shows before the last thing done in the session."""
+    h = session_with(store, "s1", [None], close=False)
+    h.append("tool.failed", {"tool": "Bash", "signature": "Bash: x", "exit_code": 1})
+    h.close_session("other")
+    ts = "2026-01-01T00:00:00.000Z"  # every event of both logs on one millisecond
+    for log in (h.paths.lifecycle, h.paths.segment(1).events):
+        rewrite_log(log, lambda events: [{**e, "ts": ts} for e in events])
+    kinds = [e["kind"] for e in readers.timeline(store, "s1")]
+    assert kinds == ["session.opened", "segment.opened", "tool.failed", "segment.sealed", "session.closed"]
+
+
+def test_a_lost_refresh_after_a_seal_refolds_the_segments_too(store):
+    """segment.json's own watermark covers only its activity log: a seal whose refresh was lost leaves it
+    valid, current by that measure, and wrong. A stale session.json is the signal to refold every segment."""
     from claudna.session_store import events as ev
     from claudna.session_store.fsio import append_jsonl
 
     h = session_with(store, "s1", [None], close=False)
-    ts = "2026-01-01T00:00:00.000Z"
-    for path, kind, data, seg in [
-        (h.paths.lifecycle, "session.closed", {"reason": "other"}, None),
-        (h.paths.segment(1).events, "tool.failed", {"tool": "Bash", "signature": "Bash: x", "exit_code": 1}, 1),
-    ]:
-        append_jsonl(path, ev.make_event(kind, "s1", data, seg=seg, ts=ts))
-    rewritten = [{**json.loads(line), "ts": ts} for line in h.paths.lifecycle.read_text().splitlines()]
-    h.paths.lifecycle.write_text("".join(json.dumps(e) + "\n" for e in rewritten))
-    kinds = [e["kind"] for e in readers.timeline(store, "s1")]
-    assert kinds == ["session.opened", "segment.opened", "tool.failed", "segment.sealed", "session.closed"]
+    h.open_segment("compact", 100)  # seg-002, open
+    append_jsonl(h.paths.lifecycle, ev.make_event("segment.sealed", "s1", {"end": 200, "sealed_by": "precompact",
+                                                                           "trigger": "auto"}, seg=2))  # no refresh
+    assert json.loads(h.paths.segment(2).segment_json.read_text())["status"] == "open"  # stale on disk
+    assert [s["status"] for s in readers.show(store, "s1")["segments"]] == ["sealed", "sealed"]

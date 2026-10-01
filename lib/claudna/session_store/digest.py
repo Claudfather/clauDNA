@@ -26,7 +26,6 @@ writes, risk tiers, the inbox and ambiguous queues, and ``revert-run``.
 from __future__ import annotations
 
 import hashlib
-import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -51,41 +50,14 @@ def person_item(key: str) -> str:
     return "person:" + hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
 
 
-VAULT_MARKER = ".claudron-vault"
-
-
-def _real(path: str) -> Path:
-    return Path(os.path.realpath(os.path.expanduser(path)))
-
-
-def vault_note(path: str | None, vault: str | None) -> tuple[str | None, str | None]:
-    """``(vault root, vault-relative note path)`` for a note path ``capture`` returned.
-
-    ``capture`` answers ``created``/``updated`` with an absolute path, but
-    ``claudron promote`` takes a vault-relative one (engine contract §2), so
-    the digest keeps the relative path and the root it is relative to. The
-    root is the session's recorded vault when the note lies under it, else
-    the nearest ancestor holding the vault marker. Both sides are compared as
-    real paths (``~`` expanded, symlinks and ``..`` resolved: a vault named
-    through a symlink is still the vault). A path it can't place is kept as given.
-    """
-    if not path or not os.path.isabs(path):
-        return vault, path
-    note = _real(path)
-    candidates = [_real(vault)] if vault else []
-    candidates += [d for d in note.parents if (d / VAULT_MARKER).is_file()][:1]
-    for base in candidates:
-        try:
-            return str(base), note.relative_to(base).as_posix()
-        except ValueError:
-            continue
-    return vault, path
-
-
 def record_capture(root: Path, *, sid: str, seg: int, block: dict, title: str, action: str,
                    path: str | None, vault: str | None) -> None:
-    """One ledger line for one ``claudron capture`` answer, its note path made vault-relative."""
-    vault, path = vault_note(path, vault)
+    """One ledger line for one ``claudron capture`` answer: its vault-relative path and the vault it is in.
+
+    Harvest's capture adapter makes the path relative to the root Claudron
+    reports, so the digest's ``item``/``vault`` are exactly what ``claudron
+    --vault <vault> promote <item>`` takes.
+    """
     append_jsonl(ensure_dir(home(root)) / "ledger.jsonl", {
         "ts": now_ts(), "sid": sid, "seg": seg, "key": claim_key(block), "title": title, "claim": block.get("claim"),
         "asserted_by": block.get("asserted_by"), "action": action, "path": path, "vault": vault,
@@ -137,12 +109,11 @@ def items(root: Path, *, limit: int | None = DIGEST_SIZE) -> list[Item]:
     """The digest: unreviewed drafts, most-reinforced first, then held person facts."""
     ledger, held, done = _records(root)
     seen = evidence(root, ledger, held)
-    drafts: dict[str, dict] = {}
+    drafts: dict[tuple[str | None, str], dict] = {}
     for rec in ledger:
         path, vault = rec.get("path"), rec.get("vault")
-        if rec.get("action") not in ("created", "updated") or not isinstance(path, str) or \
-                (vault, path) in done or (None, path) in done:
-            continue  # a note is (vault, path); a review that named no vault covers the path in any vault
+        if rec.get("action") not in ("created", "updated") or not isinstance(path, str) or (vault, path) in done:
+            continue  # a note is (vault, path): the same relative path in two vaults is two notes
         d = drafts.setdefault((vault, path), {"title": rec.get("title") or path, "claim": rec.get("claim"),
                                               "vault": vault, "sessions": 0, "user": False, "last_ts": ""})
         d["sessions"] = max(d["sessions"], len(seen.get(rec.get("key"), ())))
@@ -169,7 +140,7 @@ def mark_reviewed(root: Path, item: str, *, outcome: str, vault: str | None = No
 
     ``item`` and ``vault`` are the digest item's own fields: a note's
     vault-relative path and its vault, or a held fact's ``person:`` id (no
-    vault). With no ``vault``, a note path is taken out in every vault.
+    vault).
     """
     if outcome not in ("promoted", "discarded", "kept"):
         raise ValueError(f"invalid outcome: {outcome!r}")

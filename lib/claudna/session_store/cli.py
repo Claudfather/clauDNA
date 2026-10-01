@@ -410,6 +410,9 @@ def main(argv: list[str] | None = None) -> int:
         store = _store(args)
         if store is None:
             return 1
+        if args.vault and not args.done:
+            print("error: --vault only goes with --done", file=sys.stderr)
+            return 2
         if args.done:
             digest.mark_reviewed(store.root, args.done, outcome=args.outcome, vault=args.vault)
             print(json.dumps({"item": args.done, "vault": args.vault, "outcome": args.outcome}))

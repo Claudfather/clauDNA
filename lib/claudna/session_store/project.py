@@ -200,7 +200,13 @@ STALE_PENDING_S = 15 * 60
 MAX_ATTEMPTS = 3
 
 
-def summary_verdict(events: list[dict], now: float) -> str | None:
+def abandoned_at(lifecycle: list[dict]) -> str | None:
+    """When the session was closed as ``abandoned``, if that is how it is closed now."""
+    _, closed_at, reason = session_status(lifecycle)
+    return closed_at if reason == "abandoned" else None
+
+
+def summary_verdict(events: list[dict], now: float, *, abandoned_at: str | None = None) -> str | None:
     """Does a final segment's summary need another attempt (``"retry"``), or has it had its last (``"give up"``)?
 
     The one rule for "settled": harvest retries on ``"retry"`` and moves past
@@ -212,6 +218,14 @@ def summary_verdict(events: list[dict], now: float) -> str | None:
     the request (the spawn or the worker died), or a retryable failure; each
     gets another attempt, up to :data:`MAX_ATTEMPTS`. A permanent failure, or
     the last attempt spent, is given up so the session isn't stuck.
+
+    ``abandoned_at`` is when the session was closed as ``abandoned`` (the
+    sweep, ``seal``): that close summarizes a segment a PreCompact may have
+    sealed long before, spawning the worker just after, before it records its
+    request — so the seal's age says nothing. Within :data:`STALE_PENDING_S`
+    of such a close the summary is waited for rather than retried, by harvest
+    and export alike. (Every other close seals at that moment, and the seal's
+    own age already covers it.)
     """
     seals = [n for n, e in enumerate(events) if e["kind"] == "segment.sealed"]
     if not seals:
@@ -228,7 +242,11 @@ def summary_verdict(events: list[dict], now: float) -> str | None:
         return "give up"
     if last["kind"] in ("segment.sealed", "summary.requested") and now - epoch_of(last["ts"]) < STALE_PENDING_S:
         return None  # a worker may still be on it
-    return "give up" if attempts >= MAX_ATTEMPTS else "retry"
+    if attempts >= MAX_ATTEMPTS:
+        return "give up"
+    if abandoned_at and now - epoch_of(abandoned_at) < STALE_PENDING_S:
+        return None  # the worker the close spawned may not have recorded its request yet
+    return "retry"
 
 
 SUMMARY_ENV = "CLAUDNA_SESSION_SUMMARY"
@@ -498,13 +516,25 @@ def segment_states(paths: SessionPaths, lifecycle: list[dict]) -> list[SegmentSt
     return out
 
 
-def segment_docs(paths: SessionPaths, lifecycle: Log) -> list[dict]:
-    """Each segment's ``segment.json``, or the same document folded from its logs when the file can't be trusted."""
+def _current_session_json(paths: SessionPaths) -> dict | None:
+    return read_projection(paths.session_json, SESSION_SCHEMA, bytes_before=file_size(paths.lifecycle))
+
+
+def segment_docs(paths: SessionPaths, lifecycle: Log, *, trusted: bool | None = None) -> list[dict]:
+    """Each segment's ``segment.json``, or the same document folded from its logs when the file can't be trusted.
+
+    A ``segment.json`` folds two logs, but its watermark covers only its
+    activity log. :func:`refresh` writes the segments before ``session.json``,
+    so a current ``session.json`` vouches for every segment's lifecycle side;
+    when it isn't current (``trusted`` False: a lost refresh after a seal or a
+    summary event), every segment is folded from its logs.
+    """
+    trusted = _current_session_json(paths) is not None if trusted is None else trusted
     buckets, transcripts = by_segment(lifecycle.events), segment_transcript_paths(lifecycle.events)
     out = []
     for index in paths.segment_indices():
         doc = read_projection(paths.segment(index).segment_json, SEGMENT_SCHEMA,
-                              bytes_before=file_size(paths.segment(index).events))  # current, not just valid
+                              bytes_before=file_size(paths.segment(index).events)) if trusted else None
         out.append(doc if doc is not None else project_segment(
             paths.sid, index, buckets.get(index, []), load_activity(paths, index), transcript_path=transcripts[index]))
     return out
@@ -512,9 +542,9 @@ def segment_docs(paths: SessionPaths, lifecycle: Log) -> list[dict]:
 
 def session_doc(paths: SessionPaths, lifecycle: Log | None = None) -> dict:
     """``session.json``, or the same document folded from the log when the file can't be trusted. Writes nothing."""
-    doc = read_projection(paths.session_json, SESSION_SCHEMA, bytes_before=file_size(paths.lifecycle))
+    doc = _current_session_json(paths)
     if doc is not None:
         return doc  # valid and current: it covers every byte of its log (a lost refresh falls through)
     lifecycle = load_lifecycle(paths) if lifecycle is None else lifecycle
-    return project_session(paths.sid, lifecycle, segment_docs(paths, lifecycle),
+    return project_session(paths.sid, lifecycle, segment_docs(paths, lifecycle, trusted=False),
                            transcript_path=transcript_path_of(lifecycle.events))

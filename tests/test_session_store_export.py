@@ -160,50 +160,47 @@ class TestRetention:
 class TestExportReviewFixes:
     """The full-range review: a summary that will never come, reserved names, and an ack's bound."""
 
-    def failed_for_good(self, store, sid, *, harvest_on=True):
+    def stranded(self, store, sid, *, retryable=False, harvest_on=True, repo="webapp", close="other"):
+        """seg-001's summary failed (for good, or retryably); seg-002 is done; the session is closed."""
         h = store.session(sid)
-        h.open_session("startup", actor=ACTOR, origin={**ORIGIN, "repo": "webapp"}, transcript_path="/t.jsonl",
+        h.open_session("startup", actor=ACTOR, origin={**ORIGIN, "repo": repo}, transcript_path="/t.jsonl",
                        harvest={"enabled": harvest_on, "vault": "/v"})
         for i in (1, 2):
             h.open_segment("session_open" if i == 1 else "compact", (i - 1) * 100)
             h.seal_segment(i * 100, "precompact")
-        h.append("summary.failed", {"job_id": "j1", "error": "bad", "retryable": False}, seg=1)
+        h.append("summary.failed", {"job_id": "j1", "error": "x", "retryable": retryable}, seg=1)
         complete_segment(h, 2, segment_summary(sid, 2, [BLOCK_A], end=200))
-        h.close_session("other")
+        h.append("session.closed", {"reason": close})
         return h
 
+    def segs(self, store, now=LATER):
+        return [i["seg"] for i in export.export(store, "claudron", now=now)["items"]]
+
     def test_a_summary_that_failed_for_good_is_stepped_over(self, store):
-        self.failed_for_good(store, "s1")
-        env = export.export(store, "claudron", now=LATER)
-        assert [(i["sid"], i["seg"]) for i in env["items"]] == [("s1", 2)] and env["next"] == {"s1": 2}
+        self.stranded(store, "s1")
+        assert export.export(store, "claudron", now=LATER)["next"] == {"s1": 2} and self.segs(store) == [2]
 
     def test_a_retryable_failure_waits_for_harvest_when_harvest_runs(self, store):
-        h = self.failed_for_good(store, "s1")
-        h.append("summary.failed", {"job_id": "j2", "error": "net", "retryable": True}, seg=1)
-        assert export.export(store, "claudron", now=LATER)["items"] == []  # harvest will retry it: hold
+        self.stranded(store, "s1", retryable=True)
+        assert self.segs(store) == []  # harvest will retry it: hold
 
     def test_a_session_harvest_skips_is_treated_as_unharvested(self, store):
         """Opted in but with no repo: harvest never takes it, so nothing will retry its summaries."""
-        h = store.session("s1")
-        h.open_session("startup", actor=ACTOR, origin={**ORIGIN, "repo": None}, transcript_path="/t.jsonl",
-                       harvest={"enabled": True, "vault": "/v"})
-        for i in (1, 2):
-            h.open_segment("session_open" if i == 1 else "compact", (i - 1) * 100)
-            h.seal_segment(i * 100, "precompact")
-        h.append("summary.failed", {"job_id": "j1", "error": "net", "retryable": True}, seg=1)
-        complete_segment(h, 2, segment_summary("s1", 2, [BLOCK_A], end=200))
-        h.close_session("other")
-        assert [i["seg"] for i in export.export(store, "claudron", now=LATER)["items"]] == [2]
+        self.stranded(store, "s1", retryable=True, repo=None)
+        assert self.segs(store) == [2]
 
     def test_without_harvest_nothing_retries_so_it_is_stepped_over(self, store):
-        h = self.failed_for_good(store, "s1", harvest_on=False)
-        h.append("summary.failed", {"job_id": "j2", "error": "net", "retryable": True}, seg=1)
-        assert [i["seg"] for i in export.export(store, "claudron", now=LATER)["items"]] == [2]
+        self.stranded(store, "s1", retryable=True, harvest_on=False)
+        assert self.segs(store) == [2]
 
-    def test_a_just_closed_session_still_waits_for_its_summarizer(self, store):
+    def test_an_abandoned_close_waits_for_the_summarizer_it_spawned(self, store):
         """Closing an abandoned session spawns its summarizer just after: don't step over it meanwhile."""
-        self.failed_for_good(store, "s1", harvest_on=False)
-        assert export.export(store, "claudron")["items"] == []
+        self.stranded(store, "s1", retryable=True, harvest_on=False, close="abandoned")
+        assert self.segs(store, now=time.time()) == [] and self.segs(store) == [2]
+
+    def test_a_summary_given_up_on_is_not_held_by_a_recent_close(self, store):
+        self.stranded(store, "s1", harvest_on=False, close="abandoned")
+        assert self.segs(store, now=time.time()) == [2]
 
     def test_the_stores_own_consumer_names_are_reserved(self, store):
         session_with(store, "s1", ["done"])

@@ -17,6 +17,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
+from .events import REGISTRY
 from .fsio import read_json
 from .paths import SessionPaths
 from .project import load_activity, load_lifecycle, segment_docs, session_doc
@@ -88,9 +89,8 @@ def show(store: SessionStore, sid: str) -> dict:
             "rollup": _rollup(paths) or current(paths, lifecycle.events)}  # missing or foreign: computed
 
 
-#: Lifecycle kinds that start something: on a timestamp tie (milliseconds) they precede the activity they open.
-#: Every other lifecycle kind (a seal, a close, a summary job, a retirement) follows the activity it ends.
-_OPENING = frozenset({"session.opened", "segment.opened", "session.privacy_set", "session.child_linked"})
+#: Tie ranks on a shared millisecond: what opens, then activity, then what ends or follows it.
+_OPENS, _ACTIVITY, _FOLLOWS = 0, 1, 2
 
 
 def timeline(store: SessionStore, sid: str) -> list[dict]:
@@ -104,10 +104,10 @@ def timeline(store: SessionStore, sid: str) -> list[dict]:
     if not handle.exists():
         raise LookupError(f"no session {sid}")
     paths = handle.paths
-    merged = [(e["ts"], 0 if e["kind"] in _OPENING else 2, n, "lifecycle", e)
+    merged = [(e["ts"], _OPENS if REGISTRY[e["kind"]].opens else _FOLLOWS, n, "lifecycle", e)
               for n, e in enumerate(load_lifecycle(paths).events)]
     for index in paths.segment_indices():
-        merged += [(e["ts"], 1, n, "activity", e) for n, e in enumerate(load_activity(paths, index).events)]
+        merged += [(e["ts"], _ACTIVITY, n, "activity", e) for n, e in enumerate(load_activity(paths, index).events)]
     merged.sort(key=lambda row: row[:3])
     return [{"ts": e["ts"], "log": log, "seg": e["seg"], "kind": e["kind"], "data": e["data"]}
             for _, _, _, log, e in merged]

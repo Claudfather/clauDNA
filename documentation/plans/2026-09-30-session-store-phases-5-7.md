@@ -33,7 +33,7 @@ These are the three phases the spec lists after activity, built in one pass beca
 
 §7.2's full pipeline needs Claudron pipes that don't exist yet. Claudron 0.6.1 has no `subjects`, `resolve`, `revert-run` or `--include-drafts` ([Claudron#200](https://github.com/Claudfather/Claudron/issues/200)). What doesn't need them is built:
 
-- **The ledger**, `harvest/ledger.jsonl`: one line per capture. Each line has the session, the segment, the note's path made vault-relative (`capture` answers with an absolute `data.path`; `claudron promote` takes a vault-relative one), the vault root, who asserted it, and a **claim key** (the rollup's block key). Held person facts carry the key too.
+- **The ledger**, `harvest/ledger.jsonl`: one line per capture. Each line has the session, the segment, the note's path made vault-relative against the root `claudron status --json` reports (`capture` answers with an absolute `data.path`; `claudron promote` takes a vault-relative one; vault resolution stays Claudron's), that vault root, who asserted it, and a **claim key** (the rollup's block key). Held person facts carry the key too.
 - **Evidence**: the distinct sessions per claim key. That is §7.2's "recurring across ≥ 2 sessions" signal, counted locally.
 - **The promotion digest** (§7.2, "a digest capped at ~5 items, most-reinforced first, surfaced as one SessionStart line, never blocking"): `digest.py`, `session_store digest`, and `/claudna:capture --review`.
   - It lists unreviewed drafts by sessions of evidence, user-asserted first on a tie, then the most recent. Held person facts come after.
