@@ -53,7 +53,7 @@ If none of them contains the file, stop and say so. Never fall back to a path in
 | Field | Type | Rules |
 |---|---|---|
 | `name` | string | Letters (any case), digits, and hyphens only. Must match the parent directory name exactly. Globally unique across the repo (no two skills share a `name`). Convention is `kebab-case`. |
-| `description` | string | When-to-use trigger statement — the routing surface the model reads when deciding whether to load the skill. Length: 20–500 characters. Grammar rules in §2.1 (trigger-first, no flag tokens, no workflow summaries, negative routing). |
+| `description` | string | When-to-use trigger statement — the routing surface the model reads when deciding whether to load the skill. Length: 20–500 characters, and it counts against the catalog budget (§5.1, Catalog budget). Grammar rules in §2.1 (trigger-first, no flag tokens, no workflow summaries, negative routing). |
 
 ### Optional fields
 

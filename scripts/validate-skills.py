@@ -247,9 +247,8 @@ def main() -> int:
     # there is no local copy to diff (see check_vault_address's docstring).
     vault_errors, vault_warnings, vault_notes = run_vault_address_check(REPO_ROOT)
 
-    # Catalog budget: the summed skill and agent listings against their
-    # ceilings. ALWAYS-BLOCKING: the total belongs to no one skill, so the
-    # touched-set partition can't attribute it (see check_catalog_budget).
+    # Catalog budget (SKILL_CONTRACT §5.1). ALWAYS-BLOCKING: the total belongs
+    # to no one skill, so the touched-set partition can't attribute it.
     budget_errors, budget_warnings, budget_notes = run_catalog_budget_check(REPO_ROOT)
 
     total_skills = len(skill_dirs) - len(SKIP_SKILLS)
@@ -292,7 +291,6 @@ def main() -> int:
     for msg in vault_errors:
         blocking_errors.setdefault("vault-address", []).append(msg)
 
-    # Catalog-budget errors block in BOTH modes (rationale above).
     for msg in budget_errors:
         blocking_errors.setdefault("catalog-budget", []).append(msg)
 

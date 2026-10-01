@@ -1,15 +1,21 @@
 name: Routing eval
 
-# Live routing evals cost money, so they never run on every push: only when a
-# PR carries the `routing-eval` label (added, or pushed to while it has it),
-# or by hand. The eval itself is `make routing-eval`, the same target a
-# contributor runs locally. Needs the repository secret ANTHROPIC_API_KEY;
-# without it the job fails at the eval step and says so.
+# `make routing-eval` (scripts/routing_eval.py) is paid, so it runs only on a PR
+# carrying the `routing-eval` label (when the label is added, or on a push while
+# it's there and the PR touches what routing depends on), or by hand. Needs the
+# repository secret ANTHROPIC_API_KEY.
 
 on:
   pull_request:
     branches: [main]
     types: [labeled, synchronize]
+    paths:
+      - "skills/**"
+      - "agents/**"
+      - "plugin-hooks/**"
+      - ".claude-plugin/**"
+      - "tests/fixtures/routing-matrix.yaml"
+      - "scripts/routing_eval.py"
   workflow_dispatch:
 
 jobs:

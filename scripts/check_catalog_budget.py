@@ -1,30 +1,12 @@
 #!/usr/bin/env python3
-"""Catalog budget: the always-loaded skill and agent listings have a ceiling.
+"""Catalog budget: the summed skill and agent listings against their ceilings.
 
-Every skill the model can invoke lists its name and description in every
-session, whether or not it is used, and so does every agent (CLAUDE.md, Design
-Philosophy: "each one must earn its context cost"). The per-skill length rule
-(SKILL_CONTRACT §2, 20–500 characters) bounds one description; nothing bounded
-the sum, so the catalog could only grow. This gate holds each sum to a ceiling
-in ``scripts/catalog-budget.json``:
-
-* **Over the ceiling** is an error. Adding a skill, or lengthening a
-  description, means raising the number in the same PR, so the cost is a
-  reviewed one-line diff rather than a side effect.
-* **Under it at all** is a warning naming the number to lower it to, so a
-  trim's PR is told to take the freed room back. It doesn't block: two trims
-  that each pass alone could put ``main`` under together, and a trim should
-  never be what fails a build. Until someone lowers it, the gap is room a
-  later PR can spend unreviewed; the warning is what keeps that gap visible.
-
-A skill with ``disable-model-invocation: true`` isn't in the model's listing,
-so it isn't counted. Size is the characters of the entry, ``claudna:<name>:
-<description>``, plus `` (Tools: …)`` for an agent, whose listing names its
-tools (``*`` when it declares none): a deterministic proxy for what the listing
-costs (about four characters a token), good for comparing change against change.
-
-Wired into ``validate-skills.py`` as an always-blocking gate; standalone it
-also prints the bill of materials, largest first::
+The rule and its reasons are SKILL_CONTRACT §5.1 (Catalog budget); the
+ceilings are ``scripts/catalog-budget.json``. An entry is
+``claudna:<name>: <description>``, plus `` (Tools: …)`` for an agent; a skill
+with ``disable-model-invocation: true`` isn't listed, so isn't counted.
+Over a ceiling is an error, under it a warning. ``validate-skills.py`` runs it
+as an always-blocking gate; standalone it prints the bill of materials::
 
     python3 scripts/check_catalog_budget.py
 """
@@ -38,7 +20,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from skill_checks import SKIP_DIRS, parse_frontmatter  # noqa: E402
+from skill_checks import parse_frontmatter, skill_dirs  # noqa: E402
 
 BUDGET_FILE = Path("scripts") / "catalog-budget.json"
 #: Entries named in an over-budget error: where to look first.
@@ -83,9 +65,7 @@ def _entries(paths: list[Path], *, agents: bool) -> dict[str, int]:
 
 def catalogs(repo_root: Path) -> dict[str, dict[str, int]]:
     """The two always-loaded catalogs, ``{"skills": {...}, "agents": {...}}``, with sizes per entry."""
-    skills_dir = repo_root / "skills"
-    skills = sorted(p / "SKILL.md" for p in (skills_dir.iterdir() if skills_dir.is_dir() else [])
-                    if p.is_dir() and p.name not in SKIP_DIRS and (p / "SKILL.md").is_file())
+    skills = [d / "SKILL.md" for d in skill_dirs(repo_root / "skills")]
     agents = sorted((repo_root / "agents").glob("*.md"))
     return {"skills": _entries(skills, agents=False), "agents": _entries(agents, agents=True)}
 

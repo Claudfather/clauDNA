@@ -64,13 +64,9 @@ deps-runtime:
 test-runtime:
 	python3 -m pytest $(RUNTIME_TESTS)
 
-# Live routing evals: real `claude -p` runs that check a plain prompt picks the
-# expected skill (scripts/routing_eval.py). Not part of `make check`: it costs
-# money (about $0.50 for the default set on Sonnet) and needs Claude Code plus an API
-# key or login. CI runs it only on a PR labelled `routing-eval`.
-# The Claude Code the CI eval runs on, pinned: a CLI upgrade can change the
-# picker or the built-in skills it competes with, and the results with it.
-# Raise it on purpose, with a routing-eval run.
+# Live routing evals (scripts/routing_eval.py): paid, so not in `make check`.
+# The Claude Code CI evals on is pinned: an upgrade can change the picker or the
+# built-in skills it competes with. Raise it on purpose, with an eval run.
 CLAUDE_CODE_VERSION = 2.1.287
 deps-eval:
 	npm install -g @anthropic-ai/claude-code@$(CLAUDE_CODE_VERSION)

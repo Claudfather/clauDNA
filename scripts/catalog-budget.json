@@ -1,5 +1,5 @@
 {
-  "_doc": "Ceilings, in characters, for the always-loaded skill and agent listings. Raise one in the PR that grows its catalog; lower it when a trim frees room (a warning, not a failure). See scripts/check_catalog_budget.py and SKILL_CONTRACT.md §5.1.",
+  "_doc": "Ceilings, in characters, for the always-loaded skill and agent listings. Rule: SKILL_CONTRACT.md §5.1 (Catalog budget).",
   "skills": 11806,
   "agents": 1216
 }

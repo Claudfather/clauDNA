@@ -9,14 +9,10 @@
 #      skill's frontmatter description — the picker routes on descriptions,
 #      so keyword presence is the mechanical proxy for routing quality.
 #   2. Live (richer): type the utterance in a fresh session and record which
-#      skill the picker resolves. Pass rule: 2 of 3 attempts resolve to
-#      `expect`. `scripts/routing_eval.py` (`make routing-eval`, or the
-#      `routing-eval` PR label) runs this headless for rows marked
-#      `eval: true` and for `controls`, utterances that must resolve to no
-#      clauDNA skill; `--all` takes every row. `mode` is recorded, not judged
-#      (the manual protocol's "+ mode where noted" stays manual). A row whose
-#      skill misroutes today carries `known_failure: <why>` and reports XFAIL
-#      until a fix lands; XPASS means the marker can go.
+#      skill the picker resolves; pass on 2 of 3. `scripts/routing_eval.py`
+#      runs this headless for rows marked `eval: true` and for `controls`
+#      (its docstring has the rules, including `known_failure`). `mode` is
+#      recorded, not judged, so "+ mode where noted" stays manual.
 #
 # Rows for not-yet-consolidated families point at their current skills; each
 # phase updates its own family's `expect` values in its PR (P3: audit → the

@@ -30,6 +30,10 @@ from typing import Callable, Mapping
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+from skill_checks import skill_dirs  # noqa: E402
+
 MATRIX = REPO_ROOT / "tests" / "fixtures" / "routing-matrix.yaml"
 PREFIX = "claudna:"
 #: The router under test, by alias so it tracks the current Sonnet. Haiku is a
@@ -144,7 +148,7 @@ def parse_stream(text: str) -> Attempt:
 
 def skill_names() -> frozenset[str]:
     """clauDNA's skills by bare name, so a pick written without the prefix is still recognised."""
-    return frozenset(p.name for p in (REPO_ROOT / "skills").iterdir() if (p / "SKILL.md").is_file())
+    return frozenset(d.name for d in skill_dirs(REPO_ROOT / "skills"))
 
 
 def picked(attempt: Attempt, case: Case, ours: frozenset[str] = frozenset()) -> bool:

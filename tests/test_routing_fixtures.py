@@ -23,10 +23,14 @@ from skill_checks import parse_frontmatter
 FIXTURES = Path(__file__).parent / "fixtures" / "routing-matrix.yaml"
 
 
-def load_rows() -> list[dict]:
+def load_matrix() -> dict:
     data = yaml.safe_load(FIXTURES.read_text())
     assert isinstance(data, dict) and isinstance(data.get("rows"), list)
-    return data["rows"]
+    return data
+
+
+def load_rows() -> list[dict]:
+    return load_matrix()["rows"]
 
 
 def test_fixture_schema():
@@ -40,8 +44,7 @@ def test_fixture_schema():
 
 
 def test_controls_schema():
-    data = yaml.safe_load(FIXTURES.read_text())
-    for control in data.get("controls", []):
+    for control in load_matrix().get("controls", []):
         assert set(control) == {"utterance"} and isinstance(control["utterance"], str) and control["utterance"]
 
 
