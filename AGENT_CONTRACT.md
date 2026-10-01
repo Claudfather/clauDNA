@@ -90,6 +90,8 @@ python scripts/validate-agents.py
 
 The validator returns non-zero on any violation and prints a structured report. Every pull request runs the same script in CI via `make check` (target `check-agents`).
 
+The agents' summed name and description listing also has a ceiling, `agents` in `scripts/catalog-budget.json`, checked by `scripts/validate-skills.py` (`make check-skills`): an agent added, a description lengthened or a tool list grown raises it in the same PR ([SKILL_CONTRACT.md §5.1](./SKILL_CONTRACT.md), Catalog budget).
+
 ---
 
 ## 6. Changing this contract

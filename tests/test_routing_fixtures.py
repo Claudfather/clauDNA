@@ -35,6 +35,14 @@ def test_fixture_schema():
         assert isinstance(row.get("keywords"), list) and row["keywords"]
         assert isinstance(row.get("expect"), str) and row["expect"]
         assert isinstance(row.get("phase"), str) and row["phase"]
+        assert isinstance(row.get("eval", False), bool)  # scripts/routing_eval.py runs the true ones
+        assert "known_failure" not in row or (row.get("eval") is True and isinstance(row["known_failure"], str))
+
+
+def test_controls_schema():
+    data = yaml.safe_load(FIXTURES.read_text())
+    for control in data.get("controls", []):
+        assert set(control) == {"utterance"} and isinstance(control["utterance"], str) and control["utterance"]
 
 
 def test_expected_skills_exist():

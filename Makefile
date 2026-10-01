@@ -18,7 +18,7 @@
 #                    (CI forwards PR labels via this env var; consumed
 #                    by scripts/skill_checks.py)
 
-.PHONY: check deps deps-runtime test-runtime check-skills check-integration check-agents check-manifest check-changelog lint test
+.PHONY: check deps deps-runtime deps-eval test-runtime routing-eval check-skills check-integration check-agents check-manifest check-changelog lint test
 
 check: check-skills check-integration check-agents check-manifest check-changelog lint test
 
@@ -63,3 +63,18 @@ deps-runtime:
 
 test-runtime:
 	python3 -m pytest $(RUNTIME_TESTS)
+
+# Live routing evals: real `claude -p` runs that check a plain prompt picks the
+# expected skill (scripts/routing_eval.py). Not part of `make check`: it costs
+# money (about $0.50 for the default set on Sonnet) and needs Claude Code plus an API
+# key or login. CI runs it only on a PR labelled `routing-eval`.
+# The Claude Code the CI eval runs on, pinned: a CLI upgrade can change the
+# picker or the built-in skills it competes with, and the results with it.
+# Raise it on purpose, with a routing-eval run.
+CLAUDE_CODE_VERSION = 2.1.287
+deps-eval:
+	npm install -g @anthropic-ai/claude-code@$(CLAUDE_CODE_VERSION)
+
+ROUTING_EVAL_ARGS ?=
+routing-eval:
+	python3 scripts/routing_eval.py $(ROUTING_EVAL_ARGS)

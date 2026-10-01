@@ -69,7 +69,7 @@ There is no `start` command and no `terminals`, because the repo has no server o
    ```bash
    make check
    ```
-   This is the exact set CI runs — `.github/workflows/ci.yml` executes this same target, so a green `make check` is a green CI run. The check-set is defined once, in the [`Makefile`](./Makefile) (`make -n check` lists it); individual sub-targets (`make lint`, `make test`, `make check-skills`, ...) are available while iterating. Among the checks, `integration-test.py` covers reference-file resolution, tool-name validity, body-structure conventions, and cross-skill uniqueness. CI additionally forwards PR labels; to reproduce a label-gated run: `PR_LABELS=full-validate make check`.
+   This is the exact set CI runs — `.github/workflows/ci.yml` executes this same target, so a green `make check` is a green CI run. The check-set is defined once, in the [`Makefile`](./Makefile) (`make -n check` lists it); individual sub-targets (`make lint`, `make test`, `make check-skills`, ...) are available while iterating. Among the checks, `integration-test.py` covers reference-file resolution, tool-name validity, body-structure conventions, and cross-skill uniqueness. CI additionally forwards PR labels; to reproduce a label-gated run: `PR_LABELS=full-validate make check`. To check that skills still trigger from plain prompts, `make routing-eval` runs the live routing evals (`scripts/routing_eval.py`: real `claude -p` runs, about $0.50, needs Claude Code and a login or `ANTHROPIC_API_KEY`); add the `routing-eval` label to run them on a PR, worth doing whenever a description changes.
 
 5. **Update CHANGELOG.md** — add your change under the `[Unreleased]` section following the [Keep a Changelog](https://keepachangelog.com/) format.
 
