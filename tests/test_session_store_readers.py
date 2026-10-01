@@ -238,3 +238,16 @@ def test_a_failed_refresh_after_a_summary_drops_the_stale_rollup(store, tmp_path
     assert not rollup.rollup_path(h.paths).exists()
     kinds = [json.loads(line)["kind"] for line in h.paths.lifecycle.read_text().splitlines()]
     assert kinds[-1] == "summary.completed"
+
+
+def test_a_valid_projection_behind_its_log_is_refolded(store):
+    """A lost refresh (a hook killed between its append and re-projection) leaves session.json valid but
+    stale; readers check its watermark, so the session still reads as closed."""
+    from claudna.session_store import events as ev
+    from claudna.session_store.fsio import append_jsonl
+
+    h = session_with(store, "s1", [None], close=False)
+    append_jsonl(h.paths.lifecycle, ev.make_event("session.closed", "s1", {"reason": "other"}))  # no refresh
+    assert json.loads(h.paths.session_json.read_text())["status"] == "open"  # the file is stale
+    assert readers.show(store, "s1")["session"]["status"] == "closed"
+    assert [r["status"] for r in readers.list_sessions(store)] == ["closed"]

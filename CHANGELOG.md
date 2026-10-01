@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The session store can be read (phase 6).**
   - `session_store list|show|timeline|failures`, also as `/claudna:session` verbs: sessions newest first, one session with its lineage and segments, a merged event timeline, and tool failures grouped by signature across sessions. They're read-only: an untrusted projection is folded from its log, never written.
   - Each session gets a deterministic rollup, `sessions/<sid>/summary.json` (spec §6.7), refreshed after every segment summary.
-  - `session_store export --consumer <name>` is the door Claudron reads through (`claudna.export/1`), with `--ack` to move a consumer's cursor.
-  - **Retention:** the background sweep retires a segment once every registered consumer acked it and it is 7 days old, or once it is 30 days old. It logs `segment.retired` first and keeps what the segment summarized in the rollup.
+  - `session_store export --consumer <name>` is the door Claudron reads through (`claudna.export/1`), with `--ack` to move a consumer's cursor. A segment whose summary will never come (its last attempt spent) is stepped over rather than holding the session for good; an ack can't go past the session's last segment; `harvest` is a reserved consumer name.
+  - **Retention:** the background sweep retires a segment once every registered consumer acked it and it is 7 days old, or once it is 30 days old (`CLAUDNA_RETAIN_DAYS=0` turns the age cap off). It logs `segment.retired` first and keeps what the segment summarized in the rollup.
 - **The promotion digest (phase 5, clauDNA side).**
   - Harvest keeps a ledger of every draft it writes, with a claim key, and counts how many sessions asserted each claim.
   - `session_store digest` lists up to 5 drafts, most-reinforced first, plus held person facts. SessionStart shows a `Memory, to review:` line, and `/claudna:capture --review` lets a person promote (`claudron promote`), discard or skip each one.

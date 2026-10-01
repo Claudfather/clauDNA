@@ -23,7 +23,7 @@ from pathlib import Path
 import pytest
 from conftest import ACTOR, ORIGIN, segment_summary
 
-from claudna.session_store import harvest
+from claudna.session_store import harvest, project
 from claudna.session_store.fsio import atomic_write_json, exclusive_lock
 
 BLOCK = {"home": "entity", "subject_hint": {"name": "staging DB", "kind": "service", "aliases": []},
@@ -272,7 +272,7 @@ class TestStrandedSummaries:
         assert report.retried == 0 and report.segments == 1
 
     def test_after_the_last_attempt_harvest_gives_up_and_moves_on(self, store):
-        h = self.stranded(store, "failed", attempts=harvest.MAX_ATTEMPTS)
+        h = self.stranded(store, "failed", attempts=project.MAX_ATTEMPTS)
         report = harvest.harvest(store, env=ON, capture=FakeCapture(), resummarize=lambda h, i, e: pytest.fail("retried"))
         assert report.gave_up == 1 and cursor(h) == 2 and "never summarized" in report.errors[0]
 
@@ -391,7 +391,7 @@ class TestReviewRound373:
             ts = time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime(now - 1))
             events = [{"kind": "segment.sealed", "ts": ts, "data": {}},
                       {"kind": "summary.requested", "ts": ts, "data": {"job_id": "j"}}]
-            assert harvest._stranded(events, now) is None  # 1 s old, not 3,601
+            assert project.summary_verdict(events, now) is None  # 1 s old, not 3,601
         finally:
             monkeypatch.delenv("TZ")
             time.tzset()
@@ -422,8 +422,8 @@ class TestReviewRound373:
         seal = {"kind": "segment.sealed", "ts": "2000-01-01T00:00:00.000Z", "data": {}}
         failed = [{"kind": "summary.requested", "ts": seal["ts"], "data": {"job_id": f"j{n}"}} for n in range(3)] + \
             [{"kind": "summary.failed", "ts": seal["ts"], "data": {"job_id": "j2", "error": "x", "retryable": True}}]
-        assert harvest._stranded([seal, *failed], time.time()) == "give up"
-        assert harvest._stranded([seal, *failed, seal, failed[0], failed[-1]], time.time()) == "retry"
+        assert project.summary_verdict([seal, *failed], time.time()) == "give up"
+        assert project.summary_verdict([seal, *failed, seal, failed[0], failed[-1]], time.time()) == "retry"
 
     def test_a_crash_in_one_session_still_leaves_the_run_record(self, store, monkeypatch):
         summarized_session(store, "s1", [[BLOCK]])

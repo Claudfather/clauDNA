@@ -14,22 +14,28 @@ consumer may ack once it has taken that session's items.
 
 Per session, segments are walked in order past the consumer's cursor (or
 ``--since-seg``): a final segment with a ``done`` summary is an item; one that
-was skipped passes; anything still in flight (not final, pending, failed,
-never summarized) stops that session, so a cursor never skips work that is
-still coming. That is harvest's rule. Private sessions are never exported.
-An ack goes through ``SessionHandle.ack``: one locked writer, and a cursor
-never moves back.
+was skipped passes, and so does one whose summary will never come (its last
+attempt spent, or a retry no harvest will run: :func:`_settled`). Anything
+still in flight stops that session, so a cursor never skips work that is
+still coming — harvest's rule, from the same verdict. Private sessions are
+never exported. An ack goes through ``SessionHandle.ack``: one locked writer,
+never past the session's last segment, and a cursor never moves back. The
+store's own consumers (``harvest``) are reserved names.
 """
 
 from __future__ import annotations
 
 import re
+import time
 
-from .project import load_lifecycle, segment_states, session_doc, session_facts
+from .project import (by_segment, load_lifecycle, next_segment_index, segment_states, session_doc, session_facts,
+                      summary_verdict)
 from .store import SessionStore
 
 EXPORT_SCHEMA = "claudna.export/1"
 CONSUMER = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
+#: Consumers the store runs itself, which acks only through their own code: an export ack must not move them.
+RESERVED = frozenset({"harvest"})
 SESSION_FIELDS = ("sid", "status", "opened_at", "closed_at", "close_reason", "chain_id", "parent_sid", "actor",
                   "origin")
 
@@ -37,12 +43,30 @@ SESSION_FIELDS = ("sid", "status", "opened_at", "closed_at", "close_reason", "ch
 def check_consumer(name: str) -> str:
     if not isinstance(name, str) or not CONSUMER.match(name):
         raise ValueError(f"invalid consumer name: {name!r}")
+    if name in RESERVED:
+        raise ValueError(f"consumer name {name!r} is reserved for the store's own use")
     return name
 
 
-def export(store: SessionStore, consumer: str, *, since_seg: int | None = None, limit: int = 100) -> dict:
+def _settled(state, events: list[dict], facts, now: float) -> bool:
+    """Is a final segment with no usable summary past waiting for, so export may step over it (no item)?
+
+    Its summary has had its last attempt (:func:`project.summary_verdict`),
+    or it is merely due a retry in a session harvest never runs for: only
+    harvest retries summaries, so nothing else is coming. A stale or
+    unreadable summary is still waited for.
+    """
+    if state.summary not in ("none", "pending", "failed"):
+        return False
+    verdict = summary_verdict(events, now)
+    return verdict == "give up" or (verdict == "retry" and not (facts.harvest or {}).get("enabled"))
+
+
+def export(store: SessionStore, consumer: str, *, since_seg: int | None = None, limit: int = 100,
+           now: float | None = None) -> dict:
     """The envelope of everything ``consumer`` hasn't taken yet, up to ``limit`` items."""
     check_consumer(consumer)
+    now = time.time() if now is None else now
     items: list[dict] = []
     nxt: dict[str, int] = {}
     for sid in store.session_ids():
@@ -54,12 +78,17 @@ def export(store: SessionStore, consumer: str, *, since_seg: int | None = None, 
         if not indices or indices[-1] <= start:
             continue  # nothing past the cursor: no log read
         lifecycle = load_lifecycle(handle.paths)
-        if not lifecycle.events or session_facts(lifecycle.events).private:
+        facts = session_facts(lifecycle.events)
+        if not lifecycle.events or facts.private:
             continue
-        through, subset = start, None
+        through, subset, buckets = start, None, None
         for state in (s for s in segment_states(handle.paths, lifecycle.events) if s.index > start):
-            if not state.final or state.summary not in ("done", "skipped") or len(items) >= limit:
-                break  # still in flight, stale or unreadable: the session's cursor holds here
+            if not state.final or len(items) >= limit:
+                break
+            if state.summary not in ("done", "skipped"):
+                buckets = buckets if buckets is not None else by_segment(lifecycle.events)
+                if not _settled(state, buckets.get(state.index, []), facts, now):
+                    break  # still in flight, stale or unreadable: the session's cursor holds here
             if state.summary == "done":
                 if subset is None:
                     doc = session_doc(handle.paths, lifecycle)
@@ -79,5 +108,8 @@ def ack(store: SessionStore, consumer: str, sid: str, through: int) -> int:
     handle = store.session(sid)
     if not handle.exists():
         raise LookupError(f"no session {sid}")
+    highest = next_segment_index(handle.paths) - 1
+    if through > highest:  # a cursor never moves back: one past the end would skip segments not yet made
+        raise ValueError(f"--through {through} is past session {sid}'s last segment ({highest})")
     handle.ack(consumer, through)
     return handle.cursor(consumer)

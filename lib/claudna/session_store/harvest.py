@@ -42,8 +42,8 @@ from . import digest
 from claudna.redact import redact_strings
 
 from . import schema
-from .fsio import atomic_write_json, ensure_dir, epoch_of, exclusive_lock, read_json, utc_seconds
-from .project import by_segment, load_lifecycle, session_facts
+from .fsio import atomic_write_json, ensure_dir, exclusive_lock, read_json, utc_seconds
+from .project import by_segment, load_lifecycle, session_facts, summary_verdict
 from .store import SessionStore
 
 ENABLE_ENV = "CLAUDNA_HARVEST"
@@ -56,10 +56,6 @@ CONSUMER = "harvest"
 NOTE_TYPES = {"entity": "knowledge", "concept": "knowledge", "project": "knowledge",
               "practice": "knowledge", "decision": "decision"}
 TIMEOUT_S = 30
-#: A summary still ``pending`` this long after its request lost its worker (killed, machine asleep).
-STALE_PENDING_S = 15 * 60
-#: Summarizer attempts per segment before harvest gives up on it and moves on.
-MAX_ATTEMPTS = 3
 #: Stranded summaries harvest re-runs per run (each is one model call, in this detached process).
 MAX_RETRIES_PER_RUN = 2
 LAST_RUN = "harvest/last_run.json"
@@ -209,33 +205,6 @@ class RunReport:
         return {**self.__dict__, "started_at": self.started_at}
 
 
-def _stranded(events: list[dict], now: float) -> str | None:
-    """Does a final segment's summary need another attempt (``"retry"``), or has it had its last (``"give up"``)?
-
-    Only events since the segment's **last seal** count: a re-seal starts a
-    fresh budget. Stranded means ``none`` or ``pending`` long past the seal or
-    the request (the spawn or the worker died), or a retryable failure; each
-    gets another attempt, up to :data:`MAX_ATTEMPTS`. A permanent failure, or
-    the last attempt spent, is given up so the session isn't stuck.
-    """
-    seals = [n for n, e in enumerate(events) if e["kind"] == "segment.sealed"]
-    if not seals:
-        return None
-    since = events[seals[-1]:]
-    summary = [e for e in since if e["kind"].startswith("summary.")]
-    requested = {e["data"]["job_id"] for e in summary if e["kind"] == "summary.requested"}
-    attempts = len(requested) + sum(e["kind"] == "summary.failed" and e["data"]["job_id"] not in requested
-                                    for e in summary)
-    last = summary[-1] if summary else since[0]  # the seal itself when nothing followed it
-    if last["kind"] in ("summary.completed", "summary.skipped"):
-        return None
-    if last["kind"] == "summary.failed" and not last["data"]["retryable"]:
-        return "give up"
-    if last["kind"] in ("segment.sealed", "summary.requested") and now - epoch_of(last["ts"]) < STALE_PENDING_S:
-        return None  # a worker may still be on it
-    return "give up" if attempts >= MAX_ATTEMPTS else "retry"
-
-
 def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: Callable[..., str],
                      env: Mapping[str, str], resummarize: Callable[..., str]) -> None:
     handle = store.session(sid)
@@ -266,7 +235,8 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
         if status == "done" and valid and summary["input"]["range"]["end"] != boundary.last_seal["data"]["end"]:
             status = "stale"  # summarized before a later re-seal: its range misses the tail
         if status in ("none", "pending", "failed", "stale"):
-            verdict = "retry" if status == "stale" else _stranded(by_segment(lifecycle)[index], report.started_epoch)
+            verdict = "retry" if status == "stale" else \
+                summary_verdict(by_segment(lifecycle)[index], report.started_epoch)
             if verdict == "give up":
                 report.gave_up += 1
                 report.errors.append(f"{sid}: seg-{index:03d} was never summarized; skipped by harvest")

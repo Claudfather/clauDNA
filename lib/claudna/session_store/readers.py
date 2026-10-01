@@ -1,9 +1,11 @@
 """Readers (spec §8, phase 6): ``list``, ``show``, ``timeline``, ``failures``.
 
 Read-only views over the store: nothing here writes. A projection that is
-missing or fails its schema is folded from its log in memory instead (the log
-is the truth; ``rebuild`` is what repairs files), so a reader never trusts a
-stale file and never needs the lock.
+missing, fails its schema, or is behind its log (its ``projected_from.bytes``
+isn't the log's size: a lost refresh) is folded from its log in memory instead
+(the log is the truth; ``rebuild`` is what repairs files), so a reader never
+trusts a stale file and never needs the lock. The rollup is the exception:
+``list`` reads it as it is, ``show`` computes a missing one.
 
 Each function returns plain data; the CLI prints it as text or ``--json``.
 """

@@ -144,7 +144,57 @@ class TestRetention:
         assert fsio.env_number({retention.CAP_ENV: value}, retention.CAP_ENV, 30.0) == 30.0
 
     def test_the_sweep_verb_runs_retention(self, store, capsys, monkeypatch):
-        session_with(store, "s1", ["done"])
-        monkeypatch.setenv(retention.CAP_ENV, "0")
+        session_with(store, "s1", ["done"]).ack("claudron", 1)
+        monkeypatch.setenv(retention.FLOOR_ENV, "0")  # acked and no floor: due at once, whatever the clock
         assert main(["sweep", "--root", str(store.root)]) == 0
-        assert json.loads(capsys.readouterr().out)["retention"]["retired"] == ["s1/seg-001 (age)"]
+        assert json.loads(capsys.readouterr().out)["retention"]["retired"] == ["s1/seg-001 (acked)"]
+
+    def test_a_cap_of_zero_means_no_age_cap(self, store):
+        h = session_with(store, "s1", ["done"])
+        assert retention.due(h, {retention.CAP_ENV: "0"}, now=time.time() + 365 * DAY) == []
+        assert retention.due(h, {}, now=time.time() + 31 * DAY) == [(1, "age")]
+
+
+
+class TestExportReviewFixes:
+    """The full-range review: a summary that will never come, reserved names, and an ack's bound."""
+
+    def failed_for_good(self, store, sid, *, harvest_on=True):
+        h = store.session(sid)
+        h.open_session("startup", actor=ACTOR, origin={**ORIGIN, "repo": "webapp"}, transcript_path="/t.jsonl",
+                       harvest={"enabled": harvest_on, "vault": None})
+        for i in (1, 2):
+            h.open_segment("session_open" if i == 1 else "compact", (i - 1) * 100)
+            h.seal_segment(i * 100, "precompact")
+        h.append("summary.failed", {"job_id": "j1", "error": "bad", "retryable": False}, seg=1)
+        complete_segment(h, 2, segment_summary(sid, 2, [BLOCK_A], end=200))
+        h.close_session("other")
+        return h
+
+    def test_a_summary_that_failed_for_good_is_stepped_over(self, store):
+        self.failed_for_good(store, "s1")
+        env = export.export(store, "claudron")
+        assert [(i["sid"], i["seg"]) for i in env["items"]] == [("s1", 2)] and env["next"] == {"s1": 2}
+
+    def test_a_retryable_failure_waits_for_harvest_when_harvest_runs(self, store):
+        h = self.failed_for_good(store, "s1")
+        h.append("summary.failed", {"job_id": "j2", "error": "net", "retryable": True}, seg=1)
+        assert export.export(store, "claudron")["items"] == []  # harvest will retry it: hold
+
+    def test_without_harvest_nothing_retries_so_it_is_stepped_over(self, store):
+        h = self.failed_for_good(store, "s1", harvest_on=False)
+        h.append("summary.failed", {"job_id": "j2", "error": "net", "retryable": True}, seg=1)
+        assert [i["seg"] for i in export.export(store, "claudron")["items"]] == [2]
+
+    def test_the_stores_own_consumer_names_are_reserved(self, store):
+        session_with(store, "s1", ["done"])
+        with pytest.raises(ValueError, match="reserved"):
+            export.ack(store, "harvest", "s1", 1)
+        with pytest.raises(ValueError, match="reserved"):
+            export.export(store, "harvest")
+
+    def test_an_ack_past_the_last_segment_is_refused(self, store):
+        h = session_with(store, "s1", ["done", "done"])
+        with pytest.raises(ValueError, match="past"):
+            export.ack(store, "claudron", "s1", 3)
+        assert export.ack(store, "claudron", "s1", 2) == 2 and h.cursor("claudron") == 2

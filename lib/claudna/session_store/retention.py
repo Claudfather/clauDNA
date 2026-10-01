@@ -12,7 +12,7 @@ The floor is a deliberate addition to §9, which retires an acked segment at
 once. Without it, a harvested segment would vanish right after harvest and
 take ``timeline``/``show`` with it, so recent history is kept a week
 regardless. Both are configurable (``CLAUDNA_RETAIN_ACKED_DAYS``,
-``CLAUDNA_RETAIN_DAYS``).
+``CLAUDNA_RETAIN_DAYS``); a cap of ``0`` means no age cap, never "retire at once".
 
 Retiring a session's due segments is one batch: each ``done`` summary moves to
 ``sessions/<sid>/summaries/`` (so the rollup keeps what it said), each segment
@@ -54,7 +54,7 @@ def due(handle: SessionHandle, env: Mapping[str, str], *, now: float | None = No
     if not handle.paths.segment_indices():
         return []  # fully retired (or never opened): one directory listing, no log read
     now = time.time() if now is None else now
-    cap = env_number(env, CAP_ENV, CAP_DAYS) * 86400
+    cap = env_number(env, CAP_ENV, CAP_DAYS) * 86400 or float("inf")  # 0 means no age cap: keep until acked
     floor = env_number(env, FLOOR_ENV, ACKED_FLOOR_DAYS) * 86400
     acked = _acked_through(handle)
     out = []

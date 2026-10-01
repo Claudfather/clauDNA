@@ -338,7 +338,7 @@ No LLM. Recomputed from the `done` segment summaries on every `summary.completed
 | Field | Rule |
 |---|---|
 | `journey.title`, `journey.intent`, `journey.outcome` | latest segment's |
-| `journey.arc`, `journey.done`, `blocks`, `procedures`, `artifacts.*` | union across segments, dedup on normalized text (blocks: on `home` + subject + claim), keep `from_seg` |
+| `journey.arc`, `journey.done`, `blocks`, `procedures` | union across segments, dedup on normalized text (blocks: on `home` + subject + claim), keep `from_seg` |
 | `journey.in_progress`, `journey.next` | latest segment's only |
 
 ```json

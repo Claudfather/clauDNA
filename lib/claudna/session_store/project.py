@@ -24,7 +24,7 @@ from dataclasses import dataclass
 
 from . import events as ev
 from . import schema
-from .fsio import atomic_write_json, read_json, read_jsonl
+from .fsio import atomic_write_json, epoch_of, file_size, read_json, read_jsonl
 from .schema import is_instance
 from .paths import SessionPaths
 
@@ -169,6 +169,43 @@ class SessionFacts:
     chain_id: str | None = None  # the first session.opened's, as session.json has it: a resume records its own sid
     claude_pid: int | None = None  # the latest session.opened's owning Claude Code process
     harvest: dict | None = None  # the latest session.opened's {enabled, vault}: its own consumer choice
+
+
+#: A summary still ``pending`` this long after its request lost its worker (killed, machine asleep).
+STALE_PENDING_S = 15 * 60
+#: Summarizer attempts per segment before it is given up on (harvest stops retrying; export passes it).
+MAX_ATTEMPTS = 3
+
+
+def summary_verdict(events: list[dict], now: float) -> str | None:
+    """Does a final segment's summary need another attempt (``"retry"``), or has it had its last (``"give up"``)?
+
+    The one rule for "settled": harvest retries on ``"retry"`` and moves past
+    on ``"give up"``; export passes a ``"give up"`` segment (no item) so one
+    summary that will never come can't hold a consumer's cursor for good.
+
+    Only events since the segment's **last seal** count: a re-seal starts a
+    fresh budget. Stranded means ``none`` or ``pending`` long past the seal or
+    the request (the spawn or the worker died), or a retryable failure; each
+    gets another attempt, up to :data:`MAX_ATTEMPTS`. A permanent failure, or
+    the last attempt spent, is given up so the session isn't stuck.
+    """
+    seals = [n for n, e in enumerate(events) if e["kind"] == "segment.sealed"]
+    if not seals:
+        return None
+    since = events[seals[-1]:]
+    summary = [e for e in since if e["kind"].startswith("summary.")]
+    requested = {e["data"]["job_id"] for e in summary if e["kind"] == "summary.requested"}
+    attempts = len(requested) + sum(e["kind"] == "summary.failed" and e["data"]["job_id"] not in requested
+                                    for e in summary)
+    last = summary[-1] if summary else since[0]  # the seal itself when nothing followed it
+    if last["kind"] in ("summary.completed", "summary.skipped"):
+        return None
+    if last["kind"] == "summary.failed" and not last["data"]["retryable"]:
+        return "give up"
+    if last["kind"] in ("segment.sealed", "summary.requested") and now - epoch_of(last["ts"]) < STALE_PENDING_S:
+        return None  # a worker may still be on it
+    return "give up" if attempts >= MAX_ATTEMPTS else "retry"
 
 
 SUMMARY_ENV = "CLAUDNA_SESSION_SUMMARY"
@@ -443,7 +480,8 @@ def segment_docs(paths: SessionPaths, lifecycle: Log) -> list[dict]:
     buckets, transcripts = by_segment(lifecycle.events), segment_transcript_paths(lifecycle.events)
     out = []
     for index in paths.segment_indices():
-        doc = read_projection(paths.segment(index).segment_json, SEGMENT_SCHEMA)
+        doc = read_projection(paths.segment(index).segment_json, SEGMENT_SCHEMA,
+                              bytes_before=file_size(paths.segment(index).events))  # current, not just valid
         out.append(doc if doc is not None else project_segment(
             paths.sid, index, buckets.get(index, []), load_activity(paths, index), transcript_path=transcripts[index]))
     return out
@@ -451,9 +489,9 @@ def segment_docs(paths: SessionPaths, lifecycle: Log) -> list[dict]:
 
 def session_doc(paths: SessionPaths, lifecycle: Log | None = None) -> dict:
     """``session.json``, or the same document folded from the log when the file can't be trusted. Writes nothing."""
-    doc = read_projection(paths.session_json, SESSION_SCHEMA)
+    doc = read_projection(paths.session_json, SESSION_SCHEMA, bytes_before=file_size(paths.lifecycle))
     if doc is not None:
-        return doc
+        return doc  # valid and current: it covers every byte of its log (a lost refresh falls through)
     lifecycle = load_lifecycle(paths) if lifecycle is None else lifecycle
     return project_session(paths.sid, lifecycle, segment_docs(paths, lifecycle),
                            transcript_path=transcript_path_of(lifecycle.events))
