@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.23.0] - 2026-10-01
 ### Added
 - **Heads-up: the session store now deletes old raw data.** The background sweep retires a segment's directory (its event log and projection) 30 days after it was sealed, or 7 days after every consumer acked it. What its summary said is kept in `sessions/<sid>/summaries/`, so `list`, `show` and `export` still cover it, but `timeline` and `failures` no longer see its events. `CLAUDNA_RETAIN_DAYS=0` turns the age cap off; `CLAUDNA_RETAIN_ACKED_DAYS` sets the floor. See SETUP_GUIDE §3.7.
 - **The session store can be read (phase 6).**
