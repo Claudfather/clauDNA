@@ -136,9 +136,41 @@ class TestRetention:
         retention.sweep(store, {}, now=self.later(31))
         assert h.open_segment("compact", 200) == 3
 
-    def test_the_limit_bounds_a_run(self, store):
-        session_with(store, "s1", ["done", "done", "done"])
-        assert len(retention.sweep(store, {}, now=self.later(31), limit=2).retired) == 2
+    def test_a_time_budget_bounds_a_run_and_the_next_run_resumes(self, store):
+        for sid in ("s1", "s2"):
+            session_with(store, sid, ["done"])
+        ticks = iter([0.0, 0.0, 99.0])  # start, s1 within budget, s2 past it
+        report = retention.sweep(store, {}, now=self.later(31), budget_s=10, clock=lambda: next(ticks))
+        assert report.retired == ["s1/seg-001 (age)"] and "time budget" in report.errors[-1]
+        assert retention.sweep(store, {}, now=self.later(31)).retired == ["s2/seg-001 (age)"]
+
+    def test_a_closed_session_left_with_an_unsealed_segment_is_repaired(self, store):
+        """0.22 could open a segment after a close; never final, it would never be summarized or retired."""
+        h = session_with(store, "s1", ["done"])
+        (h.paths.dir / "seg-002").mkdir()
+        h.append("segment.opened", {"opened_by": "compact", "start": 100}, seg=2)  # as 0.22 wrote it
+        report = retention.sweep(store, {})
+        assert report.repaired == ["s1"] and h.boundary(2).sealed
+        assert h.boundary(2).last_seal["data"]["sealed_by"] == "abandoned"
+        assert retention.sweep(store, {}).repaired == []  # once
+
+    def test_an_interrupted_retirement_never_leaves_the_count_wrong(self, store, monkeypatch):
+        """#387 review S2: the projection counts what the log says is retired, not what a directory says."""
+        h = session_with(store, "s1", ["done", "done"])
+
+        def no_rmtree(*a, **k):
+            raise SystemExit  # the sweep dies right after the rename
+
+        monkeypatch.setattr("claudna.session_store.store.shutil.rmtree", no_rmtree)
+        with pytest.raises(SystemExit):
+            retention.retire(h, [(1, "age")])
+        doc = json.loads(h.paths.session_json.read_text())
+        assert (doc["segments"]["count"], doc["segments"]["retired"]) == (1, 1)
+        assert h.paths.archived_summary(1).is_file()  # archived before anything else
+        monkeypatch.undo()
+        retention.sweep(store, {})
+        assert not list(h.paths.dir.glob(".retired-*"))  # the husk is cleaned up later
+        assert retention.retire(h, [(1, "age")]) == []  # and nothing retires twice
 
     @pytest.mark.parametrize("value", ["nan", "inf", "-1", "junk"])
     def test_bad_settings_fall_back(self, value):
@@ -220,3 +252,58 @@ class TestExportReviewFixes:
         with pytest.raises(ValueError, match="past"):
             export.ack(store, "claudron", "s1", 3)
         assert export.ack(store, "claudron", "s1", 2) == 2 and h.cursor("claudron") == 2
+
+
+class TestReviewRound387:
+    """Owner decisions S4 (no data loss through the door) and Q1 (harvest registered at open)."""
+
+    def test_a_consumer_behind_retention_still_gets_the_archived_summaries(self, store):
+        h = session_with(store, "s1", ["done", "done"])
+        retention.retire(h, [(1, "age"), (2, "age")])  # both retired before claudron ever ran
+        assert h.paths.segment_indices() == []
+        env = export.export(store, "claudron")
+        assert [(i["seg"], i["summary"]["index"]) for i in env["items"]] == [(1, 1), (2, 2)]
+        assert env["next"] == {"s1": 2}
+        export.ack(store, "claudron", "s1", 2)
+        assert export.export(store, "claudron")["items"] == []  # nothing twice
+
+    def test_an_up_to_date_consumer_reads_no_archive(self, store, monkeypatch):
+        h = session_with(store, "s1", ["done"])
+        export.ack(store, "claudron", "s1", 1)
+        retention.retire(h, [(1, "acked")])
+        monkeypatch.setattr(export, "_archived", lambda *a: pytest.fail("read an archive it didn't need"))
+        assert export.export(store, "claudron")["items"] == []
+
+    def test_an_ack_cannot_pass_the_open_segment(self, store):
+        session_with(store, "s1", ["done", "done"], close=False)  # seg-002 is current: not final
+        with pytest.raises(ValueError, match="last final segment"):
+            export.ack(store, "claudron", "s1", 2)
+        assert export.ack(store, "claudron", "s1", 1) == 1
+
+    def test_an_opted_in_session_holds_acked_retirement_for_harvest(self, store):
+        """Another consumer's ack can't retire a segment harvest hasn't taken (harvest stalled)."""
+        h = store.session("s1")
+        h.open_session("startup", actor=ACTOR, origin={**ORIGIN, "repo": "webapp"}, transcript_path="/t.jsonl",
+                       harvest={"enabled": True, "vault": "/v"})
+        h.open_segment("session_open", 0)
+        h.seal_segment(100, "precompact")
+        h.close_session("other")
+        h.ack("claudron", 1)
+        later = time.time() + 8 * DAY
+        assert retention.due(h, {}, now=later) == []  # harvest is registered at cursor 0
+        h.ack("harvest", 1)
+        assert retention.due(h, {}, now=later) == [(1, "acked")]
+
+
+
+def test_a_consumer_name_with_a_trailing_newline_is_refused():
+    with pytest.raises(ValueError):
+        export.check_consumer("harvest\n")  # `$` would match before the newline; fullmatch doesn't
+
+
+def test_claim_keys_are_unicode_normalized():
+    nfc, nfd = "caf\u00e9 opens at nine", "cafe\u0301 opens at nine"
+    def key(claim):
+        return rollup.dedup_key("blocks", {"home": "entity", "subject_hint": {"name": "x"}, "claim": claim})
+
+    assert key(nfc) == key(nfd)

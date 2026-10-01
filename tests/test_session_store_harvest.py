@@ -199,11 +199,19 @@ class TestHarvest:
         assert len(capture.findings) == 2 and cursor(h) == 1
 
 
-    def test_an_unreadable_summary_holds_the_cursor_and_is_reported(self, store):
+    def test_an_unreadable_summary_is_summarized_again_not_held_for_a_month(self, store):
+        """#387 review S3: a done segment whose summary.json is missing or invalid is rebuilt, like a stale one."""
         h = summarized_session(store, "s1", [[BLOCK], [BLOCK]])
         atomic_write_json(h.paths.segment(2).dir / "summary.json", {"summary": {"blocks": [BLOCK]}})  # old shape
-        report = harvest.harvest(store, env=ON, capture=FakeCapture())
-        assert cursor(h) == 1 and "seg-002/summary.json is missing or invalid" in report.errors[0]
+        calls = []
+
+        def resummarize(handle, index, env):
+            calls.append(index)
+            atomic_write_json(handle.paths.segment(index).summary, artifact("s1", index, [BLOCK], start=20, end=25))
+            return "summarized"
+
+        harvest.harvest(store, env=ON, capture=FakeCapture(), resummarize=resummarize)
+        assert calls == [2] and cursor(h) == 2
 
     def test_a_skipped_segment_never_holds_the_cursor(self, store):
         h = summarized_session(store, "s1", [[BLOCK], [BLOCK]])

@@ -81,6 +81,20 @@ def ensure_dir(path: Path) -> Path:
     return path
 
 
+def atomic_write_text(path: Path, text: str) -> None:
+    """Write ``text`` to ``path`` atomically (temp file + ``os.replace``), mode ``0600``; ``path.parent`` must exist."""
+    fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        os.chmod(tmp, FILE_MODE)
+        os.replace(tmp, path)
+    except BaseException:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(tmp)
+        raise
+
+
 def atomic_write_json(path: Path, obj: object, *, durable: bool = False) -> None:
     """Write ``obj`` as pretty JSON to ``path`` atomically, mode ``0600``.
 

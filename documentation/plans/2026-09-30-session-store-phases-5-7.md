@@ -38,9 +38,10 @@ These are the three phases the spec lists after activity, built in one pass beca
 - **The promotion digest** (§7.2, "a digest capped at ~5 items, most-reinforced first, surfaced as one SessionStart line, never blocking"): `digest.py`, `session_store digest`, and `/claudna:capture --review`.
   - It lists unreviewed drafts by sessions of evidence, user-asserted first on a tie, then the most recent. Held person facts come after.
   - A person chooses each item:
-    - **promote** runs `claudron promote --to verified --by user`;
-    - **discard** or **skip** takes the item out of the digest without promoting it;
-    - a **person** fact is captured normally.
+    - **promote** is `session_store digest --promote <item> [--vault V]`. It's deterministic: the verb checks the item against the digest, runs `claudron --vault V promote <item> --to verified --by user --json` itself, checks the envelope, and only then marks the item reviewed. The model never builds the `claudron` call;
+    - **discard** (`digest --done <item> --outcome discarded`) takes the item out of the digest without promoting it;
+    - **skip** does nothing: the item stays in the digest for next time;
+    - a **person** fact is captured normally, then marked with `digest --done <item> --outcome promoted`. `--outcome` is required on `--done`.
   - clauDNA never promotes on its own. `harvest/review.txt` is the SessionStart line (`Memory, to review: …`), rewritten after each harvest run and each review.
 
 **Still blocked on Claudron#200, and not here:** subject resolution and the harvest plan model; section-targeted writes and one commit per run; `revert-run`; the risk tiers; the inbox and ambiguous queues, with their thresholds and 90-day archive; and Claudron-side draft filtering in `lookup`. Each needs a Claudron verb to exist first. The ledger and claim keys are shaped so a plan model can consume them when it lands.
@@ -63,3 +64,10 @@ These are the three phases the spec lists after activity, built in one pass beca
 
 1. **The retention floor:** kept at 7 days for an acked segment. Spec §9 records it as built.
 2. **Export consumers:** anyone who acks a session is registered for it. A consumer that never ran can't hold data back, and one that stops is caught by the 30-day cap. Claudron's side of the export door is Claudron's to build, against `claudna.export/1`.
+
+## Owner decisions (2026-10-01, PR #387 review)
+
+3. **Export past a retired segment:** export serves the archived summary of a retired segment that sits past a consumer's cursor, so a consumer that falls behind loses nothing. The archive is read only when a consumer is behind.
+4. **Harvest registers from the start:** a session opened with harvest enabled registers harvest as a consumer from its first segment, so nothing retires before harvest has seen it.
+5. **Digest evidence is per vault:** sessions of evidence are counted per vault, and the same claim key in two vaults is two items.
+6. **Mechanical steps are deterministic:** promotion is the `digest --promote` verb, which runs `claudron` itself. A model picks *what* to promote; it doesn't build the command.

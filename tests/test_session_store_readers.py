@@ -20,9 +20,10 @@ import json
 import pytest
 from conftest import ACTOR, ORIGIN, complete_segment, rewrite_log, segment_summary
 
+from claudna.session_store import events as ev
 from claudna.session_store import readers, retention, rollup
 from claudna.session_store.cli import main
-from claudna.session_store.fsio import exclusive_lock
+from claudna.session_store.fsio import append_jsonl, exclusive_lock
 
 BLOCK_A = {"home": "entity", "subject_hint": {"name": "staging DB", "kind": "service", "aliases": []},
            "claim": "The staging DB resets nightly.", "asserted_by": "user", "tags": []}
@@ -146,12 +147,16 @@ class TestReaders:
             readers.show(store, "nope")
 
     def test_the_timeline_merges_both_logs_in_order(self, store):
-        h = session_with(store, "s1", [None], close=False)
+        """Activity written while the segment is open, then the seal: in order, tie or no tie (#387 review B1)."""
+        h = store.session("s1")
+        h.open_session("startup", actor=ACTOR, origin={**ORIGIN, "repo": "webapp"}, transcript_path="/t.jsonl")
+        h.open_segment("session_open", 0)
         h.append("prompt.submitted", {"prompt_id": "p", "chars": 3})
         h.append("tool.failed", {"tool": "Bash", "signature": "Bash: boom", "exit_code": 1})
+        h.seal_segment(100, "precompact")
         h.close_session("other")
         kinds = [e["kind"] for e in readers.timeline(store, "s1")]
-        assert kinds == ["session.opened", "segment.opened", "segment.sealed", "prompt.submitted", "tool.failed",
+        assert kinds == ["session.opened", "segment.opened", "prompt.submitted", "tool.failed", "segment.sealed",
                          "session.closed"]
         assert all(a["ts"] <= b["ts"] for a, b in zip(readers.timeline(store, "s1"), readers.timeline(store, "s1")[1:]))
 
@@ -295,3 +300,57 @@ def test_a_tie_keeps_each_logs_own_order(store):
     rows = [(e["kind"], e["seg"]) for e in readers.timeline(store, "s1")]
     assert rows == [("session.opened", None), ("segment.opened", 1), ("tool.failed", 1), ("segment.sealed", 1),
                     ("segment.opened", 2), ("tool.failed", 2)]
+
+
+
+def test_a_segment_opening_never_precedes_activity_still_in_the_previous_segment(store):
+    """An async hook can land in seg-001 after its seal, on the millisecond seg-002 opens (#387 review)."""
+    h = session_with(store, "s1", [None], close=False)
+    h.open_segment("compact", 100)
+    append_jsonl(h.paths.segment(1).events, ev.make_event(
+        "tool.failed", "s1", {"tool": "Bash", "signature": "Bash: late", "exit_code": 1}, seg=1))
+    ts = "2026-01-01T00:00:00.000Z"
+    for log in (h.paths.lifecycle, h.paths.segment(1).events):
+        rewrite_log(log, lambda events: [{**e, "ts": ts} for e in events])
+    rows = [(e["kind"], e["seg"]) for e in readers.timeline(store, "s1")]
+    assert rows.index(("tool.failed", 1)) < rows.index(("segment.opened", 2))
+
+
+def test_a_clock_step_never_reorders_a_log_against_itself(store):
+    h = session_with(store, "s1", [None])
+    stepped = ["2026-01-01T00:00:05.000Z", "2026-01-01T00:00:01.000Z"]  # the clock went back mid-session
+    rewrite_log(h.paths.lifecycle, lambda es: [{**e, "ts": stepped[min(n, 1)]} for n, e in enumerate(es)])
+    kinds = [e["kind"] for e in readers.timeline(store, "s1") if e["log"] == "lifecycle"]
+    assert kinds == [json.loads(line)["kind"] for line in h.paths.lifecycle.read_text().splitlines()]
+
+
+
+def test_private_sessions_stay_out_of_cross_session_views(store):
+    """#387 review S6: a private session's titles and signatures must not reach another session's prose."""
+    for sid in ("pub", "priv"):
+        h = session_with(store, sid, [None], close=False)
+        h.append("tool.failed", {"tool": "Bash", "signature": f"Bash: {sid} host", "exit_code": 1})
+    store.session("priv").set_private(True)
+    assert [r["sid"] for r in readers.list_sessions(store)] == ["pub"]
+    assert {r["sid"] for r in readers.list_sessions(store, include_private=True)} == {"pub", "priv"}
+    assert [g["signature"] for g in readers.failures(store, group=True)] == ["Bash: pub host"]
+    assert len(readers.failures(store, group=True, include_private=True)) == 2
+    assert len(readers.failures(store, "priv")) == 1  # named explicitly: read
+
+
+def test_an_unreadable_session_is_skipped_not_fatal(store, monkeypatch):
+    """#387 review S7: one root-owned session (sudo claude) mustn't break the readers for every session."""
+    from claudna.session_store import project
+
+    session_with(store, "ok", [None])
+    session_with(store, "bad", [None])
+    real = project.session_doc
+
+    def doc(paths, *a, **k):
+        if paths.sid == "bad":
+            raise PermissionError(13, "Permission denied")
+        return real(paths, *a, **k)
+
+    monkeypatch.setattr(readers, "session_doc", doc)
+    unreadable = []
+    assert [r["sid"] for r in readers.list_sessions(store, unreadable=unreadable)] == ["ok"] and unreadable == ["bad"]

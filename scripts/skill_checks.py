@@ -648,8 +648,11 @@ _FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
 # stay literal, and neither is set in the shell.
 _PLUGIN_VAR_RE = re.compile(r"\$\{CLAUDE_(?:PLUGIN_ROOT|SKILL_DIR)\}")
 _PLUGIN_CACHE = "plugins/cache/Claudfather/claudna"
-# A bundled script run from the working directory, which is the user's project.
-_CWD_SCRIPT_RE = re.compile(r"(?<![\w/.-])(?:python3?|bash|sh)\s+[\"']?(?:\./)?scripts/[\w.-]+")
+# A bundled script, or a lib/ entry point, run from the working directory,
+# which is the user's project.
+_CWD_SCRIPT_RE = re.compile(
+    r"(?<![\w/.-])(?:python3?|bash|sh)\s+[\"']?(?:\./)?(?P<tree>scripts|lib)/[\w.-]+(?:/[\w.-]+)*"
+)
 
 
 def _definition_lines(lines: list[str]) -> set[int]:
@@ -741,14 +744,14 @@ def check_plugin_cache_paths(text: str, md_file: Path, skills_dir: Path, fm: dic
 
 
 def check_cwd_script_calls(text: str, md_file: Path, skills_dir: Path, fm: dict | None) -> list[str]:
-    """Check (d): a bundled script run from the working directory, outside a
-    skill that declares it runs from a clone of this repo."""
+    """Check (d): a bundled script or lib/ entry point run from the working
+    directory, outside a skill that declares it runs from a clone of this repo."""
     if (fm or {}).get("requires-context") == "repo-clone":
         return []
     rel = md_file.relative_to(skills_dir)
     return [
         f"{rel}:{i + 1}: `{m.group(0)}` runs from the working directory, which is the user's project, not "
-        f'this plugin -- write `python3 "{CLAUDNA_ROOT}/scripts/<name>"` (SKILL_CONTRACT §1.1)'
+        f'this plugin -- write `python3 "{CLAUDNA_ROOT}/{m.group("tree")}/<path>"` (SKILL_CONTRACT §1.1)'
         for i, line in enumerate(text.split("\n"))
         for m in _CWD_SCRIPT_RE.finditer(line)
     ]

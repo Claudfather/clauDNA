@@ -49,6 +49,7 @@ Assert on every call: top-level `ok` (bool) / `command` (matches the verb) / `da
 | `recall` → `recall` | `project`, `query`, `conventions`, `notes` (list) |
 | `status` → `status` | `root`, `tiers`, `total_docs`, `total_stale`, `projects`, `fleets`, `quarantined`, `index_present`, `index_fresh`, `warnings` |
 | `doctor` → `doctor` | `vault_format`, `engine_format`, `pending` (list), `fixable` (list); after `--fix` also `applied`, `commit` |
+| `promote` → `promote` | `action`: `promoted`, or `unchanged` for a note already at the target (both success); `path`, `from`, `to` — run only by `session_store digest --promote` (see below), never built by a skill |
 
 A missing top-level key, a `command` mismatch, or an absent expected `data` key is an **unrecognized envelope** → engine failure (§3). Do not parse a partial or guessed shape.
 
@@ -64,7 +65,7 @@ The `capture` `action` value drives the capture flow — its five values and the
 | `suggest_supersede` | the near-duplicate is **stale** | vault-relative |
 | `rejected` | validation failed; nothing written (exit 1) | — |
 
-The engine always stamps a new note `draft`; **consumers never set or promote `maturity`** — promotion is Claudron curation.
+The engine always stamps a new note `draft`; **consumers never set or promote `maturity`** — promotion is Claudron curation. One exception: in `/claudna:capture --review`, a person picks a harvested draft to promote, and `python3 "<claudna-root>/lib/claudna/session_store" digest --promote` runs `claudron promote … --to verified --by user` for it and checks the envelope (`<claudna-root>` per [`../_shared/claudna-root.md`](../_shared/claudna-root.md)). Nothing promotes without that pick, and no skill builds the `promote` call itself.
 
 ## 3. Failure posture — branch on the exit code, then degrade loudly
 

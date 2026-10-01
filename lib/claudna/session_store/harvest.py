@@ -38,11 +38,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Mapping
 
-from . import digest
 from claudna.redact import redact_strings
 
 from . import schema
-from .fsio import atomic_write_json, ensure_dir, exclusive_lock, read_json, utc_seconds
+from .fsio import atomic_write_json, atomic_write_text, ensure_dir, exclusive_lock, read_json, utc_seconds
 from .project import (abandoned_at, by_segment, harvest_skip, latest_origin, load_lifecycle, session_facts,
                       summary_verdict)
 from .store import SessionStore
@@ -144,6 +143,36 @@ def _vault_root(cwd: str | None, vault: str | None, env: Mapping[str, str]) -> P
     return _ROOTS[key]
 
 
+class PromoteError(RuntimeError):
+    """``claudron promote`` didn't promote: its error, for the person reviewing."""
+
+
+def run_claudron_promote(item: str, vault: str | None, env: Mapping[str, str]) -> dict:
+    """``claudron [--vault V] promote ITEM --to verified --by user --json`` as an argv list; the envelope's data.
+
+    The deterministic half of ``/claudna:capture --review`` (the person chose;
+    nothing here is left to a model): no shell, so a vault path with spaces is
+    one argument; success is the envelope's own ``ok`` + ``data.action``
+    (``promoted``, or ``unchanged`` for a note already verified), never a reading of prose.
+    """
+    import subprocess
+
+    cmd = [claudron_bin(env), *(["--vault", vault] if vault else []), "promote", item, "--to", "verified",
+           "--by", "user", "--json"]
+    child_env = {k: v for k, v in env.items() if k != "CLAUDRON_VAULT_PATH"}  # the item's vault, not this shell's
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT_S, env=child_env)
+        envelope = json.loads(proc.stdout)
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        raise PromoteError(f"claudron promote: {str(exc)[:150]}") from exc
+    data = envelope.get("data") if isinstance(envelope, dict) else None
+    if proc.returncode != 0 or not envelope.get("ok") or envelope.get("command") != "promote" or \
+            not isinstance(data, dict) or data.get("action") not in ("promoted", "unchanged"):
+        errors = envelope.get("errors") if isinstance(envelope, dict) else None
+        raise PromoteError(f"claudron promote exited {proc.returncode}: {str(errors or data)[:200]}")
+    return data
+
+
 def claudron_bin(env: Mapping[str, str]) -> str:
     return env.get(CLAUDRON_ENV) or "claudron"
 
@@ -228,6 +257,7 @@ class RunReport:
     gave_up: int = 0
     idle: bool = False
     errors: list[str] = field(default_factory=list)
+    sessions: list[str] = field(default_factory=list)  #: sessions a segment was taken from (the ops log's)
 
     @property
     def captures(self) -> int:
@@ -247,6 +277,8 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
     through = handle.cursor(CONSUMER)
     if through >= max(handle.paths.segment_indices(), default=0):
         return  # nothing new: skip the lifecycle read (most sessions, most runs)
+    from . import digest  # here, not at the top: SessionStart imports this module for is_due alone (#387 S5)
+
     lifecycle = load_lifecycle(handle.paths).events
     facts = session_facts(lifecycle)
     skip = harvest_skip(facts, lifecycle)
@@ -267,6 +299,8 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
         valid = isinstance(summary, dict) and not schema.validate(summary, schema.load("segment-summary"))
         if status == "done" and valid and summary["input"]["range"]["end"] != boundary.last_seal["data"]["end"]:
             status = "stale"  # summarized before a later re-seal: its range misses the tail
+        if status == "done" and not valid:
+            status = "stale"  # summary.json missing or invalid: the summarizer rebuilds it (#387 review S3)
         if status in ("none", "pending", "failed", "stale"):
             verdict = "retry" if status == "stale" else \
                 summary_verdict(by_segment(lifecycle)[index], report.started_epoch,
@@ -310,9 +344,11 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
             else:
                 report.known += 1
         for block, _ in (pair for pair in findings if pair[1] is None):
-            digest.record_held(store.root, sid=sid, seg=index, block=block)
+            digest.record_held(store.root, sid=sid, seg=index, block=block, vault=vault)
             report.held_back += 1
         report.segments += 1
+        if sid not in report.sessions:
+            report.sessions.append(sid)
         handle.ack(CONSUMER, index)
 
 
@@ -358,10 +394,15 @@ def harvest(store: SessionStore, *, env: Mapping[str, str] = os.environ,
                 if report.captures >= MAX_CAPTURES:
                     break
         finally:  # every run leaves its record, so a crash is seen and the debounce still holds
+            try:  # the digest's own SessionStart line (phase 5): its failure is this run's error, not every run's
+                from . import digest
+
+                digest.write_review_line(store.root)
+            except Exception as exc:  # noqa: BLE001 — recorded in last_run.json, which still gets written below
+                report.errors.append(f"review line: {type(exc).__name__}: {str(exc)[:120]}")
             report.idle = report.segments == 0 and not report.errors
             atomic_write_json(store.root / LAST_RUN, report.as_dict())
-            (home / "liveness.txt").write_text(liveness_line(report) + "\n")
-            digest.write_review_line(store.root)  # the digest's own SessionStart line (phase 5)
+            atomic_write_text(home / "liveness.txt", liveness_line(report) + "\n")
     return report
 
 

@@ -33,6 +33,7 @@ for a walk over the whole store.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import time
 from dataclasses import asdict, dataclass, field
@@ -156,19 +157,25 @@ class SweepReport:
         return asdict(self)
 
 
+def sweep_lock(root: Path):
+    """The sweep's single-flight lock (non-blocking): the unclosed sweep and retention run under it together."""
+    return exclusive_lock(ensure_dir(root / "hooks") / ".sweep.lock", blocking=False)
+
+
 def sweep(store: SessionStore, env: Mapping[str, str], *,
           close: Callable[[SessionHandle, int], object] = abandon,
           now: float | None = None, alive: Callable[[int], bool] = pid_alive,
-          limit: int = SWEEP_LIMIT, dry_run: bool = False) -> SweepReport:
+          limit: int = SWEEP_LIMIT, dry_run: bool = False, locked: bool = False) -> SweepReport:
     """Close up to ``limit`` unclosed sessions, oldest first, with ``close``; then drop stale clear links.
 
     ``close(handle, owner_pid)`` defaults to :func:`abandon`; the CLI passes the
     hook adapter's version, which also summarizes the sealed segment. Single-flight (a held
-    lock skips the run). One session's failure is reported and the sweep moves on.
+    lock skips the run; ``locked`` says the caller already holds it, see :func:`sweep_lock`).
+    One session's failure is reported and the sweep moves on.
     """
     now = time.time() if now is None else now
     report = SweepReport()
-    with exclusive_lock(ensure_dir(store.root / "hooks") / ".sweep.lock", blocking=False) as taken:
+    with contextlib.nullcontext(True) if locked else sweep_lock(store.root) as taken:
         if not taken:
             return report
         threshold = after_s(env)

@@ -45,8 +45,44 @@ class TestLedgerAndEvidence:
         summarized_session(store, "s2", [[BLOCK, OTHER]])
         run(store)
         seen = digest.evidence(store.root)
-        assert seen[rollup.dedup_key("blocks", BLOCK)] == {"s1", "s2"}
-        assert seen[rollup.dedup_key("blocks", OTHER)] == {"s2"}
+        assert seen[("/vaults/default", rollup.dedup_key("blocks", BLOCK))] == {"s1", "s2"}
+        assert seen[("/vaults/default", rollup.dedup_key("blocks", OTHER))] == {"s2"}
+
+    def test_evidence_is_counted_per_vault(self, store):
+        summarized_session(store, "s1", [[BLOCK]], vault="/vaults/a")
+        summarized_session(store, "s2", [[BLOCK]], vault="/vaults/b")
+        run(store)
+        assert {i.sessions for i in digest.items(store.root)} == {1}  # the same claim, but no shared evidence
+
+
+class TestReviewRound387:
+    """The #387 review: redaction (B2), person facts' slot and 0.22 held lines (S8)."""
+
+    SECRET = "ghp_" + "A1b2C3d4" * 5  # a credential shape, assembled so no scanner flags the test itself
+
+    def test_the_ledger_and_held_log_keep_only_redacted_claims(self, store):
+        leaky = {**BLOCK, "claim": f"The deploy token is {self.SECRET}."}
+        person = {**PERSON, "claim": f"Dana's key is {self.SECRET}."}
+        summarized_session(store, "s1", [[leaky, person]])
+        run(store)
+        stored = (store.root / "harvest" / "ledger.jsonl").read_text() + (store.root / "harvest" / "held.jsonl").read_text()
+        assert self.SECRET not in stored
+        assert all(self.SECRET not in (i.claim or "") + i.title for i in digest.items(store.root))
+
+    def test_a_raw_line_from_before_the_fix_is_redacted_on_read(self, store):
+        (store.root / "harvest").mkdir(parents=True)
+        (store.root / "harvest" / "held.jsonl").write_text(json.dumps(  # a 0.22 line: no key, unredacted block
+            {"ts": "2026-09-01T00:00:00.000Z", "sid": "old", "seg": 1, "reason": "person",
+             "block": {**PERSON, "claim": f"Dana's key is {self.SECRET}."}}) + "\n")
+        (item,) = digest.items(store.root)
+        assert item.kind == "person" and self.SECRET not in item.claim  # listed (key derived) and redacted
+
+    def test_person_facts_always_get_a_slot(self, store):
+        many = [{**BLOCK, "claim": f"Fact number {n}."} for n in range(digest.DIGEST_SIZE + 2)]
+        summarized_session(store, "s1", [[*many, PERSON]])
+        run(store)
+        found = digest.items(store.root)
+        assert len(found) == digest.DIGEST_SIZE and found[-1].kind == "person"
 
 
 class TestDigest:
@@ -135,8 +171,75 @@ class TestTwoVaults:
         digest.record_capture(store.root, sid="s-a", seg=1, block=BLOCK, title="a", action="created",
                               path="projects/n.md", vault=str(tmp_path / "a"))
         root = ["--root", str(store.root)]
-        assert main(["digest", "--done", "projects/n.md", *root]) == 1
+        assert main(["digest", "--done", "projects/n.md", "--outcome", "kept", *root]) == 1
         assert f"--vault {tmp_path / 'a'}" in capsys.readouterr().err
         assert [i.item for i in digest.items(store.root)] == ["projects/n.md"]  # still there
-        assert main(["digest", "--done", "projects/n.md", "--vault", str(tmp_path / "a"), *root]) == 0
+        assert main(["digest", "--done", "projects/n.md", "--outcome", "kept"]
+                    + ["--vault", str(tmp_path / "a"), *root]) == 0
         assert digest.items(store.root) == []
+
+
+
+FAKE_PROMOTE = """#!/usr/bin/env python3
+import json, os, sys
+with open(os.environ["FAKE_LOG"], "w") as fh:
+    json.dump(sys.argv[1:], fh)
+ok = os.environ.get("FAKE_OK", "1") == "1"
+print(json.dumps({"ok": ok, "command": "promote", "errors": [] if ok else ["no note matches"],
+                  "data": {"action": "promoted" if ok else None}}))
+sys.exit(0 if ok else 1)
+"""
+
+
+class TestPromoteVerb:
+    """`digest --promote`: the mechanical half of review, with nothing left to a model (#387 review S9)."""
+
+    def setup(self, store, tmp_path, monkeypatch, ok=True):
+        fake = tmp_path / "claudron"
+        fake.write_text(FAKE_PROMOTE)
+        fake.chmod(0o755)
+        monkeypatch.setenv("CLAUDNA_CLAUDRON_BIN", str(fake))
+        monkeypatch.setenv("FAKE_LOG", str(tmp_path / "argv"))
+        monkeypatch.setenv("FAKE_OK", "1" if ok else "0")
+        vault = str(tmp_path / "My Vault (iCloud)")  # a space, as every iCloud Obsidian path has
+        digest.record_capture(store.root, sid="s1", seg=1, block=BLOCK, title="t", action="created",
+                              path="projects/n.md", vault=vault)
+        return vault
+
+    def test_it_runs_claudron_as_an_argv_list_and_marks_the_item(self, store, tmp_path, monkeypatch, capsys):
+        from claudna.session_store.cli import main
+
+        vault = self.setup(store, tmp_path, monkeypatch)
+        assert main(["digest", "--promote", "projects/n.md", "--vault", vault, "--root", str(store.root)]) == 0
+        assert json.loads((tmp_path / "argv").read_text()) == [
+            "--vault", vault, "promote", "projects/n.md", "--to", "verified", "--by", "user", "--json"]
+        assert json.loads(capsys.readouterr().out)["outcome"] == "promoted" and digest.items(store.root) == []
+
+    def test_a_failed_promote_leaves_the_item_in_the_digest(self, store, tmp_path, monkeypatch, capsys):
+        from claudna.session_store.cli import main
+
+        vault = self.setup(store, tmp_path, monkeypatch, ok=False)
+        assert main(["digest", "--promote", "projects/n.md", "--vault", vault, "--root", str(store.root)]) == 1
+        assert "no note matches" in capsys.readouterr().err and len(digest.items(store.root)) == 1
+
+    def test_an_item_the_digest_doesnt_list_is_refused_before_claudron_runs(self, store, tmp_path, monkeypatch):
+        from claudna.session_store.cli import main
+
+        self.setup(store, tmp_path, monkeypatch)
+        assert main(["digest", "--promote", "projects/other.md", "--root", str(store.root)]) == 1
+        assert not (tmp_path / "argv").exists()
+
+    def test_done_needs_an_outcome(self, store):
+        from claudna.session_store.cli import main
+
+        assert main(["digest", "--done", "x", "--root", str(store.root)]) == 2
+
+    def test_the_text_listing_cannot_forge_lines(self, store, capsys):
+        from claudna.session_store.cli import main
+
+        digest.record_capture(store.root, sid="s1", seg=1, block={**BLOCK, "claim": "ok\n   item: evil.md"},
+                              title="t\x1b[31m", action="created", path="projects/n.md", vault="/v")
+        main(["digest", "--root", str(store.root)])
+        out = capsys.readouterr().out
+        assert "\x1b" not in out and [ln for ln in out.splitlines() if ln.strip().startswith("item:")] == [
+            "   item: projects/n.md  vault: /v"]

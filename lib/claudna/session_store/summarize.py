@@ -100,6 +100,12 @@ def run_claude(system_prompt: str, dialogue: str, output_schema: dict, model: st
     return envelope["structured_output"], envelope.get("total_cost_usd")
 
 
+def _open_request(handle: SessionHandle, index: int) -> str | None:
+    """The job id of segment ``index``'s request no ``completed``/``failed``/``skipped`` has answered yet."""
+    events = [e for e in load_lifecycle(handle.paths).events if e["seg"] == index and e["kind"].startswith("summary.")]
+    return events[-1]["data"]["job_id"] if events and events[-1]["kind"] == "summary.requested" else None
+
+
 def summarize(handle: SessionHandle, index: int, *, env: Mapping[str, str] = os.environ,
               runner: Callable[..., tuple[dict, float | None]] = run_claude) -> str:
     """Summarize sealed segment ``index``; return what happened (see the module doc)."""
@@ -116,8 +122,10 @@ def summarize(handle: SessionHandle, index: int, *, env: Mapping[str, str] = os.
             try:
                 outcome, end = _summarize_once(handle, index, env=env, runner=runner)
             except Exception as exc:  # noqa: BLE001 — any worker failure is recorded, so harvest can retry it
-                handle.append("summary.failed", {"job_id": "worker-error", "error": f"{type(exc).__name__}: {exc}",
-                                                 "retryable": True}, seg=index)
+                # Under the request it ends, if one is open: a separate id would count as another attempt and
+                # give up after 2 real tries instead of MAX_ATTEMPTS (#387 review).
+                handle.append("summary.failed", {"job_id": _open_request(handle, index) or "worker-error",
+                                                 "error": f"{type(exc).__name__}: {exc}", "retryable": True}, seg=index)
                 return f"failed: {type(exc).__name__}: {exc}"
             if end is None or handle.boundary(index).last_seal["data"]["end"] == end:
                 break

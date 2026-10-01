@@ -48,15 +48,31 @@ def _rollup(paths: SessionPaths) -> dict | None:
 
 
 def list_sessions(store: SessionStore, *, since: str | None = None, repo: str | None = None,
-                  bot: str | None = None, limit: int = 50) -> list[dict]:
-    """Sessions, newest first: one row each, with status, segment count and the rollup's title."""
+                  bot: str | None = None, limit: int = 50, include_private: bool = False,
+                  unreadable: list[str] | None = None) -> list[dict]:
+    """Sessions, newest first: one row each, with status, segment count and the rollup's title.
+
+    A cross-session view, so private sessions are left out unless
+    ``include_private``: a private session's titles mustn't reach another
+    session's prose (and its summary, and the vault). A session that can't be
+    read (permissions: files left by ``sudo claude``) is skipped and named in
+    ``unreadable`` rather than failing the whole list.
+    """
     cutoff = since_cutoff(since)
     rows = []
     for sid in store.session_ids():
         paths = store.session(sid).paths
-        if cutoff and _older_than(paths.lifecycle, cutoff):
-            continue  # its log hasn't changed since before the cutoff, so it opened before it too
-        doc = session_doc(paths)
+        try:
+            if cutoff and _older_than(paths.lifecycle, cutoff):
+                continue  # its log hasn't changed since before the cutoff, so it opened before it too
+            doc = session_doc(paths)
+            roll = _rollup(paths)
+        except OSError:
+            if unreadable is not None:
+                unreadable.append(sid)
+            continue
+        if doc.get("private") and not include_private:
+            continue
         actor, origin = doc.get("actor") or {}, doc.get("origin") or {}
         if cutoff and (doc.get("opened_at") or "") < cutoff:
             continue
@@ -64,7 +80,6 @@ def list_sessions(store: SessionStore, *, since: str | None = None, repo: str | 
             continue
         if bot and bot not in (actor.get("bot_name"), actor.get("bot_id")):
             continue
-        roll = _rollup(paths)
         rows.append({
             "sid": sid, "opened_at": doc.get("opened_at"), "status": doc.get("status"),
             "close_reason": doc.get("close_reason"), "private": doc.get("private"),
@@ -94,26 +109,32 @@ def _lifecycle_first(life: dict, act: dict) -> bool:
 
     What opens (a session, a segment) precedes the activity it opens; what
     ends or follows (a seal, a close, a summary job) comes after the activity
-    it ends, unless that activity is already in a later segment.
+    it ends — always within segments: an opening never precedes activity
+    still in an earlier segment (an async hook landing after the seal), and
+    an ending never follows activity already in a later one.
     """
-    return REGISTRY[life["kind"]].opens or (life["seg"] is not None and act["seg"] > life["seg"])
+    if life["seg"] is None:  # a session-level event: what opens the session precedes, the rest follows
+        return REGISTRY[life["kind"]].opens
+    if REGISTRY[life["kind"]].opens:  # a segment opening precedes only activity in it or later
+        return act["seg"] >= life["seg"]
+    return act["seg"] > life["seg"]  # a seal or summary job follows its segment's activity
 
 
 def timeline(store: SessionStore, sid: str) -> list[dict]:
     """Every lifecycle and activity event of one session, in time order.
 
-    The two logs share no sequence number, so they are merged: each keeps
-    its own order (a seal and the next segment's opening share a millisecond
-    when one step writes both), and a tie across the two is broken by meaning
-    (:func:`_lifecycle_first`).
+    The two logs share no sequence number, so they are merged, each in its
+    *file* order: appends hold the session lock, so a log's order is causal,
+    and a clock step must not reorder a log against itself. Activity is taken
+    segment by segment. Where both heads are comparable, the earlier
+    timestamp goes first, and a tie is broken by meaning (:func:`_lifecycle_first`).
     """
     handle = store.session(sid)
     if not handle.exists():
         raise LookupError(f"no session {sid}")
     paths = handle.paths
-    life = sorted(load_lifecycle(paths).events, key=lambda e: e["ts"])  # stable: the log's order on a tie
-    act = sorted((e for index in paths.segment_indices() for e in load_activity(paths, index).events),
-                 key=lambda e: e["ts"])
+    life = load_lifecycle(paths).events
+    act = [e for index in paths.segment_indices() for e in load_activity(paths, index).events]
     merged, i, j = [], 0, 0
     while i < len(life) or j < len(act):
         if j == len(act) or (i < len(life) and (life[i]["ts"] < act[j]["ts"] or (
@@ -127,16 +148,23 @@ def timeline(store: SessionStore, sid: str) -> list[dict]:
             for log, e in merged]
 
 
-def _failures(store: SessionStore, sids: Iterable[str], cutoff: str | None) -> list[dict]:
+def _failures(store: SessionStore, sids: Iterable[str], cutoff: str | None, *, skip_private: bool,
+              unreadable: list[str] | None) -> list[dict]:
     out = []
     for sid in sids:
         paths = store.session(sid).paths
-        for index in paths.segment_indices():
-            events = paths.segment(index).events
-            if cutoff and _older_than(events, cutoff):
-                continue  # untouched since before the cutoff: nothing in it can pass (one stat, no read)
-            out += [{"sid": sid, "seg": index, "ts": e["ts"], **e["data"]}
-                    for e in load_activity(paths, index).events if e["kind"] == "tool.failed"]
+        try:
+            if skip_private and session_doc(paths).get("private"):
+                continue  # signatures carry hosts, paths, repo URLs: never folded into another session's view
+            for index in paths.segment_indices():
+                events = paths.segment(index).events
+                if cutoff and _older_than(events, cutoff):
+                    continue  # untouched since before the cutoff: nothing in it can pass (one stat, no read)
+                out += [{"sid": sid, "seg": index, "ts": e["ts"], **e["data"]}
+                        for e in load_activity(paths, index).events if e["kind"] == "tool.failed"]
+        except OSError:
+            if unreadable is not None:
+                unreadable.append(sid)
     return out
 
 
@@ -147,18 +175,20 @@ def _older_than(path, cutoff: str) -> bool:
         return True
 
 
-def failures(store: SessionStore, sid: str | None = None, *, group: bool = False,
-             since: str | None = None) -> list[dict]:
+def failures(store: SessionStore, sid: str | None = None, *, group: bool = False, since: str | None = None,
+             include_private: bool = False, unreadable: list[str] | None = None) -> list[dict]:
     """``tool.failed`` events for one session or all, newest first; ``group`` folds them by signature.
 
     A group carries its count, how many sessions saw it, the exit codes, and
     the newest occurrence's ``sid``/``tool_use_id`` (where to read the full
-    error: the transcript).
+    error: the transcript). Across sessions (no ``sid``), private sessions are
+    left out unless ``include_private``; one named by ``sid`` is always read.
     """
     if sid is not None and not store.session(sid).exists():
         raise LookupError(f"no session {sid}")
     cutoff = since_cutoff(since)
-    rows = [r for r in _failures(store, [sid] if sid else store.session_ids(), cutoff)
+    rows = [r for r in _failures(store, [sid] if sid else store.session_ids(), cutoff,
+                                 skip_private=sid is None and not include_private, unreadable=unreadable)
             if not cutoff or (r["ts"] or "") >= cutoff]
     rows.sort(key=lambda r: r["ts"] or "", reverse=True)
     if not group:
@@ -193,13 +223,26 @@ def _compact(data: dict) -> str:
     return " ".join(f"{k}={v}" for k, v in data.items() if v not in (None, "", [], {}))
 
 
+_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def printable(text: str) -> str:
+    """``text`` with control characters (newlines, ANSI escapes) turned to spaces.
+
+    Titles, claims and signatures are model- or tool-written: a newline in one
+    could forge another line (an ``item:``), an escape sequence reach the terminal.
+    """
+    return _CONTROL.sub(" ", text)
+
+
 def render(verb: str, data, *, group: bool = False) -> list[str]:
     """Plain lines for a person at a terminal: one row per session, event or failure group."""
     if verb == "list":
         if not data:
             return ["no sessions"]
         return [f"{_short(r['opened_at'])}  {r['status'] or '-':7} {r['segments']:>3} seg  "
-                f"{(r['repo'] or '-')[:24]:24}  {r['sid']}  {r['title'] or ''}".rstrip() for r in data]
+                f"{(r['repo'] or '-')[:24]:24}  {r['sid']}  {'[private] ' if r['private'] else ''}"
+                f"{r['title'] or ''}".rstrip() for r in data]
     if verb == "show":
         s, roll = data["session"], data["rollup"]
         lines = [f"session {s['sid']}  {s['status']}" + (f" ({s['close_reason']})" if s.get("close_reason") else ""),

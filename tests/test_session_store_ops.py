@@ -89,3 +89,34 @@ def test_the_hook_path_never_imports_the_ops_log():
            "print('claudna.session_store.ops' in sys.modules)"
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=REPO_ROOT).stdout
     assert out.strip() == "False"
+
+
+
+def test_the_session_start_path_never_imports_the_digest():
+    """#387 review S5: SessionStart imports harvest for is_due; digest (and hashlib, rollup) stay off that path."""
+    code = ("import sys; sys.path.insert(0, 'lib'); import claudna.session_store.cli, claudna.session_store.boundaries; "
+            "from claudna.session_store import harvest; harvest.is_due; "
+            "print(sorted(m for m in ('claudna.session_store.digest', 'claudna.session_store.rollup', 'hashlib') "
+            "if m in sys.modules))")
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=REPO_ROOT).stdout
+    assert out.strip() == "[]"
+
+
+def test_a_harvest_run_records_its_sessions(store):
+    from test_session_store_harvest import BLOCK, ON, FakeCapture, summarized_session
+
+    summarized_session(store, "s1", [[BLOCK]])
+    with ops.run(store.root, "harvest") as rec:
+        report = harvest.harvest(store, env=ON, capture=FakeCapture(), force=True)
+        rec["sessions"] = report.sessions
+    assert ops.runs(store.root)[0]["sessions"] == ["s1"]
+
+
+def test_runs_read_the_rotated_generation_too(tmp_path, monkeypatch):
+    from claudna.session_store import fsio
+
+    monkeypatch.setattr(ops, "cap_log", lambda path: fsio.cap_log(path, 10))  # rotate at 10 bytes
+    ops.record(tmp_path, "sweep", started=100.0, outcome="first")
+    ops.record(tmp_path, "sweep", started=200.0, outcome="second")  # rotates the first into runs.jsonl.old
+    assert ops.log_path(tmp_path).with_name("runs.jsonl.old").is_file()
+    assert [r["outcome"] for r in ops.runs(tmp_path)] == ["second", "first"]

@@ -402,3 +402,24 @@ class TestRegressionsThatBite:
         out = summarize.summarize(h, 1, env={}, runner=FakeRunner(output={**GOOD_OUTPUT, **oversize}))
         assert out.startswith("failed: invalid summary")
         assert not (h.paths.segment(1).dir / "summary.json").exists()
+
+
+
+def test_a_worker_crash_is_logged_under_its_own_request(store, tmp_path):
+    """#387 review: a crash after summary.requested ends that request, not a second phantom attempt."""
+    from claudna.session_store import project, summarize
+
+    path = tmp_path / "t.jsonl"
+    write_transcript(path, DIALOGUE)
+    h = store.session("s1")
+    h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path=str(path), harvest=OPTED_IN)
+    h.open_segment("session_open", 0)
+    h.seal_segment(path.stat().st_size, "precompact")
+
+    def crash(*a, **k):
+        raise KeyError("boom")  # not a SummarizerError
+
+    summarize.summarize(h, 1, env={}, runner=crash)
+    events = [e for e in project.load_lifecycle(h.paths).events if e["kind"].startswith("summary.")]
+    assert [e["kind"] for e in events] == ["summary.requested", "summary.failed"]
+    assert events[0]["data"]["job_id"] == events[1]["data"]["job_id"]

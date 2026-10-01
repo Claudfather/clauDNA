@@ -2,19 +2,22 @@
 
 Harvest writes drafts; only a person promotes them (``draft → verified``).
 Harvest records every capture in ``<root>/harvest/ledger.jsonl``: the session
-and segment, the note's vault path, the vault, who asserted the claim, and a
-**claim key** (the rollup's dedup key: home + subject + claim, normalized). This
-module reads that ledger:
+and segment, the note's vault-relative path, the vault, who asserted the claim,
+and a **claim key** (the rollup's dedup key: home + subject + claim,
+normalized). Everything stored is redacted, and redacted again on read (a line
+from before a newer pattern). This module reads that ledger:
 
 * **Evidence** is the number of distinct sessions that asserted the same claim
-  key. It is §7.2's "recurring across ≥ 2 sessions" signal.
-* **The digest** is at most :data:`DIGEST_SIZE` draft notes not yet reviewed:
-  the most-reinforced first, a user-asserted claim ahead of an agent's on a
-  tie, then the most recent. The other-person facts harvest held back
-  (``held.jsonl``) are queued beside them.
-* **Review** (``/claudna:capture --review``) promotes through ``claudron
-  promote`` and then marks the item done here, in ``reviewed.jsonl``, so it
-  leaves the digest. clauDNA never promotes anything itself.
+  key in the same vault. It is §7.2's "recurring across ≥ 2 sessions" signal.
+* **The digest** is at most :data:`DIGEST_SIZE` items: draft notes not yet
+  reviewed, the most-reinforced first, a user-asserted claim ahead of an
+  agent's on a tie, then the most recent; and the other-person facts harvest
+  held back (``held.jsonl``), of which one always shows.
+* **Review** (``/claudna:capture --review``) is a person's choice per item.
+  The mechanical half is deterministic: ``digest --promote`` runs ``claudron
+  promote`` itself and marks the item done only when the envelope says so;
+  ``digest --done`` records a discard or a captured person fact, in
+  ``reviewed.jsonl``. Nothing promotes without a person's pick.
 
 ``review.txt`` holds the one line SessionStart shows, rewritten after every
 harvest run and every review.
@@ -29,8 +32,10 @@ import hashlib
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from claudna.redact import redact_strings
+
 from .events import now_ts
-from .fsio import append_jsonl, ensure_dir, read_jsonl
+from .fsio import append_jsonl, atomic_write_text, ensure_dir, read_jsonl
 from .rollup import dedup_key
 
 DIGEST_SIZE = 5
@@ -58,17 +63,21 @@ def record_capture(root: Path, *, sid: str, seg: int, block: dict, title: str, a
     reports, so the digest's ``item``/``vault`` are exactly what ``claudron
     --vault <vault> promote <item>`` takes.
     """
+    key = claim_key(block)  # keyed on the claim as summarized, so the same claim keys alike however redaction evolves
+    block, title = redact_strings(block), redact_strings(title)  # the ledger holds what the vault got (#387 B2)
     append_jsonl(ensure_dir(home(root)) / "ledger.jsonl", {
-        "ts": now_ts(), "sid": sid, "seg": seg, "key": claim_key(block), "title": title, "claim": block.get("claim"),
+        "ts": now_ts(), "sid": sid, "seg": seg, "key": key, "title": title, "claim": block.get("claim"),
         "asserted_by": block.get("asserted_by"), "action": action, "path": path, "vault": vault,
-    }, durable=False)
+    })  # fsynced: harvest acks right after, and the ack is durable — a crash must not keep it and lose this
 
 
-def record_held(root: Path, *, sid: str, seg: int, block: dict, reason: str = "person") -> None:
-    """One ``held.jsonl`` line for a block harvest keeps back for a person (an other-person fact)."""
+def record_held(root: Path, *, sid: str, seg: int, block: dict, vault: str | None = None,
+                reason: str = "person") -> None:
+    """One ``held.jsonl`` line for a block harvest keeps back for a person (an other-person fact), redacted."""
     append_jsonl(ensure_dir(home(root)) / "held.jsonl", {
-        "ts": now_ts(), "sid": sid, "seg": seg, "reason": reason, "key": claim_key(block), "block": block,
-    }, durable=False)
+        "ts": now_ts(), "sid": sid, "seg": seg, "reason": reason, "key": claim_key(block), "vault": vault,
+        "block": redact_strings(block),
+    })
 
 
 @dataclass(frozen=True)
@@ -91,17 +100,27 @@ def _records(root: Path) -> tuple[list[dict], list[dict], set[tuple[str | None, 
     h = home(root)
     reviewed = {(r.get("vault"), r["item"]) for r in read_jsonl(h / "reviewed.jsonl").records
                 if isinstance(r.get("item"), str)}
-    return read_jsonl(h / "ledger.jsonl").records, read_jsonl(h / "held.jsonl").records, reviewed
+    held = []
+    for rec in read_jsonl(h / "held.jsonl").records:
+        block = rec.get("block") if isinstance(rec.get("block"), dict) else {}
+        if not isinstance(rec.get("key"), str) and block:  # 0.22 held lines carry no key: derive it
+            rec = {**rec, "key": claim_key(block)}
+        held.append(rec)
+    return read_jsonl(h / "ledger.jsonl").records, held, reviewed
 
 
-def evidence(root: Path, ledger: list[dict] | None = None, held: list[dict] | None = None) -> dict[str, set[str]]:
-    """``claim key -> the sessions that asserted it`` (captures and held person facts alike)."""
+def evidence(root: Path, ledger: list[dict] | None = None,
+             held: list[dict] | None = None) -> dict[tuple[str | None, str], set[str]]:
+    """``(vault, claim key) -> the sessions that asserted it`` (captures and held person facts alike).
+
+    Per vault: a claim recurring in vault A is no evidence for a draft in vault B.
+    """
     if ledger is None or held is None:
         ledger, held, _ = _records(root)
-    out: dict[str, set[str]] = {}
+    out: dict[tuple[str | None, str], set[str]] = {}
     for rec in [*ledger, *held]:
         if isinstance(rec.get("key"), str) and isinstance(rec.get("sid"), str):
-            out.setdefault(rec["key"], set()).add(rec["sid"])
+            out.setdefault((rec.get("vault"), rec["key"]), set()).add(rec["sid"])
     return out
 
 
@@ -114,9 +133,10 @@ def items(root: Path, *, limit: int | None = DIGEST_SIZE) -> list[Item]:
         path, vault = rec.get("path"), rec.get("vault")
         if rec.get("action") not in ("created", "updated") or not isinstance(path, str) or (vault, path) in done:
             continue  # a note is (vault, path): the same relative path in two vaults is two notes
-        d = drafts.setdefault((vault, path), {"title": rec.get("title") or path, "claim": rec.get("claim"),
+        d = drafts.setdefault((vault, path), {"title": redact_strings(rec.get("title") or path),
+                                              "claim": redact_strings(rec.get("claim")),  # again on read: old lines
                                               "vault": vault, "sessions": 0, "user": False, "last_ts": ""})
-        d["sessions"] = max(d["sessions"], len(seen.get(rec.get("key"), ())))
+        d["sessions"] = max(d["sessions"], len(seen.get((vault, rec.get("key")), ())))
         d["user"] = d["user"] or rec.get("asserted_by") == "user"
         d["last_ts"] = max(d["last_ts"], rec.get("ts") or "")
     newest = sorted(drafts.items(), key=lambda kv: kv[1]["last_ts"], reverse=True)  # stable: the tiebreak below
@@ -128,10 +148,14 @@ def items(root: Path, *, limit: int | None = DIGEST_SIZE) -> list[Item]:
         key, block = rec.get("key"), rec.get("block") if isinstance(rec.get("block"), dict) else {}
         if not isinstance(key, str) or (None, item := person_item(key)) in done:
             continue
+        block = redact_strings(block)  # again on read: 0.22 held the block as summarized
         name = (block.get("subject_hint") or {}).get("name") or "person fact"
-        people[key] = Item("person", item, name, block.get("claim"), None, len(seen.get(key, ())),
-                           block.get("asserted_by"), rec.get("ts") or "")
-    found = ranked + sorted(people.values(), key=lambda i: i.last_ts, reverse=True)
+        people[key] = Item("person", item, name, block.get("claim"), None,
+                           len(seen.get((rec.get("vault"), key), ())), block.get("asserted_by"), rec.get("ts") or "")
+    persons = sorted(people.values(), key=lambda i: i.last_ts, reverse=True)
+    if limit is not None and persons and len(ranked) >= limit:
+        return ranked[:limit - 1] + persons[:1]  # person facts are §7.2's high-risk items: one always shows
+    found = ranked + persons
     return found if limit is None else found[:limit]
 
 
@@ -164,5 +188,4 @@ def review_line(root: Path) -> str:
 
 def write_review_line(root: Path) -> None:
     line = review_line(root)
-    path = ensure_dir(home(root)) / "review.txt"
-    path.write_text(line + "\n" if line else "", encoding="utf-8")
+    atomic_write_text(ensure_dir(home(root)) / "review.txt", line + "\n" if line else "")

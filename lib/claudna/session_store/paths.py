@@ -134,6 +134,14 @@ class SessionPaths:
     def session_json(self) -> Path:
         return self.dir / "session.json"
 
+    def archived_indices(self) -> list[int]:
+        """The indices of retired segments whose summary was archived, ascending (a directory listing, no reads)."""
+        archive = self.dir / "summaries"
+        if not archive.is_dir():
+            return []
+        found = (parse_seg_dirname(p.name[:-5]) for p in archive.iterdir() if p.name.endswith(".json"))
+        return sorted(i for i in found if i is not None)
+
     def archived_summary(self, index: int) -> Path:
         """Where a retired segment's summary is kept (retention, phase 6): the rollup reads it from here."""
         return self.dir / "summaries" / f"{seg_dirname(index)}.json"

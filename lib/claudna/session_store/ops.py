@@ -21,7 +21,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
-from .fsio import append_jsonl, cap_log, ensure_dir, read_jsonl, utc_seconds
+from .fsio import append_jsonl, cap_log, ensure_dir, exclusive_lock, read_jsonl, utc_seconds
 
 KINDS = ("summarize", "harvest", "sweep")
 
@@ -43,7 +43,9 @@ def record(root: Path, kind: str, *, started: float, outcome: str, sessions: lis
            "duration_ms": max(0, int((time.time() - started) * 1000)), "outcome": outcome[:200],
            "sessions": sorted(set(sessions or [])), "detail": detail or {}}
     try:
-        append_jsonl(cap_log(ensure_dir(root / "runs") / "runs.jsonl"), rec, durable=False)
+        runs_dir = ensure_dir(root / "runs")
+        with exclusive_lock(runs_dir / ".lock"):  # rotate and append as one step: two rotations can't race
+            append_jsonl(cap_log(runs_dir / "runs.jsonl"), rec, durable=False)
     except OSError:
         return None
     return rec
@@ -68,7 +70,8 @@ def run(root: Path, kind: str) -> Iterator[dict]:
 
 def runs(root: Path, *, kind: str | None = None, since: str | None = None, limit: int = 50) -> list[dict]:
     """Run records, newest first, optionally one kind and on or after ``since`` (an ISO timestamp)."""
-    out = [r for r in read_jsonl(log_path(root)).records
+    old = log_path(root).with_name("runs.jsonl.old")  # the generation the last rotation kept
+    out = [r for r in [*read_jsonl(old).records, *read_jsonl(log_path(root)).records]
            if (kind is None or r.get("kind") == kind) and (since is None or (r.get("started_at") or "") >= since)]
     out.sort(key=lambda r: r.get("started_at") or "", reverse=True)
     return out[:limit]

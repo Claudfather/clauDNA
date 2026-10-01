@@ -23,6 +23,7 @@ left out until the new one lands.
 from __future__ import annotations
 
 import re
+import unicodedata
 from pathlib import Path
 
 from . import schema
@@ -51,7 +52,8 @@ _SPACE = re.compile(r"\s+")
 
 
 def _norm(text: object) -> str:
-    return _SPACE.sub(" ", str(text or "")).strip().casefold()
+    """Whitespace-collapsed, case-folded and NFKC-normalized: ``café`` keys alike in NFC and NFD."""
+    return _SPACE.sub(" ", unicodedata.normalize("NFKC", str(text or ""))).strip().casefold()
 
 
 def dedup_key(field: str, item: dict) -> str:

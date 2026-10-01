@@ -13,14 +13,16 @@ segment summary>}``. ``next`` maps each session to the segment index the
 consumer may ack once it has taken that session's items.
 
 Per session, segments are walked in order past the consumer's cursor (or
-``--since-seg``): a final segment with a ``done`` summary is an item; one that
-was skipped passes, and so does one whose summary will never come (its last
-attempt spent, or a retry no harvest will run: :func:`_settled`). Anything
-still in flight stops that session, so a cursor never skips work that is
-still coming — harvest's rule, from the same verdict. Private sessions are
-never exported. An ack goes through ``SessionHandle.ack``: one locked writer,
-never past the session's last segment, and a cursor never moves back. The
-store's own consumers (``harvest``) are reserved names.
+``--since-seg``): a final segment with a ``done`` summary is an item, and so
+is a retired one, from its archived summary (no data loss: a consumer behind
+retention still gets everything; the archive is read only past the cursor).
+A skipped segment passes, and so does one whose summary will never come (its
+last attempt spent, or a retry no harvest will run: :func:`_settled`).
+Anything still in flight stops that session, so a cursor never skips work
+that is still coming — harvest's rule, from the same verdict. Private
+sessions are never exported. An ack goes through ``SessionHandle.ack``: one
+locked writer, never past the session's last *final* segment, and a cursor
+never moves back. The store's own consumers (``harvest``) are reserved names.
 """
 
 from __future__ import annotations
@@ -28,8 +30,9 @@ from __future__ import annotations
 import re
 import time
 
-from .fsio import epoch_of
-from .project import (abandoned_at, by_segment, harvest_skip, load_lifecycle, next_segment_index, segment_states,
+from . import schema
+from .fsio import epoch_of, read_json
+from .project import (abandoned_at, by_segment, harvest_skip, load_lifecycle, segment_states,
                       session_doc, session_facts, summary_verdict)
 from .store import SessionStore
 
@@ -45,7 +48,7 @@ SESSION_FIELDS = ("sid", "status", "opened_at", "closed_at", "close_reason", "ch
 
 
 def check_consumer(name: str) -> str:
-    if not isinstance(name, str) or not CONSUMER.match(name):
+    if not isinstance(name, str) or not CONSUMER.fullmatch(name):
         raise ValueError(f"invalid consumer name: {name!r}")
     if name in RESERVED:
         raise ValueError(f"consumer name {name!r} is reserved for the store's own use")
@@ -60,14 +63,25 @@ def _settled(summary: str, events: list[dict], *, retried: bool, abandoned: str 
     summaries, and ``retried`` says whether harvest takes this session
     (:func:`project.harvest_skip`) — or would, but a retry has been due for
     :data:`RETRY_WAIT_DAYS` without one running (harvest since switched off,
-    or ``claudron`` gone). A stale or unreadable summary is still waited for.
+    or ``claudron`` gone). A stale or unreadable summary is harvest's to
+    re-summarize: waited for on the same terms, stepped over when harvest
+    never takes the session.
     """
+    quiet = bool(events) and now - epoch_of(events[-1]["ts"]) > RETRY_WAIT_DAYS * 86400
+    if summary in ("stale", "unreadable"):  # harvest re-summarizes these; nothing else does (#387 review S3)
+        return not retried or quiet
     if summary not in ("none", "pending", "failed"):
         return False
     verdict = summary_verdict(events, now, abandoned_at=abandoned)
-    if verdict == "retry" and retried and events and now - epoch_of(events[-1]["ts"]) > RETRY_WAIT_DAYS * 86400:
+    if verdict == "retry" and retried and quiet:
         return True  # harvest was to retry it but hasn't in a week (turned off, claudron gone): stop waiting
     return verdict == "give up" or (verdict == "retry" and not retried)
+
+
+def _archived(paths, index: int) -> dict | None:
+    """A retired segment's archived summary if it is one (read only when a consumer is past it)."""
+    doc = read_json(paths.archived_summary(index))
+    return doc if isinstance(doc, dict) and not schema.validate(doc, schema.load("segment-summary")) else None
 
 
 def export(store: SessionStore, consumer: str, *, since_seg: int | None = None, limit: int = 100,
@@ -82,9 +96,9 @@ def export(store: SessionStore, consumer: str, *, since_seg: int | None = None, 
             break
         handle = store.session(sid)
         start = max(handle.cursor(consumer), since_seg or 0)
-        indices = handle.paths.segment_indices()
-        if not indices or indices[-1] <= start:
-            continue  # nothing past the cursor: no log read
+        live, archived = handle.paths.segment_indices(), handle.paths.archived_indices()
+        if max([*live, *archived], default=0) <= start:
+            continue  # nothing past the cursor, live or archived: no log read
         lifecycle = load_lifecycle(handle.paths)
         facts = session_facts(lifecycle.events)
         if not lifecycle.events or facts.private:
@@ -92,18 +106,28 @@ def export(store: SessionStore, consumer: str, *, since_seg: int | None = None, 
         through, subset = start, None
         buckets, abandoned = by_segment(lifecycle.events), abandoned_at(lifecycle.events)
         retried = harvest_skip(facts, lifecycle.events) is None
-        for state in (s for s in segment_states(handle.paths, lifecycle.events) if s.index > start):
-            if not state.final or len(items) >= limit:
+        states = {s.index: s for s in segment_states(handle.paths, lifecycle.events) if s.index > start}
+        for index in sorted({*states, *(i for i in archived if i > start)}):
+            if len(items) >= limit:
                 break
-            if state.summary not in ("done", "skipped") and not _settled(
-                    state.summary, buckets.get(state.index, []), retried=retried, abandoned=abandoned, now=now):
+            state = states.get(index)
+            if state is None:  # retired: its archived summary is final and done (no data loss: owner, #387 S4)
+                doc = _archived(handle.paths, index)
+                if doc is None:
+                    break  # an archive that can't be read holds the cursor rather than skip it
+            elif not state.final:
+                break
+            elif state.summary not in ("done", "skipped") and not _settled(
+                    state.summary, buckets.get(index, []), retried=retried, abandoned=abandoned, now=now):
                 break  # still in flight, stale or unreadable: the session's cursor holds here
-            if state.summary == "done":
+            else:
+                doc = state.doc if state.summary == "done" else None
+            if doc is not None:
                 if subset is None:
-                    doc = session_doc(handle.paths, lifecycle)
-                    subset = {k: doc.get(k) for k in SESSION_FIELDS}
-                items.append({"sid": sid, "seg": state.index, "session": subset, "summary": state.doc})
-            through = state.index
+                    session = session_doc(handle.paths, lifecycle)
+                    subset = {k: session.get(k) for k in SESSION_FIELDS}
+                items.append({"sid": sid, "seg": index, "session": subset, "summary": doc})
+            through = index
         if through > start:
             nxt[sid] = through
     return {"schema": EXPORT_SCHEMA, "consumer": consumer, "items": items, "next": nxt}
@@ -117,8 +141,11 @@ def ack(store: SessionStore, consumer: str, sid: str, through: int) -> int:
     handle = store.session(sid)
     if not handle.exists():
         raise LookupError(f"no session {sid}")
-    highest = next_segment_index(handle.paths) - 1
-    if through > highest:  # a cursor never moves back: one past the end would skip segments not yet made
-        raise ValueError(f"--through {through} is past session {sid}'s last segment ({highest})")
+    lifecycle = load_lifecycle(handle.paths).events
+    finals = [s.index for s in segment_states(handle.paths, lifecycle) if s.final]
+    retired = [e["seg"] for e in lifecycle if e["kind"] == "segment.retired"]
+    highest = max([*finals, *retired], default=0)
+    if through > highest:  # a cursor never moves back: past the last *final* segment would skip work still coming
+        raise ValueError(f"--through {through} is past session {sid}'s last final segment ({highest})")
     handle.ack(consumer, through)
     return handle.cursor(consumer)

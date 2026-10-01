@@ -343,6 +343,8 @@ def project_session(sid: str, lifecycle: Log, segments: list[dict], *, transcrip
             children.append(e["data"]["child_sid"])
     private = session_facts(lifecycle.events).private
 
+    retired = {e["seg"] for e in lifecycle.events if e["kind"] == "segment.retired"}
+    segments = [s for s in segments if s["index"] not in retired]  # the log, not a directory, says what's retired
     tally = dict.fromkeys(_SUMMARY_STATUS.values(), 0)
     for s in segments:
         if s["summary"]["status"] in tally:
@@ -365,7 +367,7 @@ def project_session(sid: str, lifecycle: Log, segments: list[dict], *, transcrip
         "closed_at": closed_at,
         "close_reason": close_reason,
         "segments": {"count": len(segments), "open": max(open_segments) if open_segments else None,
-                     "retired": len({e["seg"] for e in lifecycle.events if e["kind"] == "segment.retired"})},
+                     "retired": len(retired)},
         "summary": {f"segments_{k}": n for k, n in tally.items()},
         "projected_from": lifecycle.projected_from,
     }

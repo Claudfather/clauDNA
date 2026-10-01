@@ -16,6 +16,9 @@ Hook adapters call this module; they never write store files themselves.
 from __future__ import annotations
 
 import contextlib
+import errno
+import os
+import shutil
 from pathlib import Path
 from typing import Iterator
 
@@ -94,9 +97,38 @@ class SessionHandle:
         with contextlib.ExitStack() as stack:
             try:
                 taken = stack.enter_context(exclusive_lock(seg.summarize_lock, blocking=False))
-            except FileNotFoundError:
+            except OSError as exc:  # the directory went (or is going) as the lock was opened
+                if exc.errno not in (errno.ENOENT, errno.EINVAL, errno.ENOTDIR):
+                    raise
                 taken = None
             yield "missing" if taken is None or (taken and not seg.dir.is_dir()) else "taken" if taken else "busy"
+
+    def retire_segment(self, index: int, reason: str, *, archive: dict | None = None) -> bool:
+        """Retire segment ``index`` (retention): archive its summary, log ``segment.retired``, take its directory.
+
+        All under the session lock, so no hook's refresh can recreate a file in
+        the directory as it goes: the archive is written durably first (after
+        this, it is the summary's only copy), the event is logged once, and the
+        directory is renamed out of the segment namespace (atomic). The renamed
+        husk is deleted after the lock is released. Returns whether this call
+        retired it (``False``: already retired, or no such segment).
+        """
+        seg = self.paths.segment(index)
+        with self._locked():
+            if not seg.dir.is_dir():
+                return False
+            if archive is not None:
+                target = self.paths.archived_summary(index)
+                ensure_dir(target.parent)
+                atomic_write_json(target, archive, durable=True)
+            lifecycle = load_lifecycle(self.paths).events
+            fresh = not any(e["kind"] == "segment.retired" and e["seg"] == index for e in lifecycle)
+            if fresh:
+                self._append_locked("segment.retired", {"reason": reason}, seg=index)
+            husk = self.paths.dir / f".retired-{seg.dir.name}-{os.urandom(4).hex()}"
+            os.replace(seg.dir, husk)
+        shutil.rmtree(husk, ignore_errors=True)  # a failure leaves a husk outside the namespace: swept later
+        return fresh
 
     def _refuse_first_write(self, kind: str, data: dict, *, seg: int | None) -> None:
         """For a session with no directory: raise now whatever the locked append would refuse."""

@@ -121,6 +121,33 @@ def test_a_working_directory_script_call_passes_only_in_a_repo_clone_skill(skill
     assert check_cwd_script_calls(mention, md_file, skills, {}) == []
 
 
+@pytest.mark.parametrize(
+    "call",
+    [
+        "python3 lib/claudna/session_store digest --json",
+        "python3 ./lib/claudna/session_store digest --json",
+        "python3 'lib/claudna/session_store' digest --json",
+    ],
+)
+def test_a_working_directory_lib_call_fails_outside_a_repo_clone_skill(skills: Path, call: str) -> None:
+    body = f"Run `{call}`.\n"
+    md_file = _file(skills, "demo/SKILL.md", body)
+    [error] = check_cwd_script_calls(body, md_file, skills, {})
+    assert error.startswith("demo/SKILL.md:1: `")
+    assert "lib/claudna/session_store` runs from the working directory" in error
+    assert '`python3 "<claudna-root>/lib/<path>"`' in error
+    assert check_cwd_script_calls(body, md_file, skills, {"requires-context": "repo-clone"}) == []
+
+
+def test_a_lib_call_anchored_on_the_resolver_passes(skills: Path) -> None:
+    body = (
+        'python3 "<claudna-root>/lib/claudna/session_store" digest --json\n'
+        "The store lives in `lib/claudna/session_store/` (see lib/CLAUDE.md).\n"
+    )
+    md_file = _file(skills, "demo/SKILL.md", body)
+    assert check_cwd_script_calls(body, md_file, skills, {}) == []
+
+
 def test_a_file_using_the_placeholder_points_at_its_definition(skills: Path) -> None:
     body = "x\nForward: Read <claudna-root>/skills/_shared/guide.md\n"
     md_file = _file(skills, "demo/SKILL.md", body)

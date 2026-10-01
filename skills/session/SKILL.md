@@ -34,7 +34,7 @@ For the selected verb, read ONLY its depth file in this skill directory and foll
 
 ## Shared conventions
 
-- **Identity:** keyed by cwd. The handoff lives at `<cwd>/.claude/session.md`. No global slug, no cross-project state, and **no writes to `~/.claude/`** — this engine stays out of the user-config tree entirely.
+- **Identity:** the handoff verbs are keyed by cwd. The handoff lives at `<cwd>/.claude/session.md`, with no global slug and no cross-project state. The history verbs are the exception: they only read the session store (`~/.claudna/sessions/`), which spans every session and project on the host. Nothing here **writes to `~/.claude/`** — this engine stays out of the user-config tree entirely.
 - **Atomic writes:** always `session.md.tmp` then `mv` — a concurrent reader never sees a half-written file.
 - **No compound commands:** separate parallel tool calls; `allowed-tools` patterns match simple commands only.
 - **`--auto` is silent:** no questions, reaper as the only pruning mechanism, and a §10.C structured result (per `../_shared/orchestration-guide.md`) as the final output — `"skill": "session"` with `"mode"` inside `artifacts`.

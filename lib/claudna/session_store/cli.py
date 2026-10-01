@@ -235,23 +235,29 @@ def _read(args) -> int:
     store = _store(args)
     if store is None:
         return 1
+    unreadable: list[str] = []
     try:
         if args.verb == "list":
-            data = readers.list_sessions(store, since=args.since, repo=args.repo, bot=args.bot, limit=args.limit)
+            data = readers.list_sessions(store, since=args.since, repo=args.repo, bot=args.bot, limit=args.limit,
+                                         include_private=args.include_private, unreadable=unreadable)
         elif args.verb == "show":
             data = readers.show(store, args.sid)
         elif args.verb == "timeline":
             data = readers.timeline(store, args.sid)
         else:
-            data = readers.failures(store, args.sid, group=args.group, since=args.since)
-    except (LookupError, InvalidSessionId, ValueError) as exc:
+            data = readers.failures(store, args.sid, group=args.group, since=args.since,
+                                    include_private=args.include_private, unreadable=unreadable)
+    except (LookupError, InvalidSessionId, ValueError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
+    if unreadable:
+        print(f"warning: {len(unreadable)} session(s) could not be read (permissions?): {', '.join(unreadable[:5])}",
+              file=sys.stderr)
     if args.json:
         print(json.dumps(data, indent=2, sort_keys=True))
     else:
         for line in readers.render(args.verb, data, group=getattr(args, "group", False)):
-            print(line)
+            print(readers.printable(line))
     return 0
 
 
@@ -291,6 +297,7 @@ def main(argv: list[str] | None = None) -> int:
     lst.add_argument("--bot", help="a bot name or id")
     lst.add_argument("--limit", type=int, default=50)
     lst.add_argument("--json", action="store_true")
+    lst.add_argument("--include-private", action="store_true", help="also list private sessions (marked)")
     for verb, text in (("show", "one session: its projection, segments, rollup and lineage"),
                        ("timeline", "one session's lifecycle and activity, in time order")):
         p = sub.add_parser(verb, help=text, parents=[rooted])
@@ -302,6 +309,8 @@ def main(argv: list[str] | None = None) -> int:
     fails.add_argument("--group", action="store_true")
     fails.add_argument("--since", help="7d, 12h, 2w, or an ISO date")
     fails.add_argument("--json", action="store_true")
+    fails.add_argument("--include-private", action="store_true",
+                       help="across sessions, also fold in private ones (a named sid is always read)")
     exp = sub.add_parser("export", help="what a consumer hasn't taken yet (claudna.export/1), or --ack",
                          parents=[rooted])
     exp.add_argument("--consumer", required=True)
@@ -315,9 +324,11 @@ def main(argv: list[str] | None = None) -> int:
                          parents=[rooted])
     dig.add_argument("--limit", type=int, default=5)
     dig.add_argument("--json", action="store_true")
-    dig.add_argument("--done", metavar="ITEM", help="take an item (a note path or a held fact's person: id) off")
-    dig.add_argument("--vault", help="with --done: the item's vault, as the digest gave it")
-    dig.add_argument("--outcome", choices=("promoted", "discarded", "kept"), default="kept")
+    act = dig.add_mutually_exclusive_group()
+    act.add_argument("--promote", metavar="ITEM", help="promote a draft to verified (runs claudron), then take it off")
+    act.add_argument("--done", metavar="ITEM", help="take an item (a note path or a held fact's person: id) off")
+    dig.add_argument("--vault", help="with --promote/--done: the item's vault, as the digest gave it")
+    dig.add_argument("--outcome", choices=("promoted", "discarded", "kept"), help="with --done: what the person did")
     rns = sub.add_parser("runs", help="the ops log: the store's background runs, newest first", parents=[rooted])
     rns.add_argument("--kind", choices=("summarize", "harvest", "sweep"))
     rns.add_argument("--since", help="7d, 12h, 2w, or an ISO date")
@@ -343,7 +354,7 @@ def main(argv: list[str] | None = None) -> int:
 
         with ops.run(store.root, "harvest") as rec:
             report = harvest.harvest(store, force=args.force).as_dict()
-            rec["outcome"] = report.get("status") or "done"
+            rec["outcome"], rec["sessions"] = report.get("status") or "done", report.get("sessions") or []
             rec["detail"] = {k: report.get(k) for k in ("created", "known", "held_back", "rejected", "retried",
                                                         "gave_up", "segments", "errors")}
         print(json.dumps(report))
@@ -370,15 +381,20 @@ def main(argv: list[str] | None = None) -> int:
         else:
             from . import retention
 
-            with ops.run(store.root, "sweep") as rec:
-                report = unclosed.sweep(store, env, close=close).as_dict()
-                # retention (spec §9) rides the same detached, debounced worker
-                report["retention"] = retention.sweep(store, env).as_dict()
-                retired = report["retention"]["retired"]
-                errors = report["errors"] + report["retention"]["errors"]
-                rec.update(outcome="error" if errors else "done",
-                           sessions=report["closed"] + [r.split("/", 1)[0] for r in retired],
-                           detail={"closed": len(report["closed"]), "retired": len(retired), "errors": errors[:5]})
+            with unclosed.sweep_lock(store.root) as taken:
+                if not taken:  # another sweep is running: neither half runs twice (#387 review S1)
+                    print(json.dumps({"status": "skipped", "reason": "another sweep is running"}))
+                    return 0
+                with ops.run(store.root, "sweep") as rec:
+                    report = unclosed.sweep(store, env, close=close, locked=True).as_dict()
+                    # retention (spec §9) rides the same detached, debounced worker, under the same lock
+                    report["retention"] = retention.sweep(store, env).as_dict()
+                    retired = report["retention"]["retired"]
+                    errors = report["errors"] + report["retention"]["errors"]
+                    rec.update(outcome="error" if errors else "done",
+                               sessions=report["closed"] + [r.split("/", 1)[0] for r in retired],
+                               detail={"closed": len(report["closed"]), "retired": len(retired),
+                                       "repaired": len(report["retention"]["repaired"]), "errors": errors[:5]})
         print(json.dumps(report))
         return 0
     if args.verb == "runs":
@@ -405,24 +421,42 @@ def main(argv: list[str] | None = None) -> int:
     if args.verb == "export":
         return _export(args)
     if args.verb == "digest":
-        from . import digest
+        from . import digest, readers
 
         store = _store(args)
         if store is None:
             return 1
-        if args.vault and not args.done:
-            print("error: --vault only goes with --done", file=sys.stderr)
+        item = args.promote or args.done
+        if args.vault and not item:
+            print("error: --vault only goes with --promote or --done", file=sys.stderr)
             return 2
-        if args.done:
+        if args.done and not args.outcome:
+            print("error: --done needs --outcome (promoted, discarded or kept)", file=sys.stderr)
+            return 2
+        if item:
             pending = digest.items(store.root, limit=None)
-            if not any((i.item, i.vault) == (args.done, args.vault) for i in pending):
+            match = next((i for i in pending if (i.item, i.vault) == (item, args.vault)), None)
+            if match is None:
                 vaults = sorted({"no vault (omit --vault)" if i.vault is None else f"--vault {i.vault}"
-                                 for i in pending if i.item == args.done})
+                                 for i in pending if i.item == item})
                 hint = f"; it is under {', '.join(vaults)}" if vaults else ""
-                print(f"error: no digest item {args.done!r} in vault {args.vault!r}{hint}", file=sys.stderr)
+                print(f"error: no digest item {item!r} in vault {args.vault!r}{hint}", file=sys.stderr)
                 return 1
-            digest.mark_reviewed(store.root, args.done, outcome=args.outcome, vault=args.vault)
-            print(json.dumps({"item": args.done, "vault": args.vault, "outcome": args.outcome}))
+            outcome = args.outcome
+            if args.promote:
+                if match.kind != "draft":
+                    print("error: only a draft is promoted; a person fact is captured, then --done", file=sys.stderr)
+                    return 1
+                from . import harvest
+
+                try:
+                    harvest.run_claudron_promote(item, args.vault, os.environ)
+                except harvest.PromoteError as exc:
+                    print(f"error: {exc}", file=sys.stderr)  # not marked reviewed: it stays in the digest
+                    return 1
+                outcome = "promoted"
+            digest.mark_reviewed(store.root, item, outcome=outcome, vault=args.vault)
+            print(json.dumps({"item": item, "vault": args.vault, "outcome": outcome}))
             return 0
         found = [i.as_dict() for i in digest.items(store.root, limit=args.limit)]
         if args.json:
@@ -430,7 +464,8 @@ def main(argv: list[str] | None = None) -> int:
         else:
             for n, i in enumerate(found, 1):
                 seen = f"{i['sessions']} session(s)" + (", user-asserted" if i["asserted_by"] == "user" else "")
-                print(f"{n}. [{i['kind']}] {i['title']}  ({seen})\n   {i['claim'] or ''}\n   item: {i['item']}"
+                title, claim = readers.printable(i["title"]), readers.printable(i["claim"] or "")
+                print(f"{n}. [{i['kind']}] {title}  ({seen})\n   {claim}\n   item: {i['item']}"
                       + (f"  vault: {i['vault']}" if i["vault"] else ""))
             if not found:
                 print("nothing to review")
