@@ -202,10 +202,10 @@ class TestEvents:
             ev.make_event(kind, "s1", data, seg=seg)
 
     def test_free_text_is_capped_not_rejected(self):
-        e = ev.make_event("tool.failed", "s1", {"tool": "Bash", "signature": "x", "exit_code": 1,
-                                                 "command": "c" * 1000, "error": "e" * 5000}, seg=1)
-        assert len(e["data"]["command"]) == 300 and len(e["data"]["error"]) == 800
-        assert e["data"]["error"].endswith("…")
+        e = ev.make_event("prompt.submitted", "s1", {"prompt_id": None, "chars": 9, "text": "t" * 1000}, seg=1)
+        n = ev.make_event("checkpoint.noted", "s1", {"note": "n" * 5000}, seg=1)
+        assert len(e["data"]["text"]) == 500 and len(n["data"]["note"]) == 1000
+        assert n["data"]["note"].endswith("…")
 
     def test_timestamps_are_utc_millisecond_z(self):
         assert re.match(schema.load("event")["properties"]["ts"]["pattern"], ev.now_ts())
@@ -377,8 +377,7 @@ class TestStore:
         h.append("skill.invoked", {"skill": "claudna:ship", "args_chars": 0}, seg=s1)
         h.seal_segment(100, "precompact", trigger="auto")
         s2 = h.open_segment("compact", 100)
-        h.append("tool.failed", {"tool": "Bash", "signature": "sig", "exit_code": 1, "command": None,
-                                 "error": None}, seg=s2)
+        h.append("tool.failed", {"tool": "Bash", "signature": "sig", "exit_code": 1}, seg=s2)
         live = load(h.paths.session_json)
         assert live["status"] == "open" and live["segments"] == {"count": 2, "open": 2}
 
@@ -392,7 +391,7 @@ class TestStore:
         assert done["segments"] == {"count": 2, "open": None}
         assert done["children"] == ["child-1"] and done["private"] is True
         assert done["chain_id"] == h.sid  # no parent: its own chain root
-        assert load(h.paths.segment(1).segment_json)["counts"] == {"prompts": 1, "skills": 1, "failures": 0,
+        assert load(h.paths.segment(1).segment_json)["counts"] == {"prompts": 1, "skills": 1, "failures": 0, "interrupts": 0,
                                                                    "checkpoints": 0}
         assert load(h.paths.segment(2).segment_json)["counts"]["failures"] == 1
 
@@ -540,8 +539,7 @@ class TestProjection:
         h.append("summary.requested", {"job_id": "j"}, seg=s1)
         h.seal_segment(50, "precompact", trigger="auto")
         s2 = h.open_segment("compact", 50)
-        h.append("tool.failed", {"tool": "Bash", "signature": "s", "exit_code": 1, "command": None,
-                                 "error": None}, seg=s2)
+        h.append("tool.failed", {"tool": "Bash", "signature": "s", "exit_code": 1}, seg=s2)
         h.link_child("c")
         h.seal_segment(80, "session_end")
         h.close_session("other")
@@ -794,8 +792,7 @@ class TestWritersAreStrictAboutDataKeys:
         assert ev.classify(e) == "ok"
 
     def test_a_failure_signature_is_capped(self):
-        e = ev.make_event("tool.failed", "s1", {"tool": "Bash", "signature": "x" * 50_000, "exit_code": 1,
-                                                "command": None, "error": None}, seg=1)
+        e = ev.make_event("tool.failed", "s1", {"tool": "Bash", "signature": "x" * 50_000, "exit_code": 1}, seg=1)
         assert len(e["data"]["signature"]) == ev.REGISTRY["tool.failed"].caps["signature"]
 
     def test_fork_is_a_session_source(self, store):
@@ -883,7 +880,7 @@ class TestPinsForUnheldGuarantees:
         for i in range(3):
             h.append("prompt.submitted", {"prompt_id": f"p{i}", "chars": i})
         h.append("skill.invoked", {"skill": "claudna:ship", "args_chars": 0})
-        h.append("tool.failed", {"tool": "Bash", "signature": "s", "exit_code": 1, "command": None, "error": None})
+        h.append("tool.failed", {"tool": "Bash", "signature": "s", "exit_code": 1})
         path = h.paths.segment(seg).segment_json
         incremental = path.read_text()  # no lifecycle event since: this is the fast path's own output
         h.rebuild()
@@ -939,8 +936,7 @@ class TestPinsForUnheldGuarantees:
 
 class TestWritersRedact:
     def test_free_text_is_redacted_before_it_is_capped(self):
-        e = ev.make_event("tool.failed", "s1", {"tool": "Bash", "signature": "auth failed",
-                                                "exit_code": 1, "error": None,
-                                                "command": "curl -H 'Authorization: Bearer " + "tok" * 8 + "'"},
+        e = ev.make_event("prompt.submitted", "s1", {"prompt_id": None, "chars": 60,
+                                                     "text": "curl -H 'Authorization: Bearer " + "tok" * 8 + "'"},
                           seg=1)
-        assert "toktok" not in e["data"]["command"] and "[REDACTED]" in e["data"]["command"]
+        assert "toktok" not in e["data"]["text"] and "[REDACTED]" in e["data"]["text"]

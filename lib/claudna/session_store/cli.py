@@ -212,6 +212,11 @@ def main(argv: list[str] | None = None) -> int:
     if argv[:1] == ["hook"] and len(argv) == 2:  # the hot path: no argparse
         run_hook(argv[1], sys.stdin.buffer.read())
         return 0
+    if argv == ["telemetry"]:  # telemetry-emit.sh: its own entry, so it works with the store off
+        from . import telemetry
+
+        telemetry.run_hook(sys.stdin.buffer.read(), os.environ)
+        return 0
     import argparse
 
     parser = argparse.ArgumentParser(prog="claudna.session_store", description="clauDNA session store")

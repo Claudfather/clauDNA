@@ -1,3 +1,3 @@
 {"data":{"chars":42,"prompt_id":"p1"},"kind":"prompt.submitted","seg":1,"sid":"5f0c2d1e-0000-4000-8000-000000000001","ts":"2026-09-28T10:00:10.000Z","v":1}
 {"data":{"args_chars":0,"skill":"claudna:build"},"kind":"skill.invoked","seg":1,"sid":"5f0c2d1e-0000-4000-8000-000000000001","ts":"2026-09-28T10:00:20.000Z","v":1}
-{"data":{"command":"make check","error":"ruff failed","exit_code":2,"signature":"bash:make check:exit 2","tool":"Bash"},"kind":"tool.failed","seg":1,"sid":"5f0c2d1e-0000-4000-8000-000000000001","ts":"2026-09-28T10:05:00.000Z","v":1}
+{"data":{"exit_code":2,"signature":"Bash: make check exit <n>","tool":"Bash"},"kind":"tool.failed","seg":1,"sid":"5f0c2d1e-0000-4000-8000-000000000001","ts":"2026-09-28T10:05:00.000Z","v":1}

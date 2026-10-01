@@ -39,6 +39,8 @@ SESSION_STORE_LAYERS = {
     "events": 2,
     "project": 3,
     "store": 4,
+    "activity": 1,
+    "telemetry": 2,
     "summarize": 5,
     "unclosed": 5,
     "harvest": 6,

@@ -310,7 +310,8 @@ In an opted-in interactive session, a detached worker summarizes each segment af
 - **Sessions that never ended:** a crash or a kill skips SessionEnd and leaves a session open. About every 6 hours, a SessionStart starts a detached sweep. It closes up to 5 sessions that have sat idle for `CLAUDNA_UNCLOSED_AFTER_H` and whose `claude` process is gone, and marks them `abandoned`. Their last segment is summarized as usual if the session opted in. A session that recorded no process id is never closed automatically. `python3 "<plugin>/lib/claudna/session_store" sweep --dry-run` lists the candidates, and `seal <session-id>` closes one by hand.
 - **`/clear` lineage:** the session a `/clear` starts records the one it cleared (`parent_sid`), and every session in that chain shares one `chain_id`.
 - **Keeping one session out:** `python3 "<plugin>/lib/claudna/session_store" private <session-id>` marks a session private: it is never summarized or harvested. `--off` clears the mark.
-- **Privacy:** prompts aren't recorded yet. When prompt events arrive, they carry counts only unless you opt in with `CLAUDNA_CAPTURE_PROMPTS=1`. Free text the store keeps, and everything the summarizer sees, goes through the credential redactor first. Directories are `0700` and files `0600`.
+- **Activity:** each segment also records what happened inside it, in `seg-NNN/events.jsonl`: one line per prompt, per Skill call, per failing tool call, and per tool call you stopped with Esc. Those hooks run in the background, so no prompt waits on them. Tool events store the tool, the exit code and a normalized, redacted one-line signature, plus a pointer to the call in Claude Code's own transcript. The command and its error output are never copied.
+- **Privacy:** a prompt is recorded as its length only, unless you opt in with `CLAUDNA_CAPTURE_PROMPTS=1`. Free text the store keeps, and everything the summarizer sees, goes through the credential redactor first. Directories are `0700` and files `0600`.
 - **When something breaks:** `~/.claudna/hooks/errors.log` holds one JSON line per failure. `session-store.stderr`, `summarizer.stderr` and `harvest.stderr` next to it catch anything Python couldn't log itself. `python3 "<plugin>/lib/claudna/session_store" check <session-id>` validates a session's files.
 - **Removal:** uninstalling the plugin leaves `~/.claudna/` in place, so session history survives a reinstall. Delete that directory to remove it.
 - **Upgrading from 0.21.x:** earlier versions kept hook state in `${XDG_STATE_HOME:-~/.local/state}/claudna/`. Nothing reads it any more. Its `permissions.log` holds whole command lines, so delete that directory by hand.
@@ -653,18 +654,23 @@ clauDNA can emit lightweight telemetry events when skills are invoked. Events ar
 
 ### What's collected
 
-Each event records:
+Each `claudna:*` skill call appends one line, in Claudosseum's ingestion format:
+
+```json
+{"ts": "2026-09-30T21:30:00Z", "bot": "interactive", "type": "skill_invocation", "source": "vitals",
+ "data": {"skill_slug": "recall", "duration_ms": 12, "success": true, "session_id": "…"}}
+```
 
 | Field | Value |
 |-------|-------|
-| `event` | `"skill_invocation"` |
-| `skill` | Skill name (e.g., `claudna:review-work`) |
-| `ts` | ISO 8601 timestamp (UTC) |
+| `ts` | ISO 8601 timestamp (UTC, seconds) |
 | `bot` | `BOT_NAME` env var, or `"interactive"` |
-| `duration_ms` | `null` (not available in PostToolUse hooks) |
-| `success` | `true` / `false` (heuristic based on error indicators in output) |
+| `data.skill_slug` | the skill without its `claudna:` prefix |
+| `data.duration_ms` | how long the Skill call took, from Claude Code |
+| `data.success` | whether the Skill call succeeded, from Claude Code (a failed call is recorded too, with `false`) |
+| `data.session_id` | Claude Code's session id |
 
-No prompts, tool arguments, file paths, or PII are captured.
+No prompts, tool arguments, file paths, or PII are captured. Since 0.23, `telemetry-emit.sh` hands the payload to the session store's telemetry writer (§3.7). The shape is unchanged, but `duration_ms`, `success` and `session_id` are now the real values. Before, they were `null`, a guess from the skill's output text, and the hook shell's pid. Telemetry keeps working with `CLAUDNA_SESSION_STORE=0`.
 
 ### Where events go
 
@@ -683,11 +689,11 @@ Override the path with `CLAUDNA_TELEMETRY_PATH`.
 | Interactive users | **Off** | Set `CLAUDNA_TELEMETRY=1` to enable |
 | Fleet bots | **On** (Claudlobby sets `CLAUDNA_TELEMETRY=1`) | Set `CLAUDNA_TELEMETRY=0` to disable |
 
-The hook checks `CLAUDNA_TELEMETRY` on every invocation and exits immediately if it's not `1`. There is no startup cost when telemetry is off.
+The hook checks `CLAUDNA_TELEMETRY` on every Skill call and writes nothing unless it's `1`. It runs async, so no call waits on it.
 
 ### Auto-pruning
 
-Entries older than 30 days are pruned automatically. Pruning runs opportunistically (roughly every 100th write) to avoid adding latency to normal skill invocations.
+Entries older than 30 days are pruned at most once a day, from the same async hook, so no Skill call waits on it and it works with the session store off.
 
 ### Integration with fleet observability
 

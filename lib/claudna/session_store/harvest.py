@@ -43,7 +43,7 @@ from . import events as ev
 from claudna.redact import redact_strings
 
 from . import schema
-from .fsio import append_jsonl, atomic_write_json, ensure_dir, exclusive_lock, read_json
+from .fsio import append_jsonl, atomic_write_json, ensure_dir, exclusive_lock, read_json, utc_seconds
 from .project import by_segment, load_lifecycle, session_facts
 from .store import SessionStore
 
@@ -203,7 +203,7 @@ class RunReport:
 
     @property
     def started_at(self) -> str:
-        return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.started_epoch))
+        return utc_seconds(self.started_epoch)
 
     def as_dict(self) -> dict:
         return {**self.__dict__, "started_at": self.started_at}

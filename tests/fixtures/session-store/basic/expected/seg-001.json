@@ -2,6 +2,7 @@
   "counts": {
     "checkpoints": 0,
     "failures": 1,
+    "interrupts": 0,
     "prompts": 1,
     "skills": 1
   },
@@ -9,7 +10,7 @@
   "opened_at": "2026-09-28T10:00:01.000Z",
   "opened_by": "session_open",
   "projected_from": {
-    "bytes": 553,
+    "bytes": 511,
     "lines": 3,
     "skipped": 0
   },

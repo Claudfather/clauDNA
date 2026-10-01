@@ -1,8 +1,9 @@
 #!/bin/bash
 # Session store hook (R-record, spec §4.4): records session and segment
-# boundaries in ${CLAUDNA_STATE_DIR:-~/.claudna}/sessions/. Wired for
-# SessionStart, PreCompact and SessionEnd; the event name is $1, the hook
-# payload arrives on stdin.
+# boundaries, and in-segment activity, in ${CLAUDNA_STATE_DIR:-~/.claudna}/sessions/.
+# Wired for SessionStart, PreCompact and SessionEnd (synchronous), and
+# UserPromptSubmit, PostToolUse (Skill) and PostToolUseFailure (async, so no
+# prompt waits on it). The event name is $1; the hook payload arrives on stdin.
 #
 # Invariants (tests/test_session_store_hook.py):
 #   - ALWAYS exits 0 and prints nothing — SessionStart stdout would land in the

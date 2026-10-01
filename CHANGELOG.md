@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **The session store records activity (phase 4).** Each segment's `events.jsonl` gets one line per prompt (`prompt.submitted`: its length, with the text only under `CLAUDNA_CAPTURE_PROMPTS=1`), per Skill call (`skill.invoked`: the real `ok` and `duration_ms`), per failing tool call (`tool.failed`), and per call the user stopped with Esc (`tool.interrupted`, never counted as a failure). `segment.json` counts all four, and `interrupts` is new and optional, so 0.22 projections still validate. The three hooks (UserPromptSubmit, PostToolUse on `Skill`, PostToolUseFailure) are `async`, so no prompt waits on the store; one that lands after SessionEnd records and logs nothing. Tool events **point into the transcript instead of copying it**: `tool.failed` keeps the tool, the exit code, a normalized and redacted one-line signature for grouping, and `tool_use_id`/`prompt_id`, and its `command`/`error` fields are gone. The nested-child guard covers activity unchanged.
+
+### Changed
+- **Skill telemetry reports real values.** `plugin-hooks/telemetry-emit.sh` is now a thin, async gate on `CLAUDNA_TELEMETRY=1` that calls the session store's `telemetry` writer (`telemetry.py`). The Skill payload is decoded once, by the same code that records `skill.invoked`. The Claudosseum `skill_invocation` line keeps its opt-in, path and shape, and it still works with the store off. `data.success` and `data.duration_ms` now come from Claude Code instead of a grep of the output and `null`, and `data.session_id` is the real session id instead of a shell pid. The file is created `0600`. A failed Skill call, which Claude Code reports through PostToolUseFailure, is now recorded with `success: false`; before, failures never produced a line. An interrupted call records nothing. Pruning (30 days) moved from every ~100th write to at most once a day, from the same async hook, so it still works with the store off; it rewrites the file only when a line is due, and a prune killed mid-way no longer loses its lines to the next one. A telemetry failure now lands in `<telemetry file>.stderr` instead of being discarded. SETUP_GUIDE §8 now documents the line as it really is.
+
+### Fixed
+- **`scripts/redact.py` masks current credential shapes ([#356](https://github.com/Claudfather/clauDNA/issues/356)).** It missed several formats in use today. The rules that change:
+  - Vendor prefixes for current formats: `github_pat_`, `sk_live_`/`rk_test_`, `whsec_`, `sk-proj-`/`sk-ant-`/`sk-or-`, `npm_`, `hf_`, `gsk_`, `glpat-`, `ASIA`, `xox?-` and `xapp-`.
+  - Telegram tokens inside a bot URL.
+  - Secret-named assignments whose keyword sits anywhere in the name (`SECRET_KEY`, `GITHUB_PAT`, `DB_PASS`), keeping the name; `tokenizer` and `max_tokens` still pass.
+  - Auth headers, including a quoted header name as a headers dict prints it (`{"Authorization": "Bearer …"}`), `--access-token`/`--api-token`, `-u user:password` on a curl or wget line (elsewhere `-u` is another flag: `date -u`, `docker run -u`, `rsync -u`), and URL passwords with an empty user.
+  - PEM private-key blocks. A block that is cut off (a BEGIN line quoted in prose, or a capture of the first lines of a key file) is masked through its key lines, encryption headers and blank line included, and no further: the text after it survives.
+  - The high-entropy backstop now ends a run at `_` and `-`.
+  - In place, each file is handled on its own: one that fails is reported, the rest are still redacted, and the exit status is non-zero. A file that is not UTF-8 is redacted with its other bytes kept, and a symlink is refused rather than written through.
+  - Coverage is stated as the tested list (`tests/test_redact.py`, one case per shape) in the script and in `orchestration-guide.md`.
 
 ## [0.22.0] - 2026-09-30
 ### Added
@@ -24,15 +40,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **clauDNA keeps one state root, `~/.claudna`.** The permission hook's debug log and the pre-compact marker move from `${XDG_STATE_HOME:-~/.local/state}/claudna/` to `${CLAUDNA_STATE_DIR:-~/.claudna}/hooks/`, next to the session store. A relative `CLAUDNA_STATE_DIR` keeps no state instead of writing into the project. The old directory is no longer read or written. Its `permissions.log` holds whole command lines, so delete it by hand (SETUP_GUIDE §3.7). The pre-compact hook now sets `umask 077`, so the state root is `0700` whichever hook creates it first. The store hook rotates its own stderr capture, and a Python 3.9 CI leg (`make test-runtime`) holds the runtime floor.
 
 ### Fixed
-- **`scripts/redact.py` masks current credential shapes ([#356](https://github.com/Claudfather/clauDNA/issues/356)).** It missed several formats in use today. The rules that change:
-  - Vendor prefixes for current formats: `github_pat_`, `sk_live_`/`rk_test_`, `whsec_`, `sk-proj-`/`sk-ant-`/`sk-or-`, `npm_`, `hf_`, `gsk_`, `glpat-`, `ASIA`, `xox?-` and `xapp-`.
-  - Telegram tokens inside a bot URL.
-  - Secret-named assignments whose keyword sits anywhere in the name (`SECRET_KEY`, `GITHUB_PAT`, `DB_PASS`), keeping the name; `tokenizer` and `max_tokens` still pass.
-  - Auth headers, including a quoted header name as a headers dict prints it (`{"Authorization": "Bearer …"}`), `--access-token`/`--api-token`, `-u user:password` on a curl or wget line (elsewhere `-u` is another flag: `date -u`, `docker run -u`, `rsync -u`), and URL passwords with an empty user.
-  - PEM private-key blocks. A block that is cut off (a BEGIN line quoted in prose, or a capture of the first lines of a key file) is masked through its key lines, encryption headers and blank line included, and no further: the text after it survives.
-  - The high-entropy backstop now ends a run at `_` and `-`.
-  - In place, each file is handled on its own: one that fails is reported, the rest are still redacted, and the exit status is non-zero. A file that is not UTF-8 is redacted with its other bytes kept, and a symlink is refused rather than written through.
-  - Coverage is stated as the tested list (`tests/test_redact.py`, one case per shape) in the script and in `orchestration-guide.md`.
 - **`github-activity-report`**: the reference line for `crawl.sh` said to copy the script into a working directory and run it, which contradicted the crawl step. It now says, as the step does, to run the bundled script from the skill's own directory, never a copy.
 
 ## [0.21.1] - 2026-09-30

@@ -39,6 +39,7 @@ _OPT_STR = (str, type(None))
 _INT = (int,)
 _OPT_INT = (int, type(None))
 _BOOL = (bool,)
+_OPT_BOOL = (bool, type(None))
 _DICT = (dict,)
 
 
@@ -159,20 +160,31 @@ REGISTRY: dict[str, KindSpec] = {
         caps={"text": 500},
         constraints={"chars": _NON_NEGATIVE},
     ),
-    "skill.invoked": KindSpec(log=ACTIVITY, seg=True, fields={"skill": _STR, "args_chars": _INT},
-                              constraints={"args_chars": _NON_NEGATIVE}),
+    # Tool events point into the transcript (``tool_use_id``) instead of copying it: the full
+    # command and error are already there, so the store keeps only what groups and counts them.
+    "skill.invoked": KindSpec(
+        log=ACTIVITY,
+        seg=True,
+        fields={"skill": _STR, "args_chars": _INT},
+        optional={"ok": _OPT_BOOL, "duration_ms": _OPT_INT, "prompt_id": _OPT_STR, "tool_use_id": _OPT_STR},
+        constraints={"args_chars": _NON_NEGATIVE, "duration_ms": _NON_NEGATIVE},
+    ),
     "tool.failed": KindSpec(
         log=ACTIVITY,
         seg=True,
-        fields={
-            "tool": _STR,
-            "signature": _STR,
-            "exit_code": _OPT_INT,
-            "command": _OPT_STR,
-            "error": _OPT_STR,
-        },
-        # signature is a normalized first error line; capped so it can't smuggle stderr in
-        caps={"signature": 200, "command": 300, "error": 800},
+        fields={"tool": _STR, "signature": _STR, "exit_code": _OPT_INT},
+        optional={"duration_ms": _OPT_INT, "prompt_id": _OPT_STR, "tool_use_id": _OPT_STR},
+        # signature is a normalized, redacted first error line; capped so it can't smuggle stderr in
+        caps={"signature": 200},
+        constraints={"duration_ms": _NON_NEGATIVE},
+    ),
+    # The user stopped a tool call (Esc): intent, not a failure, so it never counts as one.
+    "tool.interrupted": KindSpec(
+        log=ACTIVITY,
+        seg=True,
+        fields={"tool": _STR},
+        optional={"duration_ms": _OPT_INT, "prompt_id": _OPT_STR, "tool_use_id": _OPT_STR},
+        constraints={"duration_ms": _NON_NEGATIVE},
     ),
     "checkpoint.noted": KindSpec(log=ACTIVITY, seg=True, fields={"note": _STR}, caps={"note": 1000}),
 }

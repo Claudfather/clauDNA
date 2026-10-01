@@ -1,7 +1,7 @@
 """Input-hardening invariants for two hooks (#260, defense-in-depth).
 
 Neither is exploitable today — `session_id` is a Claude-Code-generated UUID and
-the telemetry slug arrives quote-free through a `grep -o` — but both place an
+the telemetry slug comes from the Skill tool's own input — but both place an
 externally-derived value into a structural position (a filesystem path, a
 hand-built JSON line) without validating its charset. These tests pin the
 guard so a future refactor that changes the value's provenance cannot silently
@@ -65,54 +65,25 @@ class TestPrecompactSessionIdIsPathSafe:
 
 
 class TestTelemetryEmitsValidJson:
-    """The jq-less fallback hand-builds a JSON line; whatever the slug, the
-    emitted line must be valid JSON or nothing at all."""
+    """Skill telemetry (telemetry-emit.sh, writing through the store's telemetry.py) writes one
+    JSON line per claudna skill; whatever the slug, the line is valid JSON with
+    a slug of the real charset, or nothing at all."""
 
-    def _run_without_jq(self, tmp_path: Path, event: dict) -> list[str]:
-        # Force the hand-built JSON branch by pointing PATH at a curated dir of
-        # symlinks that includes the coreutils the hook needs but NOT jq — a
-        # failing stub wouldn't work, since `command -v jq` would still find it.
-        import shutil
-
-        curated = tmp_path / "curated-bin"
-        curated.mkdir(exist_ok=True)
-        # `bash`/`sh` included so the child interpreter itself resolves under
-        # this PATH (subprocess looks up the executable via the child env);
-        # jq is deliberately excluded to force the hand-built branch.
-        for tool in ("bash", "sh", "grep", "cut", "head", "date", "mkdir",
-                     "dirname", "cat", "wc", "mv", "rm", "touch", "sed", "sort", "find"):
-            real = shutil.which(tool)
-            if real:
-                (curated / tool).symlink_to(real)
-        assert shutil.which("jq", path=str(curated)) is None, "jq leaked into the no-jq PATH"
-
+    def _run(self, tmp_path: Path, event: dict) -> list[str]:
         out_path = tmp_path / "events.jsonl"
-        env = {
-            "PATH": str(curated),
-            "CLAUDNA_TELEMETRY": "1",
-            "CLAUDNA_TELEMETRY_PATH": str(out_path),
-            "HOME": str(tmp_path),
-        }
-        # Compact JSON: the no-jq branch extracts with a whitespace-free
-        # `"skill":"…"` grep, which is the contract this branch already assumes.
-        subprocess.run(
-            ["bash", str(TELEMETRY)], input=json.dumps(event, separators=(",", ":")),
-            capture_output=True, text=True, cwd=tmp_path, env=env, timeout=10,
-        )
+        env = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "CLAUDNA_TELEMETRY": "1",
+               "CLAUDNA_TELEMETRY_PATH": str(out_path), "CLAUDNA_SESSION_STORE": "0"}
+        subprocess.run(["bash", str(TELEMETRY)], input=json.dumps(event),
+                       capture_output=True, text=True, cwd=tmp_path, env=env, timeout=20)
         return out_path.read_text().splitlines() if out_path.exists() else []
 
     def test_backslash_slug_does_not_emit_broken_json(self, tmp_path):
-        # `\z` is an invalid JSON escape; a hand-built line carrying it would be
-        # unparseable. The guard must drop such a slug, not emit corrupt JSON.
-        lines = self._run_without_jq(
-            tmp_path, {"tool_input": {"skill": "claudna:bad\\zslug"}}
-        )
+        lines = self._run(tmp_path, {"tool_name": "Skill", "tool_input": {"skill": "claudna:bad\\zslug"}})
         assert lines == [], f"a malformed slug was emitted: {lines}"
 
     def test_normal_slug_emits_one_valid_event(self, tmp_path):
-        lines = self._run_without_jq(
-            tmp_path, {"tool_input": {"skill": "claudna:capture"}}
-        )
+        lines = self._run(tmp_path, {"tool_name": "Skill", "tool_input": {"skill": "claudna:capture"},
+                                     "tool_response": {"success": True}, "duration_ms": 12, "session_id": "s-1"})
         assert len(lines) == 1
         rec = json.loads(lines[0])
-        assert rec["data"]["skill_slug"] == "capture"
+        assert rec["data"] == {"skill_slug": "capture", "duration_ms": 12, "success": True, "session_id": "s-1"}
