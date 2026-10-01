@@ -67,6 +67,8 @@ test-runtime:
 # Live routing evals (scripts/routing_eval.py): paid, so not in `make check`.
 # The Claude Code CI evals on is pinned: an upgrade can change the picker or the
 # built-in skills it competes with. Raise it on purpose, with an eval run.
+# deps-eval is for CI: it replaces the global `claude`. Locally, run
+# `make routing-eval` with the Claude Code you have.
 CLAUDE_CODE_VERSION = 2.1.287
 deps-eval:
 	npm install -g @anthropic-ai/claude-code@$(CLAUDE_CODE_VERSION)

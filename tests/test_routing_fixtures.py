@@ -44,7 +44,7 @@ def test_fixture_schema():
 
 
 def test_controls_schema():
-    for control in load_matrix().get("controls", []):
+    for control in load_matrix().get("controls") or []:
         assert set(control) == {"utterance"} and isinstance(control["utterance"], str) and control["utterance"]
 
 

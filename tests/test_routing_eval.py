@@ -266,3 +266,37 @@ def test_main_exits_2_when_claude_cannot_run(capsys):
 def test_main_rejects_a_pass_rule_it_cannot_meet():
     with pytest.raises(SystemExit):
         re_.main(["--runs", "2", "--pass", "3"])
+
+
+def test_a_spend_cap_stop_keeps_the_pick():
+    attempt = re_.parse_stream(stream("claudna:modal", subtype="error_max_budget_usd"))
+    assert attempt.skill == "claudna:modal" and attempt.error is None
+
+
+def test_a_timeout_reason_survives_a_multiline_stderr():
+    def slow(argv, env, cwd):
+        return "", "timed out after 90s first line\nsecond line"
+
+    logs = []
+    verdicts, _, _ = re_.evaluate([MODAL], runs=1, need=1, model="m", claude_bin="claude", budget_usd=1,
+                                  runner=slow, base_env={}, log=logs.append)
+    assert "timed out after 90s" in verdicts[0].attempts[0].error
+
+
+def test_attempts_run_in_a_scratch_git_repo():
+    seen = []
+
+    def look(argv, env, cwd):
+        seen.append((cwd / ".git").is_dir())
+        return stream("claudna:modal"), ""
+
+    re_.evaluate([MODAL], runs=1, need=1, model="m", claude_bin="claude", budget_usd=1, runner=look,
+                 base_env={}, log=lambda _: None)
+    assert seen == [True]  # so the SessionStart briefing runs, as in a user's project
+
+
+def test_empty_rows_or_controls_keys_load_as_none_and_are_skipped(tmp_path):
+    matrix = tmp_path / "m.yaml"
+    matrix.write_text("rows:\ncontrols:\n")
+    assert re_.load_cases(matrix) == []
+

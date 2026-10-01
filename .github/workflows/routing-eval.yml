@@ -16,6 +16,10 @@ on:
       - ".claude-plugin/**"
       - "tests/fixtures/routing-matrix.yaml"
       - "scripts/routing_eval.py"
+      - "scripts/skill_checks.py"
+      - "lib/**"
+      - "Makefile"
+      - ".github/workflows/routing-eval.yml"
   workflow_dispatch:
 
 jobs:

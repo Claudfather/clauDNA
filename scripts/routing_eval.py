@@ -88,9 +88,9 @@ class Verdict:
 def load_cases(path: Path | None = None, *, all_rows: bool = False) -> list[Case]:
     """The rows to evaluate (``eval: true`` ones unless ``all_rows``), then the controls."""
     doc = yaml.safe_load((MATRIX if path is None else path).read_text())
-    rows = [r for r in doc.get("rows", []) if all_rows or r.get("eval") is True]
+    rows = [r for r in doc.get("rows") or [] if all_rows or r.get("eval") is True]  # `key:` alone loads as None
     cases = [Case(r["utterance"], r["expect"], r.get("mode"), r.get("known_failure")) for r in rows]
-    return cases + [Case(c["utterance"], None) for c in doc.get("controls", [])]
+    return cases + [Case(c["utterance"], None) for c in doc.get("controls") or []]
 
 
 def build_command(utterance: str, *, claude_bin: str, model: str, cap_usd: float = ATTEMPT_CAP_USD) -> list[str]:
@@ -110,8 +110,8 @@ def child_env(base: Mapping[str, str], state_dir: Path) -> dict[str, str]:
 
     ``CLAUDNA_SESSION_CHILD`` (``session_store/paths.py``) makes the store's
     hooks record nothing and start no worker; the scratch ``CLAUDNA_STATE_DIR``
-    is the backstop. The SessionStart briefing still runs: users see it, so the
-    router should too.
+    is the backstop. The SessionStart briefing still runs (in a git repo, see
+    :func:`scratch_repo`): users see it, so the router should too.
     """
     env = {k: v for k, v in base.items() if k in ENV_ALLOW or k.startswith(ENV_ALLOW_PREFIXES)}
     env["CLAUDNA_SESSION_CHILD"] = "1"
@@ -119,11 +119,27 @@ def child_env(base: Mapping[str, str], state_dir: Path) -> dict[str, str]:
     return env
 
 
+def scratch_repo(work: Path) -> None:
+    """Make ``work`` an empty git repo, so the SessionStart briefing runs as it does in a user's project.
+
+    In a directory that isn't a repo the briefing has nothing to say and prints
+    nothing. Without git, the runs go on without it.
+    """
+    try:
+        subprocess.run(["git", "init", "-q", "-b", "main", str(work)], capture_output=True, timeout=30, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
+#: Result subtypes that end a run normally here: the pick is made in the first turn.
+NORMAL_STOPS = ("error_max_turns", "error_max_budget_usd")
+
+
 def parse_stream(text: str) -> Attempt:
     """The first Skill call in a stream-json transcript, and the run's cost.
 
     Non-JSON lines are dropped (a CLI can print warnings on stdout). A run
-    that hit ``--max-turns`` is normal here: one turn is all the pick needs.
+    that hit ``--max-turns`` or its spend cap is normal here (:data:`NORMAL_STOPS`).
     """
     records = []
     for line in text.splitlines():
@@ -141,7 +157,7 @@ def parse_stream(text: str) -> Attempt:
     if result is None:
         return Attempt(skill, args, 0.0, error="no result record: the run died or the output isn't stream-json")
     error = None
-    if result.get("is_error") and result.get("subtype") != "error_max_turns":
+    if result.get("is_error") and result.get("subtype") not in NORMAL_STOPS:
         error = f"run failed: {result.get('subtype')}"
     return Attempt(skill, args, float(result.get("total_cost_usd") or 0.0), error)
 
@@ -181,16 +197,18 @@ def evaluate(cases: list[Case], *, runs: int, need: int, model: str, claude_bin:
              on_verdict: Callable[[Verdict], None] = lambda _v: None) -> tuple[list[Verdict], float, bool]:
     """Run every case ``runs`` times; ``(verdicts, spent, stopped early)``.
 
-    Each attempt runs in an empty scratch directory, so where the script is
+    Each attempt runs in an empty scratch git repo, so where the script is
     run from never reaches the router. A run stops early when the budget is
     spent, or after :data:`MAX_ERRORS_IN_A_ROW` errored attempts (a setup
-    failure, named with the child's stderr). ``on_verdict`` gets each case as
+    failure, named with the child's stderr). A timed-out attempt has no
+    result record, so its spend isn't counted. ``on_verdict`` gets each case as
     it finishes, so a run killed part way keeps what it had.
     """
     verdicts, spent, errors_in_a_row, ours = [], 0.0, 0, skill_names()
     with tempfile.TemporaryDirectory(prefix="claudna-routing-eval-") as scratch:
         state, work = Path(scratch) / "state", Path(scratch) / "work"
         work.mkdir()
+        scratch_repo(work)
         env = child_env(os.environ if base_env is None else base_env, state)
         for case in cases:
             attempts = []
@@ -203,8 +221,10 @@ def evaluate(cases: list[Case], *, runs: int, need: int, model: str, claude_bin:
                                   env, work)
                 attempt = parse_stream(out)
                 if attempt.error is not None and err.strip():
+                    lines = err.strip().splitlines()  # a timeout leads with its reason; else the last line says most
+                    why = lines[0] if lines[0].startswith("timed out") else lines[-1]
                     attempt = Attempt(attempt.skill, attempt.args, attempt.cost_usd,
-                                      f"{attempt.error}; stderr: {err.strip().splitlines()[-1][:200]}")
+                                      f"{attempt.error}; stderr: {why[:200]}")
                 spent += attempt.cost_usd
                 attempts.append(attempt)
                 errors_in_a_row = errors_in_a_row + 1 if attempt.error else 0
