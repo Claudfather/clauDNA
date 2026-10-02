@@ -89,7 +89,7 @@ P4 says free text (prompts, stderr) is off unless opted in. `tool.failed.command
 - **`hooks.json`:** the three activity hooks are `async: true` and wired with the right matchers. The Cursor manifest still has no hooks (`make check-manifest`).
 - **Canaries still needed:**
   - **interactive** timing on a plain machine, to confirm an async UserPromptSubmit adds nothing a person can feel;
-  - `PostToolUseFailure` for a **Skill** that fails, and for an MCP tool, to see what their `error` looks like.
+  - `PostToolUseFailure` for a **Skill** that fails, and for an MCP tool, to see what their `error` looks like. **Partly answered 2026-10-02 (2.1.287, headless):** a call to an unknown skill is rejected before the tool runs (`Unknown skill: …`), and neither PostToolUse nor PostToolUseFailure fires, so the store records nothing for it. A Skill that fails while running, and an MCP tool, are still open; `scripts/session_canary.py` reports whatever it sees.
 
 ## Decisions (owner, 2026-09-30)
 

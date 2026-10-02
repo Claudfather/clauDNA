@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **`scripts/session_canary.py` checks the session store's harness assumptions on your machine.** `setup` writes a throwaway plugin that logs hook events (names, ids, sizes and pids, never prompts) and prints eight steps to run in one interactive session; `report` prints a verdict per canary: the compact offset (spec §11.3), the `claude` pid across `/clear` (§11.4), whether a nested `claude -p` inherits its parent's session id (§11.5), and what a failed Skill call fires. Headless in a cloud container, the first two hold and the nested child inherits the id, as in phase 3; the plain-machine run is still to do. A call to an unknown skill turns out to fire no hook at all.
+
 ### Changed
 - **CI runs its actions on Node 24.** GitHub deprecated the Node 20 runtime that `actions/checkout@v4`, `setup-python@v5`, `setup-node@v4` and `upload-artifact@v4` use, and was forcing them onto Node 24 with a warning. All workflows now use v7 of each, which targets Node 24 natively and keeps every input we pass. The routing eval also installs Claude Code on Node 22 instead of the end-of-life Node 20.
 
