@@ -7,11 +7,10 @@ where each lands as ``maturity: draft``. Claudron never reads the store;
 clauDNA never writes the vault except through ``claudron``.
 
 This is the loop-closing slice, not the full librarian: no plan model and
-no risk tiers yet. On an engine with Claudron#200's pipes (``subjects``,
-``amend``, ``runs``; Claudron ≥ 0.7) each block is filed under its subject by
-:mod:`.filing`, every write tagged with the run's id (:attr:`RunReport.run_id`,
-undone whole by ``claudron revert-run``); on an older one, each block is one
-per-claim draft. What it does hold to:
+no risk tiers yet. How each block is written (per claim, or filed under its
+subject on Claudron ≥ 0.7.1) is :mod:`.filing`'s. On an engine with ``runs``
+every write carries the run's id (:attr:`RunReport.run_id`), so ``claudron
+revert-run`` undoes a run whole. What it does hold to:
 
 * **Drafts only, marked as external.** On an engine with ``trust-aware-reads``
   every write is ``source_type: session``, with ``session:<sid>:<seg>`` as its
@@ -24,13 +23,17 @@ per-claim draft. What it does hold to:
   and waits for the human digest. Private sessions are never harvested.
 * **Claudron's dedup routes, never rejects.** A ``suggest_update`` /
   ``suggest_supersede`` answer writes nothing; it counts as already known.
+* **Unknown capabilities, no write.** If ``claudron status`` fails for a
+  session's vault, that session waits for the next run: guessing "an old
+  engine" would write drafts that read as authored, not external.
 * **The cursor moves only after success.** Each session's harvest cursor
   (``consumers.json``, written only through :meth:`SessionHandle.ack`)
   advances past a segment only when every capture for it returned; a failure
   leaves it to the next run.
 * **Single-flight and bounded.** A non-blocking lock on
   ``<root>/harvest/lock``, a debounce (:data:`INTERVAL_ENV`, hours), and at
-  most :data:`MAX_CAPTURES` writes per run.
+  most :data:`MAX_CAPTURES` blocks per run (a block filed under a new subject
+  takes two writes).
 * **Liveness.** Every run writes ``<root>/harvest/last_run.json`` and a
   one-line ``<root>/harvest/liveness.txt`` that SessionStart shows.
 
@@ -52,7 +55,8 @@ from . import schema
 from .fsio import atomic_write_json, atomic_write_text, ensure_dir, exclusive_lock, read_json, utc_seconds
 from . import claudron
 from .claudron import _STATUS, CLAUDRON_ENV, CaptureError, claudron_bin  # noqa: F401 (re-exported)
-from .filing import DRAFT_BANNER, FILING_CAPS, HARVEST_TAG, evidence_ref, file_block, short_title
+from .filing import (DRAFT_BANNER, FILING_CAPS, HARVEST_TAG, RUN_CAP, TRUST_CAP, Target, evidence_ref, file_block,
+                     per_claim, short_title)
 from .project import (HARVEST_CONSUMER, MAX_ATTEMPTS, abandoned_at, by_segment, harvest_skip, latest_origin,
                       load_lifecycle, session_facts, summary_verdict)
 from .store import SessionStore
@@ -69,9 +73,6 @@ NOTE_TYPES = {"entity": "knowledge", "concept": "knowledge", "project": "knowled
 MAX_RETRIES_PER_RUN = 2
 LAST_RUN = "harvest/last_run.json"
 IDLE_INTERVAL_H = 1.0
-#: The engine capability that makes ``source_type: session`` both accepted and withheld (Claudron#200 §1).
-TRUST_CAP = "trust-aware-reads"
-RUN_CAP = "runs"
 
 
 run_claudron_capture = claudron.capture  #: the default capture (tests replace it)
@@ -158,10 +159,12 @@ class RunReport:
     errors: list[str] = field(default_factory=list)
     sessions: list[str] = field(default_factory=list)  #: sessions a segment was taken from (the ops log's)
     #: Every write this run makes on an engine with ``runs`` carries it: ``claudron revert-run <id>`` undoes them.
+    #: The random tail keeps two runs in one second (two hosts on one vault) from sharing an id.
     run_id: str = ""
 
     def __post_init__(self) -> None:
-        self.run_id = self.run_id or time.strftime("harvest-%Y%m%dT%H%M%SZ", time.gmtime(self.started_epoch))
+        self.run_id = self.run_id or (time.strftime("harvest-%Y%m%dT%H%M%SZ", time.gmtime(self.started_epoch))
+                                      + "-" + os.urandom(3).hex())
 
     @property
     def captures(self) -> int:
@@ -199,8 +202,13 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
         return
     origin, vault = latest_origin(lifecycle), facts.harvest.get("vault")
     caps = claudron.capabilities(origin.get("cwd"), vault, env)
-    run_id = report.run_id if RUN_CAP in caps else None
+    if caps is None:
+        report.errors.append(f"{sid}: claudron status failed for its vault; left for the next run")
+        return
+    target = Target(cwd=origin.get("cwd"), env=env, vault=vault, project=origin["repo"],
+                    run_id=report.run_id if RUN_CAP in caps else None, capture=capture)
     filing = FILING_CAPS <= caps
+    trust_aware = TRUST_CAP in caps
     indices = handle.paths.segment_indices()
     for index in indices:
         if index <= through:
@@ -250,28 +258,20 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
             return  # never step past a segment whose blocks can't be read: the cursor holds
         blocks = [b for b in summary["blocks"] if not tripped(b)]  # a summary written before the screen existed
         report.screened += len(summary["blocks"]) - len(blocks) + _dropped_when_written(lifecycle, index, boundary)
-        findings = [(b, finding_of(b, sid=sid, index=index, project=origin["repo"], trust_aware=TRUST_CAP in caps))
+        findings = [(b, finding_of(b, sid=sid, index=index, project=origin["repo"], trust_aware=trust_aware))
                     for b in blocks]
         wanted = [f for _, f in findings if f is not None]
         if report.captures and report.captures + len(wanted) > MAX_CAPTURES:
             return  # out of budget: the whole segment waits for the next run (a first one always fits)
         for block, finding in ((b, f) for b, f in findings if f is not None):
-            if filing:
-                answer = file_block(block, finding, sid=sid, index=index, cwd=origin.get("cwd"), env=env,
-                                    vault=vault, run_id=run_id, capture=capture)
-            else:
-                answer = {**capture(finding, origin.get("cwd"), env, vault, run_id=run_id), "title": finding["title"]}
-            action = answer["action"]
-            digest.record_capture(store.root, sid=sid, seg=index, block=block, title=answer["title"],
-                                  action=action, path=answer["path"], vault=answer.get("vault", vault), run_id=run_id)
-            if answer.get("amended") and action == "updated":
-                report.filed += 1
-            elif action in ("created", "updated"):
-                report.created += 1
-            elif action == "rejected":
-                report.rejected += 1
-            else:
-                report.known += 1
+            def record(answer: dict, block: dict = block) -> None:  # each write, as it lands
+                digest.record_capture(store.root, sid=sid, seg=index, block=block, title=answer["title"],
+                                      action=answer["action"], path=answer["path"],
+                                      vault=answer.get("vault", vault), run_id=target.run_id)
+
+            outcome = file_block(block, finding, sid=sid, index=index, target=target, record=record) if filing \
+                else per_claim(block, finding, target, record)
+            setattr(report, outcome, getattr(report, outcome) + 1)  # created · filed · known · rejected
         for block, _ in (pair for pair in findings if pair[1] is None):
             root = claudron.vault_root(origin.get("cwd"), vault, env)  # the root captures record: one name per vault
             digest.record_held(store.root, sid=sid, seg=index, block=block, vault=str(root) if root else vault)

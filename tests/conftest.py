@@ -16,6 +16,16 @@ ACTOR = {"kind": "interactive", "fleet": None, "bot_id": None, "bot_name": None,
 ORIGIN = {"cwd": "/work", "repo": None, "branch": None, "head": None}
 
 
+@pytest.fixture(autouse=True)
+def _no_real_claudron_status(monkeypatch):
+    """No test reaches this machine's ``claudron status``: an engine with no capabilities, whose root is the
+    recorded vault. A test of the door itself puts the real functions back (it drives a fake binary)."""
+    from claudna.session_store import claudron
+
+    monkeypatch.setattr(claudron, "capabilities", lambda cwd, vault, env: frozenset())
+    monkeypatch.setattr(claudron, "vault_root", lambda cwd, vault, env: Path(vault) if vault else None)
+
+
 @pytest.fixture
 def store(tmp_path: Path) -> SessionStore:
     """An empty store rooted in the test's temp dir."""

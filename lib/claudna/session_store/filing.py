@@ -1,47 +1,70 @@
-"""Subject filing: one harvested block into the vault through Claudron's pipes (#200 §4, the deterministic slice).
+"""Writing one harvested block to the vault: per claim, or filed under its subject (#200 §4).
 
-Harvest's thin slice writes one draft note per claim. When the engine declares
-``subjects``, ``amend`` and ``runs`` (Claudron ≥ 0.7), a block is filed under
-its subject instead, with no model in the loop:
+Every block becomes one or two writes through the ``claudron`` door, each
+handed to ``record`` the moment it lands (the ledger then holds every write,
+even when a later one for the same block fails). :func:`per_claim` and
+:func:`file_block` say what became of the block: ``created``, ``filed``,
+``known`` or ``rejected``.
 
-* ``claudron resolve`` the block's ``subject_hint``: its name, its aliases, and
-  the bannered title a subject note harvest wrote carries. Only a note whose
-  title or alias *is* one of those names counts as the subject.
-* **An exact match on a subject note harvest wrote** (an external draft tagged
-  :data:`HARVEST_TAG`): ``amend append_fact`` into it, with the session and
-  segment as the evidence ref. A replayed fact writes nothing, and the same fact
-  from another session adds only its evidence (recurrence counts).
-* **An exact match on any other note** (trusted, an authored draft, a web
-  capture): a per-claim draft, as before. Harvest never edits a note it didn't
-  write: that would launder unreviewed text into reviewed memory.
-* **No exact match**: a new subject draft, then the fact appended to it. If
-  Claudron's dedup routes the new subject elsewhere, the claim falls back to a
-  per-claim draft, whose own dedup answer stands.
+**Per claim** (any engine): one draft note per claim, ``(unverified) <subject>: <claim>``.
 
-Every write carries the run id, so ``claudron revert-run <id>`` undoes a whole
-run. What this slice still leaves to the plan model (spec §7.2): supersede,
-merge, the new-subject threshold, and ambiguity parking.
+**Filed under its subject** (an engine with :data:`FILING_CAPS`, Claudron ≥ 0.7.1), no model in the loop:
+
+* ``claudron resolve`` the block's subject, by its name, its aliases and the
+  bannered subject title, within the session's project.
+* **Every exact match is a subject note harvest wrote** (a session draft
+  tagged :data:`SUBJECT_TAG`): the claim is appended to it as a fact
+  (``amend append_fact``, evidence ``session:<sid>:<seg>``, ``expect_trust:
+  external``, so a note a person promoted meanwhile is refused, not written).
+  A replay writes nothing; the same fact from another session adds only its
+  evidence.
+* **Another note is an exact match** (reviewed, authored, a web capture):
+  per claim. Harvest never edits a note it didn't write; that would launder
+  unreviewed text into reviewed memory.
+* **No exact match:** a new subject draft, then the fact appended to it.
+
+Whatever Claudron declines (dedup routing the new subject elsewhere, an
+amend it refuses) falls back to per claim, whose own answer stands: one odd
+block never stops a run. What waits for the plan model (spec §7.2):
+supersede, merge, the new-subject threshold, ambiguity parking.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Callable, Mapping
 
 from claudna.redact import redact_strings
 
 from . import claudron
 
-#: What filing needs from the engine; without all three, harvest writes per-claim drafts.
-FILING_CAPS = frozenset({"subjects", "amend", "runs"})
+RUN_CAP = "runs"
+TRUST_CAP = "trust-aware-reads"  #: makes ``source_type: session`` both accepted and withheld (Claudron#200 §1)
+#: What filing needs: the 0.7 pipes, trust-aware reads (a subject draft is ``source_type: session``), and
+#: 0.7.1's ``subject-filing`` (``exact``, ``--project``, ``--alias``, ``expect_trust``, the refusal envelope).
+FILING_CAPS = frozenset({TRUST_CAP, "subjects", "amend", RUN_CAP, "subject-filing"})
 HARVEST_TAG = "origin:session-harvest"
+SUBJECT_TAG = "harvest:subject"  #: only subject notes carry it, so a per-claim draft is never taken for one
 #: Prefixed to every draft's title, so any view that lists it — Claudron's own SessionStart brief
 #: included — shows it as unreviewed (spec §7.2's banner; #373 review, M4).
 DRAFT_BANNER = "(unverified) "
 DEFAULT_SECTION = "Facts"
-#: Text the fact format reads as structure (Claudron SCHEMA.md §Facts); a claim carrying one is filed per-claim.
+#: What Claudron's fact format reads as structure (amend.py ``_one_line``): a claim carrying one goes per claim.
 FACT_MARKERS = ("<!--", "-->")
 
-Capture = Callable[..., dict]
+Record = Callable[[dict], None]
+
+
+@dataclass(frozen=True)
+class Target:
+    """Where a session's blocks go: its vault and project, the run, and the capture door."""
+
+    cwd: str | None
+    env: Mapping[str, str]
+    vault: str | None
+    project: str | None
+    run_id: str | None
+    capture: Callable[..., dict]
 
 
 def short_title(text: str, limit: int = 100) -> str:
@@ -51,93 +74,93 @@ def short_title(text: str, limit: int = 100) -> str:
     return text[:limit].rsplit(" ", 1)[0].rstrip(" ,;:") + "…"
 
 
+def one_line(text: object) -> str:
+    """``text`` as one printable line: whitespace folded, control characters (a NUL) dropped."""
+    return "".join(ch for ch in " ".join(str(text or "").split()) if ch.isprintable())
+
+
 def evidence_ref(sid: str, index: int) -> str:
     """Where a harvested claim came from, as a ``source_url`` and an evidence ref: ``session:<sid>:<seg>``."""
     return f"session:{sid}:{index}"
 
 
 def subject_title(name: str) -> str:
-    """The title of the subject note harvest writes for ``name``."""
-    return DRAFT_BANNER + short_title(name)
+    """The title of the subject note harvest writes for ``name`` (whole: two long names must not collide)."""
+    return DRAFT_BANNER + one_line(name)
 
 
 def section_of(block: dict) -> str:
     """The section a block's fact goes under: its ``section_hint`` when the fact format can carry it."""
-    hint = " ".join(str(block.get("section_hint") or "").replace("#", " ").split())
+    hint = one_line(str(block.get("section_hint") or "").replace("#", " "))
     if not hint or hint == "History" or any(m in hint for m in FACT_MARKERS):
         return DEFAULT_SECTION  # History holds superseded facts; Claudron refuses a write into it
     return hint
 
 
-def _fold(name: object) -> str:
-    return " ".join(str(name).lower().split())
+def per_claim(block: dict, finding: dict, target: Target, record: Record) -> str:
+    """One per-claim draft; the block's outcome."""
+    answer = {**target.capture(finding, target.cwd, target.env, target.vault, run_id=target.run_id),
+              "title": finding["title"]}
+    record(answer)
+    action = answer["action"]
+    return "created" if action in ("created", "updated") else "rejected" if action == "rejected" else "known"
 
 
-def _names_exactly(candidate: dict, names: list[str]) -> bool:
-    """Does the note's title or one of its aliases equal one of ``names`` (case- and space-folded)?
-
-    Checked here, not read off ``match_type``: ``resolve`` labels a fuzzy title
-    hit ``title`` too, so a note that merely shares a word ("(unverified)") would
-    pass for the subject itself.
-    """
-    wanted = {_fold(n) for n in names}
-    aliases = candidate.get("aliases") if isinstance(candidate.get("aliases"), list) else []
-    return any(_fold(n) in wanted for n in [candidate.get("title", ""), *aliases])
-
-
-def _is_harvest_draft(candidate: dict) -> bool:
+def _is_subject_draft(candidate: dict) -> bool:
     tags = candidate.get("tags") if isinstance(candidate.get("tags"), list) else []
-    return candidate.get("trust") == "external" and HARVEST_TAG in tags
+    return (candidate.get("trust") == "external" and candidate.get("source_type") == "session"
+            and SUBJECT_TAG in tags)
 
 
-def _subject_finding(block: dict, finding: dict, ref: str) -> dict:
-    name = block["subject_hint"]["name"]
+def _subject_finding(block: dict, finding: dict, title: str, ref: str) -> dict:
     subject = {
         "type": finding["type"],
-        "title": subject_title(name),
-        "body": f"Facts about {name}, filed by harvest from session summaries. Unreviewed: check each fact "
-                "against its evidence before relying on it.",
-        "tags": sorted({f"home:{block['home']}", HARVEST_TAG}),
+        "title": title,
+        # No subject name here: it is model-written, and a body line is where it could pass for structure.
+        "body": "Facts filed by harvest from session summaries. Unreviewed: check each fact against its "
+                "evidence before relying on it.",
+        "tags": sorted({f"home:{block['home']}", HARVEST_TAG, SUBJECT_TAG}),
         "source_type": "session",
         "source_url": ref,
     }
     if finding.get("project"):
         subject["project"] = finding["project"]
-    return redact_strings(subject)
+    return subject
 
 
-def file_block(block: dict, finding: dict, *, sid: str, index: int, cwd: str | None, env: Mapping[str, str],
-               vault: str | None, run_id: str, capture: Capture) -> dict:
-    """File one block; ``{"action", "path", "vault", "title", "amended"}``, in capture's action vocabulary.
+def file_block(block: dict, finding: dict, *, sid: str, index: int, target: Target, record: Record) -> str:
+    """File one block under its subject (see the module doc); the block's outcome.
 
-    ``finding`` is the block's per-claim draft (``harvest.finding_of``), written
-    when filing under a subject isn't safe. An amend into an existing subject
-    answers ``updated`` (a fact or its evidence added) or ``unchanged``, with
-    ``amended`` set; a new subject answers ``created``.
+    ``finding`` is the block's per-claim draft (``harvest.finding_of``), the
+    fallback whenever filing under a subject isn't safe or Claudron declines it.
     """
-    def per_claim() -> dict:
-        return {**capture(finding, cwd, env, vault, run_id=run_id), "title": finding["title"]}
-
-    if any(m in block["claim"] for m in FACT_MARKERS):
-        return per_claim()
+    block = redact_strings(block)  # names reach argv: redacted like everything else that leaves (defense in depth)
     hint = block["subject_hint"]
-    title = subject_title(hint["name"])
-    names = [hint["name"], *hint.get("aliases", []), title]
-    candidates = claudron.resolve(names[0], aliases=names[1:], note_type=finding["type"], cwd=cwd, env=env,
-                                  vault=vault)
-    top = candidates[0] if candidates else None  # exact matches rank first, so only the top can be one
+    name, claim = one_line(hint["name"]), one_line(block["claim"])
+    if not name or not claim or any(m in claim for m in FACT_MARKERS):
+        return per_claim(block, finding, target, record)
+    title = subject_title(name)
+    names = list(dict.fromkeys(n for n in [name, *(one_line(a) for a in hint.get("aliases", [])), title] if n))
+    exact = [c for c in claudron.resolve(names, project=target.project, cwd=target.cwd, env=target.env,
+                                         vault=target.vault) if c.get("exact")]
     ref = evidence_ref(sid, index)
-    if top and _names_exactly(top, names):
-        if not _is_harvest_draft(top):
-            return per_claim()
-        path, action, title = top.get("path"), None, top.get("title") or title
+    if exact:
+        if not all(_is_subject_draft(c) for c in exact):
+            return per_claim(block, finding, target, record)  # a note harvest didn't write owns the name
+        path, created = exact[0].get("path"), False
+        title = exact[0].get("title") or title
     else:
-        created = capture(_subject_finding(block, finding, ref), cwd, env, vault, run_id=run_id)
-        if created["action"] != "created" or not created.get("path"):
-            return per_claim()  # dedup routed the subject elsewhere: the claim's own answer decides
-        path, action = created["path"], "created"
-    request = redact_strings({"note": path, "op": "append_fact", "section": section_of(block),
-                              "fact": block["claim"], "evidence": {"ref": ref, "asserted_by": block["asserted_by"]}})
-    answer = claudron.amend(request, cwd, env, vault, run_id=run_id)
-    return {"action": action or answer["action"], "path": answer["path"] or path, "vault": answer["vault"],
-            "title": title, "amended": action is None}
+        answer = target.capture(_subject_finding(block, finding, title, ref), target.cwd, target.env, target.vault,
+                                run_id=target.run_id)
+        if answer["action"] != "created" or not answer.get("path"):
+            return per_claim(block, finding, target, record)  # dedup routed it elsewhere: the claim's answer decides
+        record({**answer, "title": title})
+        path, created = answer["path"], True
+    request = {"note": path, "op": "append_fact", "section": section_of(block), "fact": claim,
+               "evidence": {"ref": ref, "asserted_by": block["asserted_by"]}, "expect_trust": "external"}
+    answer = claudron.amend(request, target.cwd, target.env, target.vault, run_id=target.run_id)
+    if answer["action"] == "rejected":
+        return per_claim(block, finding, target, record)
+    if answer["action"] == "updated":
+        record({**answer, "path": answer["path"] or path, "title": title})
+    return "created" if created else "filed" if answer["action"] == "updated" else "known"

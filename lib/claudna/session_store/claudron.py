@@ -27,7 +27,7 @@ CLAUDRON_ENV = "CLAUDNA_CLAUDRON_BIN"
 TIMEOUT_S = 30
 CAPTURE_ACTIONS = ("created", "updated", "suggest_update", "suggest_supersede", "rejected")
 PROMOTE_ACTIONS = ("promoted", "unchanged")  #: ``unchanged``: the note is already at the target maturity
-AMEND_ACTIONS = ("updated", "unchanged")  #: an amend harvest sends is well-formed, so ``rejected`` is a failure
+AMEND_ACTIONS = ("updated", "unchanged", "rejected")
 
 
 class ClaudronError(RuntimeError):
@@ -81,15 +81,18 @@ def capture(finding: dict, cwd: str | None, env: Mapping[str, str], vault: str |
     ``run_id`` rides in the JSON (Claudron ≥ 0.7, ``runs``): the commit carries
     the run's trailer, so ``claudron revert-run`` can undo the whole run.
     """
-    payload = {**finding, "run_id": run_id} if run_id else finding
-    code, envelope = _run(["capture", "--stdin", "--json"], env, vault=vault, stdin=json.dumps(payload), cwd=cwd,
-                          error=CaptureError)
+    code, envelope = _run(["capture", "--stdin", "--json"], env, vault=vault,
+                          stdin=json.dumps(_with_run(finding, run_id)), cwd=cwd, error=CaptureError)
     data = _data(envelope)
     action = data.get("action")
     if envelope.get("command") != "capture" or action not in CAPTURE_ACTIONS or \
             ((code != 0 or not envelope.get("ok")) and action != "rejected"):
         raise CaptureError(f"claudron capture exited {code}: {str(envelope.get('errors') or data)[:150]}")
     return {"action": action, **_located(data.get("path"), cwd, vault, env)}
+
+
+def _with_run(payload: dict, run_id: str | None) -> dict:
+    return {**payload, "run_id": run_id} if run_id else payload
 
 
 def _located(path: object, cwd: str | None, vault: str | None, env: Mapping[str, str]) -> dict:
@@ -109,18 +112,20 @@ def _located(path: object, cwd: str | None, vault: str | None, env: Mapping[str,
     return {"path": path, "vault": str(root) if root else vault}
 
 
-def resolve(name: str, *, aliases: list[str], note_type: str, cwd: str | None, env: Mapping[str, str],
+def resolve(names: list[str], *, project: str | None, cwd: str | None, env: Mapping[str, str],
             vault: str | None = None) -> list[dict]:
-    """``claudron resolve --name N --aliases A,B --type T --json``: the candidate subjects, best first.
+    """``claudron resolve --name N --alias A ... [--project P] --json``: the candidate subjects, best first.
 
-    Claudron ≥ 0.7 (``subjects``). Each candidate carries ``path``,
-    ``match_type`` (``title``/``alias``/``slug`` for an exact match), ``trust``
-    and ``tags``; choosing among them is the caller's job.
+    Needs ``subject-filing`` (Claudron ≥ 0.7.1): each candidate carries
+    ``exact`` (the note *is* one of the names), ``trust``, ``source_type``,
+    ``tier`` and ``tags``. ``--project`` keeps one repo's "staging DB" apart
+    from another's. Choosing among the candidates is the caller's job.
     """
-    # ``--flag=value``: a name the model wrote may start with a dash, and argparse would read it as a flag.
-    args = ["resolve", f"--name={name}", f"--type={note_type}", "--json"]
-    if aliases:
-        args.append("--aliases=" + ",".join(a.replace(",", " ") for a in aliases))
+    # ``--flag=value``: a name the model wrote may start with a dash, and argparse would read it as a flag;
+    # ``--alias`` once per name, since ``--aliases`` splits on commas.
+    args = ["resolve", f"--name={names[0]}", *(f"--alias={n}" for n in names[1:]), "--limit=10", "--json"]
+    if project:
+        args.append(f"--project={project}")
     code, envelope = _run(args, env, vault=vault, cwd=cwd, error=CaptureError)
     candidates = _data(envelope).get("candidates")
     if code != 0 or not envelope.get("ok") or envelope.get("command") != "resolve" or not isinstance(candidates, list):
@@ -130,21 +135,23 @@ def resolve(name: str, *, aliases: list[str], note_type: str, cwd: str | None, e
 
 def amend(request: dict, cwd: str | None, env: Mapping[str, str], vault: str | None = None, *,
           run_id: str | None = None) -> dict:
-    """One ``claudron amend --stdin --json``: ``{"action", "outcome", "fact_id", "path", "vault"}``.
+    """One ``claudron amend --stdin --json``: ``{"action", "reason", "path", "vault"}``.
 
-    Claudron ≥ 0.7 (``amend``). ``request`` is ``{note, op, ...}``; a replay of
-    the same fact and evidence answers ``unchanged``. A request Claudron refuses
-    (a malformed one exits 2 with no envelope) raises :class:`CaptureError`, as
-    a failed capture does: harvest stops and keeps the cursor.
+    ``request`` is ``{note, op, ...}``. ``updated`` wrote; ``unchanged`` is a
+    replay (the same fact and evidence). ``rejected`` is Claudron refusing this
+    request (exit 2 or 1, with an envelope since 0.7.1: a note that no longer
+    reads as ``expect_trust``, text the fact format can't hold), which is an
+    answer about this block. Anything else raises :class:`CaptureError`, as a
+    failed capture does: harvest stops and keeps the cursor.
     """
-    payload = {**request, "run_id": run_id} if run_id else request
-    code, envelope = _run(["amend", "--stdin", "--json"], env, vault=vault, stdin=json.dumps(payload), cwd=cwd,
-                          error=CaptureError)
+    code, envelope = _run(["amend", "--stdin", "--json"], env, vault=vault,
+                          stdin=json.dumps(_with_run(request, run_id)), cwd=cwd, error=CaptureError)
     data = _data(envelope)
-    if code != 0 or not envelope.get("ok") or envelope.get("command") != "amend" or \
-            data.get("action") not in AMEND_ACTIONS:
+    action = data.get("action")
+    if envelope.get("command") != "amend" or action not in AMEND_ACTIONS or \
+            (action != "rejected" and (code != 0 or not envelope.get("ok"))):
         raise CaptureError(f"claudron amend exited {code}: {str(envelope.get('errors') or data)[:150]}")
-    return {"action": data["action"], "outcome": data.get("outcome") or "", "fact_id": data.get("fact_id") or "",
+    return {"action": action, "reason": str(data.get("reason") or "")[:200],
             **_located(data.get("path"), cwd, vault, env)}
 
 
@@ -190,10 +197,11 @@ def vault_root(cwd: str | None, vault: str | None, env: Mapping[str, str]) -> Pa
     return found.root if found else None
 
 
-def capabilities(cwd: str | None, vault: str | None, env: Mapping[str, str]) -> frozenset:
-    """The engine's declared capabilities for this vault (empty when ``status`` fails or predates them)."""
+def capabilities(cwd: str | None, vault: str | None, env: Mapping[str, str]) -> frozenset | None:
+    """The engine's declared capabilities for this vault: empty for an engine that predates them,
+    ``None`` when ``status`` failed (unknown, which is not the same as none)."""
     found = status(cwd, vault, env)
-    return found.capabilities if found else frozenset()
+    return found.capabilities if found else None
 
 
 def promote(item: str, vault: str | None, env: Mapping[str, str]) -> dict:
