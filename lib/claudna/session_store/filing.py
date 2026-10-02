@@ -1,8 +1,9 @@
 """Writing one harvested block to the vault: per claim, or filed under its subject (#200 §4).
 
 Every block becomes one or two writes through the ``claudron`` door, each
-handed to ``record`` the moment it lands (the ledger then holds every write,
-even when a later one for the same block fails). :func:`per_claim` and
+handed to ``record`` as it lands, except a new subject's, which waits for its
+first fact: a ledger line must name a claim its note holds (a subject whose
+fact was refused stays empty, and out of the digest, until one lands). :func:`per_claim` and
 :func:`file_block` say what became of the block: ``created``, ``filed``,
 ``known`` or ``rejected``.
 
