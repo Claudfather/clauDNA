@@ -77,7 +77,7 @@ Not yet verified (open, §11): that PreCompact's transcript byte offset lines up
 
 - **P1 — Logs are truth; JSON files are projections.** Every `.json` in the store is rebuildable from the `.jsonl` logs beside it (`session rebuild <sid>`). A torn or deleted projection is a cache miss, never data loss. **One exception:** `consumers.json` (§6.8). No log records an ack, so `rebuild` can't regenerate it; `SessionHandle.ack` writes it fsynced (file and directory) instead, since a lost ack re-harvests or re-exports work.
 - **P2 — One writer per file.** Hooks append events. The projector (same process, right after the append) rewrites projections via temp + `os.replace`. The summarizer writes only its own artifact, then appends an event announcing it.
-- **P3 — Reference, don't copy.** The transcript is never copied into the store. Segments point at it by path + byte range + content hash.
+- **P3 — Reference, don't copy.** The transcript is never copied into the store. Segments point at it by path + byte range.
 - **P4 — Metadata by default.** Free text (prompts, stderr) is off unless opted in, and when on is scrubbed (`scripts/redact.py` rules) and capped. Capping happens in `make_event`, so no caller can forget it; redaction joins it there — one choke point — when free-text capture ships (phase 2 moves `redact.py` into `lib/claudna/`).
 - **P5 — Boundaries are observed, never inferred.** Only harness hook events open or close sessions and segments. Counters are derived from what exists on disk, never stored.
 - **P6 — Fail open, bounded.** A store hook never blocks, never fails a session, and returns in well under a second. Heavy work detaches.
@@ -188,7 +188,7 @@ Schemas ship as JSON Schema (draft 2020-12) beside the code in `lib/claudna/sess
 | `SessionId` | string, as issued by Claude Code (UUID today; treat as opaque) |
 | `SegIndex` | integer ≥ 1; directory name `seg-%03d` (widens past 999 without breaking sort for readers that parse the int) |
 | `ByteRange` | `{ "start": int ≥ 0, "end": int ≥ start \| null }` — `end: null` means open |
-| `TranscriptRef` | `{ "path": string, "range": ByteRange, "sha256": string \| null }` — hash over the range, set at seal |
+| `TranscriptRef` | `{ "path": string, "range": ByteRange }` |
 | `Actor` | `{ "kind": "interactive" \| "headless" \| "bot", "fleet": string \| null, "bot_id": string \| null, "bot_name": string \| null, "model": string \| null, "entrypoint": string \| null }` — `fleet`/`bot_id` from `FLEET_NAME`/`BOT_ID`, matching the plane's `bot:<fleet>/<BOT_ID>` alias |
 | `Origin` | `{ "cwd": string, "repo": string \| null, "branch": string \| null, "head": string \| null }` — repo = `owner/name` from the git remote |
 | `Text` | scrubbed string, capped per field (caps listed where used); `null` when capture is off |
@@ -218,10 +218,11 @@ Every line in every log:
 | `session.child_linked` | `{ child_sid: SessionId }` |
 | `session.privacy_set` | `{ private: bool, by: "user"\|"policy" }` |
 | `segment.opened` | `{ opened_by: "session_open"\|"compact", start: int }` |
-| `segment.sealed` | `{ end: int ≥ start, sealed_by: "precompact"\|"compact"\|"session_end"\|"resume"\|"abandoned", trigger: "manual"\|"auto"\|null, sha256?: hex64\|null }` |
+| `segment.sealed` | `{ end: int ≥ start, sealed_by: "precompact"\|"compact"\|"session_end"\|"resume"\|"abandoned", trigger: "manual"\|"auto"\|null }` |
 | `segment.retired` | `{ reason: "acked"\|"age" }` — appended by retention (§9) before the segment's directory is removed |
 | `summary.requested` | `{ job_id: string }` |
 | `summary.completed` | `{ job_id: string, artifact: "seg-NNN/summary.json", input_sha256: string, duration_ms: int }` |
+| `summary.screened` | `{ job_id: string, blocks_dropped: int, strings_withheld: int, patterns: string (≤200), fingerprints: string (≤400) }` — what the instruction screen (`lib/claudna/screen.py`) took out before the summary was written: counts, comma-joined pattern ids, 12-hex fingerprints, never the text |
 | `summary.failed` | `{ job_id: string, error: string (≤200), retryable: bool }` |
 | `summary.skipped` | `{ reason: "private"\|"disabled"\|"trivial"\|"headless"\|"no_transcript" }` |
 | `session.closed` | `{ reason: "clear"\|"resume"\|"logout"\|"prompt_input_exit"\|"other"\|"abandoned" }`. `abandoned` is the store's own (`seal`, the sweep: a session whose SessionEnd never ran); a SessionEnd payload can't claim it |
@@ -234,7 +235,6 @@ Every line in every log:
 | `skill.invoked` | `{ skill: string, args_chars: int, ok?: bool\|null, duration_ms?: int\|null, prompt_id?, tool_use_id? }` |
 | `tool.failed` | `{ tool: string, signature: string (≤200), exit_code: int\|null, duration_ms?, prompt_id?, tool_use_id? }`. `signature` is a stable grouping key (tool + the first real error line, normalized and redacted), computed at write time so readers group without re-parsing. **No copy of the command or its stderr** (phase 4 decision): `tool_use_id` points at the call in the transcript, which holds both. |
 | `tool.interrupted` | `{ tool: string, duration_ms?, prompt_id?, tool_use_id? }`. The user stopped the call: counted as `interrupts`, never as a failure. |
-| `checkpoint.noted` | `{ note: Text (≤1000) }` — from `/claudna:session checkpoint` |
 
 ### 6.3 Why two logs
 
@@ -268,14 +268,14 @@ Every line in every log:
 
 ```json
 {
-  "schema": "claudna.segment/1",
+  "schema": "claudna.segment/2",
   "sid": "3fbb…",
   "index": 2,
   "status": "sealed",
   "opened_at": "…", "opened_by": "compact",
   "sealed_at": "…", "sealed_by": "session_end",
-  "transcript": { "path": "/…/3fbb….jsonl", "range": { "start": 48211, "end": 90377 }, "sha256": "…" },
-  "counts": { "prompts": 4, "skills": 2, "failures": 1, "interrupts": 0, "checkpoints": 0 },
+  "transcript": { "path": "/…/3fbb….jsonl", "range": { "start": 48211, "end": 90377 } },
+  "counts": { "prompts": 4, "skills": 2, "failures": 1, "interrupts": 0 },
   "summary": { "status": "done", "job_id": "…" }
 }
 ```
@@ -342,7 +342,7 @@ No LLM. Recomputed from the `done` segment summaries on every `summary.completed
 | `journey.in_progress`, `journey.next` | latest segment's only |
 
 ```json
-{ "schema": "claudna.session-summary/2", "sid": "…", "through_seg": 2, "fields": { … }, "segments": [1, 2] }
+{ "schema": "claudna.session-summary/2", "sid": "…", "through_seg": 2, "fields": { … }, "segments": [1, 2], "screened": true }
 ```
 
 **As built (phase 6):** it's also recomputed on every retirement (a retired segment's summary is archived in `sessions/<sid>/summaries/` and still counts) and by `session_store rebuild <sid>`. With nothing left to roll up, the file is removed rather than left stale. `session show` computes a missing rollup in memory; `session list` reads the file only.

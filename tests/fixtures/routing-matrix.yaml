@@ -177,7 +177,6 @@ rows:
   # --- P6: lens family (panel-internal — utterances resolve to /ironclad --lens <name>) ---
   - utterance: "step back — are we even solving the right problem?"
     eval: true
-    known_failure: "on Sonnet it resolves to recall, weigh-development-paths or no skill (2026-10-01 baseline); ironclad's description has no premise-check trigger"
     keywords: [harden, plan]
     expect: ironclad
     mode: --lens

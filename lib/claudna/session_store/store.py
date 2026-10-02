@@ -293,7 +293,6 @@ class SessionHandle:
         *,
         index: int | None = None,
         trigger: str | None = None,
-        sha256: str | None = None,
         clamp: bool = False,
     ) -> dict:
         """Record ``segment.sealed`` for ``index`` (default: current). Safe to repeat.
@@ -314,10 +313,8 @@ class SessionHandle:
                 end = max(end, start)
             if end < start:
                 raise StoreError(f"segment {target} starts at {start}; cannot seal it at {end}")
-            data = {"end": end, "sealed_by": sealed_by, "trigger": trigger}
-            if sha256 is not None:
-                data["sha256"] = sha256
-            return self._append_locked("segment.sealed", data, seg=target)
+            return self._append_locked("segment.sealed", {"end": end, "sealed_by": sealed_by, "trigger": trigger},
+                                       seg=target)
 
     def close_session(self, reason: str) -> dict:
         return self.append("session.closed", {"reason": reason})

@@ -30,7 +30,11 @@ from .schema import is_instance
 from .paths import SessionPaths
 
 SESSION_SCHEMA = "claudna.session/1"
-SEGMENT_SCHEMA = "claudna.segment/1"
+SEGMENT_SCHEMA = "claudna.segment/2"
+#: Projection tags earlier releases wrote. Readers re-fold them; :func:`stale_projections` finds them to rewrite.
+OLDER_PROJECTIONS = frozenset({"claudna.segment/1"})
+#: Summary prompt versions written before the instruction screen existed: screened again as they're read.
+UNSCREENED_PROMPTS = frozenset({"segment-summary/1"})
 _SCHEMA_FILES = {SESSION_SCHEMA: "session", SEGMENT_SCHEMA: "segment"}
 
 _SUMMARY_STATUS = {
@@ -44,7 +48,6 @@ _COUNTED = {
     "skill.invoked": "skills",
     "tool.failed": "failures",
     "tool.interrupted": "interrupts",
-    "checkpoint.noted": "checkpoints",
 }
 
 
@@ -333,7 +336,6 @@ def project_segment(sid: str, index: int, boundary: list[dict], activity: Log, *
         "transcript": {
             "path": transcript_path,
             "range": {"start": b.start, "end": b.last_seal["data"]["end"] if b.last_seal else None},
-            "sha256": b.last_seal["data"].get("sha256") if b.last_seal else None,
         },
         "counts": counts,
         "summary": b.summary,
@@ -411,6 +413,19 @@ def rebuild(paths: SessionPaths) -> RebuildReport:
     return RebuildReport(sid=paths.sid, segments=indices, skipped_lines=skipped)
 
 
+def stale_projections(paths: SessionPaths) -> bool:
+    """Does any ``segment.json`` carry a tag an earlier release wrote (:data:`OLDER_PROJECTIONS`)?
+
+    Readers re-fold such a file in memory every time; a closed session never
+    writes again, so the sweep rebuilds it once instead.
+    """
+    for index in paths.segment_indices():
+        doc = read_json(paths.segment(index).segment_json)
+        if isinstance(doc, dict) and doc.get("schema") in OLDER_PROJECTIONS:
+            return True
+    return False
+
+
 def read_projection(path, schema_id: str, *, bytes_before: int | None = None) -> dict | None:
     """The projection at ``path`` if it's well-formed (and, given ``bytes_before``, current), else ``None``.
 
@@ -475,9 +490,8 @@ def _refresh_activity(paths: SessionPaths, event: dict, *, bytes_before: int) ->
         _fold_segment(paths, seg, buckets=by_segment(lifecycle.events),
                       transcripts=segment_transcript_paths(lifecycle.events))
         return
-    if kind in _COUNTED:  # .get: a 0.22 projection has no "interrupts" yet
-        counts = projected["counts"]
-        counts[_COUNTED[kind]] = counts.get(_COUNTED[kind], 0) + 1
+    if kind in _COUNTED:
+        projected["counts"][_COUNTED[kind]] += 1
     pf = projected["projected_from"]
     projected["projected_from"] = {"lines": pf["lines"] + 1, "bytes": paths.segment(seg).events.stat().st_size,
                                    "skipped": pf["skipped"]}
@@ -504,6 +518,21 @@ class SegmentState:
     sealed_at: str | None
 
 
+def screened_summary(doc: dict) -> dict:
+    """``doc`` as the instruction screen would have written it, when it predates the screen (else unchanged).
+
+    Every reader of summaries goes through here or :func:`rollup.read_archived`
+    (export, harvest, the rollup and so ``show``/``list``), so one call covers
+    what 0.23 wrote.
+    """
+    if doc.get("producer", {}).get("prompt_version") not in UNSCREENED_PROMPTS:
+        return doc
+    from claudna.screen import screen_summary  # here, not at the top: off the SessionStart import path
+
+    parts, _ = screen_summary({k: doc[k] for k in ("journey", "blocks", "procedures")})
+    return {**doc, **parts}
+
+
 def segment_states(paths: SessionPaths, lifecycle: list[dict]) -> list[SegmentState]:
     """Every existing segment's :class:`SegmentState`, in index order — the one place this rule lives."""
     indices = paths.segment_indices()
@@ -521,6 +550,8 @@ def segment_states(paths: SessionPaths, lifecycle: list[dict]) -> list[SegmentSt
                 status, doc = "unreadable", None
             elif seal is None or doc["input"]["range"]["end"] != seal["data"]["end"]:
                 status, doc = "stale", None
+            else:
+                doc = screened_summary(doc)
         out.append(SegmentState(index, seal is not None and (closed or index < indices[-1]), status, doc,
                                 seal["ts"] if seal else None))
     return out

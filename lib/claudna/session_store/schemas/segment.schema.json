@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "claudna.segment/1",
+  "$id": "claudna.segment/2",
   "title": "seg-NNN/segment.json \u2014 projection of one segment",
   "type": "object",
   "required": [
@@ -20,7 +20,7 @@
   "additionalProperties": false,
   "properties": {
     "schema": {
-      "const": "claudna.segment/1"
+      "const": "claudna.segment/2"
     },
     "sid": {
       "type": "string",
@@ -63,8 +63,7 @@
       "type": "object",
       "required": [
         "path",
-        "range",
-        "sha256"
+        "range"
       ],
       "additionalProperties": false,
       "properties": {
@@ -97,13 +96,6 @@
               "minimum": 0
             }
           }
-        },
-        "sha256": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "pattern": "^[0-9a-f]{64}$"
         }
       }
     },
@@ -113,7 +105,7 @@
         "prompts",
         "skills",
         "failures",
-        "checkpoints"
+        "interrupts"
       ],
       "additionalProperties": false,
       "properties": {
@@ -130,10 +122,6 @@
           "minimum": 0
         },
         "interrupts": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "checkpoints": {
           "type": "integer",
           "minimum": 0
         }

@@ -35,7 +35,7 @@ from typing import Callable, Mapping
 from . import rollup
 from .fsio import atomic_write_json, atomic_write_text, ensure_dir, env_number, epoch_of, read_json
 from .project import (HARVEST_CONSUMER, SegmentState, harvest_skip, load_lifecycle, retired_indices, segment_states,
-                      session_facts)
+                      session_facts, stale_projections)
 from .store import SessionHandle, SessionStore
 
 CAP_ENV, FLOOR_ENV = "CLAUDNA_RETAIN_DAYS", "CLAUDNA_RETAIN_ACKED_DAYS"
@@ -134,6 +134,7 @@ def _sweep_husks(handle: SessionHandle) -> None:
 class RetentionReport:
     retired: list[str] = field(default_factory=list)  #: "<sid>/seg-NNN (reason)"
     repaired: list[str] = field(default_factory=list)  #: sessions whose unsealed post-close segment was sealed
+    upgraded: list[str] = field(default_factory=list)  #: sessions whose older projections were rebuilt
     errors: list[str] = field(default_factory=list)
     budget_spent: bool = False  #: the run stopped on its time budget; the next one resumes where it stopped
 
@@ -177,12 +178,19 @@ def sweep(store: SessionStore, env: Mapping[str, str], *, now: float | None = No
         handle = store.session(sid)
         try:
             _sweep_husks(handle)
+            if rollup.outdated(handle.paths):  # 0.23's unscreened rollup: before the fully-retired skip below
+                rollup.refresh(handle.paths)
+                report.upgraded.append(sid)
             if not handle.paths.segment_indices():
                 continue  # fully retired: a directory listing, no log read
             lifecycle = load_lifecycle(handle.paths).events
             if session_facts(lifecycle).status == "closed" and handle.seal_after_close() is not None:
                 report.repaired.append(sid)  # a 0.22 leftover, sealed under the lock: fold the log again
                 lifecycle = load_lifecycle(handle.paths).events
+            if stale_projections(handle.paths):  # an earlier release's segment.json: rewrite once, not re-fold
+                handle.rebuild()
+                if sid not in report.upgraded:
+                    report.upgraded.append(sid)
             batch = due(handle, env, now=now, lifecycle=lifecycle)
             report.retired += [f"{sid}/seg-{index:03d} ({reason})"
                                for index, reason in retire(handle, batch, deadline=spent)]

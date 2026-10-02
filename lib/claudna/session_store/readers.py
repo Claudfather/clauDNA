@@ -21,7 +21,7 @@ from .events import REGISTRY
 from .fsio import read_json
 from .paths import SessionPaths
 from .project import load_activity, load_lifecycle, segment_docs, session_doc
-from .rollup import ROLLUP_SCHEMA, current, rollup_path
+from .rollup import current, rollup_path, trusted
 from .store import SessionStore
 
 _SINCE = re.compile(r"^(\d+)([hdw])$")
@@ -44,7 +44,7 @@ def since_cutoff(since: str | None, *, now: float | None = None) -> str | None:
 def _rollup(paths: SessionPaths) -> dict | None:
     """``summary.json`` if it is one: one read, for ``list``'s every row."""
     doc = read_json(rollup_path(paths))
-    return doc if isinstance(doc, dict) and doc.get("schema") == ROLLUP_SCHEMA else None
+    return doc if trusted(doc) else None
 
 
 def list_sessions(store: SessionStore, *, since: str | None = None, repo: str | None = None,
@@ -248,7 +248,7 @@ def render(verb: str, data, *, group: bool = False) -> list[str]:
             c = seg["counts"]
             lines.append(f"  seg-{seg['index']:03d} {seg['status']:6} summary={seg['summary']['status']:7} "
                          f"prompts={c['prompts']} skills={c['skills']} failures={c['failures']} "
-                         f"interrupts={c.get('interrupts', 0)}")
+                         f"interrupts={c['interrupts']}")
         if roll:
             f = roll["fields"]
             lines += [f"  {f.get('title') or ''}".rstrip(), f"  outcome: {f.get('outcome') or '-'}"]

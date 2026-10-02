@@ -35,7 +35,7 @@ LIB = REPO_ROOT / "lib"
 sys.path.insert(0, str(LIB))
 
 from claudna.session_store import events as ev  # noqa: E402
-from claudna.session_store import schema  # noqa: E402
+from claudna.session_store import readers, retention, schema  # noqa: E402
 from claudna.session_store.cli import check_session, main  # noqa: E402
 from claudna.session_store.fsio import (  # noqa: E402
     append_jsonl,
@@ -52,6 +52,7 @@ from claudna.session_store.paths import (  # noqa: E402
     state_root,
     validate_sid,
 )
+from claudna.session_store.project import load_lifecycle  # noqa: E402
 from claudna.session_store.store import NotAppendable, SessionStore, StoreError  # noqa: E402
 
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "session-store" / "basic"
@@ -192,7 +193,7 @@ class TestEvents:
                                 "origin": ORIGIN, "transcript_path": None}, None),
             ("session.opened", {"source": "startup", "parent_sid": None, "chain_id": "s", "actor": ACTOR,
                                 "origin": {}, "transcript_path": None}, None),
-            ("segment.sealed", {"end": 10, "sealed_by": "precompact", "trigger": None, "sha256": "abc"}, 1),
+            ("segment.sealed", {"end": -1, "sealed_by": "precompact", "trigger": None}, 1),
             ("segment.opened", {"opened_by": "compact", "start": -1}, 1),
             ("prompt.submitted", {"prompt_id": None, "chars": -3}, 1),
         ],
@@ -203,9 +204,9 @@ class TestEvents:
 
     def test_free_text_is_capped_not_rejected(self):
         e = ev.make_event("prompt.submitted", "s1", {"prompt_id": None, "chars": 9, "text": "t" * 1000}, seg=1)
-        n = ev.make_event("checkpoint.noted", "s1", {"note": "n" * 5000}, seg=1)
-        assert len(e["data"]["text"]) == 500 and len(n["data"]["note"]) == 1000
-        assert n["data"]["note"].endswith("…")
+        n = ev.make_event("summary.failed", "s1", {"job_id": "j", "error": "n" * 5000, "retryable": True}, seg=1)
+        assert len(e["data"]["text"]) == 500 and len(n["data"]["error"]) == 200
+        assert n["data"]["error"].endswith("…")
 
     def test_timestamps_are_utc_millisecond_z(self):
         assert re.match(schema.load("event")["properties"]["ts"]["pattern"], ev.now_ts())
@@ -391,8 +392,7 @@ class TestStore:
         assert done["segments"] == {"count": 2, "open": None, "retired": 0}
         assert done["children"] == ["child-1"] and done["private"] is True
         assert done["chain_id"] == h.sid  # no parent: its own chain root
-        assert load(h.paths.segment(1).segment_json)["counts"] == {"prompts": 1, "skills": 1, "failures": 0, "interrupts": 0,
-                                                                   "checkpoints": 0}
+        assert load(h.paths.segment(1).segment_json)["counts"] == {"prompts": 1, "skills": 1, "failures": 0, "interrupts": 0}
         assert load(h.paths.segment(2).segment_json)["counts"]["failures"] == 1
 
     def test_resume_reopens_a_closed_session(self, store):
@@ -519,6 +519,45 @@ class TestProjection:
         assert paths.segment(1).segment_json.read_text() == (expected / "seg-001.json").read_text()
         assert paths.segment(2).segment_json.read_text() == (expected / "seg-002.json").read_text()
 
+    def test_a_0_23_segment_projection_is_refolded_to_the_current_schema(self, tmp_path):
+        """A store written by 0.23 (``claudna.segment/1``, with ``checkpoints`` and ``sha256``) upgrades on read."""
+        root = _copy_fixture(tmp_path)
+        handle = SessionStore(root).session(FIXTURE_SID)
+        handle.rebuild()
+        old = load(FIXTURE / "expected" / "seg-001.json")
+        old.update(schema="claudna.segment/1")
+        old["counts"]["checkpoints"] = 0
+        old["transcript"]["sha256"] = "a" * 64
+        atomic_write_json(handle.paths.segment(1).segment_json, old)
+        doc = next(d for d in readers.show(SessionStore(root), FIXTURE_SID)["segments"] if d["index"] == 1)
+        assert doc["schema"] == "claudna.segment/2"
+        assert "checkpoints" not in doc["counts"] and "sha256" not in doc["transcript"]
+        report = check_session(handle)  # flagged as older, not as broken
+        assert report.problems == [] and any("an older projection" in w for w in report.warnings)
+
+    @pytest.mark.parametrize("doc", [[], 5, "x", {"schema": "garbage", "counts": "nonsense"},
+                                     {"schema": "claudna.segment/9"}])
+    def test_check_reports_a_broken_or_unknown_projection_as_a_problem(self, tmp_path, doc):
+        root = _copy_fixture(tmp_path)
+        handle = SessionStore(root).session(FIXTURE_SID)
+        handle.rebuild()
+        atomic_write_json(handle.paths.segment(1).segment_json, doc)
+        report = check_session(handle)  # never a crash, and only a known older tag is downgraded
+        assert report.problems and not any("an older projection" in w for w in report.warnings)
+
+    def test_the_sweep_rewrites_a_0_23_projection_once(self, tmp_path):
+        root = _copy_fixture(tmp_path)
+        store = SessionStore(root)
+        handle = store.session(FIXTURE_SID)
+        handle.rebuild()
+        old = load(handle.paths.segment(1).segment_json)
+        old.update(schema="claudna.segment/1")
+        atomic_write_json(handle.paths.segment(1).segment_json, old)
+        report = retention.sweep(store, {})
+        assert report.upgraded == [FIXTURE_SID]
+        assert load(handle.paths.segment(1).segment_json)["schema"] == "claudna.segment/2"
+        assert retention.sweep(store, {}).upgraded == []  # once
+
     def test_rebuild_is_deterministic_and_never_touches_logs(self, tmp_path):
         root = _copy_fixture(tmp_path)
         handle = SessionStore(root).session(FIXTURE_SID)
@@ -624,7 +663,7 @@ class TestSchemas:
     def test_fixture_logs_validate(self):
         event_schema = schema.load("event")
         for log in (FIXTURE / "sessions").rglob("*.jsonl"):
-            for record in read_jsonl(log).records:
+            for record in read_jsonl(log).records:  # 0.23-written, sha256 included: they still fold
                 assert schema.validate(record, event_schema) == []
                 assert ev.classify(record) == "ok"
 
@@ -637,7 +676,7 @@ class TestSchemas:
             ("session", lambda d: d["segments"].update(count=-1)),
             ("session", lambda d: d.update(opened_at="2026-09-28 10:00")),
             ("segment", lambda d: d.update(index=0)),
-            ("segment", lambda d: d["transcript"].update(sha256="nothex")),
+            ("segment", lambda d: d["transcript"]["range"].update(start=-1)),
             ("segment", lambda d: d["summary"].update(status="maybe")),
         ],
     )
@@ -927,11 +966,13 @@ class TestPinsForUnheldGuarantees:
         s = load(h.paths.session_json)
         assert (s["parent_sid"], s["chain_id"]) == ("parent", "root")
 
-    def test_seal_segment_records_the_content_hash(self, store):
+    def test_a_seal_still_writes_what_a_0_23_reader_requires(self, store):
+        """``trigger`` stays required: a 0.23 reader sharing the store would reject a seal without it."""
         h = opened(store)
         h.open_segment("session_open", 0)
-        h.seal_segment(10, "precompact", sha256="ab" * 32)
-        assert load(h.paths.segment(1).segment_json)["transcript"]["sha256"] == "ab" * 32
+        h.seal_segment(10, "precompact")
+        sealed = [e for e in load_lifecycle(h.paths).events if e["kind"] == "segment.sealed"][-1]
+        assert sealed["data"] == {"end": 10, "sealed_by": "precompact", "trigger": None}
 
 
 class TestWritersRedact:

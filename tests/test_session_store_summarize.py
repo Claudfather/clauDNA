@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import ACTOR, ORIGIN
+from conftest import ACTOR, ORIGIN, PLANTED
 
 from claudna.session_store import schema, summarize, transcript
 from claudna.session_store.fsio import exclusive_lock
@@ -433,3 +433,32 @@ def test_a_worker_crash_is_logged_under_its_own_request(store, tmp_path):
     events = [e for e in project.load_lifecycle(h.paths).events if e["kind"].startswith("summary.")]
     assert [e["kind"] for e in events] == ["summary.requested", "summary.failed"]
     assert events[0]["data"]["job_id"] == events[1]["data"]["job_id"]
+
+
+
+
+class TestInstructionScreen:
+    def test_a_planted_block_is_dropped_before_the_summary_is_written_and_logged_without_its_text(self, sealed):
+        output = {**GOOD_OUTPUT, "blocks": [*GOOD_OUTPUT["blocks"], PLANTED]}
+        assert summarize.summarize(sealed, 1, env={}, runner=FakeRunner(output)) == "summarized: 1 block(s)"
+        written = json.loads(sealed.paths.segment(1).summary.read_text())
+        assert written["blocks"] == GOOD_OUTPUT["blocks"]
+        assert schema.validate(written, schema.load("segment-summary")) == []
+        log = sealed.paths.lifecycle.read_text()
+        event = next(json.loads(line) for line in log.splitlines() if '"summary.screened"' in line)
+        assert event["data"]["blocks_dropped"] == 1 and event["data"]["strings_withheld"] == 0
+        assert "pipe-to-shell" in event["data"]["patterns"] and "curl" not in log
+
+    def test_a_clean_summary_logs_no_screen_event(self, sealed):
+        summarize.summarize(sealed, 1, env={}, runner=FakeRunner())
+        assert '"summary.screened"' not in sealed.paths.lifecycle.read_text()
+
+    def test_the_prompt_file_carries_the_version_summaries_record(self):
+        assert f"prompt_version: {summarize.PROMPT_VERSION} " in summarize.PROMPT_FILE.read_text()
+
+    def test_fingerprints_are_cut_only_between_whole_hashes(self):
+        joined = summarize._whole(f"{n:012x}" for n in range(90))
+        kept, rest = joined.rsplit(",", 1)
+        assert len(joined) <= 400 and rest.startswith("+") and int(rest[1:]) + len(kept.split(",")) == 90
+        assert all(len(fp) == 12 for fp in kept.split(","))
+

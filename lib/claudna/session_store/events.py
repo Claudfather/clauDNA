@@ -132,15 +132,16 @@ REGISTRY: dict[str, KindSpec] = {
     "segment.sealed": KindSpec(
         log=LIFECYCLE,
         seg=True,
+        # ``trigger`` is required because a 0.23 reader requires it: dropping a required key needs a new
+        # envelope major. ``sha256`` (optional, never set) went in 0.24.
         fields={"end": _INT, "sealed_by": _STR, "trigger": _OPT_STR},
-        optional={"sha256": _OPT_STR},
         choices={
             # "compact"/"resume": open_segment sealing an unsealed predecessor (missed PreCompact / lost SessionEnd)
             # "abandoned": unclosed.py sealing a session whose SessionEnd never ran
             "sealed_by": ("precompact", "compact", "session_end", "resume", "abandoned"),
             "trigger": ("manual", "auto", None),
         },
-        constraints={"end": _NON_NEGATIVE, "sha256": _SHA256},
+        constraints={"end": _NON_NEGATIVE},
     ),
     "summary.requested": KindSpec(log=LIFECYCLE, seg=True, fields={"job_id": _STR}),
     "summary.completed": KindSpec(
@@ -148,6 +149,16 @@ REGISTRY: dict[str, KindSpec] = {
         seg=True,
         fields={"job_id": _STR, "artifact": _STR, "input_sha256": _STR, "duration_ms": _INT},
         constraints={"input_sha256": _SHA256, "duration_ms": _NON_NEGATIVE},
+    ),
+    # What the instruction screen (``claudna.screen``) took out of a summary before it was written: counts,
+    # pattern ids and short hashes, never the text.
+    "summary.screened": KindSpec(
+        log=LIFECYCLE,
+        seg=True,
+        fields={"job_id": _STR, "blocks_dropped": _INT, "strings_withheld": _INT, "patterns": _STR,
+                "fingerprints": _STR},
+        caps={"patterns": 200, "fingerprints": 400},
+        constraints={"blocks_dropped": _NON_NEGATIVE, "strings_withheld": _NON_NEGATIVE},
     ),
     "summary.failed": KindSpec(
         log=LIFECYCLE,
@@ -197,7 +208,6 @@ REGISTRY: dict[str, KindSpec] = {
         optional={"duration_ms": _OPT_INT, "prompt_id": _OPT_STR, "tool_use_id": _OPT_STR},
         constraints={"duration_ms": _NON_NEGATIVE},
     ),
-    "checkpoint.noted": KindSpec(log=ACTIVITY, seg=True, fields={"note": _STR}, caps={"note": 1000}),
 }
 
 #: Close reasons only the store itself writes (``unclosed.py``). A SessionEnd payload can't claim them.
