@@ -1,6 +1,6 @@
 # Session store hardening: an injection screen, and cutting what nobody reads
 
-**Status:** decided 2026-10-02 (§3); the cleanup and the screen are being built. The rest stays proposed.
+**Status:** decided 2026-10-02 (§3). The screen (§1) and cleanup ranks 1–2 (§2) are built; the rest stays proposed.
 **Spec:** `documentation/specs/2026-09-28-session-store-design.md` §4.2 (hooks), §4.3 (lineage), §6.2 (event kinds), §6.5 (`segment.json`), §8 (export), P4 (metadata by default).
 
 Two pieces of work that ask the same question: what does each part of the store actually do for a reader?

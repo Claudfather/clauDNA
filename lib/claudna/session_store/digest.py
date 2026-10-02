@@ -33,6 +33,7 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from claudna.redact import redact_strings
+from claudna.screen import tripped
 
 from .events import now_ts
 from .fsio import append_jsonl, atomic_write_text, ensure_dir, read_jsonl
@@ -142,19 +143,23 @@ def _pending(root: Path, limit: int | None) -> list[Item]:
         path, vault = rec.get("path"), rec.get("vault")
         if rec.get("action") not in ("created", "updated") or not isinstance(path, str) or (vault, path) in done:
             continue  # a note is (vault, path): the same relative path in two vaults is two notes
+        if tripped({"title": rec.get("title"), "claim": rec.get("claim")}):
+            continue  # instruction-shaped (claudna.screen): never offered for promotion, however it got here
         d = drafts.setdefault((vault, path), {"title": rec.get("title") or path, "claim": rec.get("claim"),
                                               "vault": vault, "sessions": 0, "user": False, "last_ts": ""})
         d["sessions"] = max(d["sessions"], len(seen.get((vault, rec.get("key")), ())))
         d["user"] = d["user"] or rec.get("asserted_by") == "user"
         d["last_ts"] = max(d["last_ts"], rec.get("ts") or "")
     newest = sorted(drafts.items(), key=lambda kv: kv[1]["last_ts"], reverse=True)  # stable: the tiebreak below
+    # Ranked by evidence, then newest. Not by asserted_by: the summarizing model picks that label, so text
+    # planted in a transcript could claim "user" and climb the list (the hardening note, path 2).
     ranked = [Item("draft", path, d["title"], d["claim"], d["vault"], d["sessions"],
                    "user" if d["user"] else "agent", d["last_ts"])
-              for (_, path), d in sorted(newest, key=lambda kv: (-kv[1]["sessions"], not kv[1]["user"]))]
+              for (_, path), d in sorted(newest, key=lambda kv: -kv[1]["sessions"])]
     people: dict[str, Item] = {}
     for rec in held:
         key, block = rec.get("key"), rec.get("block") if isinstance(rec.get("block"), dict) else {}
-        if not isinstance(key, str) or (None, item := person_item(key)) in done:
+        if not isinstance(key, str) or (None, item := person_item(key)) in done or tripped(block):
             continue
         name = (block.get("subject_hint") or {}).get("name") or "person fact"
         people[key] = Item("person", item, name, block.get("claim"), None,

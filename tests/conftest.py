@@ -57,7 +57,7 @@ def segment_summary(sid: str, index: int, blocks=(), *, title: str = "t", start:
         "schema": "claudna.segment-summary/1", "sid": sid, "index": index,
         "input": {"transcript_path": "/t.jsonl", "range": {"start": start, "end": end}, "sha256": "0" * 64,
                   "turns": 1},
-        "producer": {"model": "haiku", "prompt_version": "segment-summary/1", "duration_ms": 1, "cost_usd": None},
+        "producer": {"model": "haiku", "prompt_version": "segment-summary/2", "duration_ms": 1, "cost_usd": None},
         "journey": {"title": title, "intent": "i", "outcome": outcome, "arc": [{"step": "s", "result": "r"}],
                     "done": [{"text": t} for t in done], "in_progress": [], "next": [{"text": t} for t in next_]},
         "blocks": list(blocks), "procedures": [],

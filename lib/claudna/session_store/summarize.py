@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import Callable, Mapping
 
 from claudna.redact import redact_strings, redact_text
+from claudna.screen import screen_summary
 
 from . import rollup, schema
 from .fsio import atomic_write_json, read_json
@@ -50,7 +51,7 @@ from .transcript import Turn, read_range, render
 
 SCHEMA_ID = "claudna.segment-summary/1"
 PROMPT_FILE = Path(__file__).resolve().parent / "prompts" / "segment-summary.md"
-PROMPT_VERSION = "segment-summary/1"
+PROMPT_VERSION = "segment-summary/2"
 MODEL_ENV = "CLAUDNA_SUMMARY_MODEL"
 CLAUDE_ENV = "CLAUDNA_CLAUDE_BIN"
 DEFAULT_MODEL = "haiku"
@@ -132,6 +133,17 @@ def summarize(handle: SessionHandle, index: int, *, env: Mapping[str, str] = os.
         return outcome
 
 
+def _log_screened(handle: SessionHandle, index: int, job_id: str, screened: list[dict]) -> None:
+    """Record what the screen took out: counts, pattern ids, fingerprints; never the text."""
+    handle.append("summary.screened", {
+        "job_id": job_id,
+        "blocks_dropped": sum(f["path"].startswith("blocks[") for f in screened),
+        "strings_withheld": sum(not f["path"].startswith("blocks[") for f in screened),
+        "patterns": ",".join(sorted({p for f in screened for p in f["patterns"]})),
+        "fingerprints": ",".join(f["fingerprint"] for f in screened),
+    }, seg=index)
+
+
 def _summarize_once(handle: SessionHandle, index: int, *, env: Mapping[str, str],
                     runner: Callable[..., tuple[dict, float | None]]) -> tuple[str, int | None]:
     """One pass, under the segment's lock: ``(outcome, the seal end it worked from)``."""
@@ -182,6 +194,7 @@ def _summarize_once(handle: SessionHandle, index: int, *, env: Mapping[str, str]
         problems = schema.validate(output, full["$defs"]["model_output"])
         if problems:
             raise SummarizerError("invalid summary: " + "; ".join(problems[:3]), retryable=True)
+        output, screened = screen_summary(output)  # instructions out before anything reads it (claudna.screen)
         artifact = {
             **redact_strings(output),
             "schema": SCHEMA_ID, "sid": handle.sid, "index": index,
@@ -197,6 +210,8 @@ def _summarize_once(handle: SessionHandle, index: int, *, env: Mapping[str, str]
                       seg=index)
         return f"failed: {exc}", end
     atomic_write_json(seg.dir / "summary.json", artifact)
+    if screened:
+        _log_screened(handle, index, job_id, screened)
     logged = time.time()  # a rollup written after this counts the summary: discard() keeps it
     handle.append("summary.completed", {"job_id": job_id, "artifact": f"{seg.dir.name}/summary.json",
                                         "input_sha256": sha, "duration_ms": duration_ms}, seg=index)

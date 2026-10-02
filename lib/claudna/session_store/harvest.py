@@ -142,6 +142,7 @@ class RunReport:
     created: int = 0
     known: int = 0
     held_back: int = 0
+    screened: int = 0  #: blocks the instruction screen kept out (claudna.screen): never captured or held
     rejected: int = 0
     retried: int = 0
     gave_up: int = 0
@@ -172,6 +173,8 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
     through = handle.cursor(CONSUMER)
     if through >= max(handle.paths.segment_indices(), default=0):
         return  # nothing new: skip the lifecycle read (most sessions, most runs)
+    from claudna.screen import tripped
+
     from . import digest  # here, not at the top: SessionStart imports this module for is_due alone (#387 S5)
 
     lifecycle = load_lifecycle(handle.paths).events
@@ -229,7 +232,9 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
         if not valid:
             report.errors.append(f"{sid}: seg-{index:03d}/summary.json is missing or invalid; not harvested")
             return  # never step past a segment whose blocks can't be read: the cursor holds
-        findings = [(b, finding_of(b, sid=sid, index=index, project=origin["repo"])) for b in summary["blocks"]]
+        blocks = [b for b in summary["blocks"] if not tripped(b)]  # a summary written before the screen existed
+        report.screened += len(summary["blocks"]) - len(blocks)
+        findings = [(b, finding_of(b, sid=sid, index=index, project=origin["repo"])) for b in blocks]
         wanted = [f for _, f in findings if f is not None]
         if report.captures and report.captures + len(wanted) > MAX_CAPTURES:
             return  # out of budget: the whole segment waits for the next run (a first one always fits)
@@ -318,6 +323,8 @@ def liveness_line(report: RunReport) -> str:
         parts.append(f"{report.known} already known")
     if report.held_back:
         parts.append(f"{report.held_back} person fact(s) held for review")
+    if report.screened:
+        parts.append(f"{report.screened} withheld as instruction-like")
     if report.rejected:
         parts.append(f"{report.rejected} rejected")
     if report.retried:

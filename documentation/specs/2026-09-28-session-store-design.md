@@ -222,6 +222,7 @@ Every line in every log:
 | `segment.retired` | `{ reason: "acked"\|"age" }` — appended by retention (§9) before the segment's directory is removed |
 | `summary.requested` | `{ job_id: string }` |
 | `summary.completed` | `{ job_id: string, artifact: "seg-NNN/summary.json", input_sha256: string, duration_ms: int }` |
+| `summary.screened` | `{ job_id: string, blocks_dropped: int, strings_withheld: int, patterns: string (≤200), fingerprints: string (≤400) }` — what the instruction screen (`lib/claudna/screen.py`) took out before the summary was written: counts, comma-joined pattern ids, 12-hex fingerprints, never the text |
 | `summary.failed` | `{ job_id: string, error: string (≤200), retryable: bool }` |
 | `summary.skipped` | `{ reason: "private"\|"disabled"\|"trivial"\|"headless"\|"no_transcript" }` |
 | `session.closed` | `{ reason: "clear"\|"resume"\|"logout"\|"prompt_input_exit"\|"other"\|"abandoned" }`. `abandoned` is the store's own (`seal`, the sweep: a session whose SessionEnd never ran); a SessionEnd payload can't claim it |

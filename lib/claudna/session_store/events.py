@@ -150,6 +150,16 @@ REGISTRY: dict[str, KindSpec] = {
         fields={"job_id": _STR, "artifact": _STR, "input_sha256": _STR, "duration_ms": _INT},
         constraints={"input_sha256": _SHA256, "duration_ms": _NON_NEGATIVE},
     ),
+    # What the instruction screen (``claudna.screen``) took out of a summary before it was written: counts,
+    # pattern ids and short hashes, never the text.
+    "summary.screened": KindSpec(
+        log=LIFECYCLE,
+        seg=True,
+        fields={"job_id": _STR, "blocks_dropped": _INT, "strings_withheld": _INT, "patterns": _STR,
+                "fingerprints": _STR},
+        caps={"patterns": 200, "fingerprints": 400},
+        constraints={"blocks_dropped": _NON_NEGATIVE, "strings_withheld": _NON_NEGATIVE},
+    ),
     "summary.failed": KindSpec(
         log=LIFECYCLE,
         seg=True,
