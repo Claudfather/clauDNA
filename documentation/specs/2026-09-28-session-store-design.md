@@ -342,7 +342,7 @@ No LLM. Recomputed from the `done` segment summaries on every `summary.completed
 | `journey.in_progress`, `journey.next` | latest segment's only |
 
 ```json
-{ "schema": "claudna.session-summary/2", "sid": "…", "through_seg": 2, "fields": { … }, "segments": [1, 2] }
+{ "schema": "claudna.session-summary/3", "sid": "…", "through_seg": 2, "fields": { … }, "segments": [1, 2] }
 ```
 
 **As built (phase 6):** it's also recomputed on every retirement (a retired segment's summary is archived in `sessions/<sid>/summaries/` and still counts) and by `session_store rebuild <sid>`. With nothing left to roll up, the file is removed rather than left stale. `session show` computes a missing rollup in memory; `session list` reads the file only.

@@ -173,7 +173,7 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
     through = handle.cursor(CONSUMER)
     if through >= max(handle.paths.segment_indices(), default=0):
         return  # nothing new: skip the lifecycle read (most sessions, most runs)
-    from claudna.screen import tripped
+    from claudna.screen import tripped  # both here, not at the top: off the SessionStart import path
 
     from . import digest  # here, not at the top: SessionStart imports this module for is_due alone (#387 S5)
 

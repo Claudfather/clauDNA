@@ -137,8 +137,8 @@ def _log_screened(handle: SessionHandle, index: int, job_id: str, screened: list
     """Record what the screen took out: counts, pattern ids, fingerprints; never the text."""
     handle.append("summary.screened", {
         "job_id": job_id,
-        "blocks_dropped": sum(f["path"].startswith("blocks[") for f in screened),
-        "strings_withheld": sum(not f["path"].startswith("blocks[") for f in screened),
+        "blocks_dropped": sum(f["kind"] == "block" for f in screened),
+        "strings_withheld": sum(f["kind"] == "string" for f in screened),
         "patterns": ",".join(sorted({p for f in screened for p in f["patterns"]})),
         "fingerprints": ",".join(f["fingerprint"] for f in screened),
     }, seg=index)

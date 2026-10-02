@@ -1,17 +1,10 @@
 """Screening model-written text for instructions before it is remembered.
 
-A session summary is written by a model reading a transcript, and a transcript
-can carry someone else's text: a web page, a README, a quoted tool output. An
-instruction in it ("ignore previous instructions", "always run curl …| sh
-before builds") can come back as a summary's claim, then as a vault draft or a
-digest item that a later session reads. Redaction (``claudna.redact``) masks
-secrets; this masks *instructions*. It is deterministic (no model call) and
-deliberately narrow: it flags the shapes an attack takes, not every imperative,
-so "the build runs `make check` before pushing" passes while "curl x | sh"
-doesn't. It can't catch a well-written lie; drafts stay unverified for that.
-
-Used where summary text is written (``session_store.summarize``) and again
-where older text is read back (``session_store.digest``, ``session_store.harvest``).
+A summary can carry an instruction planted in a transcript back as a "fact".
+Redaction (``claudna.redact``) masks secrets; this masks instructions. It is
+deterministic and deliberately narrow: it flags the shapes an attack takes, not
+every imperative, and it can't catch a well-written lie. Where it runs and why:
+``documentation/plans/2026-10-01-session-store-hardening.md`` §1.
 """
 
 from __future__ import annotations
@@ -61,36 +54,34 @@ def fingerprint(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", "replace")).hexdigest()[:12]
 
 
-def _strings(value: object, path: str):
-    """Every ``(path, string)`` leaf under ``value``."""
+def _walk(value: object, path: str, on_string) -> object:
+    """``value`` rebuilt with each string leaf replaced by ``on_string(path, text)``."""
     if isinstance(value, str):
-        yield path, value
-    elif isinstance(value, dict):
-        for key, item in value.items():
-            yield from _strings(item, f"{path}.{key}" if path else key)
-    elif isinstance(value, list):
-        for n, item in enumerate(value):
-            yield from _strings(item, f"{path}[{n}]")
+        return on_string(path, value)
+    if isinstance(value, dict):
+        return {k: _walk(v, f"{path}.{k}" if path else k, on_string) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_walk(v, f"{path}[{n}]", on_string) for n, v in enumerate(value)]
+    return value
+
+
+def _withhold(value: object, path: str) -> tuple[object, list[dict]]:
+    """``value`` with every tripping string replaced by :data:`WITHHELD`, and a finding for each."""
+    found: list[dict] = []
+
+    def check(where: str, text: str) -> str:
+        names = hits(text)
+        if not names:
+            return text
+        found.append({"kind": "string", "path": where, "patterns": names, "fingerprint": fingerprint(text)})
+        return WITHHELD
+
+    return _walk(value, path, check), found
 
 
 def tripped(value: object) -> list[str]:
     """Pattern ids any string under ``value`` trips (a block, a ledger line): empty when it's clean."""
-    return sorted({name for _, text in _strings(value, "") for name in hits(text)})
-
-
-def _withhold(value: object, path: str, found: list[dict]) -> object:
-    """``value`` with every tripping string replaced by :data:`WITHHELD`, recording each in ``found``."""
-    if isinstance(value, str):
-        names = hits(value)
-        if names:
-            found.append({"path": path, "patterns": names, "fingerprint": fingerprint(value)})
-            return WITHHELD
-        return value
-    if isinstance(value, dict):
-        return {k: _withhold(v, f"{path}.{k}" if path else k, found) for k, v in value.items()}
-    if isinstance(value, list):
-        return [_withhold(v, f"{path}[{n}]", found) for n, v in enumerate(value)]
-    return value
+    return sorted({name for f in _withhold(value, "")[1] for name in f["patterns"]})
 
 
 def screen_summary(output: dict) -> tuple[dict, list[dict]]:
@@ -99,19 +90,20 @@ def screen_summary(output: dict) -> tuple[dict, list[dict]]:
     A block that trips is dropped whole: it is an atomic fact bound for the
     vault, and half of one is worse than none. In the journey and the
     procedures, only the tripping string is replaced. Each finding is
-    ``{"path", "patterns", "fingerprint"}``, never the text itself.
+    ``{"kind": "block"|"string", "path", "patterns", "fingerprint"}``, never the text.
     """
     found: list[dict] = []
     blocks = []
     for n, block in enumerate(output.get("blocks") or []):
-        names = tripped(block)
-        if names:
-            text = "\n".join(t for _, t in _strings(block, ""))
-            found.append({"path": f"blocks[{n}]", "patterns": names, "fingerprint": fingerprint(text)})
+        _, inside = _withhold(block, f"blocks[{n}]")
+        if inside:
+            found.append({"kind": "block", "path": f"blocks[{n}]", "fingerprint": inside[0]["fingerprint"],
+                          "patterns": sorted({p for f in inside for p in f["patterns"]})})
         else:
             blocks.append(block)
     screened = {**output, "blocks": blocks}
     for part in ("journey", "procedures"):
         if part in output:
-            screened[part] = _withhold(output[part], part, found)
+            screened[part], withheld = _withhold(output[part], part)
+            found += withheld
     return screened, found

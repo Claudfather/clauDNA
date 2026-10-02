@@ -33,6 +33,8 @@ SESSION_SCHEMA = "claudna.session/1"
 SEGMENT_SCHEMA = "claudna.segment/2"
 #: Projection tags earlier releases wrote. Readers re-fold them; :func:`stale_projections` finds them to rewrite.
 OLDER_PROJECTIONS = frozenset({"claudna.segment/1"})
+#: Summary prompt versions written before the instruction screen existed: screened again as they're read.
+UNSCREENED_PROMPTS = frozenset({"segment-summary/1"})
 _SCHEMA_FILES = {SESSION_SCHEMA: "session", SEGMENT_SCHEMA: "segment"}
 
 _SUMMARY_STATUS = {
@@ -516,6 +518,21 @@ class SegmentState:
     sealed_at: str | None
 
 
+def screened_summary(doc: dict) -> dict:
+    """``doc`` as the instruction screen would have written it, when it predates the screen (else unchanged).
+
+    Every reader of summaries goes through here or :func:`rollup.read_archived`
+    (export, harvest, the rollup and so ``show``/``list``), so one call covers
+    what 0.23 wrote.
+    """
+    if doc.get("producer", {}).get("prompt_version") not in UNSCREENED_PROMPTS:
+        return doc
+    from claudna.screen import screen_summary  # here, not at the top: off the SessionStart import path
+
+    parts, _ = screen_summary({k: doc[k] for k in ("journey", "blocks", "procedures")})
+    return {**doc, **parts}
+
+
 def segment_states(paths: SessionPaths, lifecycle: list[dict]) -> list[SegmentState]:
     """Every existing segment's :class:`SegmentState`, in index order — the one place this rule lives."""
     indices = paths.segment_indices()
@@ -533,6 +550,8 @@ def segment_states(paths: SessionPaths, lifecycle: list[dict]) -> list[SegmentSt
                 status, doc = "unreadable", None
             elif seal is None or doc["input"]["range"]["end"] != seal["data"]["end"]:
                 status, doc = "stale", None
+            else:
+                doc = screened_summary(doc)
         out.append(SegmentState(index, seal is not None and (closed or index < indices[-1]), status, doc,
                                 seal["ts"] if seal else None))
     return out

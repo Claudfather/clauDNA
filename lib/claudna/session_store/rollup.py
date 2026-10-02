@@ -29,9 +29,10 @@ from pathlib import Path
 from . import schema
 from .fsio import atomic_write_json, exclusive_lock, read_json
 from .paths import SessionPaths
-from .project import load_lifecycle, segment_states
+from .project import load_lifecycle, screened_summary, segment_states
 
-ROLLUP_SCHEMA = "claudna.session-summary/2"
+#: /3: rollups now come from screened summaries (claudna.screen); a /2 file may hold what the screen removes.
+ROLLUP_SCHEMA = "claudna.session-summary/3"
 
 LATEST = "latest"  #: the newest segment's value wins
 UNION = "union"  #: every segment's items, deduplicated, each tagged with from_seg
@@ -86,8 +87,14 @@ def read_archived(paths: SessionPaths, index: int) -> dict | None:
     """Retired segment ``index``'s archived summary, if it is a valid one for that index."""
     doc = read_json(paths.archived_summary(index))
     if isinstance(doc, dict) and not schema.validate(doc, schema.load("segment-summary")) and doc["index"] == index:
-        return doc
+        return screened_summary(doc)
     return None
+
+
+def outdated(paths: SessionPaths) -> bool:
+    """Is there a rollup on disk from an earlier :data:`ROLLUP_SCHEMA`? Readers ignore it; the sweep rewrites it."""
+    doc = read_json(rollup_path(paths))
+    return isinstance(doc, dict) and doc.get("schema") != ROLLUP_SCHEMA
 
 
 def compute(sid: str, by_index: dict[int, dict]) -> dict | None:

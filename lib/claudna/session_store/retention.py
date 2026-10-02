@@ -184,8 +184,9 @@ def sweep(store: SessionStore, env: Mapping[str, str], *, now: float | None = No
             if session_facts(lifecycle).status == "closed" and handle.seal_after_close() is not None:
                 report.repaired.append(sid)  # a 0.22 leftover, sealed under the lock: fold the log again
                 lifecycle = load_lifecycle(handle.paths).events
-            if stale_projections(handle.paths):  # written by an earlier release: rewrite once, not re-fold forever
-                handle.rebuild()
+            if stale_projections(handle.paths) or rollup.outdated(handle.paths):  # an earlier release's files:
+                handle.rebuild()  # rewrite once, not re-fold forever
+                rollup.refresh(handle.paths)
                 report.upgraded.append(sid)
             batch = due(handle, env, now=now, lifecycle=lifecycle)
             report.retired += [f"{sid}/seg-{index:03d} ({reason})"
