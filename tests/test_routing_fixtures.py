@@ -23,10 +23,14 @@ from skill_checks import parse_frontmatter
 FIXTURES = Path(__file__).parent / "fixtures" / "routing-matrix.yaml"
 
 
-def load_rows() -> list[dict]:
+def load_matrix() -> dict:
     data = yaml.safe_load(FIXTURES.read_text())
     assert isinstance(data, dict) and isinstance(data.get("rows"), list)
-    return data["rows"]
+    return data
+
+
+def load_rows() -> list[dict]:
+    return load_matrix()["rows"]
 
 
 def test_fixture_schema():
@@ -35,6 +39,13 @@ def test_fixture_schema():
         assert isinstance(row.get("keywords"), list) and row["keywords"]
         assert isinstance(row.get("expect"), str) and row["expect"]
         assert isinstance(row.get("phase"), str) and row["phase"]
+        assert isinstance(row.get("eval", False), bool)  # scripts/routing_eval.py runs the true ones
+        assert "known_failure" not in row or (row.get("eval") is True and isinstance(row["known_failure"], str))
+
+
+def test_controls_schema():
+    for control in load_matrix().get("controls") or []:
+        assert set(control) == {"utterance"} and isinstance(control["utterance"], str) and control["utterance"]
 
 
 def test_expected_skills_exist():

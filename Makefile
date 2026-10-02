@@ -18,7 +18,7 @@
 #                    (CI forwards PR labels via this env var; consumed
 #                    by scripts/skill_checks.py)
 
-.PHONY: check deps deps-runtime test-runtime check-skills check-integration check-agents check-manifest check-changelog lint test
+.PHONY: check deps deps-runtime deps-eval test-runtime routing-eval check-skills check-integration check-agents check-manifest check-changelog lint test
 
 check: check-skills check-integration check-agents check-manifest check-changelog lint test
 
@@ -63,3 +63,16 @@ deps-runtime:
 
 test-runtime:
 	python3 -m pytest $(RUNTIME_TESTS)
+
+# Live routing evals (scripts/routing_eval.py): paid, so not in `make check`.
+# The Claude Code CI evals on is pinned: an upgrade can change the picker or the
+# built-in skills it competes with. Raise it on purpose, with an eval run.
+# deps-eval is for CI: it replaces the global `claude`. Locally, run
+# `make routing-eval` with the Claude Code you have.
+CLAUDE_CODE_VERSION = 2.1.287
+deps-eval:
+	npm install -g @anthropic-ai/claude-code@$(CLAUDE_CODE_VERSION)
+
+ROUTING_EVAL_ARGS ?=
+routing-eval:
+	python3 scripts/routing_eval.py $(ROUTING_EVAL_ARGS)

@@ -1,0 +1,5 @@
+{
+  "_doc": "Ceilings, in characters, for the always-loaded skill and agent listings. Rule: SKILL_CONTRACT.md §5.1 (Catalog budget).",
+  "skills": 11806,
+  "agents": 1216
+}

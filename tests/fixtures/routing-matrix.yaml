@@ -8,10 +8,11 @@
 #      anchor `keywords` appear (case-insensitive substrings) in the expected
 #      skill's frontmatter description — the picker routes on descriptions,
 #      so keyword presence is the mechanical proxy for routing quality.
-#   2. Manual (richer, run at phase boundaries): in a fresh interactive
-#      session, type the utterance and record which skill the picker
-#      resolves. Pass rule: 2 of 3 attempts resolve to `expect` (+ mode where
-#      noted). Paste the results table into the consolidation PR.
+#   2. Live (richer): type the utterance in a fresh session and record which
+#      skill the picker resolves; pass on 2 of 3. `scripts/routing_eval.py`
+#      runs this headless for rows marked `eval: true` and for `controls`
+#      (its docstring has the rules, including `known_failure`). `mode` is
+#      recorded, not judged, so "+ mode where noted" stays manual.
 #
 # Rows for not-yet-consolidated families point at their current skills; each
 # phase updates its own family's `expect` values in its PR (P3: audit → the
@@ -30,6 +31,7 @@
 rows:
   # --- P2: infra engines (consolidated this phase) ---
   - utterance: "deploy my modal app to production"
+    eval: true
     keywords: [modal, deploy]
     expect: modal
     mode: deploy
@@ -50,6 +52,7 @@ rows:
     mode: deploy
     phase: P2
   - utterance: "show me the railway service logs"
+    eval: true
     keywords: [railway, logs]
     expect: railway
     mode: logs
@@ -80,6 +83,7 @@ rows:
     mode: query
     phase: P2
   - utterance: "create a neon database branch to experiment safely"
+    eval: true
     keywords: [neon, branch]
     expect: neon
     mode: branch
@@ -92,6 +96,7 @@ rows:
 
   # --- P3: audit family (consolidated into the /audit engine) ---
   - utterance: "check the codebase for security vulnerabilities"
+    eval: true
     keywords: [security, vulnerabilit]
     expect: audit
     mode: security
@@ -122,6 +127,7 @@ rows:
     mode: data-model
     phase: P3
   - utterance: "the page flickers and scrolls janky — find out why"
+    eval: true
     keywords: [janky, performance]
     expect: audit
     mode: frontend-perf
@@ -134,6 +140,7 @@ rows:
 
   # --- P4: session family (consolidated into the /session engine) ---
   - utterance: "write a handoff — I'm done for the day"
+    eval: true
     keywords: [end of a session, handoff]
     expect: session
     mode: handoff
@@ -156,6 +163,7 @@ rows:
 
   # --- P5: review family (consolidated into /review-work) ---
   - utterance: "review my uncommitted changes before I commit"
+    eval: true
     keywords: [uncommitted changes]
     expect: review-work
     mode: changes
@@ -168,6 +176,8 @@ rows:
 
   # --- P6: lens family (panel-internal — utterances resolve to /ironclad --lens <name>) ---
   - utterance: "step back — are we even solving the right problem?"
+    eval: true
+    known_failure: "on Sonnet it resolves to recall, weigh-development-paths or no skill (2026-10-01 baseline); ironclad's description has no premise-check trigger"
     keywords: [harden, plan]
     expect: ironclad
     mode: --lens
@@ -200,6 +210,7 @@ rows:
 
   # --- P8: orientation + install diagnostic ---
   - utterance: "is my claudna installation healthy? are the hooks wired?"
+    eval: true
     keywords: [installation, healthy, hooks]
     expect: using-claudna
     mode: health
@@ -242,7 +253,14 @@ rows:
     mode: frontend-perf
     phase: cross
   - utterance: "the spacing and typography look inconsistent across screens"
+    eval: true
     keywords: [visual, UX]
     expect: audit
     mode: design
     phase: cross
+
+# Utterances that must resolve to no clauDNA skill: the picker over-firing is
+# a routing failure too. Read only by scripts/routing_eval.py.
+controls:
+  - utterance: "what is 17 times 23?"
+  - utterance: "translate 'good morning' into French"

@@ -13,6 +13,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from check_catalog_budget import run_check as run_catalog_budget_check
 from check_schema_drift import run_check as run_schema_drift_check
 from check_vault_address import run_check as run_vault_address_check
 from skill_checks import (
@@ -246,6 +247,10 @@ def main() -> int:
     # there is no local copy to diff (see check_vault_address's docstring).
     vault_errors, vault_warnings, vault_notes = run_vault_address_check(REPO_ROOT)
 
+    # Catalog budget (SKILL_CONTRACT §5.1). ALWAYS-BLOCKING: the total belongs
+    # to no one skill, so the touched-set partition can't attribute it.
+    budget_errors, budget_warnings, budget_notes = run_catalog_budget_check(REPO_ROOT)
+
     total_skills = len(skill_dirs) - len(SKIP_SKILLS)
 
     # In CI mode, partition errors into blocking (touched) vs warnings (untouched).
@@ -286,12 +291,22 @@ def main() -> int:
     for msg in vault_errors:
         blocking_errors.setdefault("vault-address", []).append(msg)
 
+    for msg in budget_errors:
+        blocking_errors.setdefault("catalog-budget", []).append(msg)
+
     # Drift notes/warnings are advisory — always printed, never blocking.
     if drift_notes or drift_warnings:
         for n in drift_notes:
             print(f"NOTE(schema-drift): {n}")
         for w in drift_warnings:
             print(f"WARN(schema-drift): {w}")
+        print()
+
+    for n in budget_notes:
+        print(f"NOTE(catalog-budget): {n}")
+    for w in budget_warnings:
+        print(f"WARN(catalog-budget): {w}")
+    if budget_notes or budget_warnings:
         print()
 
     if vault_notes or vault_warnings:

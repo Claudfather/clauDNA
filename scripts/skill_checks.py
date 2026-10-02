@@ -126,6 +126,14 @@ _RAW_GH_PATTERNS = [
 ]
 
 
+def skill_dirs(skills_dir: Path) -> list[Path]:
+    """Each skill directory under ``skills_dir`` (one with a ``SKILL.md``, not in :data:`SKIP_DIRS`), sorted."""
+    if not skills_dir.is_dir():
+        return []
+    return sorted(p for p in skills_dir.iterdir()
+                  if p.is_dir() and p.name not in SKIP_DIRS and (p / "SKILL.md").is_file())
+
+
 def parse_frontmatter(path: Path) -> tuple[dict, str] | None:
     """Return (frontmatter_dict, body) or None if no frontmatter."""
     text = path.read_text()

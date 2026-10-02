@@ -45,7 +45,7 @@ scripts/
 
 ## Design Philosophy
 
-- **Skills are thinking frameworks, not SKUs.** Before adding a skill, ask whether it can be a lens or mode inside an existing skill — consolidation over fragmentation. Every skill description loads into every session; each one must earn its context cost.
+- **Skills are thinking frameworks, not SKUs.** Before adding a skill, ask whether it can be a lens or mode inside an existing skill — consolidation over fragmentation. Every skill description loads into every session; each one must earn its context cost, and the summed catalog has a ceiling (`scripts/catalog-budget.json`, [SKILL_CONTRACT.md §5.1](./SKILL_CONTRACT.md)).
 - **Descriptions are routing surfaces.** State when to use the skill (trigger conditions first), name the confusable sibling ("For X, use /claudna:Y"), keep CLI flags in `argument-hint`, and never summarize the skill's workflow in its description — the model follows the summary instead of reading the body. Grammar is contract-bound: [SKILL_CONTRACT.md §2.1](./SKILL_CONTRACT.md).
 
 ## Ecosystem boundary
