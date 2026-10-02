@@ -1,7 +1,7 @@
 {
   "name": "claudna",
   "displayName": "clauDNA",
-  "version": "0.23.0",
+  "version": "0.24.0",
   "description": "Curated skills and agents for shipping software — audits, plan review, build workflows, and infra operations for Vercel, Railway, Modal, Neon, Snowflake, and dbt.",
   "author": {
     "name": "Chris Rogers",

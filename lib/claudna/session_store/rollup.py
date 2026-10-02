@@ -98,8 +98,9 @@ def trusted(doc: object) -> bool:
 def outdated(paths: SessionPaths) -> bool:
     """Is the rollup on disk one 0.23 wrote (unscreened)? Readers recompute past it; the sweep rewrites it.
 
-    Only that known shape: a rollup some other release wrote is left alone, so
-    two versions sharing a store don't rewrite each other's files every sweep.
+    Only that known shape: a rollup a newer release wrote is left alone. While a
+    0.23 session still shares the store it can write this shape back, and the
+    next sweep upgrades it again; that stops once the old session is gone.
     """
     doc = read_json(rollup_path(paths))
     return isinstance(doc, dict) and doc.get("schema") == ROLLUP_SCHEMA and "screened" not in doc
