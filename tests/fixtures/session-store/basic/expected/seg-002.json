@@ -1,6 +1,5 @@
 {
   "counts": {
-    "checkpoints": 1,
     "failures": 0,
     "interrupts": 0,
     "prompts": 1,
@@ -10,11 +9,11 @@
   "opened_at": "2026-09-28T10:11:05.000Z",
   "opened_by": "compact",
   "projected_from": {
-    "bytes": 300,
-    "lines": 2,
+    "bytes": 155,
+    "lines": 1,
     "skipped": 0
   },
-  "schema": "claudna.segment/1",
+  "schema": "claudna.segment/2",
   "sealed_at": "2026-09-28T10:20:01.000Z",
   "sealed_by": "session_end",
   "sid": "5f0c2d1e-0000-4000-8000-000000000001",
@@ -28,7 +27,6 @@
     "range": {
       "end": 9100,
       "start": 4200
-    },
-    "sha256": null
+    }
   }
 }

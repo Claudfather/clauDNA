@@ -188,7 +188,7 @@ Schemas ship as JSON Schema (draft 2020-12) beside the code in `lib/claudna/sess
 | `SessionId` | string, as issued by Claude Code (UUID today; treat as opaque) |
 | `SegIndex` | integer ≥ 1; directory name `seg-%03d` (widens past 999 without breaking sort for readers that parse the int) |
 | `ByteRange` | `{ "start": int ≥ 0, "end": int ≥ start \| null }` — `end: null` means open |
-| `TranscriptRef` | `{ "path": string, "range": ByteRange, "sha256": string \| null }` — hash over the range, set at seal |
+| `TranscriptRef` | `{ "path": string, "range": ByteRange }` (a `sha256` over the range was never set by any writer and was dropped in `claudna.segment/2`) |
 | `Actor` | `{ "kind": "interactive" \| "headless" \| "bot", "fleet": string \| null, "bot_id": string \| null, "bot_name": string \| null, "model": string \| null, "entrypoint": string \| null }` — `fleet`/`bot_id` from `FLEET_NAME`/`BOT_ID`, matching the plane's `bot:<fleet>/<BOT_ID>` alias |
 | `Origin` | `{ "cwd": string, "repo": string \| null, "branch": string \| null, "head": string \| null }` — repo = `owner/name` from the git remote |
 | `Text` | scrubbed string, capped per field (caps listed where used); `null` when capture is off |
@@ -218,10 +218,10 @@ Every line in every log:
 | `session.child_linked` | `{ child_sid: SessionId }` |
 | `session.privacy_set` | `{ private: bool, by: "user"\|"policy" }` |
 | `segment.opened` | `{ opened_by: "session_open"\|"compact", start: int }` |
-| `segment.sealed` | `{ end: int ≥ start, sealed_by: "precompact"\|"compact"\|"session_end"\|"resume"\|"abandoned", trigger: "manual"\|"auto"\|null, sha256?: hex64\|null }` |
+| `segment.sealed` | `{ end: int ≥ start, sealed_by: "precompact"\|"compact"\|"session_end"\|"resume"\|"abandoned" }` (0.23 also wrote `trigger` and allowed `sha256`; readers ignore both) |
 | `segment.retired` | `{ reason: "acked"\|"age" }` — appended by retention (§9) before the segment's directory is removed |
 | `summary.requested` | `{ job_id: string }` |
-| `summary.completed` | `{ job_id: string, artifact: "seg-NNN/summary.json", input_sha256: string, duration_ms: int }` |
+| `summary.completed` | `{ job_id: string }` — the input hash and duration live in the summary (`input.sha256`, `producer.duration_ms`); 0.23 copied them here, and readers ignore those keys |
 | `summary.failed` | `{ job_id: string, error: string (≤200), retryable: bool }` |
 | `summary.skipped` | `{ reason: "private"\|"disabled"\|"trivial"\|"headless"\|"no_transcript" }` |
 | `session.closed` | `{ reason: "clear"\|"resume"\|"logout"\|"prompt_input_exit"\|"other"\|"abandoned" }`. `abandoned` is the store's own (`seal`, the sweep: a session whose SessionEnd never ran); a SessionEnd payload can't claim it |
@@ -234,7 +234,6 @@ Every line in every log:
 | `skill.invoked` | `{ skill: string, args_chars: int, ok?: bool\|null, duration_ms?: int\|null, prompt_id?, tool_use_id? }` |
 | `tool.failed` | `{ tool: string, signature: string (≤200), exit_code: int\|null, duration_ms?, prompt_id?, tool_use_id? }`. `signature` is a stable grouping key (tool + the first real error line, normalized and redacted), computed at write time so readers group without re-parsing. **No copy of the command or its stderr** (phase 4 decision): `tool_use_id` points at the call in the transcript, which holds both. |
 | `tool.interrupted` | `{ tool: string, duration_ms?, prompt_id?, tool_use_id? }`. The user stopped the call: counted as `interrupts`, never as a failure. |
-| `checkpoint.noted` | `{ note: Text (≤1000) }` — from `/claudna:session checkpoint` |
 
 ### 6.3 Why two logs
 
@@ -268,14 +267,14 @@ Every line in every log:
 
 ```json
 {
-  "schema": "claudna.segment/1",
+  "schema": "claudna.segment/2",
   "sid": "3fbb…",
   "index": 2,
   "status": "sealed",
   "opened_at": "…", "opened_by": "compact",
   "sealed_at": "…", "sealed_by": "session_end",
-  "transcript": { "path": "/…/3fbb….jsonl", "range": { "start": 48211, "end": 90377 }, "sha256": "…" },
-  "counts": { "prompts": 4, "skills": 2, "failures": 1, "interrupts": 0, "checkpoints": 0 },
+  "transcript": { "path": "/…/3fbb….jsonl", "range": { "start": 48211, "end": 90377 } },
+  "counts": { "prompts": 4, "skills": 2, "failures": 1, "interrupts": 0 },
   "summary": { "status": "done", "job_id": "…" }
 }
 ```

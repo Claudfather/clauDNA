@@ -30,7 +30,7 @@ from .schema import is_instance
 from .paths import SessionPaths
 
 SESSION_SCHEMA = "claudna.session/1"
-SEGMENT_SCHEMA = "claudna.segment/1"
+SEGMENT_SCHEMA = "claudna.segment/2"
 _SCHEMA_FILES = {SESSION_SCHEMA: "session", SEGMENT_SCHEMA: "segment"}
 
 _SUMMARY_STATUS = {
@@ -44,7 +44,6 @@ _COUNTED = {
     "skill.invoked": "skills",
     "tool.failed": "failures",
     "tool.interrupted": "interrupts",
-    "checkpoint.noted": "checkpoints",
 }
 
 
@@ -333,7 +332,6 @@ def project_segment(sid: str, index: int, boundary: list[dict], activity: Log, *
         "transcript": {
             "path": transcript_path,
             "range": {"start": b.start, "end": b.last_seal["data"]["end"] if b.last_seal else None},
-            "sha256": b.last_seal["data"].get("sha256") if b.last_seal else None,
         },
         "counts": counts,
         "summary": b.summary,

@@ -1,6 +1,5 @@
 {
   "counts": {
-    "checkpoints": 0,
     "failures": 1,
     "interrupts": 0,
     "prompts": 1,
@@ -14,7 +13,7 @@
     "lines": 3,
     "skipped": 0
   },
-  "schema": "claudna.segment/1",
+  "schema": "claudna.segment/2",
   "sealed_at": "2026-09-28T10:11:00.000Z",
   "sealed_by": "precompact",
   "sid": "5f0c2d1e-0000-4000-8000-000000000001",
@@ -28,7 +27,6 @@
     "range": {
       "end": 4200,
       "start": 0
-    },
-    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
   }
 }

@@ -44,7 +44,6 @@ from .store import NotAppendable, SessionHandle, SessionStore
 
 _SOURCES = ev.REGISTRY["session.opened"].choices["source"]
 _CLOSE_REASONS = ev.HOOK_CLOSE_REASONS
-_TRIGGERS = ev.REGISTRY["segment.sealed"].choices["trigger"]
 #: Entrypoints a person drives. Anything else (``sdk-*``, CI actions, chat bots) is headless (#373, M5).
 INTERACTIVE_ENTRYPOINTS = ("cli", "claude-vscode", "claude-desktop")
 
@@ -244,13 +243,12 @@ def _summarize_previous(handle: SessionHandle, previous: int | None, env: Mappin
         _summarize_segment(handle, previous, _facts(handle), env, spawn)
 
 
-def _seal(handle: SessionHandle, payload: dict, *, sealed_by: str, trigger: str | None) -> int | None:
+def _seal(handle: SessionHandle, payload: dict, *, sealed_by: str) -> int | None:
     """Seal the current segment at the transcript's size; return its index."""
     index = handle.current_segment()
     if index is None:
         return None
-    handle.seal_segment(file_size(payload.get("transcript_path")), sealed_by, index=index, trigger=trigger,
-                        clamp=True)
+    handle.seal_segment(file_size(payload.get("transcript_path")), sealed_by, index=index, clamp=True)
     return index
 
 
@@ -350,10 +348,9 @@ def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str
     if event == "SessionStart":
         return _session_start(session, payload, env, spawn=spawn, find_pid=find_pid)
     if event == "PreCompact":  # seal only: the summary waits for SessionStart(compact) or SessionEnd
-        trigger = payload.get("trigger") if payload.get("trigger") in _TRIGGERS else None
-        return "segment sealed" if _seal(session, payload, sealed_by="precompact", trigger=trigger) is not None \
+        return "segment sealed" if _seal(session, payload, sealed_by="precompact") is not None \
             else "ignored: no segment"
-    index = _seal(session, payload, sealed_by="session_end", trigger=None)
+    index = _seal(session, payload, sealed_by="session_end")
     reason = payload.get("reason") if payload.get("reason") in _CLOSE_REASONS else "other"
     session.close_session(reason)  # closed before anything that could fail after it (#373, M2)
     if index is not None:  # before the link: a failed link write must not strand the seal unsummarized

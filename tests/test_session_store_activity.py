@@ -135,7 +135,7 @@ class TestAdapter:
         fire(store, "PostToolUseFailure", "s1", tmp_path, **{**BASH_FAILURE, "is_interrupt": True})
         assert [e["kind"] for e in events(store, "s1")] == \
             ["prompt.submitted", "skill.invoked", "tool.failed", "tool.interrupted"]
-        assert counts(store, "s1") == {"prompts": 1, "skills": 1, "failures": 1, "interrupts": 1, "checkpoints": 0}
+        assert counts(store, "s1") == {"prompts": 1, "skills": 1, "failures": 1, "interrupts": 1}
 
     def test_the_counts_survive_a_rebuild(self, store, tmp_path):
         self.open(store, tmp_path)

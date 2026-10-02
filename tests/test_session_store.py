@@ -44,6 +44,7 @@ from claudna.session_store.fsio import (  # noqa: E402
     exclusive_lock,
     read_jsonl,
 )
+from claudna.session_store.project import load_lifecycle, segment_docs  # noqa: E402
 from claudna.session_store.paths import (  # noqa: E402
     InvalidSessionId,
     parse_seg_dirname,
@@ -192,7 +193,7 @@ class TestEvents:
                                 "origin": ORIGIN, "transcript_path": None}, None),
             ("session.opened", {"source": "startup", "parent_sid": None, "chain_id": "s", "actor": ACTOR,
                                 "origin": {}, "transcript_path": None}, None),
-            ("segment.sealed", {"end": 10, "sealed_by": "precompact", "trigger": None, "sha256": "abc"}, 1),
+            ("segment.sealed", {"end": -1, "sealed_by": "precompact"}, 1),
             ("segment.opened", {"opened_by": "compact", "start": -1}, 1),
             ("prompt.submitted", {"prompt_id": None, "chars": -3}, 1),
         ],
@@ -203,9 +204,9 @@ class TestEvents:
 
     def test_free_text_is_capped_not_rejected(self):
         e = ev.make_event("prompt.submitted", "s1", {"prompt_id": None, "chars": 9, "text": "t" * 1000}, seg=1)
-        n = ev.make_event("checkpoint.noted", "s1", {"note": "n" * 5000}, seg=1)
-        assert len(e["data"]["text"]) == 500 and len(n["data"]["note"]) == 1000
-        assert n["data"]["note"].endswith("…")
+        n = ev.make_event("summary.failed", "s1", {"job_id": "j", "error": "n" * 5000, "retryable": True}, seg=1)
+        assert len(e["data"]["text"]) == 500 and len(n["data"]["error"]) == 200
+        assert n["data"]["error"].endswith("…")
 
     def test_timestamps_are_utc_millisecond_z(self):
         assert re.match(schema.load("event")["properties"]["ts"]["pattern"], ev.now_ts())
@@ -244,8 +245,8 @@ class TestStore:
     def test_reseal_moves_the_end_and_is_safe_to_repeat(self, store):
         h = opened(store)
         h.open_segment("session_open", 0)
-        h.seal_segment(100, "precompact", trigger="manual")
-        h.seal_segment(140, "precompact", trigger="manual")  # first compaction was blocked
+        h.seal_segment(100, "precompact")
+        h.seal_segment(140, "precompact")  # first compaction was blocked
         seg = load(h.paths.segment(1).segment_json)
         assert seg["status"] == "sealed" and seg["transcript"]["range"] == {"start": 0, "end": 140}
 
@@ -254,7 +255,7 @@ class TestStore:
         h.open_segment("session_open", 0)
         # a hook killed between appending the seal and refreshing
         append_jsonl(h.paths.lifecycle, ev.make_event("segment.sealed", h.sid,
-                                                       {"end": 100, "sealed_by": "precompact", "trigger": "auto"}, seg=1))
+                                                       {"end": 100, "sealed_by": "precompact"}, seg=1))
         h.open_segment("compact", 100)
         h.close_session("other")
         seg1 = load(h.paths.segment(1).segment_json)
@@ -276,9 +277,9 @@ class TestStore:
     def test_activity_goes_only_to_the_current_segment_of_an_open_session(self, store):
         h = opened(store)
         h.open_segment("session_open", 0)
-        h.seal_segment(10, "precompact", trigger="manual")  # a blocked compaction: sealed, still current
+        h.seal_segment(10, "precompact")  # a blocked compaction: sealed, still current
         prompt(h, seg=1)
-        h.seal_segment(30, "precompact", trigger="manual")  # the next PreCompact re-seals later
+        h.seal_segment(30, "precompact")  # the next PreCompact re-seals later
         h.open_segment("compact", 30)
         with pytest.raises(StoreError, match="superseded"):
             prompt(h, seg=1)
@@ -314,7 +315,7 @@ class TestStore:
         h = opened(store)
         h.open_segment("session_open", 0)
         append_jsonl(h.paths.lifecycle, ev.make_event("segment.sealed", h.sid,
-                                                       {"end": 100, "sealed_by": "precompact", "trigger": "auto"}, seg=1))
+                                                       {"end": 100, "sealed_by": "precompact"}, seg=1))
         prompt(h)  # a blocked compaction: sealed, still current
         seg1 = load(h.paths.segment(1).segment_json)
         assert (seg1["status"], seg1["counts"]["prompts"]) == ("sealed", 1)
@@ -375,7 +376,7 @@ class TestStore:
         s1 = h.open_segment("session_open", 0)
         h.append("prompt.submitted", {"prompt_id": "p", "chars": 5}, seg=s1)
         h.append("skill.invoked", {"skill": "claudna:ship", "args_chars": 0}, seg=s1)
-        h.seal_segment(100, "precompact", trigger="auto")
+        h.seal_segment(100, "precompact")
         s2 = h.open_segment("compact", 100)
         h.append("tool.failed", {"tool": "Bash", "signature": "sig", "exit_code": 1}, seg=s2)
         live = load(h.paths.session_json)
@@ -391,8 +392,7 @@ class TestStore:
         assert done["segments"] == {"count": 2, "open": None, "retired": 0}
         assert done["children"] == ["child-1"] and done["private"] is True
         assert done["chain_id"] == h.sid  # no parent: its own chain root
-        assert load(h.paths.segment(1).segment_json)["counts"] == {"prompts": 1, "skills": 1, "failures": 0, "interrupts": 0,
-                                                                   "checkpoints": 0}
+        assert load(h.paths.segment(1).segment_json)["counts"] == {"prompts": 1, "skills": 1, "failures": 0, "interrupts": 0}
         assert load(h.paths.segment(2).segment_json)["counts"]["failures"] == 1
 
     def test_resume_reopens_a_closed_session(self, store):
@@ -409,8 +409,7 @@ class TestStore:
         assert load(h.paths.segment(seg).segment_json)["summary"] == {"status": "pending", "job_id": "j1"}
         h.append("summary.failed", {"job_id": "j1", "error": "timeout", "retryable": True}, seg=seg)
         h.append("summary.requested", {"job_id": "j2"}, seg=seg)
-        h.append("summary.completed", {"job_id": "j2", "artifact": "seg-001/summary.json",
-                                       "input_sha256": "0" * 64, "duration_ms": 5}, seg=seg)
+        h.append("summary.completed", {"job_id": "j2"}, seg=seg)
         assert load(h.paths.segment(seg).segment_json)["summary"] == {"status": "done", "job_id": "j2"}
         assert load(h.paths.session_json)["summary"]["segments_done"] == 1
 
@@ -519,6 +518,20 @@ class TestProjection:
         assert paths.segment(1).segment_json.read_text() == (expected / "seg-001.json").read_text()
         assert paths.segment(2).segment_json.read_text() == (expected / "seg-002.json").read_text()
 
+    def test_a_0_23_segment_projection_is_refolded_to_the_current_schema(self, tmp_path):
+        """A store written by 0.23 (``claudna.segment/1``, with ``checkpoints`` and ``sha256``) upgrades on read."""
+        root = _copy_fixture(tmp_path)
+        handle = SessionStore(root).session(FIXTURE_SID)
+        handle.rebuild()
+        old = json.loads((FIXTURE / "expected" / "seg-001.json").read_text())
+        old.update(schema="claudna.segment/1")
+        old["counts"]["checkpoints"] = 0
+        old["transcript"]["sha256"] = "a" * 64
+        atomic_write_json(handle.paths.segment(1).segment_json, old)
+        doc = next(d for d in segment_docs(handle.paths, load_lifecycle(handle.paths)) if d["index"] == 1)
+        assert doc["schema"] == "claudna.segment/2"
+        assert "checkpoints" not in doc["counts"] and "sha256" not in doc["transcript"]
+
     def test_rebuild_is_deterministic_and_never_touches_logs(self, tmp_path):
         root = _copy_fixture(tmp_path)
         handle = SessionStore(root).session(FIXTURE_SID)
@@ -537,7 +550,7 @@ class TestProjection:
         s1 = h.open_segment("session_open", 0)
         h.append("prompt.submitted", {"prompt_id": "p", "chars": 3}, seg=s1)
         h.append("summary.requested", {"job_id": "j"}, seg=s1)
-        h.seal_segment(50, "precompact", trigger="auto")
+        h.seal_segment(50, "precompact")
         s2 = h.open_segment("compact", 50)
         h.append("tool.failed", {"tool": "Bash", "signature": "s", "exit_code": 1}, seg=s2)
         h.link_child("c")
@@ -624,7 +637,7 @@ class TestSchemas:
     def test_fixture_logs_validate(self):
         event_schema = schema.load("event")
         for log in (FIXTURE / "sessions").rglob("*.jsonl"):
-            for record in read_jsonl(log).records:
+            for record in read_jsonl(log).records:  # 0.23-shaped (trigger, sha256, artifact): they still fold
                 assert schema.validate(record, event_schema) == []
                 assert ev.classify(record) == "ok"
 
@@ -637,7 +650,7 @@ class TestSchemas:
             ("session", lambda d: d["segments"].update(count=-1)),
             ("session", lambda d: d.update(opened_at="2026-09-28 10:00")),
             ("segment", lambda d: d.update(index=0)),
-            ("segment", lambda d: d["transcript"].update(sha256="nothex")),
+            ("segment", lambda d: d["transcript"]["range"].update(start=-1)),
             ("segment", lambda d: d["summary"].update(status="maybe")),
         ],
     )
@@ -806,7 +819,7 @@ class TestCheckSeesALostRefresh:
         h = opened(store)
         seg = h.open_segment("session_open", 0)
         append_jsonl(h.paths.lifecycle, ev.make_event("segment.sealed", h.sid,  # a hook killed before its refresh
-                                                       {"end": 100, "sealed_by": "precompact", "trigger": "auto"}, seg=seg))
+                                                       {"end": 100, "sealed_by": "precompact"}, seg=seg))
         report = check_session(h)
         assert report.problems == [] and any("refresh was lost" in w for w in report.warnings)
         prompt(h)  # activity heals the stale lifecycle projections first
@@ -927,11 +940,13 @@ class TestPinsForUnheldGuarantees:
         s = load(h.paths.session_json)
         assert (s["parent_sid"], s["chain_id"]) == ("parent", "root")
 
-    def test_seal_segment_records_the_content_hash(self, store):
+    def test_a_seal_records_only_its_end_and_who_sealed_it(self, store):
         h = opened(store)
         h.open_segment("session_open", 0)
-        h.seal_segment(10, "precompact", sha256="ab" * 32)
-        assert load(h.paths.segment(1).segment_json)["transcript"]["sha256"] == "ab" * 32
+        h.seal_segment(10, "precompact")
+        sealed = [e for e in load_lifecycle(h.paths).events if e["kind"] == "segment.sealed"][-1]
+        assert sealed["data"] == {"end": 10, "sealed_by": "precompact"}
+        assert "sha256" not in load(h.paths.segment(1).segment_json)["transcript"]
 
 
 class TestWritersRedact:

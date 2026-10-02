@@ -279,7 +279,6 @@ class SessionHandle:
                     self._append_locked("segment.sealed", {
                         "end": max(end, before.start or 0),
                         "sealed_by": "compact" if opened_by == "compact" else "resume",
-                        "trigger": None,
                     }, seg=previous)
             index = next_segment_index(self.paths)
             self.paths.segment(index).dir.mkdir(mode=DIR_MODE)
@@ -292,8 +291,6 @@ class SessionHandle:
         sealed_by: str,
         *,
         index: int | None = None,
-        trigger: str | None = None,
-        sha256: str | None = None,
         clamp: bool = False,
     ) -> dict:
         """Record ``segment.sealed`` for ``index`` (default: current). Safe to repeat.
@@ -314,10 +311,7 @@ class SessionHandle:
                 end = max(end, start)
             if end < start:
                 raise StoreError(f"segment {target} starts at {start}; cannot seal it at {end}")
-            data = {"end": end, "sealed_by": sealed_by, "trigger": trigger}
-            if sha256 is not None:
-                data["sha256"] = sha256
-            return self._append_locked("segment.sealed", data, seg=target)
+            return self._append_locked("segment.sealed", {"end": end, "sealed_by": sealed_by}, seg=target)
 
     def close_session(self, reason: str) -> dict:
         return self.append("session.closed", {"reason": reason})
@@ -353,7 +347,7 @@ class SessionHandle:
         if boundary.sealed:
             return None
         end = max(file_size(segment_transcript_paths(lifecycle)[index]), boundary.start or 0)
-        self._append_locked("segment.sealed", {"end": end, "sealed_by": "abandoned", "trigger": None}, seg=index)
+        self._append_locked("segment.sealed", {"end": end, "sealed_by": "abandoned"}, seg=index)
         return index
 
     def seal_after_close(self) -> int | None:
