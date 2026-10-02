@@ -2,18 +2,17 @@
 """Session-store canaries: check, on a real machine, the harness facts the store assumes.
 
 The session store rests on Claude Code behaviour that was only observed headless,
-in a cloud container (spec §2, §11; the phase 3 plan's canary table). This kit
-re-checks it interactively on a plain macOS or Linux machine:
+in a cloud container (the phase 3 plan's canary table; spec §11.3–11.5). This
+kit re-checks it interactively on a plain macOS or Linux machine:
 
 - **§11.3, compact offset:** PreCompact's transcript size is where post-compact
   content begins, so the next segment can start at the seal's end.
-- **§11.4, clear pid:** the ``claude`` process (``$CLAUDE_PID`` and the ancestor
-  walk the store falls back on) is the same before and after ``/clear``, which
-  the clear link (§4.3) is keyed on.
+- **§11.4, clear pid:** ``$CLAUDE_PID``, which the clear link (§4.3) is keyed
+  on, is the same before and after ``/clear``. The ancestor walk the store
+  falls back on is shown alongside.
 - **§11.5, nested ids:** whether a nested ``claude -p`` inherits its parent's
-  session id when it isn't given ``--session-id``.
-- **PostToolUseFailure for a Skill:** what a failed Skill call's payload looks
-  like (the phase 4 plan's open canary).
+  session id, and if so whether the store's own child guard
+  (``boundaries.inherited``) would still ignore every one of its events.
 
 Three verbs:
 
@@ -32,20 +31,19 @@ A maintainer tool: nothing here ships in the plugin or runs in a user's session.
 
 from __future__ import annotations
 
-import argparse
 import json
 import os
-import platform
-import subprocess
 import sys
-import tempfile
 import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "lib"))
 
+from claudna.session_store.boundaries import claude_pid_of, inherited  # noqa: E402
+from claudna.session_store.fsio import append_jsonl, file_size, read_jsonl  # noqa: E402
 from claudna.session_store.lineage import claude_pid  # noqa: E402
+from claudna.session_store.project import SessionFacts  # noqa: E402
 
 LOG_NAME = "canary.jsonl"
 EVENTS = ("SessionStart", "SessionEnd", "PreCompact", "UserPromptSubmit", "PostToolUse", "PostToolUseFailure")
@@ -54,46 +52,29 @@ KEPT = ("session_id", "source", "reason", "trigger", "transcript_path", "tool_na
 #: Transcript record types that carry conversation, which must not sit between a
 #: PreCompact offset and the compact boundary.
 CONVERSATION = ("user", "assistant")
-ERROR_HEAD = 300
 
 
 # --- hook: one record per event -------------------------------------------------------------------
 
-def _size(path: object) -> int | None:
-    try:
-        return os.stat(str(path)).st_size if path else None
-    except OSError:
-        return None
-
-
 def record(payload: dict, env: dict, *, walked_pid: int | None, now: float) -> dict:
     """The log line for one hook payload: names, ids, sizes and pids, never conversation text."""
-    rec = {"ts": now, "event": payload.get("hook_event_name")}
-    rec.update({k: payload[k] for k in KEPT if payload.get(k) is not None})
-    rec["transcript_size"] = _size(payload.get("transcript_path"))
-    rec["claude_pid_env"] = env.get("CLAUDE_PID")
-    rec["claude_pid_walked"] = walked_pid
-    rec["entrypoint"] = env.get("CLAUDE_CODE_ENTRYPOINT")
-    rec["payload_keys"] = sorted(payload)
-    if rec["event"] == "PostToolUseFailure":
-        error = payload.get("error")
-        rec["error_head"] = (error if isinstance(error, str) else json.dumps(error))[:ERROR_HEAD]
-    return rec
+    return {"ts": now, "event": payload.get("hook_event_name"),
+            **{k: payload[k] for k in KEPT if payload.get(k) is not None},
+            "transcript_size": file_size(payload.get("transcript_path")),
+            "claude_pid_env": claude_pid_of(env), "claude_pid_walked": walked_pid,
+            "entrypoint": env.get("CLAUDE_CODE_ENTRYPOINT")}
 
 
 def run_hook(log: Path) -> None:
     """Append the record for the payload on stdin. Never raises: a canary must not break a session."""
     try:
-        payload = json.loads(sys.stdin.read() or "{}")
-        line = record(payload, dict(os.environ), walked_pid=claude_pid(), now=time.time())
-        with open(log, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps(line) + "\n")
+        line = record(json.loads(sys.stdin.read() or "{}"), os.environ, walked_pid=claude_pid(), now=time.time())
     except Exception as exc:  # noqa: BLE001 - logged, never raised
-        try:
-            with open(log, "a", encoding="utf-8") as fh:
-                fh.write(json.dumps({"ts": time.time(), "event": "canary-error", "error": repr(exc)}) + "\n")
-        except OSError:
-            pass
+        line = {"ts": time.time(), "event": "canary-error", "error": repr(exc)}
+    try:
+        append_jsonl(log, line, durable=False)
+    except OSError:
+        pass
 
 
 # --- setup: the throwaway plugin ------------------------------------------------------------------
@@ -135,65 +116,43 @@ Then, in that one interactive session, in order:
   6. !claude -p --plugin-dir "{dir}" "say hi"
        (the leading ! runs it as a shell command, inside this session; it is
         the nested child for §11.5, with no --session-id on purpose)
-  7. Use the Skill tool to invoke the skill canary:does-not-exist
-  8. /exit
+  7. /exit
 
 Then print the verdicts, and paste them back:
 
   python3 scripts/session_canary.py report "{dir}"
 
-The log keeps event names, ids, sizes and pids, never your prompts. A failed
-tool's error text is kept to its first {head} characters; read the report
-before pasting it.
+The log keeps event names, ids, sizes and pids, never your prompts.
 """
 
 
 # --- report: verdicts from the log ----------------------------------------------------------------
 
-def load(log: Path) -> list[dict]:
-    rows = []
-    for line in log.read_text(encoding="utf-8").splitlines():
-        try:
-            row = json.loads(line)
-        except ValueError:
-            continue
-        if isinstance(row, dict):
-            rows.append(row)
-    return rows
+def _next(rows: list[dict], n: int, **want) -> dict | None:
+    """The first row after ``rows[n]`` whose fields equal ``want``."""
+    return next((r for r in rows[n + 1:] if all(r.get(k) == v for k, v in want.items())), None)
 
 
-def _pid(row: dict) -> str | None:
-    """The ``claude`` process a row ran under: the walked pid, else ``$CLAUDE_PID``.
+def _before_boundary(path: Path, offset: int) -> tuple[bool, list[str] | None]:
+    """Whether ``offset`` is a line start, and the record types from there to the compact boundary.
 
-    The walk comes first because it can't be inherited: a nested ``claude``
-    that saw its parent's ``$CLAUDE_PID`` would otherwise pass for the parent.
+    The types are ``None`` when no boundary follows. Reading stops at the boundary.
     """
-    value = row.get("claude_pid_walked") or row.get("claude_pid_env")
-    return str(value) if value else None
-
-
-def _records_from(path: Path, offset: int) -> tuple[bool, list[dict]]:
-    """Whether ``offset`` falls on a line start in ``path``, and the records from there on."""
+    types: list[str] = []
     with open(path, "rb") as fh:
-        if offset:
-            fh.seek(offset - 1)
-            on_line = fh.read(1) == b"\n"
-        else:
-            on_line = True
-        tail = fh.read()
-    records = []
-    for line in tail.splitlines():
-        try:
-            rec = json.loads(line)
-        except ValueError:
-            continue
-        if isinstance(rec, dict):
-            records.append(rec)
-    return on_line, records
-
-
-def _is_boundary(rec: dict) -> bool:
-    return rec.get("subtype") == "compact_boundary" or rec.get("type") == "compact_boundary"
+        fh.seek(max(offset - 1, 0))
+        on_line = offset == 0 or fh.read(1) == b"\n"
+        for line in fh:
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(rec, dict):
+                continue
+            if rec.get("subtype") == "compact_boundary":
+                return on_line, types
+            types.append(str(rec.get("type")))
+    return on_line, None
 
 
 def check_compact(rows: list[dict]) -> list[str]:
@@ -202,96 +161,97 @@ def check_compact(rows: list[dict]) -> list[str]:
     for n, row in enumerate(rows):
         if row.get("event") != "PreCompact":
             continue
-        after = next((r for r in rows[n + 1:] if r.get("event") == "SessionStart" and r.get("source") == "compact"
-                      and r.get("session_id") == row.get("session_id")), None)
-        path, offset = row.get("transcript_path"), row.get("transcript_size")
-        if after is None or not path or offset is None:
-            out.append("UNKNOWN: a PreCompact with no SessionStart(compact) after it, or no transcript size")
+        path, offset = row.get("transcript_path"), row.get("transcript_size") or 0
+        if not path or not _next(rows, n, event="SessionStart", source="compact", session_id=row.get("session_id")):
+            out.append("UNKNOWN: a PreCompact with no SessionStart(compact) after it, or no transcript path")
             continue
         try:
-            on_line, records = _records_from(Path(path), offset)
+            on_line, before = _before_boundary(Path(path), offset)
         except OSError as exc:
             out.append(f"UNKNOWN: can't read the transcript ({exc.strerror})")
             continue
-        boundary = next((i for i, r in enumerate(records) if _is_boundary(r)), None)
-        if boundary is None:
+        if before is None:
             out.append(f"FAIL: no compact boundary after offset {offset}")
             continue
-        before = [r.get("type") for r in records[:boundary]]
         talk = [t for t in before if t in CONVERSATION]
-        verdict = "PASS" if on_line and not talk else "FAIL"
-        out.append(f"{verdict}: offset {offset} {'is' if on_line else 'is NOT'} a line start; "
-                   f"{len(before)} record(s) before the boundary ({', '.join(map(str, before)) or 'none'})"
-                   + (f"; {len(talk)} of them conversation" if talk else ""))
+        out.append(f"{'PASS' if on_line and not talk else 'FAIL'}: offset {offset} "
+                   f"{'is' if on_line else 'is NOT'} a line start; {len(before)} record(s) before the boundary "
+                   f"({', '.join(before) or 'none'})" + (f"; {len(talk)} of them conversation" if talk else ""))
     return out or ["UNKNOWN: no PreCompact in the log (step 2 not run?)"]
 
 
 def check_clear(rows: list[dict]) -> list[str]:
-    """§11.4: each SessionEnd(clear) and the SessionStart(clear) after it ran under one ``claude``."""
+    """§11.4: ``$CLAUDE_PID`` (the clear link's key) is the same on both sides of each ``/clear``."""
     out = []
     for n, row in enumerate(rows):
         if row.get("event") != "SessionEnd" or row.get("reason") != "clear":
             continue
-        start = next((r for r in rows[n + 1:] if r.get("event") == "SessionStart" and r.get("source") == "clear"),
-                     None)
+        start = _next(rows, n, event="SessionStart", source="clear")
         if start is None:
             out.append("UNKNOWN: a SessionEnd(clear) with no SessionStart(clear) after it")
             continue
-        env_same = row.get("claude_pid_env") == start.get("claude_pid_env")
-        walked_same = row.get("claude_pid_walked") == start.get("claude_pid_walked")
-        verdict = "PASS" if env_same and walked_same and _pid(row) else "FAIL"
-        out.append(f"{verdict}: $CLAUDE_PID {row.get('claude_pid_env')} -> {start.get('claude_pid_env')}, "
-                   f"walked {row.get('claude_pid_walked')} -> {start.get('claude_pid_walked')}; "
+        env_pid, after = row.get("claude_pid_env"), start.get("claude_pid_env")
+        verdict = "PASS" if env_pid and env_pid == after else "FAIL"
+        walked = (f"walked {row['claude_pid_walked']} -> {start['claude_pid_walked']}"
+                  if row.get("claude_pid_walked") and start.get("claude_pid_walked") else "walk unavailable")
+        out.append(f"{verdict}: $CLAUDE_PID {env_pid} -> {after} ({walked}); "
                    f"new session id: {start.get('session_id') != row.get('session_id')}")
     return out or ["UNKNOWN: no /clear in the log (step 4 not run?)"]
 
 
+def _process(row: dict) -> object:
+    """Which ``claude`` a row ran under: the walked pid, which a child can't inherit, else ``$CLAUDE_PID``."""
+    return row.get("claude_pid_walked") or row.get("claude_pid_env")
+
+
 def check_nested(rows: list[dict]) -> list[str]:
-    """§11.5: a SessionStart from another ``claude`` process; did it reuse a live parent's id?"""
+    """§11.5: does a nested ``claude`` reuse a parent's id, and would the store's guard ignore it?
+
+    The guard is ``boundaries.inherited``, given the facts the store records at
+    the parent's open: its ``$CLAUDE_PID`` and entrypoint.
+    """
     starts = [r for r in rows if r.get("event") == "SessionStart"]
     if not starts:
         return ["UNKNOWN: no SessionStart in the log"]
-    parent_pid = _pid(starts[0])
-    parent_ids = {r.get("session_id") for r in rows if _pid(r) == parent_pid}
-    children = [r for r in starts if _pid(r) != parent_pid]
-    if not children:
-        return ["UNKNOWN: no SessionStart from a nested claude (step 6 not run?)"]
+    parent = starts[0]
+    parent_ids = {r.get("session_id") for r in rows if _process(r) == _process(parent)}
+    child_rows = [r for r in rows if _process(r) != _process(parent)]
+    if not child_rows:
+        return ["UNKNOWN: no events from a nested claude (step 6 not run?)"]
+    facts = SessionFacts(status="open", actor={"entrypoint": parent.get("entrypoint")}, private=False,
+                         claude_pid=parent.get("claude_pid_env"))
     out = []
-    for r in children:
-        inherits = r.get("session_id") in parent_ids
-        verdict, which = ("INHERITS", "its parent's") if inherits else ("FRESH", "a new")
-        env = r.get("claude_pid_env")
-        guard = ("its $CLAUDE_PID is the parent's, so the store's child guard can't tell them apart"
-                 if env and str(env) == str(starts[0].get("claude_pid_env")) else f"its $CLAUDE_PID is {env}")
-        out.append(f"{verdict}: nested claude (pid {_pid(r)}, entrypoint {r.get('entrypoint')}) "
-                   f"started with {which} session id; {guard}")
+    for proc in dict.fromkeys(_process(r) for r in child_rows):
+        mine = [r for r in child_rows if _process(r) == proc]
+        first = mine[0]
+        if not any(r.get("session_id") in parent_ids for r in mine):
+            out.append(f"FRESH: nested claude (pid {proc}) used a new session id; nothing to guard")
+            continue
+        leaks = [r.get("event") for r in mine if not inherited(
+            str(r.get("event")), {"source": r.get("source")}, facts,
+            {"CLAUDE_PID": str(r.get("claude_pid_env") or ""), "CLAUDE_CODE_ENTRYPOINT": r.get("entrypoint") or ""})]
+        out.append(f"{'LEAKS' if leaks else 'INHERITS'}: nested claude (pid {proc}, $CLAUDE_PID "
+                   f"{first.get('claude_pid_env')}, entrypoint {first.get('entrypoint')}) used its parent's session "
+                   f"id; the store's guard ignores {len(mine) - len(leaks)} of its {len(mine)} event(s)"
+                   + (f" and would record {', '.join(map(str, leaks))}" if leaks else ""))
     return out
 
 
-def check_skill_failure(rows: list[dict]) -> list[str]:
-    """What PostToolUseFailure carries for a Skill: its payload keys and the error's first characters."""
-    hits = [r for r in rows if r.get("event") == "PostToolUseFailure" and r.get("tool_name") == "Skill"]
-    if not hits:
-        posted = any(r.get("event") == "PostToolUse" and r.get("tool_name") == "Skill" for r in rows)
-        if posted:
-            return ["NONE: no PostToolUseFailure for Skill; the call came back as PostToolUse instead"]
-        return ["NONE: no Skill hook fired at all. If step 7 ran, the unknown skill was rejected before the tool "
-                "ran, which fires neither PostToolUse nor PostToolUseFailure (seen headless on 2.1.287)"]
-    return [f"SEEN: keys {r.get('payload_keys')}; error: {r.get('error_head')!r}" for r in hits]
-
-
 def claude_version() -> str:
+    import subprocess
+
     try:
         return subprocess.run(["claude", "--version"], capture_output=True, text=True, timeout=30).stdout.strip()
     except (OSError, subprocess.SubprocessError):
         return "unknown"
 
 
-def report(rows: list[dict], *, version: str, system: str) -> str:
+def report(rows: list[dict], *, version: str, system: str, skipped: int = 0) -> str:
     errors = [r for r in rows if r.get("event") == "canary-error"]
-    sections = [("§11.3 compact offset", check_compact(rows)), ("§11.4 claude pid across /clear", check_clear(rows)),
-                ("§11.5 nested session id", check_nested(rows)), ("Skill failure payload", check_skill_failure(rows))]
-    lines = [f"Session-store canaries: {version} on {system}, {len(rows)} hook records"]
+    sections = [("§11.3 compact offset", check_compact(rows)), ("§11.4 $CLAUDE_PID across /clear", check_clear(rows)),
+                ("§11.5 nested session id", check_nested(rows))]
+    lines = [f"Session-store canaries: {version} on {system}, {len(rows)} hook records"
+             + (f" ({skipped} unreadable line(s) skipped)" if skipped else "")]
     for title, results in sections:
         lines.append(f"\n{title}")
         lines += [f"  {r}" for r in results]
@@ -303,6 +263,8 @@ def report(rows: list[dict], *, version: str, system: str) -> str:
 # --- CLI ------------------------------------------------------------------------------------------
 
 def main(argv: list[str] | None = None) -> int:
+    import argparse
+
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="verb", required=True)
     setup = sub.add_parser("setup", help="write the canary plugin and print the steps")
@@ -317,15 +279,21 @@ def main(argv: list[str] | None = None) -> int:
         run_hook(args.log)
         return 0
     if args.verb == "setup":
+        import tempfile
+
         target = (args.dir or Path(tempfile.mkdtemp(prefix="claudna-canary-"))).resolve()
         write_plugin(target, Path(__file__).resolve())
-        print(STEPS.format(dir=target, head=ERROR_HEAD))
+        print(STEPS.format(dir=target))
         return 0
     log = args.dir / LOG_NAME
     if not log.is_file():
         print(f"no log at {log}: run the steps from `setup` first", file=sys.stderr)
         return 1
-    print(report(load(log), version=claude_version(), system=f"{platform.system()} {platform.release()}"))
+    import platform
+
+    read = read_jsonl(log)
+    print(report(read.records, version=claude_version(), system=f"{platform.system()} {platform.release()}",
+                 skipped=read.skipped))
     return 0
 
 

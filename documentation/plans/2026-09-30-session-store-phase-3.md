@@ -21,6 +21,7 @@ A plugin-dir hook logged every payload, plus the `claude` process's pid and the 
 | Does a fork name its source? | `SessionStart{source: fork}` carries no source id. The forked transcript rewrites every `sessionId` to the new id, with no `forkedFrom`. | A fork's parent is unobservable from hooks. `parent_sid` stays null; lineage is never guessed. |
 | What else is in the payloads? | SessionStart(compact) carries `model`. A fork's SessionStart carries `seconds_since_last_response`, `context_tokens` and cache estimates. | `actor.model` can be filled from SessionStart(compact) later. It isn't needed for phase 3. |
 | **§11.5:** do nested sessions inherit the id? | In this cloud container, yes: a bare `claude -p` and a fork both took the parent's id even with `CLAUDE_CODE_SESSION_ID` unset. Passing `--session-id` gives a fresh one. **Not yet tested on a plain machine.** | The guard below is needed wherever this happens; the plain-machine canary decides how often that is. |
+| **Re-run 2026-10-02** (2.1.287, headless, `scripts/session_canary.py`) | §11.3 held (only `queue-operation`, `last-prompt`, `atis-latch` before the boundary); §11.4 held (`$CLAUDE_PID` and the walk the same across `/clear`); §11.5: the nested child took its parent's id with its own `$CLAUDE_PID`, and `boundaries.inherited` ignores all 3 of its events. | Unchanged. The plain-machine run is the same script, interactively. |
 
 ## 1. Clear lineage (§4.3) — built
 
@@ -52,8 +53,8 @@ A SessionEnd that never ran (a crash, a kill, a laptop lid) leaves a session `op
 - Adapter tests for each lineage case: a link, no link, a stale link, a same-session link, and a chain across 3 clears keeping one `chain_id`.
 - The nested-child transcript guard, including a nested interactive child.
 - `seal` and the sweep: its bound, and that it never touches a live pid's session.
-- A **plain-machine canary** (macOS and Linux, not this container) for §11.5: does a bare nested `claude -p` inherit the parent's id? It decides whether the entrypoint signal can go.
-- An **interactive `/clear` canary** on a plain machine, confirming the `claude` pid is also stable there. This container's canary was headless.
+- A **plain-machine canary** (macOS and Linux, not this container) for §11.5: does a bare nested `claude -p` inherit the parent's id? It decides whether the entrypoint signal can go. Run it with `scripts/session_canary.py setup`.
+- An **interactive `/clear` canary** on a plain machine, confirming the `claude` pid is also stable there. This container's canary was headless. The same script covers it.
 
 ## Owner decisions
 
