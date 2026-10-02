@@ -69,7 +69,8 @@ def complete_segment(handle, index: int, doc: dict) -> None:
     from claudna.session_store.fsio import atomic_write_json
 
     atomic_write_json(handle.paths.segment(index).summary, doc)
-    handle.append("summary.completed", {"job_id": f"j{index}"}, seg=index)
+    handle.append("summary.completed", {"job_id": f"j{index}", "artifact": f"seg-{index:03d}/summary.json",
+                                        "input_sha256": "0" * 64, "duration_ms": 1}, seg=index)
 
 
 def rewrite_log(path: Path, edit) -> None:

@@ -35,7 +35,7 @@ LIB = REPO_ROOT / "lib"
 sys.path.insert(0, str(LIB))
 
 from claudna.session_store import events as ev  # noqa: E402
-from claudna.session_store import readers, schema  # noqa: E402
+from claudna.session_store import readers, retention, schema  # noqa: E402
 from claudna.session_store.cli import check_session, main  # noqa: E402
 from claudna.session_store.fsio import (  # noqa: E402
     append_jsonl,
@@ -193,7 +193,7 @@ class TestEvents:
                                 "origin": ORIGIN, "transcript_path": None}, None),
             ("session.opened", {"source": "startup", "parent_sid": None, "chain_id": "s", "actor": ACTOR,
                                 "origin": {}, "transcript_path": None}, None),
-            ("segment.sealed", {"end": -1, "sealed_by": "precompact"}, 1),
+            ("segment.sealed", {"end": -1, "sealed_by": "precompact", "trigger": None}, 1),
             ("segment.opened", {"opened_by": "compact", "start": -1}, 1),
             ("prompt.submitted", {"prompt_id": None, "chars": -3}, 1),
         ],
@@ -245,8 +245,8 @@ class TestStore:
     def test_reseal_moves_the_end_and_is_safe_to_repeat(self, store):
         h = opened(store)
         h.open_segment("session_open", 0)
-        h.seal_segment(100, "precompact")
-        h.seal_segment(140, "precompact")  # first compaction was blocked
+        h.seal_segment(100, "precompact", trigger="manual")
+        h.seal_segment(140, "precompact", trigger="manual")  # first compaction was blocked
         seg = load(h.paths.segment(1).segment_json)
         assert seg["status"] == "sealed" and seg["transcript"]["range"] == {"start": 0, "end": 140}
 
@@ -255,7 +255,7 @@ class TestStore:
         h.open_segment("session_open", 0)
         # a hook killed between appending the seal and refreshing
         append_jsonl(h.paths.lifecycle, ev.make_event("segment.sealed", h.sid,
-                                                       {"end": 100, "sealed_by": "precompact"}, seg=1))
+                                                       {"end": 100, "sealed_by": "precompact", "trigger": "auto"}, seg=1))
         h.open_segment("compact", 100)
         h.close_session("other")
         seg1 = load(h.paths.segment(1).segment_json)
@@ -277,9 +277,9 @@ class TestStore:
     def test_activity_goes_only_to_the_current_segment_of_an_open_session(self, store):
         h = opened(store)
         h.open_segment("session_open", 0)
-        h.seal_segment(10, "precompact")  # a blocked compaction: sealed, still current
+        h.seal_segment(10, "precompact", trigger="manual")  # a blocked compaction: sealed, still current
         prompt(h, seg=1)
-        h.seal_segment(30, "precompact")  # the next PreCompact re-seals later
+        h.seal_segment(30, "precompact", trigger="manual")  # the next PreCompact re-seals later
         h.open_segment("compact", 30)
         with pytest.raises(StoreError, match="superseded"):
             prompt(h, seg=1)
@@ -315,7 +315,7 @@ class TestStore:
         h = opened(store)
         h.open_segment("session_open", 0)
         append_jsonl(h.paths.lifecycle, ev.make_event("segment.sealed", h.sid,
-                                                       {"end": 100, "sealed_by": "precompact"}, seg=1))
+                                                       {"end": 100, "sealed_by": "precompact", "trigger": "auto"}, seg=1))
         prompt(h)  # a blocked compaction: sealed, still current
         seg1 = load(h.paths.segment(1).segment_json)
         assert (seg1["status"], seg1["counts"]["prompts"]) == ("sealed", 1)
@@ -376,7 +376,7 @@ class TestStore:
         s1 = h.open_segment("session_open", 0)
         h.append("prompt.submitted", {"prompt_id": "p", "chars": 5}, seg=s1)
         h.append("skill.invoked", {"skill": "claudna:ship", "args_chars": 0}, seg=s1)
-        h.seal_segment(100, "precompact")
+        h.seal_segment(100, "precompact", trigger="auto")
         s2 = h.open_segment("compact", 100)
         h.append("tool.failed", {"tool": "Bash", "signature": "sig", "exit_code": 1}, seg=s2)
         live = load(h.paths.session_json)
@@ -409,7 +409,8 @@ class TestStore:
         assert load(h.paths.segment(seg).segment_json)["summary"] == {"status": "pending", "job_id": "j1"}
         h.append("summary.failed", {"job_id": "j1", "error": "timeout", "retryable": True}, seg=seg)
         h.append("summary.requested", {"job_id": "j2"}, seg=seg)
-        h.append("summary.completed", {"job_id": "j2"}, seg=seg)
+        h.append("summary.completed", {"job_id": "j2", "artifact": "seg-001/summary.json",
+                                       "input_sha256": "0" * 64, "duration_ms": 5}, seg=seg)
         assert load(h.paths.segment(seg).segment_json)["summary"] == {"status": "done", "job_id": "j2"}
         assert load(h.paths.session_json)["summary"]["segments_done"] == 1
 
@@ -534,6 +535,29 @@ class TestProjection:
         report = check_session(handle)  # flagged as older, not as broken
         assert report.problems == [] and any("an older projection" in w for w in report.warnings)
 
+    @pytest.mark.parametrize("doc", [[], 5, "x", {"schema": "garbage", "counts": "nonsense"},
+                                     {"schema": "claudna.segment/9"}])
+    def test_check_reports_a_broken_or_unknown_projection_as_a_problem(self, tmp_path, doc):
+        root = _copy_fixture(tmp_path)
+        handle = SessionStore(root).session(FIXTURE_SID)
+        handle.rebuild()
+        atomic_write_json(handle.paths.segment(1).segment_json, doc)
+        report = check_session(handle)  # never a crash, and only a known older tag is downgraded
+        assert report.problems and not any("an older projection" in w for w in report.warnings)
+
+    def test_the_sweep_rewrites_a_0_23_projection_once(self, tmp_path):
+        root = _copy_fixture(tmp_path)
+        store = SessionStore(root)
+        handle = store.session(FIXTURE_SID)
+        handle.rebuild()
+        old = load(handle.paths.segment(1).segment_json)
+        old.update(schema="claudna.segment/1")
+        atomic_write_json(handle.paths.segment(1).segment_json, old)
+        report = retention.sweep(store, {})
+        assert report.upgraded == [FIXTURE_SID]
+        assert load(handle.paths.segment(1).segment_json)["schema"] == "claudna.segment/2"
+        assert retention.sweep(store, {}).upgraded == []  # once
+
     def test_rebuild_is_deterministic_and_never_touches_logs(self, tmp_path):
         root = _copy_fixture(tmp_path)
         handle = SessionStore(root).session(FIXTURE_SID)
@@ -552,7 +576,7 @@ class TestProjection:
         s1 = h.open_segment("session_open", 0)
         h.append("prompt.submitted", {"prompt_id": "p", "chars": 3}, seg=s1)
         h.append("summary.requested", {"job_id": "j"}, seg=s1)
-        h.seal_segment(50, "precompact")
+        h.seal_segment(50, "precompact", trigger="auto")
         s2 = h.open_segment("compact", 50)
         h.append("tool.failed", {"tool": "Bash", "signature": "s", "exit_code": 1}, seg=s2)
         h.link_child("c")
@@ -639,7 +663,7 @@ class TestSchemas:
     def test_fixture_logs_validate(self):
         event_schema = schema.load("event")
         for log in (FIXTURE / "sessions").rglob("*.jsonl"):
-            for record in read_jsonl(log).records:  # 0.23-shaped (trigger, sha256, artifact): they still fold
+            for record in read_jsonl(log).records:  # 0.23-written, sha256 included: they still fold
                 assert schema.validate(record, event_schema) == []
                 assert ev.classify(record) == "ok"
 
@@ -821,7 +845,7 @@ class TestCheckSeesALostRefresh:
         h = opened(store)
         seg = h.open_segment("session_open", 0)
         append_jsonl(h.paths.lifecycle, ev.make_event("segment.sealed", h.sid,  # a hook killed before its refresh
-                                                       {"end": 100, "sealed_by": "precompact"}, seg=seg))
+                                                       {"end": 100, "sealed_by": "precompact", "trigger": "auto"}, seg=seg))
         report = check_session(h)
         assert report.problems == [] and any("refresh was lost" in w for w in report.warnings)
         prompt(h)  # activity heals the stale lifecycle projections first
@@ -942,12 +966,13 @@ class TestPinsForUnheldGuarantees:
         s = load(h.paths.session_json)
         assert (s["parent_sid"], s["chain_id"]) == ("parent", "root")
 
-    def test_a_seal_records_only_its_end_and_who_sealed_it(self, store):
+    def test_a_seal_still_writes_what_a_0_23_reader_requires(self, store):
+        """``trigger`` stays required: a 0.23 reader sharing the store would reject a seal without it."""
         h = opened(store)
         h.open_segment("session_open", 0)
         h.seal_segment(10, "precompact")
         sealed = [e for e in load_lifecycle(h.paths).events if e["kind"] == "segment.sealed"][-1]
-        assert sealed["data"] == {"end": 10, "sealed_by": "precompact"}
+        assert sealed["data"] == {"end": 10, "sealed_by": "precompact", "trigger": None}
 
 
 class TestWritersRedact:

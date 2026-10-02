@@ -198,7 +198,8 @@ def _summarize_once(handle: SessionHandle, index: int, *, env: Mapping[str, str]
         return f"failed: {exc}", end
     atomic_write_json(seg.dir / "summary.json", artifact)
     logged = time.time()  # a rollup written after this counts the summary: discard() keeps it
-    handle.append("summary.completed", {"job_id": job_id}, seg=index)
+    handle.append("summary.completed", {"job_id": job_id, "artifact": f"{seg.dir.name}/summary.json",
+                                        "input_sha256": sha, "duration_ms": duration_ms}, seg=index)
     try:
         rollup.refresh(handle.paths)  # §6.7: the session rollup follows every completed segment
     except Exception:  # noqa: BLE001 — the summary is done; a failed rollup must not log summary.failed after it

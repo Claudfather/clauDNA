@@ -70,7 +70,8 @@ def summarized_session(store, sid: str, blocks_per_segment: list[list[dict]], *,
         h.seal_segment(i * 10 + 5, "precompact")
         atomic_write_json(h.paths.segment(i).dir / "summary.json", artifact(sid, i, blocks, start=i * 10, end=i * 10 + 5))
         if done or i < len(blocks_per_segment):
-            h.append("summary.completed", {"job_id": f"j{i}"}, seg=i)
+            h.append("summary.completed", {"job_id": f"j{i}", "artifact": f"seg-00{i}/summary.json",
+                                           "input_sha256": "0" * 64, "duration_ms": 1}, seg=i)
         else:
             h.append("summary.requested", {"job_id": f"j{i}"}, seg=i)
     if closed:
@@ -220,7 +221,8 @@ class TestHarvest:
         atomic_write_json(h.paths.segment(2).dir / "summary.json", {"broken": True})
         for n in range(project.MAX_ATTEMPTS):  # every rebuild came back unwritable
             h.append("summary.requested", {"job_id": f"r{n}"}, seg=2)
-            h.append("summary.completed", {"job_id": f"r{n}"}, seg=2)
+            h.append("summary.completed", {"job_id": f"r{n}", "artifact": "seg-002/summary.json",
+                                           "input_sha256": "0" * 64, "duration_ms": 1}, seg=2)
         calls = []
         harvest.harvest(store, env=ON, capture=FakeCapture(), resummarize=lambda *a: calls.append(a) or "x")
         assert calls == [] and cursor(h) == 2  # no model call; the cursor moves past it
@@ -267,7 +269,8 @@ class TestStrandedSummaries:
         def resummarize(handle, index, env):
             calls.append(index)
             handle.append("summary.requested", {"job_id": "again"}, seg=index)
-            handle.append("summary.completed", {"job_id": "again"}, seg=index)
+            handle.append("summary.completed", {"job_id": "again", "artifact": "seg-002/summary.json",
+                                                "input_sha256": "0" * 64, "duration_ms": 1}, seg=index)
             return "summarized"
 
         report = harvest.harvest(store, env=ON, capture=FakeCapture(), resummarize=resummarize)

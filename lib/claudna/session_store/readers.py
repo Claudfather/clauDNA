@@ -248,7 +248,7 @@ def render(verb: str, data, *, group: bool = False) -> list[str]:
             c = seg["counts"]
             lines.append(f"  seg-{seg['index']:03d} {seg['status']:6} summary={seg['summary']['status']:7} "
                          f"prompts={c['prompts']} skills={c['skills']} failures={c['failures']} "
-                         f"interrupts={c.get('interrupts', 0)}")
+                         f"interrupts={c['interrupts']}")
         if roll:
             f = roll["fields"]
             lines += [f"  {f.get('title') or ''}".rstrip(), f"  outcome: {f.get('outcome') or '-'}"]

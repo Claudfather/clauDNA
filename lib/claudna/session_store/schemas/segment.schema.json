@@ -104,7 +104,8 @@
       "required": [
         "prompts",
         "skills",
-        "failures"
+        "failures",
+        "interrupts"
       ],
       "additionalProperties": false,
       "properties": {

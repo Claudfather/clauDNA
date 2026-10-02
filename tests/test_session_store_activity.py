@@ -170,7 +170,8 @@ class TestAdapter:
         fire(store, "UserPromptSubmit", "s1", tmp_path, prompt="a")
         path = store.session("s1").paths.segment(1).segment_json
         doc = json.loads(path.read_text())
-        del doc["counts"]["interrupts"]  # what 0.22 wrote
+        del doc["counts"]["interrupts"]  # what 0.22 wrote, under the tag it wrote
+        doc["schema"] = "claudna.segment/1"
         path.write_text(json.dumps(doc, indent=2, sort_keys=True) + "\n")
         fire(store, "PostToolUseFailure", "s1", tmp_path, **{**BASH_FAILURE, "is_interrupt": True})
         assert counts(store, "s1")["interrupts"] == 1

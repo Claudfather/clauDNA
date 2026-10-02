@@ -1,6 +1,6 @@
 # Session store hardening: an injection screen, and cutting what nobody reads
 
-**Status:** proposed, 2026-10-01. Nothing here is built; §3 holds the decisions it waits on.
+**Status:** decided 2026-10-02 (§3); the cleanup and the screen are being built. The rest stays proposed.
 **Spec:** `documentation/specs/2026-09-28-session-store-design.md` §4.2 (hooks), §4.3 (lineage), §6.2 (event kinds), §6.5 (`segment.json`), §8 (export), P4 (metadata by default).
 
 Two pieces of work that ask the same question: what does each part of the store actually do for a reader?
@@ -48,8 +48,8 @@ Every event kind, file and hook, against what reads it.
 | Rank | Item | Finding | Proposed | Risk of cutting |
 |---|---|---|---|---|
 | 1 | `checkpoint.noted`, `counts.checkpoints` | The spec says `/session checkpoint` writes it; nothing does, so the count is always 0. | Delete. Wiring it into checkpoint mode instead would record a count no reader uses. | `checkpoints` is required in `segment.schema.json`: a `claudna.segment/2` bump, self-healing because a projection with the wrong schema re-folds on read. Spec §6.2, §6.5. |
-| 2 | `segment.sealed.sha256` (and the projected copy), `trigger` | No caller passes `sha256` (`boundaries.py:252`); `trigger` shows only in `timeline`. | Delete, in the same bump. | Old logs still fold: readers tolerate extra keys. |
-| 3 | `summary.completed` `artifact`, `input_sha256`, `duration_ms` | Copies of `summary.json`'s `input.sha256` and `producer.duration_ms`; `artifact` is always `seg-NNN/summary.json`. | Delete. | Spec §6.2. |
+| 2 | `segment.sealed.sha256` (and the projected copy) | No caller passes it (`boundaries.py:252`). | Delete, in the same bump. `trigger` stays: a 0.23 reader sharing the store requires it, so dropping it needs a new envelope major. | Old logs still fold: readers tolerate extra keys. |
+| 3 | `summary.completed` `artifact`, `input_sha256`, `duration_ms` | Copies of `summary.json`'s `input.sha256` and `producer.duration_ms`. | Deferred: a 0.23 reader requires all three, so they go with the next envelope major. | — |
 | 4 | `prompt.submitted` and its UserPromptSubmit hook | One Python start per prompt, to feed `prompts=N` in `show`. | Owner's call. | Loses the count and the opt-in prompt-text capture (spec §11 item 2). |
 | 5 | Telemetry's PostToolUse(`Skill`) hook | Shares its event and matcher with the store's. `telemetry-emit.sh` exits in bash unless `CLAUDNA_TELEMETRY=1`, so only sessions with telemetry on (the bots) start Python twice. On PostToolUseFailure the matchers differ (the store's takes every tool, telemetry's only `Skill`), so there's nothing to merge there. | One wrapper for the PostToolUse(`Skill`) pair. | Small gain, bots only. Telemetry must keep working with the store off, and Claudosseum's line format can't change. |
 | 6 | `session.child_linked` | The inverse of the child's `parent_sid`; feeds only `show`'s `children`, and is the store's one write into another session's log. | Derive `children` by scanning. | `show` scans across sessions; spec §4.3. Export doesn't carry `children`. |
@@ -57,9 +57,9 @@ Every event kind, file and hook, against what reads it.
 
 `hooks.json` has 13 hook commands across 8 events.
 
-## 3. Decisions, in build order
+## 3. Decisions (owner, 2026-10-02)
 
-1. **The screen** as proposed (block dropped, journey string withheld, read-side screens in the digest and harvest, no quarantine), with the prompt and rank changes. Or start narrower: blocks only.
-2. **Cleanup ranks 1–3**, one PR and one schema bump.
-3. **`prompt.submitted`** (rank 4): keep or cut.
-4. **The telemetry merge and `child_linked`** (ranks 5–6): now, or when there's a reason.
+1. **The screen:** built as proposed (blocks dropped, journey and procedure strings withheld, read-side screens in the digest and harvest, no quarantine), with the prompt and rank changes.
+2. **Cleanup:** ranks 1–2 in one PR and one schema bump (`claudna.segment/2`); `trigger` and rank 3 wait for an envelope major, since a 0.23 reader requires them.
+3. **`prompt.submitted`:** kept.
+4. **The telemetry merge and `child_linked`:** not now.

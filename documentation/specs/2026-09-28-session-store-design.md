@@ -77,7 +77,7 @@ Not yet verified (open, §11): that PreCompact's transcript byte offset lines up
 
 - **P1 — Logs are truth; JSON files are projections.** Every `.json` in the store is rebuildable from the `.jsonl` logs beside it (`session rebuild <sid>`). A torn or deleted projection is a cache miss, never data loss. **One exception:** `consumers.json` (§6.8). No log records an ack, so `rebuild` can't regenerate it; `SessionHandle.ack` writes it fsynced (file and directory) instead, since a lost ack re-harvests or re-exports work.
 - **P2 — One writer per file.** Hooks append events. The projector (same process, right after the append) rewrites projections via temp + `os.replace`. The summarizer writes only its own artifact, then appends an event announcing it.
-- **P3 — Reference, don't copy.** The transcript is never copied into the store. Segments point at it by path + byte range + content hash.
+- **P3 — Reference, don't copy.** The transcript is never copied into the store. Segments point at it by path + byte range.
 - **P4 — Metadata by default.** Free text (prompts, stderr) is off unless opted in, and when on is scrubbed (`scripts/redact.py` rules) and capped. Capping happens in `make_event`, so no caller can forget it; redaction joins it there — one choke point — when free-text capture ships (phase 2 moves `redact.py` into `lib/claudna/`).
 - **P5 — Boundaries are observed, never inferred.** Only harness hook events open or close sessions and segments. Counters are derived from what exists on disk, never stored.
 - **P6 — Fail open, bounded.** A store hook never blocks, never fails a session, and returns in well under a second. Heavy work detaches.
@@ -218,10 +218,10 @@ Every line in every log:
 | `session.child_linked` | `{ child_sid: SessionId }` |
 | `session.privacy_set` | `{ private: bool, by: "user"\|"policy" }` |
 | `segment.opened` | `{ opened_by: "session_open"\|"compact", start: int }` |
-| `segment.sealed` | `{ end: int ≥ start, sealed_by: "precompact"\|"compact"\|"session_end"\|"resume"\|"abandoned" }` |
+| `segment.sealed` | `{ end: int ≥ start, sealed_by: "precompact"\|"compact"\|"session_end"\|"resume"\|"abandoned", trigger: "manual"\|"auto"\|null }` |
 | `segment.retired` | `{ reason: "acked"\|"age" }` — appended by retention (§9) before the segment's directory is removed |
 | `summary.requested` | `{ job_id: string }` |
-| `summary.completed` | `{ job_id: string }` — the input hash and duration live in the summary (`input.sha256`, `producer.duration_ms`) |
+| `summary.completed` | `{ job_id: string, artifact: "seg-NNN/summary.json", input_sha256: string, duration_ms: int }` |
 | `summary.failed` | `{ job_id: string, error: string (≤200), retryable: bool }` |
 | `summary.skipped` | `{ reason: "private"\|"disabled"\|"trivial"\|"headless"\|"no_transcript" }` |
 | `session.closed` | `{ reason: "clear"\|"resume"\|"logout"\|"prompt_input_exit"\|"other"\|"abandoned" }`. `abandoned` is the store's own (`seal`, the sweep: a session whose SessionEnd never ran); a SessionEnd payload can't claim it |

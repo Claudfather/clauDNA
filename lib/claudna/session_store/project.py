@@ -31,6 +31,8 @@ from .paths import SessionPaths
 
 SESSION_SCHEMA = "claudna.session/1"
 SEGMENT_SCHEMA = "claudna.segment/2"
+#: Projection tags earlier releases wrote. Readers re-fold them; :func:`stale_projections` finds them to rewrite.
+OLDER_PROJECTIONS = frozenset({"claudna.segment/1"})
 _SCHEMA_FILES = {SESSION_SCHEMA: "session", SEGMENT_SCHEMA: "segment"}
 
 _SUMMARY_STATUS = {
@@ -409,6 +411,19 @@ def rebuild(paths: SessionPaths) -> RebuildReport:
     return RebuildReport(sid=paths.sid, segments=indices, skipped_lines=skipped)
 
 
+def stale_projections(paths: SessionPaths) -> bool:
+    """Does any ``segment.json`` carry a tag an earlier release wrote (:data:`OLDER_PROJECTIONS`)?
+
+    Readers re-fold such a file in memory every time; a closed session never
+    writes again, so the sweep rebuilds it once instead.
+    """
+    for index in paths.segment_indices():
+        doc = read_json(paths.segment(index).segment_json)
+        if isinstance(doc, dict) and doc.get("schema") in OLDER_PROJECTIONS:
+            return True
+    return False
+
+
 def read_projection(path, schema_id: str, *, bytes_before: int | None = None) -> dict | None:
     """The projection at ``path`` if it's well-formed (and, given ``bytes_before``, current), else ``None``.
 
@@ -473,9 +488,8 @@ def _refresh_activity(paths: SessionPaths, event: dict, *, bytes_before: int) ->
         _fold_segment(paths, seg, buckets=by_segment(lifecycle.events),
                       transcripts=segment_transcript_paths(lifecycle.events))
         return
-    if kind in _COUNTED:  # .get: a 0.22 projection has no "interrupts" yet
-        counts = projected["counts"]
-        counts[_COUNTED[kind]] = counts.get(_COUNTED[kind], 0) + 1
+    if kind in _COUNTED:
+        projected["counts"][_COUNTED[kind]] += 1
     pf = projected["projected_from"]
     projected["projected_from"] = {"lines": pf["lines"] + 1, "bytes": paths.segment(seg).events.stat().st_size,
                                    "skipped": pf["skipped"]}

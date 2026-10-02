@@ -53,7 +53,7 @@ from . import events as ev
 from . import schema
 from .fsio import append_jsonl, cap_log, ensure_dir, read_json, read_jsonl
 from .paths import InvalidSessionId, InvalidStateDir, state_root
-from .project import SUMMARY_ENV
+from .project import OLDER_PROJECTIONS, SUMMARY_ENV
 from .store import SessionHandle, SessionStore
 
 if TYPE_CHECKING:
@@ -130,11 +130,10 @@ def check_session(handle: SessionHandle) -> CheckReport:
         if obj is None:
             problems.append(f"{path}: missing or unparseable (run rebuild)")
             continue
-        current = target_schema["properties"]["schema"]["const"]
-        if isinstance(obj.get("schema"), str) and obj["schema"] != current:
-            # written by an older release: readers re-fold it, and the next write or a rebuild replaces it
-            warnings.append(f"{path}: an older projection ({obj['schema']}, now {current}); "
-                            "readers re-fold it, and the next write or a rebuild rewrites it")
+        if isinstance(obj, dict) and obj.get("schema") in OLDER_PROJECTIONS:
+            # written by an older release: readers re-fold it; the sweep or the next write rewrites it
+            warnings.append(f"{path}: an older projection ({obj['schema']}); readers re-fold it, and the "
+                            "background sweep, the next write or a rebuild rewrites it")
             continue
         errors = schema.validate(obj, target_schema)
         problems.extend(f"{path}: {err}" for err in errors)

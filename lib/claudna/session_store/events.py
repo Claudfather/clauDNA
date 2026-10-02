@@ -74,6 +74,7 @@ class KindSpec:
 
 _SESSION_DEFS = schema.load("session")["$defs"]
 _NON_NEGATIVE = {"minimum": 0}
+_SHA256 = {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}
 
 REGISTRY: dict[str, KindSpec] = {
     # ── lifecycle.jsonl: session scope ──────────────────────────────────────
@@ -131,17 +132,24 @@ REGISTRY: dict[str, KindSpec] = {
     "segment.sealed": KindSpec(
         log=LIFECYCLE,
         seg=True,
-        fields={"end": _INT, "sealed_by": _STR},
+        # ``trigger`` is required because a 0.23 reader requires it: dropping a required key needs a new
+        # envelope major. ``sha256`` (optional, never set) went in 0.24.
+        fields={"end": _INT, "sealed_by": _STR, "trigger": _OPT_STR},
         choices={
             # "compact"/"resume": open_segment sealing an unsealed predecessor (missed PreCompact / lost SessionEnd)
             # "abandoned": unclosed.py sealing a session whose SessionEnd never ran
             "sealed_by": ("precompact", "compact", "session_end", "resume", "abandoned"),
+            "trigger": ("manual", "auto", None),
         },
         constraints={"end": _NON_NEGATIVE},
     ),
     "summary.requested": KindSpec(log=LIFECYCLE, seg=True, fields={"job_id": _STR}),
-    # The summary itself holds its input hash and duration (``input.sha256``, ``producer.duration_ms``).
-    "summary.completed": KindSpec(log=LIFECYCLE, seg=True, fields={"job_id": _STR}),
+    "summary.completed": KindSpec(
+        log=LIFECYCLE,
+        seg=True,
+        fields={"job_id": _STR, "artifact": _STR, "input_sha256": _STR, "duration_ms": _INT},
+        constraints={"input_sha256": _SHA256, "duration_ms": _NON_NEGATIVE},
+    ),
     "summary.failed": KindSpec(
         log=LIFECYCLE,
         seg=True,

@@ -279,7 +279,8 @@ def test_a_lost_refresh_after_a_seal_refolds_the_segments_too(store):
 
     h = session_with(store, "s1", [None], close=False)
     h.open_segment("compact", 100)  # seg-002, open
-    append_jsonl(h.paths.lifecycle, ev.make_event("segment.sealed", "s1", {"end": 200, "sealed_by": "precompact"}, seg=2))  # no refresh
+    append_jsonl(h.paths.lifecycle, ev.make_event("segment.sealed", "s1", {"end": 200, "sealed_by": "precompact",
+                                                                           "trigger": "auto"}, seg=2))  # no refresh
     assert json.loads(h.paths.segment(2).segment_json.read_text())["status"] == "open"  # stale on disk
     assert [s["status"] for s in readers.show(store, "s1")["segments"]] == ["sealed", "sealed"]
 
