@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.24.0] - 2026-10-02
 ### Added
 - **Summaries are screened for injected instructions** (the 2026-10-01 hardening note, §1). `lib/claudna/screen.py` matches the shapes an injected instruction takes and leaves ordinary facts alone. A knowledge block that trips it is dropped where a summary is written, and a journey or procedure string is replaced with `[withheld: instruction-like text]`; a `summary.screened` event records counts, pattern ids and fingerprints, never the text. Text from before the screen is checked as it's read: by harvest and the review digest, and for 0.23 summaries wherever summaries are read (export, `show`, `list`): a rollup now carries `screened: true`, readers recompute past one without it, and the sweep rewrites those once. The summarizer prompt asks the model not to quote or paraphrase instructions (`segment-summary/2`), and the digest no longer ranks an item higher for `asserted_by: user`, a label the model picks.
 - **A design note for hardening the session store** ([documentation/plans/2026-10-01-session-store-hardening.md](./documentation/plans/2026-10-01-session-store-hardening.md)): a screen for instruction-shaped text in summaries, and a who-reads-this audit of the store's events, files and hooks with ranked cut candidates. The owner's decisions are in its §3; the screen and cleanup ranks 1–2 ship in this release, the rest stays proposed.
