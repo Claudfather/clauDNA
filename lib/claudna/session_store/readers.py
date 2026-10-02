@@ -21,7 +21,7 @@ from .events import REGISTRY
 from .fsio import read_json
 from .paths import SessionPaths
 from .project import load_activity, load_lifecycle, segment_docs, session_doc
-from .rollup import ROLLUP_SCHEMA, current, rollup_path
+from .rollup import current, rollup_path, trusted
 from .store import SessionStore
 
 _SINCE = re.compile(r"^(\d+)([hdw])$")
@@ -44,7 +44,7 @@ def since_cutoff(since: str | None, *, now: float | None = None) -> str | None:
 def _rollup(paths: SessionPaths) -> dict | None:
     """``summary.json`` if it is one: one read, for ``list``'s every row."""
     doc = read_json(rollup_path(paths))
-    return doc if isinstance(doc, dict) and doc.get("schema") == ROLLUP_SCHEMA else None
+    return doc if trusted(doc) else None
 
 
 def list_sessions(store: SessionStore, *, since: str | None = None, repo: str | None = None,

@@ -233,7 +233,7 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
             report.errors.append(f"{sid}: seg-{index:03d}/summary.json is missing or invalid; not harvested")
             return  # never step past a segment whose blocks can't be read: the cursor holds
         blocks = [b for b in summary["blocks"] if not tripped(b)]  # a summary written before the screen existed
-        report.screened += len(summary["blocks"]) - len(blocks)
+        report.screened += len(summary["blocks"]) - len(blocks) + _dropped_when_written(lifecycle, index, boundary)
         findings = [(b, finding_of(b, sid=sid, index=index, project=origin["repo"])) for b in blocks]
         wanted = [f for _, f in findings if f is not None]
         if report.captures and report.captures + len(wanted) > MAX_CAPTURES:
@@ -257,6 +257,13 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
         if sid not in report.sessions:
             report.sessions.append(sid)
         handle.ack(CONSUMER, index)
+
+
+def _dropped_when_written(lifecycle: list[dict], index: int, boundary) -> int:
+    """Blocks the screen dropped from segment ``index``'s current summary as it was written (``summary.screened``)."""
+    job = boundary.summary.get("job_id")
+    return sum(e["data"]["blocks_dropped"] for e in lifecycle
+               if e["kind"] == "summary.screened" and e.get("seg") == index and e["data"].get("job_id") == job)
 
 
 def _resummarize(handle, index: int, env: Mapping[str, str]) -> str:

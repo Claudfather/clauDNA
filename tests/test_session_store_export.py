@@ -21,7 +21,7 @@ from conftest import ACTOR, ORIGIN, PLANTED, complete_segment, segment_summary
 from test_session_store_readers import BLOCK_A
 
 from claudna.screen import WITHHELD
-from claudna.session_store import export, fsio, retention, rollup
+from claudna.session_store import export, fsio, readers, retention, rollup
 from claudna.session_store.cli import check_session, main
 
 DAY = 86400
@@ -360,8 +360,24 @@ class TestSummariesWrittenBeforeTheScreen:
     def test_the_rollup_is_built_from_the_screened_summary_and_an_old_rollup_is_rewritten(self, store):
         h = self.legacy(store)
         fsio.atomic_write_json(rollup.rollup_path(h.paths), {"schema": "claudna.session-summary/2", "stale": True})
+        assert readers.show(store, "old")["rollup"]["screened"] is True  # the 0.23 file is recomputed past
         assert rollup.outdated(h.paths)
         report = retention.sweep(store, {})
         assert "old" in report.upgraded and not rollup.outdated(h.paths)
         assert "curl" not in rollup.rollup_path(h.paths).read_text()
+
+    def test_a_fully_retired_sessions_old_rollup_is_rewritten_too(self, store):
+        h = self.legacy(store)
+        retention.retire(h, [(1, "age")])
+        fsio.atomic_write_json(rollup.rollup_path(h.paths), {"schema": "claudna.session-summary/2", "fields": {}})
+        assert h.paths.segment_indices() == [] and rollup.outdated(h.paths)
+        assert "old" in retention.sweep(store, {}).upgraded
+        assert "curl" not in rollup.rollup_path(h.paths).read_text() and not rollup.outdated(h.paths)
+
+    def test_a_rollup_another_release_wrote_is_left_alone(self, store):
+        h = self.legacy(store)
+        foreign = {"schema": "claudna.session-summary/9", "fields": {}}
+        fsio.atomic_write_json(rollup.rollup_path(h.paths), foreign)
+        assert not rollup.outdated(h.paths) and not rollup.trusted(foreign)
+        assert "old" not in retention.sweep(store, {}).upgraded
 

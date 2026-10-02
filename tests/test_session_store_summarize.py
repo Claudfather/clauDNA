@@ -456,3 +456,9 @@ class TestInstructionScreen:
     def test_the_prompt_file_carries_the_version_summaries_record(self):
         assert f"prompt_version: {summarize.PROMPT_VERSION} " in summarize.PROMPT_FILE.read_text()
 
+    def test_fingerprints_are_cut_only_between_whole_hashes(self):
+        joined = summarize._whole(f"{n:012x}" for n in range(90))
+        kept, rest = joined.rsplit(",", 1)
+        assert len(joined) <= 400 and rest.startswith("+") and int(rest[1:]) + len(kept.split(",")) == 90
+        assert all(len(fp) == 12 for fp in kept.split(","))
+

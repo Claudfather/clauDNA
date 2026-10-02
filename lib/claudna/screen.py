@@ -11,31 +11,38 @@ from __future__ import annotations
 
 import hashlib
 import re
+import unicodedata
 
 #: The text a withheld string is replaced with. Short enough for every schema'd field.
 WITHHELD = "[withheld: instruction-like text]"
 
 _F = re.IGNORECASE
+#: Shells and interpreters a downloaded script gets piped into.
+_SHELLS = r"(sudo\s+)?((ba|z|k|da)?sh|python[0-9.]*|perl|ruby|node|php)\b"
 #: ``(id, pattern)``. Each id is what a ``summary.screened`` event records; each has its own test.
 PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    # Text addressed to the model reading it later.
-    ("override", re.compile(r"\b(ignore|disregard|forget|override)\b[^.\n]{0,40}\b(previous|prior|above|earlier|"
-                            r"all|any|your)\b[^.\n]{0,20}\b(instructions?|prompts?|rules?|guidelines?|directions?)\b",
-                            _F)),
+    # Text addressed to the model reading it later. The qualifier is what separates "ignore the previous
+    # instructions" from a fact like "ruff ignores all E501 rules".
+    ("override", re.compile(r"\b(ignore|disregard|forget|override)\b[^.\n]{0,20}\b(previous|prior|above|earlier|"
+                            r"your|these|those)\b[^.\n]{0,20}\b(instructions?|prompts?|directions?|guidelines?)\b|"
+                            r"\b(ignore|disregard|forget)\b[^.\n]{0,20}\b(instructions?|prompts?|directions?)\b"
+                            r"[^.\n]{0,15}\b(above|before|so far|previously)\b|"
+                            r"\b(ignore|disregard|forget|override)\b[^.\n]{0,20}\bsystem prompt\b", _F)),
     ("persona", re.compile(r"\b(you are now|from now on,? you|act as (an?|the) (system|administrator|developer))\b",
                            _F)),
-    ("new-instructions", re.compile(r"\b(new|updated|revised|real|actual) (system )?(instructions?|prompt)\s*:", _F)),
-    ("to-the-assistant", re.compile(r"\b(assistant|claude|ai|agent|model|llm)\s*[,:]\s*(you must|you should|always|"
-                                    r"never|ignore|do not|don't)\b", _F)),
-    # Role or prompt-format markers that only appear to impersonate a turn.
-    ("role-tag", re.compile(r"<\s*/?\s*(system|assistant|user|instructions?|im_start|im_end)\s*>|<\|[a-z_]+\|>|"
+    ("new-instructions", re.compile(r"\b(new|updated|revised|real|actual) (system )?(instructions?|prompt)\s*"
+                                    r"[:\-–—]", _F)),
+    ("to-the-assistant", re.compile(r"\b(assistant|claude|ai|agent|model|llm|system)\s*[,:]\s*(you must|"
+                                    r"you should|always|never|ignore|do not|don't)\b", _F)),
+    # Role or prompt-format markers that only appear to impersonate a turn (not ``<user>``: a placeholder).
+    ("role-tag", re.compile(r"<\s*/?\s*(system|assistant|instructions?|im_start|im_end)\s*>|<\|[a-z_]+\|>|"
                             r"\[/?INST\]", _F)),
-    # Execution an attacker wants: a download piped to a shell, a remote script, decoded payloads.
-    ("pipe-to-shell", re.compile(r"\b(curl|wget|iwr|invoke-webrequest)\b[^|\n]{0,200}\|\s*(sudo\s+)?"
-                                 r"(ba|z|k|da)?sh\b", _F)),
-    ("remote-exec", re.compile(r"\b(run|execute|eval|exec)\b[^.\n]{0,40}\bhttps?://", _F)),
-    ("decode-exec", re.compile(r"\bbase64\s+(-d|--decode)\b[^|\n]{0,200}\|\s*(ba|z)?sh\b|"
-                               r"\b(iex|invoke-expression)\b", _F)),
+    # Execution an attacker wants: a download piped to an interpreter, a remote script, a decoded payload.
+    ("pipe-to-shell", re.compile(r"\b(curl|wget|iwr|invoke-webrequest)\b[^|\n]{0,200}\|\s*" + _SHELLS, _F)),
+    ("remote-exec", re.compile(r"\b(run|execute|eval|exec)\b[^\n]{0,60}https?://\S+\.(sh|bash|ps1|py|pl|rb)\b",
+                               _F)),
+    ("decode-exec", re.compile(r"\bbase64\s+(-d|--decode)\b[^|\n]{0,200}\|\s*" + _SHELLS + r"|"
+                               r"\|\s*(iex|invoke-expression)\b|\b(iex|invoke-expression)\s*\(", _F)),
     # Moving someone's secrets somewhere (a system *description* — "the client sends the API key to the
     # gateway" — names no owner, so it passes).
     ("exfiltrate", re.compile(r"\b(send|post|upload|exfiltrate|forward|paste)\b[^.\n]{0,30}\b(your|the user'?s|all|"
@@ -43,9 +50,17 @@ PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
                               r"ssh keys?)\b|\.env\b)", _F)),
 )
 
+#: Characters that hide inside a keyword without showing: soft hyphen, zero-width space/joiners, word joiner, BOM.
+_INVISIBLE = dict.fromkeys(map(ord, "\u00ad\u200b\u200c\u200d\u2060\ufeff"))
+
 
 def hits(text: str) -> list[str]:
-    """The ids of every pattern ``text`` trips (empty when it's clean)."""
+    """The ids of every pattern ``text`` trips (empty when it's clean).
+
+    Matched on the NFKC form with invisible characters removed, so fullwidth
+    letters or a soft hyphen inside a keyword don't slip past.
+    """
+    text = unicodedata.normalize("NFKC", text).translate(_INVISIBLE)
     return [name for name, pattern in PATTERNS if pattern.search(text)]
 
 

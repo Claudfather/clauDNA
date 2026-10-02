@@ -111,6 +111,13 @@ class TestHarvest:
         assert (report.created, report.held_back, report.screened) == (1, 0, 2)
         assert "2 withheld as instruction-like" in harvest.liveness_line(report)
 
+    def test_blocks_the_write_side_screen_dropped_are_counted_in_the_run(self, store):
+        h = summarized_session(store, "s1", [[BLOCK]])
+        h.append("summary.screened", {"job_id": "j1", "blocks_dropped": 2, "strings_withheld": 1,
+                                      "patterns": "override", "fingerprints": "a" * 12}, seg=1)
+        report = harvest.harvest(store, env=ON, capture=FakeCapture())
+        assert report.screened == 2 and "2 withheld as instruction-like" in harvest.liveness_line(report)
+
     def test_a_decision_block_is_a_decision_note(self, store):
         summarized_session(store, "s1", [[{**BLOCK, "home": "decision"}]])
         capture = FakeCapture()

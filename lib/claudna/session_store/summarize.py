@@ -133,6 +133,20 @@ def summarize(handle: SessionHandle, index: int, *, env: Mapping[str, str] = os.
         return outcome
 
 
+FINGERPRINT_ROOM = 380  #: under the event's 400-character cap, so the list is never cut mid-hash
+
+
+def _whole(fingerprints) -> str:
+    """Comma-joined fingerprints that fit :data:`FINGERPRINT_ROOM`, then ``+N`` for the ones that don't."""
+    kept, rest = [], 0
+    for fp in fingerprints:
+        if rest or len(",".join([*kept, fp])) > FINGERPRINT_ROOM:
+            rest += 1
+        else:
+            kept.append(fp)
+    return ",".join(kept) + (f",+{rest}" if rest else "")
+
+
 def _log_screened(handle: SessionHandle, index: int, job_id: str, screened: list[dict]) -> None:
     """Record what the screen took out: counts, pattern ids, fingerprints; never the text."""
     handle.append("summary.screened", {
@@ -140,7 +154,7 @@ def _log_screened(handle: SessionHandle, index: int, job_id: str, screened: list
         "blocks_dropped": sum(f["kind"] == "block" for f in screened),
         "strings_withheld": sum(f["kind"] == "string" for f in screened),
         "patterns": ",".join(sorted({p for f in screened for p in f["patterns"]})),
-        "fingerprints": ",".join(f["fingerprint"] for f in screened),
+        "fingerprints": _whole(f["fingerprint"] for f in screened),
     }, seg=index)
 
 

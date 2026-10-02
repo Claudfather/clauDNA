@@ -31,8 +31,7 @@ from .fsio import atomic_write_json, exclusive_lock, read_json
 from .paths import SessionPaths
 from .project import load_lifecycle, screened_summary, segment_states
 
-#: /3: rollups now come from screened summaries (claudna.screen); a /2 file may hold what the screen removes.
-ROLLUP_SCHEMA = "claudna.session-summary/3"
+ROLLUP_SCHEMA = "claudna.session-summary/2"
 
 LATEST = "latest"  #: the newest segment's value wins
 UNION = "union"  #: every segment's items, deduplicated, each tagged with from_seg
@@ -91,10 +90,19 @@ def read_archived(paths: SessionPaths, index: int) -> dict | None:
     return None
 
 
+def trusted(doc: object) -> bool:
+    """Is ``doc`` a rollup this release may show? Its tag, and built from screened summaries."""
+    return isinstance(doc, dict) and doc.get("schema") == ROLLUP_SCHEMA and doc.get("screened") is True
+
+
 def outdated(paths: SessionPaths) -> bool:
-    """Is there a rollup on disk from an earlier :data:`ROLLUP_SCHEMA`? Readers ignore it; the sweep rewrites it."""
+    """Is the rollup on disk one 0.23 wrote (unscreened)? Readers recompute past it; the sweep rewrites it.
+
+    Only that known shape: a rollup some other release wrote is left alone, so
+    two versions sharing a store don't rewrite each other's files every sweep.
+    """
     doc = read_json(rollup_path(paths))
-    return isinstance(doc, dict) and doc.get("schema") != ROLLUP_SCHEMA
+    return isinstance(doc, dict) and doc.get("schema") == ROLLUP_SCHEMA and "screened" not in doc
 
 
 def compute(sid: str, by_index: dict[int, dict]) -> dict | None:
@@ -116,7 +124,10 @@ def compute(sid: str, by_index: dict[int, dict]) -> dict | None:
                     seen.add(key)
                     merged.append({**item, "from_seg": index})
         fields[field] = merged
-    return {"schema": ROLLUP_SCHEMA, "sid": sid, "through_seg": order[-1], "segments": order, "fields": fields}
+    # "screened": built from summaries the instruction screen has seen (claudna.screen). An extra key, not a new
+    # tag, so a 0.23 reader still takes the file; a 0.24 reader takes only a marked one (:func:`trusted`).
+    return {"schema": ROLLUP_SCHEMA, "sid": sid, "through_seg": order[-1], "segments": order, "fields": fields,
+            "screened": True}
 
 
 def rollup_path(paths: SessionPaths) -> Path:
