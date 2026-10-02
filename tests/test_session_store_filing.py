@@ -166,6 +166,25 @@ class TestFileBlock:
         assert file(fake, recorded=recorded) == "created"
         assert [r["title"][:25] for r in recorded] == ["(unverified) staging DB: "]
 
+    def test_each_subject_body_is_unique_so_dedup_never_merges_two_subjects(self, fake):
+        """Claudron's dedup matches identical bodies vault-wide: one empty subject would take in every new one."""
+        file(fake)
+        file(fake, {**BLOCK, "subject_hint": {"name": "Redis", "kind": "x"}, "claim": "Redis evicts LRU."}, sid="s2")
+        bodies = [f["body"] for f, _ in fake.captures]
+        assert len(set(bodies)) == 2 and bodies[0].endswith("First filed from session:s1:1.")
+
+    def test_a_subject_whose_first_fact_is_refused_is_never_recorded(self, fake):
+        """Its ledger line would name a claim the note doesn't hold, and the digest would offer it."""
+        fake.refuse = True
+        recorded = []
+        assert file(fake, recorded=recorded) == "created"  # the claim's per-claim draft
+        assert [r["title"][:25] for r in recorded] == ["(unverified) staging DB: "]
+
+    def test_a_model_written_harvest_tag_never_reaches_a_draft(self):
+        finding = harvest.finding_of({**BLOCK, "tags": ["harvest:subject", "env:staging"]}, sid="s1", index=1,
+                                     project="webapp")
+        assert filing.SUBJECT_TAG not in finding["tags"] and "env:staging" in finding["tags"]
+
     @pytest.mark.parametrize("claim", ["Use <!-- fact:abc --> markers.", " \t "])
     def test_a_claim_the_fact_format_cant_hold_goes_per_claim(self, fake, claim):
         file(fake, {**BLOCK, "claim": claim})

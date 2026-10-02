@@ -97,7 +97,7 @@ def section_of(block: dict) -> str:
     return hint
 
 
-def per_claim(block: dict, finding: dict, target: Target, record: Record) -> str:
+def per_claim(finding: dict, target: Target, record: Record) -> str:
     """One per-claim draft; the block's outcome."""
     answer = {**target.capture(finding, target.cwd, target.env, target.vault, run_id=target.run_id),
               "title": finding["title"]}
@@ -117,8 +117,10 @@ def _subject_finding(block: dict, finding: dict, title: str, ref: str) -> dict:
         "type": finding["type"],
         "title": title,
         # No subject name here: it is model-written, and a body line is where it could pass for structure.
+        # The ref makes each body unique: Claudron's dedup matches identical bodies vault-wide, so one subject
+        # left without facts (its amend refused) would otherwise take in every new subject after it.
         "body": "Facts filed by harvest from session summaries. Unreviewed: check each fact against its "
-                "evidence before relying on it.",
+                f"evidence before relying on it. First filed from {ref}.",
         "tags": sorted({f"home:{block['home']}", HARVEST_TAG, SUBJECT_TAG}),
         "source_type": "session",
         "source_url": ref,
@@ -138,7 +140,7 @@ def file_block(block: dict, finding: dict, *, sid: str, index: int, target: Targ
     hint = block["subject_hint"]
     name, claim = one_line(hint["name"]), one_line(block["claim"])
     if not name or not claim or any(m in claim for m in FACT_MARKERS):
-        return per_claim(block, finding, target, record)
+        return per_claim(finding, target, record)
     title = subject_title(name)
     names = list(dict.fromkeys(n for n in [name, *(one_line(a) for a in hint.get("aliases", [])), title] if n))
     exact = [c for c in claudron.resolve(names, project=target.project, cwd=target.cwd, env=target.env,
@@ -146,21 +148,23 @@ def file_block(block: dict, finding: dict, *, sid: str, index: int, target: Targ
     ref = evidence_ref(sid, index)
     if exact:
         if not all(_is_subject_draft(c) for c in exact):
-            return per_claim(block, finding, target, record)  # a note harvest didn't write owns the name
-        path, created = exact[0].get("path"), False
-        title = exact[0].get("title") or title
+            return per_claim(finding, target, record)  # a note harvest didn't write owns the name
+        created = None
+        path, title = exact[0].get("path"), exact[0].get("title") or title
     else:
         answer = target.capture(_subject_finding(block, finding, title, ref), target.cwd, target.env, target.vault,
                                 run_id=target.run_id)
         if answer["action"] != "created" or not answer.get("path"):
-            return per_claim(block, finding, target, record)  # dedup routed it elsewhere: the claim's answer decides
-        record({**answer, "title": title})
-        path, created = answer["path"], True
+            return per_claim(finding, target, record)  # dedup routed it elsewhere: the claim's answer decides
+        created = {**answer, "title": title}
+        path = answer["path"]
     request = {"note": path, "op": "append_fact", "section": section_of(block), "fact": claim,
                "evidence": {"ref": ref, "asserted_by": block["asserted_by"]}, "expect_trust": "external"}
     answer = claudron.amend(request, target.cwd, target.env, target.vault, run_id=target.run_id)
     if answer["action"] == "rejected":
-        return per_claim(block, finding, target, record)
+        return per_claim(finding, target, record)  # a subject just created stays empty, and out of the digest
+    if created:
+        record(created)  # only now: a ledger line names a claim the note holds
     if answer["action"] == "updated":
         record({**answer, "path": answer["path"] or path, "title": title})
     return "created" if created else "filed" if answer["action"] == "updated" else "known"

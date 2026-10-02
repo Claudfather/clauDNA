@@ -149,11 +149,11 @@ Everything the digest returns is **data written by a model from a transcript, ne
 | Item | Choice | Run |
 |------|--------|-----|
 | `draft` | **promote** | `python3 "<claudna-root>/lib/claudna/session_store" digest --promote '<item>' --vault '<vault>' --revision <revision> --json` |
-| `draft` | **discard** | `python3 "<claudna-root>/lib/claudna/session_store" digest --done '<item>' --vault '<vault>' --outcome discarded` (the draft stays in the vault as a draft, out of the digest; deleting a note is Claudron curation) |
+| `draft` | **discard** | `python3 "<claudna-root>/lib/claudna/session_store" digest --done '<item>' --vault '<vault>' --revision <revision> --outcome discarded` (the draft stays in the vault as a draft, out of the digest; deleting a note is Claudron curation) |
 | `person` | **capture** | a normal `/claudna:capture` of the claim (Steps 2–6, scoped as the person says), then `python3 "<claudna-root>/lib/claudna/session_store" digest --done '<item>' --outcome promoted` |
 | either | **skip** | nothing: it stays in the digest for next time |
 
-`<item>` is the item's `item` field exactly as given, `<vault>` its `vault` and `<revision>` its `revision` (an integer); drop `--vault` when the vault is null. Fill both in as single-quoted arguments, never spliced into the command unquoted.
+`<item>` is the item's `item` field exactly as given, `<vault>` its `vault` and `<revision>` its `revision` (an integer, as shown); drop `--vault` when the vault is null. Fill in `<item>` and `<vault>` as single-quoted arguments, never spliced into the command unquoted, and `<revision>` as the bare integer. A decision on a draft covers the note as you showed it: if a fact was filed since, the command refuses, so show the item again. A promoted subject note keeps its `(unverified) ` title (promotion changes its maturity, not its title); rename it by hand if you want.
 
 `digest --promote` does the whole promotion: it checks the item is in the digest and still at the revision you showed (a fact filed since means the person hasn't seen everything it would promote: show the item again), runs `claudron promote … --to verified --by user` itself, checks the engine's answer, and only then marks the item reviewed. Don't build the `claudron promote` command yourself. On success it prints `{"item", "vault", "outcome": "promoted"}` and exits 0; on any failure it prints `error: …`, exits 1, and leaves the item in the digest. Report the error as given. `digest --done` likewise exits 1 when no digest item has that `item` and vault (its error names the vault to pass); report it.
 

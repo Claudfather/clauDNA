@@ -128,8 +128,9 @@ def finding_of(block: dict, *, sid: str, index: int, project: str | None,
         "type": note_type,
         "title": DRAFT_BANNER + short_title(f"{block['subject_hint']['name']}: {block['claim']}"),
         "body": body,
-        "tags": sorted({*block.get("tags", []), f"home:{block['home']}", f"asserted-by:{block['asserted_by']}",
-                        HARVEST_TAG}),
+        # ``harvest:`` tags are harvest's own markers (``harvest:subject``), never the model's to set.
+        "tags": sorted({*(t for t in block.get("tags", []) if not t.startswith("harvest:")),
+                        f"home:{block['home']}", f"asserted-by:{block['asserted_by']}", HARVEST_TAG}),
         "source_type": "inline",
     }
     if trust_aware:
@@ -270,7 +271,7 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
                                       vault=answer.get("vault", vault), run_id=target.run_id)
 
             outcome = file_block(block, finding, sid=sid, index=index, target=target, record=record) if filing \
-                else per_claim(block, finding, target, record)
+                else per_claim(finding, target, record)
             setattr(report, outcome, getattr(report, outcome) + 1)  # created · filed · known · rejected
         for block, _ in (pair for pair in findings if pair[1] is None):
             root = claudron.vault_root(origin.get("cwd"), vault, env)  # the root captures record: one name per vault

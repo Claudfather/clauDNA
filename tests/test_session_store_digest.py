@@ -186,7 +186,8 @@ class TestCliAndBriefing:
         root = ["--root", str(store.root)]
         assert main(["digest", "--json", *root]) == 0
         (item,) = json.loads(capsys.readouterr().out)
-        assert main(["digest", "--done", item["item"], "--vault", item["vault"], "--outcome", "promoted", *root]) == 0
+        assert main(["digest", "--done", item["item"], "--vault", item["vault"], "--outcome", "promoted",
+                     "--revision", str(item["revision"]), *root]) == 0
         capsys.readouterr()
         assert main(["digest", *root]) == 0 and "nothing to review" in capsys.readouterr().out
 
@@ -220,7 +221,9 @@ class TestTwoVaults:
         assert f"--vault {tmp_path / 'a'}" in capsys.readouterr().err
         assert [i.item for i in digest.items(store.root)] == ["projects/n.md"]  # still there
         assert main(["digest", "--done", "projects/n.md", "--outcome", "kept"]
-                    + ["--vault", str(tmp_path / "a"), *root]) == 0
+                    + ["--vault", str(tmp_path / "a"), *root]) == 2  # a draft is decided as shown: --revision
+        assert main(["digest", "--done", "projects/n.md", "--outcome", "kept"]
+                    + ["--vault", str(tmp_path / "a"), "--revision", "1", *root]) == 0
         assert digest.items(store.root) == []
 
 
