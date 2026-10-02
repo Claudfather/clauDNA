@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- **CI runs its actions on Node 24.** GitHub deprecated the Node 20 runtime that `actions/checkout@v4`, `setup-python@v5`, `setup-node@v4` and `upload-artifact@v4` use, and was forcing them onto Node 24 with a warning. All workflows now use v7 of each, which targets Node 24 natively and keeps every input we pass. The routing eval also installs Claude Code on Node 22 instead of the end-of-life Node 20.
 
 ## [0.24.0] - 2026-10-02
 ### Added
