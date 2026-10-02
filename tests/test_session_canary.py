@@ -183,3 +183,65 @@ def test_report_has_a_section_per_canary_and_counts_hook_errors():
 def test_report_without_a_log_says_to_run_setup_first(tmp_path, capsys):
     assert canary.main(["report", str(tmp_path)]) == 1
     assert "run the steps from `setup` first" in capsys.readouterr().err
+
+
+# --- review fixes ---------------------------------------------------------------------------------
+
+def test_a_hook_error_row_is_not_mistaken_for_a_nested_child():
+    rows = [row("SessionStart", source="startup"), {"event": "canary-error", "error": "boom"}]
+    assert canary.check_nested(rows)[0].startswith("UNKNOWN")
+
+
+def test_without_a_walk_processes_are_told_apart_by_claude_pid():
+    no_walk = [{**r, "claude_pid_walked": None} for r in
+               (row("SessionStart", source="startup"), child("SessionStart", source="startup"))]
+    assert canary.check_nested(no_walk)[0].startswith("INHERITS")
+
+
+def test_a_child_with_its_parents_claude_pid_is_still_found_by_the_walk():
+    rows = [row("SessionStart", source="startup"), child("SessionStart", env_pid=100, source="startup")]
+    assert canary.check_nested(rows)[0].startswith("INHERITS")
+
+
+def test_an_empty_entrypoint_is_compared_as_the_store_records_it():
+    # The store records an unset or empty CLAUDE_CODE_ENTRYPOINT as None, so a child with the same
+    # $CLAUDE_PID and an empty entrypoint is indistinguishable from the parent on activity events.
+    parent = {**row("SessionStart", source="startup"), "entrypoint": ""}
+    rows = [parent, child("SessionStart", env_pid=100, entrypoint="", source="startup"),
+            child("UserPromptSubmit", env_pid=100, entrypoint="")]
+    assert canary.check_nested(rows)[0].startswith("LEAKS")
+
+
+def test_clear_falls_back_to_the_walk_when_claude_pid_is_not_exported():
+    end, start = row("SessionEnd", reason="clear"), row("SessionStart", "B", source="clear")
+    end["claude_pid_env"] = start["claude_pid_env"] = None
+    [verdict] = canary.check_clear([end, start])
+    assert verdict.startswith("PASS") and "not exported" in verdict
+    end["claude_pid_walked"] = start["claude_pid_walked"] = None
+    assert canary.check_clear([end, start])[0].startswith("UNKNOWN")
+
+
+def test_compact_with_no_recorded_size_is_unknown(tmp_path):
+    rows = _compact_log(tmp_path, [])
+    rows[0]["transcript_size"] = 0
+    assert canary.check_compact(rows)[0].startswith("UNKNOWN")
+
+
+def test_setup_refuses_a_dir_holding_an_earlier_run(tmp_path, capsys):
+    (tmp_path / canary.LOG_NAME).write_text("{}\n")
+    assert canary.main(["setup", "--dir", str(tmp_path)]) == 1
+    assert "earlier run" in capsys.readouterr().err
+
+
+def test_setup_prints_steps_that_work_from_any_directory(tmp_path, capsys):
+    assert canary.main(["setup", "--dir", str(tmp_path)]) == 0
+    assert f"python3 {SCRIPT} report {tmp_path}" in capsys.readouterr().out
+
+
+def test_the_hook_command_survives_a_path_the_shell_would_expand(tmp_path):
+    odd = tmp_path / "a $dir with spaces"
+    log = canary.write_plugin(odd, SCRIPT)
+    command = json.loads((odd / "hooks.json").read_text())["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+    subprocess.run(["sh", "-c", command], input=json.dumps({"hook_event_name": "SessionStart"}), text=True,
+                   check=True)
+    assert json.loads(log.read_text())["event"] == "SessionStart"

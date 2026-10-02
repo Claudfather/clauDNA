@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import sys
 import time
 from pathlib import Path
@@ -81,7 +82,7 @@ def run_hook(log: Path) -> None:
 
 def hooks_config(script: Path, log: Path) -> dict:
     """``hooks.json`` that sends every event in :data:`EVENTS` to ``script hook``."""
-    command = f'python3 "{script}" hook --log "{log}"'
+    command = f"python3 {shlex.quote(str(script))} hook --log {shlex.quote(str(log))}"
     entry = {"hooks": [{"type": "command", "command": command}]}
     return {"hooks": {event: [{**entry, "matcher": "*"} if event.startswith("PostToolUse") else entry]
                       for event in EVENTS}}
@@ -104,7 +105,7 @@ Canary plugin written to {dir}
 Run this in a normal terminal on your machine (not a cloud session), from any
 scratch git repo:
 
-  claude --plugin-dir "{dir}"
+  claude --plugin-dir {dir}
 
 Then, in that one interactive session, in order:
 
@@ -113,14 +114,14 @@ Then, in that one interactive session, in order:
   3. say hi again
   4. /clear
   5. say hi
-  6. !claude -p --plugin-dir "{dir}" "say hi"
+  6. !claude -p --plugin-dir {dir} "say hi"
        (the leading ! runs it as a shell command, inside this session; it is
         the nested child for §11.5, with no --session-id on purpose)
   7. /exit
 
 Then print the verdicts, and paste them back:
 
-  python3 scripts/session_canary.py report "{dir}"
+  python3 {script} report {dir}
 
 The log keeps event names, ids, sizes and pids, never your prompts.
 """
@@ -161,9 +162,10 @@ def check_compact(rows: list[dict]) -> list[str]:
     for n, row in enumerate(rows):
         if row.get("event") != "PreCompact":
             continue
-        path, offset = row.get("transcript_path"), row.get("transcript_size") or 0
-        if not path or not _next(rows, n, event="SessionStart", source="compact", session_id=row.get("session_id")):
-            out.append("UNKNOWN: a PreCompact with no SessionStart(compact) after it, or no transcript path")
+        path, offset = row.get("transcript_path"), row.get("transcript_size")
+        if not path or not offset or \
+                not _next(rows, n, event="SessionStart", source="compact", session_id=row.get("session_id")):
+            out.append("UNKNOWN: a PreCompact with no SessionStart(compact) after it, or no transcript size")
             continue
         try:
             on_line, before = _before_boundary(Path(path), offset)
@@ -191,17 +193,27 @@ def check_clear(rows: list[dict]) -> list[str]:
             out.append("UNKNOWN: a SessionEnd(clear) with no SessionStart(clear) after it")
             continue
         env_pid, after = row.get("claude_pid_env"), start.get("claude_pid_env")
-        verdict = "PASS" if env_pid and env_pid == after else "FAIL"
-        walked = (f"walked {row['claude_pid_walked']} -> {start['claude_pid_walked']}"
-                  if row.get("claude_pid_walked") and start.get("claude_pid_walked") else "walk unavailable")
-        out.append(f"{verdict}: $CLAUDE_PID {env_pid} -> {after} ({walked}); "
-                   f"new session id: {start.get('session_id') != row.get('session_id')}")
+        was, now = row.get("claude_pid_walked"), start.get("claude_pid_walked")
+        walked = f"walked {was} -> {now}" if was and now else "walk unavailable"
+        if env_pid or after:
+            verdict, key = ("PASS" if env_pid == after else "FAIL"), f"$CLAUDE_PID {env_pid} -> {after} ({walked})"
+        elif was and now:  # no $CLAUDE_PID exported: the store keys the link on the walk instead
+            verdict, key = ("PASS" if was == now else "FAIL"), f"$CLAUDE_PID not exported; {walked}"
+        else:
+            verdict, key = "UNKNOWN", "neither $CLAUDE_PID nor the walk found a claude process"
+        out.append(f"{verdict}: {key}; new session id: {start.get('session_id') != row.get('session_id')}")
     return out or ["UNKNOWN: no /clear in the log (step 4 not run?)"]
 
 
-def _process(row: dict) -> object:
-    """Which ``claude`` a row ran under: the walked pid, which a child can't inherit, else ``$CLAUDE_PID``."""
-    return row.get("claude_pid_walked") or row.get("claude_pid_env")
+def _grouper(rows: list[dict]):
+    """How to tell ``claude`` processes apart: by the walked pid, which a child can't inherit.
+
+    Only when the walk found nothing at all (a ``claude`` whose process name
+    doesn't say so) does it fall back to ``$CLAUDE_PID``; mixing the two would
+    let a child carrying its parent's ``$CLAUDE_PID`` pass for the parent.
+    """
+    key = "claude_pid_walked" if any(r.get("claude_pid_walked") for r in rows) else "claude_pid_env"
+    return lambda row: row.get(key)
 
 
 def check_nested(rows: list[dict]) -> list[str]:
@@ -210,15 +222,18 @@ def check_nested(rows: list[dict]) -> list[str]:
     The guard is ``boundaries.inherited``, given the facts the store records at
     the parent's open: its ``$CLAUDE_PID`` and entrypoint.
     """
+    rows = [r for r in rows if r.get("event") in EVENTS]  # a canary-error row names no process
     starts = [r for r in rows if r.get("event") == "SessionStart"]
     if not starts:
         return ["UNKNOWN: no SessionStart in the log"]
+    _process = _grouper(rows)
     parent = starts[0]
     parent_ids = {r.get("session_id") for r in rows if _process(r) == _process(parent)}
     child_rows = [r for r in rows if _process(r) != _process(parent)]
     if not child_rows:
         return ["UNKNOWN: no events from a nested claude (step 6 not run?)"]
-    facts = SessionFacts(status="open", actor={"entrypoint": parent.get("entrypoint")}, private=False,
+    # The facts as session.opened records them: its entrypoint (None when unset) and $CLAUDE_PID.
+    facts = SessionFacts(status="open", actor={"entrypoint": parent.get("entrypoint") or None}, private=False,
                          claude_pid=parent.get("claude_pid_env"))
     out = []
     for proc in dict.fromkeys(_process(r) for r in child_rows):
@@ -282,8 +297,12 @@ def main(argv: list[str] | None = None) -> int:
         import tempfile
 
         target = (args.dir or Path(tempfile.mkdtemp(prefix="claudna-canary-"))).resolve()
-        write_plugin(target, Path(__file__).resolve())
-        print(STEPS.format(dir=target))
+        if (target / LOG_NAME).exists():  # a second run's rows would be read as the first run's children
+            print(f"{target / LOG_NAME} is from an earlier run: delete it or pick another --dir", file=sys.stderr)
+            return 1
+        script = Path(__file__).resolve()
+        write_plugin(target, script)
+        print(STEPS.format(dir=shlex.quote(str(target)), script=shlex.quote(str(script))))
         return 0
     log = args.dir / LOG_NAME
     if not log.is_file():
