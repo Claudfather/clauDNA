@@ -95,7 +95,7 @@ class TestDigest:
         answers = iter(["knowledge/other.md", "knowledge/staging.md", "knowledge/staging.md"])
 
         class SharedPath(FakeCapture):
-            def __call__(self, finding, cwd, env, vault=None):
+            def __call__(self, finding, cwd, env, vault=None, run_id=None):
                 super().__call__(finding, cwd, env, vault)
                 return {"action": "created", "path": next(answers)}
 

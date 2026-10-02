@@ -6,11 +6,20 @@ blocks through Claudron's write door — ``claudron capture --stdin --json`` —
 where each lands as ``maturity: draft``. Claudron never reads the store;
 clauDNA never writes the vault except through ``claudron``.
 
-This is the loop-closing slice, not the full librarian: no subject
-resolution, no plan model, no risk tiers yet (they wait on Claudron#200's
-pipes). What it does hold to:
+This is the loop-closing slice, not the full librarian: no plan model and
+no risk tiers yet. On an engine with Claudron#200's pipes (``subjects``,
+``amend``, ``runs``; Claudron ≥ 0.7) each block is filed under its subject by
+:mod:`.filing`, every write tagged with the run's id (:attr:`RunReport.run_id`,
+undone whole by ``claudron revert-run``); on an older one, each block is one
+per-claim draft. What it does hold to:
 
-* **Drafts only, and never person facts.** ``person`` blocks are held back
+* **Drafts only, marked as external.** On an engine with ``trust-aware-reads``
+  every write is ``source_type: session``, with ``session:<sid>:<seg>`` as its
+  ``source_url``: Claudron then withholds it from default reads and shows it
+  only in recall's Unverified block. An older engine would refuse ``session``,
+  so there it stays ``inline``, tagged :data:`HARVEST_TAG` (Claudron's doctor
+  m003 moves those to ``session`` once the engine is upgraded).
+* **Never person facts.** ``person`` blocks are held back
   in ``<root>/harvest/held.jsonl``: an other-person fact is high-risk (§7.2)
   and waits for the human digest. Private sessions are never harvested.
 * **Claudron's dedup routes, never rejects.** A ``suggest_update`` /
@@ -42,7 +51,8 @@ from claudna.redact import redact_strings
 from . import schema
 from .fsio import atomic_write_json, atomic_write_text, ensure_dir, exclusive_lock, read_json, utc_seconds
 from . import claudron
-from .claudron import _ROOTS, CLAUDRON_ENV, CaptureError, claudron_bin  # noqa: F401 (re-exported)
+from .claudron import _STATUS, CLAUDRON_ENV, CaptureError, claudron_bin  # noqa: F401 (re-exported)
+from .filing import DRAFT_BANNER, FILING_CAPS, HARVEST_TAG, evidence_ref, file_block, short_title
 from .project import (HARVEST_CONSUMER, MAX_ATTEMPTS, abandoned_at, by_segment, harvest_skip, latest_origin,
                       load_lifecycle, session_facts, summary_verdict)
 from .store import SessionStore
@@ -59,9 +69,9 @@ NOTE_TYPES = {"entity": "knowledge", "concept": "knowledge", "project": "knowled
 MAX_RETRIES_PER_RUN = 2
 LAST_RUN = "harvest/last_run.json"
 IDLE_INTERVAL_H = 1.0
-#: Prefixed to every draft's title, so any view that lists it — Claudron's own SessionStart brief
-#: included — shows it as unreviewed (spec §7.2's banner; #373 review, M4).
-DRAFT_BANNER = "(unverified) "
+#: The engine capability that makes ``source_type: session`` both accepted and withheld (Claudron#200 §1).
+TRUST_CAP = "trust-aware-reads"
+RUN_CAP = "runs"
 
 
 run_claudron_capture = claudron.capture  #: the default capture (tests replace it)
@@ -96,20 +106,15 @@ def is_due(root: Path, env: Mapping[str, str], now: float | None = None) -> bool
     return _skip_reason(root, env, now) is None and shutil.which(claudron_bin(env), path=env.get("PATH")) is not None
 
 
-def _title(text: str, limit: int = 100) -> str:
-    """``text`` cut at a word boundary to ``limit`` characters, with an ellipsis when cut."""
-    if len(text) <= limit:
-        return text
-    return text[:limit].rsplit(" ", 1)[0].rstrip(" ,;:") + "…"
-
-
-def finding_of(block: dict, *, sid: str, index: int, project: str | None) -> dict | None:
-    """The ``claudron capture`` JSON for one block, or ``None`` when it is held back.
+def finding_of(block: dict, *, sid: str, index: int, project: str | None,
+               trust_aware: bool = False) -> dict | None:
+    """The per-claim ``claudron capture`` JSON for one block, or ``None`` when it is held back.
 
     The tag namespaces (``home:``, ``asserted-by:``, ``origin:``) are
     provisional until Claudron's tag registry lands (Claudron#200). Provenance
     goes after the claim, never before it: the first body line is the summary
-    recall shows.
+    recall shows. ``trust_aware`` (the engine declares :data:`TRUST_CAP`) marks
+    it ``source_type: session``; the tag stays either way, for older readers.
     """
     note_type = NOTE_TYPES.get(block["home"])
     if note_type is None:
@@ -120,12 +125,14 @@ def finding_of(block: dict, *, sid: str, index: int, project: str | None) -> dic
     body += f"\n\nHarvested from session {sid}, segment {index} (asserted by the {block['asserted_by']})."
     finding = {
         "type": note_type,
-        "title": DRAFT_BANNER + _title(f"{block['subject_hint']['name']}: {block['claim']}"),
+        "title": DRAFT_BANNER + short_title(f"{block['subject_hint']['name']}: {block['claim']}"),
         "body": body,
         "tags": sorted({*block.get("tags", []), f"home:{block['home']}", f"asserted-by:{block['asserted_by']}",
-                        "origin:session-harvest"}),
+                        HARVEST_TAG}),
         "source_type": "inline",
     }
+    if trust_aware:
+        finding.update(source_type="session", source_url=evidence_ref(sid, index))
     if project:
         finding["project"] = project
     return redact_strings(finding)  # defense in depth: the summary was redacted when written
@@ -140,6 +147,7 @@ class RunReport:
     reason: str | None = None
     segments: int = 0
     created: int = 0
+    filed: int = 0  #: facts (or their evidence) added to a subject draft an earlier write made
     known: int = 0
     held_back: int = 0
     screened: int = 0  #: blocks the instruction screen kept out (claudna.screen): never captured or held
@@ -149,10 +157,15 @@ class RunReport:
     idle: bool = False
     errors: list[str] = field(default_factory=list)
     sessions: list[str] = field(default_factory=list)  #: sessions a segment was taken from (the ops log's)
+    #: Every write this run makes on an engine with ``runs`` carries it: ``claudron revert-run <id>`` undoes them.
+    run_id: str = ""
+
+    def __post_init__(self) -> None:
+        self.run_id = self.run_id or time.strftime("harvest-%Y%m%dT%H%M%SZ", time.gmtime(self.started_epoch))
 
     @property
     def captures(self) -> int:
-        return self.created + self.known + self.rejected
+        return self.created + self.filed + self.known + self.rejected
 
     @property
     def started_at(self) -> str:
@@ -185,6 +198,9 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
     if skip:
         return
     origin, vault = latest_origin(lifecycle), facts.harvest.get("vault")
+    caps = claudron.capabilities(origin.get("cwd"), vault, env)
+    run_id = report.run_id if RUN_CAP in caps else None
+    filing = FILING_CAPS <= caps
     indices = handle.paths.segment_indices()
     for index in indices:
         if index <= through:
@@ -234,16 +250,23 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
             return  # never step past a segment whose blocks can't be read: the cursor holds
         blocks = [b for b in summary["blocks"] if not tripped(b)]  # a summary written before the screen existed
         report.screened += len(summary["blocks"]) - len(blocks) + _dropped_when_written(lifecycle, index, boundary)
-        findings = [(b, finding_of(b, sid=sid, index=index, project=origin["repo"])) for b in blocks]
+        findings = [(b, finding_of(b, sid=sid, index=index, project=origin["repo"], trust_aware=TRUST_CAP in caps))
+                    for b in blocks]
         wanted = [f for _, f in findings if f is not None]
         if report.captures and report.captures + len(wanted) > MAX_CAPTURES:
             return  # out of budget: the whole segment waits for the next run (a first one always fits)
         for block, finding in ((b, f) for b, f in findings if f is not None):
-            answer = capture(finding, origin.get("cwd"), env, vault)
+            if filing:
+                answer = file_block(block, finding, sid=sid, index=index, cwd=origin.get("cwd"), env=env,
+                                    vault=vault, run_id=run_id, capture=capture)
+            else:
+                answer = {**capture(finding, origin.get("cwd"), env, vault, run_id=run_id), "title": finding["title"]}
             action = answer["action"]
-            digest.record_capture(store.root, sid=sid, seg=index, block=block, title=finding["title"],
-                                  action=action, path=answer["path"], vault=answer.get("vault", vault))
-            if action in ("created", "updated"):
+            digest.record_capture(store.root, sid=sid, seg=index, block=block, title=answer["title"],
+                                  action=action, path=answer["path"], vault=answer.get("vault", vault), run_id=run_id)
+            if answer.get("amended") and action == "updated":
+                report.filed += 1
+            elif action in ("created", "updated"):
                 report.created += 1
             elif action == "rejected":
                 report.rejected += 1
@@ -326,6 +349,8 @@ def liveness_line(report: RunReport) -> str:
     if report.status == "error":
         return f"{head}: FAILED — {report.errors[0][:160]} (drafts written before it: {report.created})"
     parts = [f"{report.created} new draft(s)"]
+    if report.filed:
+        parts.append(f"{report.filed} fact(s) filed under existing subjects")
     if report.known:
         parts.append(f"{report.known} already known")
     if report.held_back:

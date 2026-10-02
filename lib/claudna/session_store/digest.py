@@ -57,18 +57,20 @@ def person_item(key: str) -> str:
 
 
 def record_capture(root: Path, *, sid: str, seg: int, block: dict, title: str, action: str,
-                   path: str | None, vault: str | None) -> None:
-    """One ledger line for one ``claudron capture`` answer: its vault-relative path and the vault it is in.
+                   path: str | None, vault: str | None, run_id: str | None = None) -> None:
+    """One ledger line for one write's answer (a capture, or an amend into a subject draft).
 
     Harvest's capture adapter makes the path relative to the root Claudron
     reports, so the digest's ``item``/``vault`` are exactly what ``claudron
-    --vault <vault> promote <item>`` takes.
+    --vault <vault> promote <item>`` takes. ``run_id`` (an engine with runs)
+    is what ``claudron --vault <vault> revert-run`` takes.
     """
     key = claim_key(block)  # keyed on the claim as summarized, so the same claim keys alike however redaction evolves
     block, title = redact_strings(block), redact_strings(title)  # the ledger holds what the vault got (#387 B2)
     append_jsonl(ensure_dir(home(root)) / "ledger.jsonl", {
         "ts": now_ts(), "sid": sid, "seg": seg, "key": key, "title": title, "claim": block.get("claim"),
         "asserted_by": block.get("asserted_by"), "action": action, "path": path, "vault": vault,
+        **({"run_id": run_id} if run_id else {}),
     })  # fsynced: harvest acks right after, and the ack is durable — a crash must not keep it and lose this
 
 

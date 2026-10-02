@@ -1,4 +1,4 @@
-"""The one door to the Claudron engine (``claudron`` CLI): capture, vault resolution, promote.
+"""The one door to the Claudron engine (``claudron`` CLI): capture, resolve, amend, vault status, promote.
 
 Every call goes through :func:`_run`, which holds the three rules the engine
 contract (``skills/_shared/claudron-engine.md`` §2) and this store share:
@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
@@ -26,6 +27,7 @@ CLAUDRON_ENV = "CLAUDNA_CLAUDRON_BIN"
 TIMEOUT_S = 30
 CAPTURE_ACTIONS = ("created", "updated", "suggest_update", "suggest_supersede", "rejected")
 PROMOTE_ACTIONS = ("promoted", "unchanged")  #: ``unchanged``: the note is already at the target maturity
+AMEND_ACTIONS = ("updated", "unchanged")  #: an amend harvest sends is well-formed, so ``rejected`` is a failure
 
 
 class ClaudronError(RuntimeError):
@@ -67,7 +69,8 @@ def _data(envelope: dict) -> dict:
     return data if isinstance(data, dict) else {}
 
 
-def capture(finding: dict, cwd: str | None, env: Mapping[str, str], vault: str | None = None) -> dict:
+def capture(finding: dict, cwd: str | None, env: Mapping[str, str], vault: str | None = None, *,
+            run_id: str | None = None) -> dict:
     """One ``claudron capture --stdin --json``: ``{"action", "path", "vault"}``.
 
     Valid answers are exit 0 + ``ok`` + a known ``data.action``; a ``rejected``
@@ -75,48 +78,122 @@ def capture(finding: dict, cwd: str | None, env: Mapping[str, str], vault: str |
     failure. ``capture`` answers ``created``/``updated`` with an absolute path,
     but ``promote`` takes a vault-relative one, so the path is made relative to
     the root Claudron reports (:func:`vault_root`), and that root is returned.
+    ``run_id`` rides in the JSON (Claudron ≥ 0.7, ``runs``): the commit carries
+    the run's trailer, so ``claudron revert-run`` can undo the whole run.
     """
-    code, envelope = _run(["capture", "--stdin", "--json"], env, vault=vault, stdin=json.dumps(finding), cwd=cwd,
+    payload = {**finding, "run_id": run_id} if run_id else finding
+    code, envelope = _run(["capture", "--stdin", "--json"], env, vault=vault, stdin=json.dumps(payload), cwd=cwd,
                           error=CaptureError)
     data = _data(envelope)
     action = data.get("action")
     if envelope.get("command") != "capture" or action not in CAPTURE_ACTIONS or \
             ((code != 0 or not envelope.get("ok")) and action != "rejected"):
         raise CaptureError(f"claudron capture exited {code}: {str(envelope.get('errors') or data)[:150]}")
-    path = data.get("path") if isinstance(data.get("path"), str) and data.get("path") else None
-    # The root is asked for when the path needs it, or when the session recorded no vault: without one,
-    # the digest item would carry vault None and `promote` would resolve against the reviewer's cwd.
+    return {"action": action, **_located(data.get("path"), cwd, vault, env)}
+
+
+def _located(path: object, cwd: str | None, vault: str | None, env: Mapping[str, str]) -> dict:
+    """``{"path", "vault"}`` for a write's answer: the path vault-relative, as ``promote`` and ``amend`` take it.
+
+    The root is asked for when the path needs it, or when the session recorded
+    no vault: without one, the digest item would carry vault None and
+    ``promote`` would resolve against the reviewer's cwd.
+    """
+    path = path if isinstance(path, str) and path else None
     root = vault_root(cwd, vault, env) if path and (os.path.isabs(path) or not vault) else None
     if root and os.path.isabs(path):
         try:
             path = Path(os.path.realpath(path)).relative_to(root).as_posix()
         except ValueError:
             pass  # outside the vault claudron reports: keep it as given
-    return {"action": action, "path": path, "vault": str(root) if root else vault}
+    return {"path": path, "vault": str(root) if root else vault}
 
 
-_ROOTS: dict[tuple[str | None, str | None], Path] = {}  #: one ``status`` per vault per run (a short process)
+def resolve(name: str, *, aliases: list[str], note_type: str, cwd: str | None, env: Mapping[str, str],
+            vault: str | None = None) -> list[dict]:
+    """``claudron resolve --name N --aliases A,B --type T --json``: the candidate subjects, best first.
+
+    Claudron ≥ 0.7 (``subjects``). Each candidate carries ``path``,
+    ``match_type`` (``title``/``alias``/``slug`` for an exact match), ``trust``
+    and ``tags``; choosing among them is the caller's job.
+    """
+    # ``--flag=value``: a name the model wrote may start with a dash, and argparse would read it as a flag.
+    args = ["resolve", f"--name={name}", f"--type={note_type}", "--json"]
+    if aliases:
+        args.append("--aliases=" + ",".join(a.replace(",", " ") for a in aliases))
+    code, envelope = _run(args, env, vault=vault, cwd=cwd, error=CaptureError)
+    candidates = _data(envelope).get("candidates")
+    if code != 0 or not envelope.get("ok") or envelope.get("command") != "resolve" or not isinstance(candidates, list):
+        raise CaptureError(f"claudron resolve exited {code}: {str(envelope.get('errors') or candidates)[:150]}")
+    return [c for c in candidates if isinstance(c, dict)]
 
 
-def vault_root(cwd: str | None, vault: str | None, env: Mapping[str, str]) -> Path | None:
-    """The vault root Claudron itself reports (``status --json``'s ``data.root``), or ``None``.
+def amend(request: dict, cwd: str | None, env: Mapping[str, str], vault: str | None = None, *,
+          run_id: str | None = None) -> dict:
+    """One ``claudron amend --stdin --json``: ``{"action", "outcome", "fact_id", "path", "vault"}``.
+
+    Claudron ≥ 0.7 (``amend``). ``request`` is ``{note, op, ...}``; a replay of
+    the same fact and evidence answers ``unchanged``. A request Claudron refuses
+    (a malformed one exits 2 with no envelope) raises :class:`CaptureError`, as
+    a failed capture does: harvest stops and keeps the cursor.
+    """
+    payload = {**request, "run_id": run_id} if run_id else request
+    code, envelope = _run(["amend", "--stdin", "--json"], env, vault=vault, stdin=json.dumps(payload), cwd=cwd,
+                          error=CaptureError)
+    data = _data(envelope)
+    if code != 0 or not envelope.get("ok") or envelope.get("command") != "amend" or \
+            data.get("action") not in AMEND_ACTIONS:
+        raise CaptureError(f"claudron amend exited {code}: {str(envelope.get('errors') or data)[:150]}")
+    return {"action": data["action"], "outcome": data.get("outcome") or "", "fact_id": data.get("fact_id") or "",
+            **_located(data.get("path"), cwd, vault, env)}
+
+
+@dataclass(frozen=True)
+class Status:
+    """What ``status --json`` says about one vault: its root and the engine's capabilities."""
+
+    root: Path
+    capabilities: frozenset
+
+
+_STATUS: dict[tuple[str | None, str | None], Status] = {}  #: one ``status`` per vault per run (a short process)
+
+
+def status(cwd: str | None, vault: str | None, env: Mapping[str, str]) -> Status | None:
+    """The vault's :class:`Status` as Claudron itself reports it, or ``None``.
 
     Vault resolution is Claudron's contract: ask it, with the same
     ``--vault``/``cwd`` the capture used. Only a success is cached: one failed
-    call (a timeout, a busy index) mustn't decide the rest of the run.
+    call (a timeout, a busy index) mustn't decide the rest of the run. An
+    engine older than the capability list reports none, which is the right
+    answer for every capability in it (claudron-engine.md §2).
     """
     key = (cwd, vault)
-    if key in _ROOTS:
-        return _ROOTS[key]
+    if key in _STATUS:
+        return _STATUS[key]
     try:
         code, envelope = _run(["status", "--json"], env, vault=vault, cwd=cwd)
     except ClaudronError:
         return None
-    root = _data(envelope).get("root") if code == 0 else None
+    data = _data(envelope) if code == 0 else {}
+    root, caps = data.get("root"), data.get("capabilities")
     if not (isinstance(root, str) and root):
         return None
-    _ROOTS[key] = Path(os.path.realpath(root))
-    return _ROOTS[key]
+    _STATUS[key] = Status(Path(os.path.realpath(root)),
+                          frozenset(c for c in caps if isinstance(c, str)) if isinstance(caps, list) else frozenset())
+    return _STATUS[key]
+
+
+def vault_root(cwd: str | None, vault: str | None, env: Mapping[str, str]) -> Path | None:
+    """The vault root Claudron reports (``status --json``'s ``data.root``), or ``None``."""
+    found = status(cwd, vault, env)
+    return found.root if found else None
+
+
+def capabilities(cwd: str | None, vault: str | None, env: Mapping[str, str]) -> frozenset:
+    """The engine's declared capabilities for this vault (empty when ``status`` fails or predates them)."""
+    found = status(cwd, vault, env)
+    return found.capabilities if found else frozenset()
 
 
 def promote(item: str, vault: str | None, env: Mapping[str, str]) -> dict:

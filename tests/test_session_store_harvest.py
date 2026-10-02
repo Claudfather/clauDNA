@@ -44,13 +44,15 @@ def _never_the_real_tools(monkeypatch):
     monkeypatch.setattr(harvest, "run_claudron_capture", lambda *a, **k: pytest.fail("reached the real claudron"))
     # Vault resolution asks claudron too: a test's recorded vault is its root (the real one resolves symlinks).
     monkeypatch.setattr(harvest.claudron, "vault_root", lambda cwd, vault, env: Path(vault) if vault else None)
+    # An engine with no capabilities: the per-claim path. Filing has its own tests (test_session_store_filing.py).
+    monkeypatch.setattr(harvest.claudron, "capabilities", lambda cwd, vault, env: frozenset())
 
 
 class FakeCapture:
     def __init__(self, answers=None, error_after=None):
         self.findings, self.answers, self.error_after = [], list(answers or []), error_after
 
-    def __call__(self, finding, cwd, env, vault=None):
+    def __call__(self, finding, cwd, env, vault=None, run_id=None):
         if self.error_after is not None and len(self.findings) >= self.error_after:
             raise harvest.CaptureError("claudron capture exited 3: vault not found")
         self.findings.append((finding, cwd))
@@ -410,7 +412,7 @@ class TestRunClaudronCapture:
         assert seen["argv"][:2] == ["--vault", "/vaults/work"] and seen["env_vault"] is None
 
     def test_an_absolute_note_path_is_made_relative_to_the_root_claudron_reports(self, tmp_path):
-        harvest._ROOTS.clear()
+        harvest._STATUS.clear()
         real = tmp_path / "real-vault"
         (real / "projects").mkdir(parents=True)
         (tmp_path / "link").symlink_to(real)  # the session named its vault through a symlink
@@ -419,25 +421,25 @@ class TestRunClaudronCapture:
         assert (answer["path"], answer["vault"]) == ("projects/n.md", str(real))  # what `promote` takes
 
     def test_without_a_root_the_path_is_kept_as_given(self, tmp_path):
-        harvest._ROOTS.clear()
+        harvest._STATUS.clear()
         env = {**self.make(tmp_path), "FAKE_PATH": str(tmp_path / "n.md")}  # status fails: no FAKE_ROOT
         answer = REAL_CAPTURE({"type": "knowledge", "title": "t"}, str(tmp_path), env)
         assert (answer["path"], answer["vault"]) == (str(tmp_path / "n.md"), None)
 
     def test_a_failed_status_call_is_not_remembered(self, tmp_path):
-        harvest._ROOTS.clear()
+        harvest._STATUS.clear()
         env = {**self.make(tmp_path), "FAKE_PATH": str(tmp_path / "n.md")}  # status fails: no FAKE_ROOT
         REAL_CAPTURE({"type": "knowledge", "title": "t"}, str(tmp_path), env, "/v")
-        assert harvest._ROOTS == {}  # the next capture asks again
+        assert harvest._STATUS == {}  # the next capture asks again
 
     def test_a_relative_answer_with_a_recorded_vault_needs_no_status_call(self, tmp_path):
-        harvest._ROOTS.clear()
+        harvest._STATUS.clear()
         answer = REAL_CAPTURE({"type": "knowledge", "title": "t"}, str(tmp_path), self.make(tmp_path), "/vaults/w")
-        assert harvest._ROOTS == {} and (answer["path"], answer["vault"]) == ("p.md", "/vaults/w")
+        assert harvest._STATUS == {} and (answer["path"], answer["vault"]) == ("p.md", "/vaults/w")
 
     def test_a_relative_answer_without_a_recorded_vault_still_names_its_vault(self, tmp_path):
         """Otherwise the digest item has vault None and `promote` resolves against the reviewer's cwd."""
-        harvest._ROOTS.clear()
+        harvest._STATUS.clear()
         real = tmp_path / "real-vault"
         real.mkdir()
         answer = REAL_CAPTURE({"type": "knowledge", "title": "t"}, str(tmp_path),
