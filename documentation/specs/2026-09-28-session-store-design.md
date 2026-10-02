@@ -71,7 +71,7 @@ Consequences this design is built on:
 3. SessionEnd(clear) and SessionStart(clear) arrive back-to-back from one `claude` process → **clear lineage is linkable** (§4.3).
 4. A nested `claude -p` launched from inside a session adopted the *parent's* session id, even with `CLAUDE_CODE_SESSION_ID` unset (observed in a cloud container; plain-machine behavior unverified) → **every child we spawn gets an explicit `--session-id`** (§7).
 
-Not yet verified (open, §11): that PreCompact's transcript byte offset lines up with the compaction record; whether the `claude` pid is stable across `/clear`.
+The two open questions this left (the compact offset, the pid across `/clear`) held headless; status in §11.3–11.4.
 
 ## 3. Principles
 
@@ -457,9 +457,9 @@ Returns an envelope: `{ schema: "claudna.export/1", items: [{ sid, seg, session:
 
 1. **State dir default — decided 2026-09-30: `~/.claudna/`.** It must be absolute: a relative `CLAUDNA_STATE_DIR` is rejected, so the store can't land inside a repo. It is visible to Claudron and Claudlobby outside Claude Code, and it survives plugin updates and uninstall (SETUP_GUIDE documents manual cleanup). `${CLAUDE_PLUGIN_DATA}` was rejected because uninstall deletes it and it can only be resolved inside Claude Code. `$CLAUDNA_STATE_DIR` still overrides the default.
 2. **Prompt text capture — decided 2026-09-30: off by default for everyone, opt-in with `CLAUDNA_CAPTURE_PROMPTS=1`.** By default `prompt.submitted` carries the time and `chars` only. The summarizer reads the transcript, so summaries and harvest come out the same either way; stored text would only make timelines nicer, at the cost of a second copy of what was typed. When capture is opted in, the text is redacted at `make_event` (P4) and capped at 500 chars. Bots gain nothing from it, because the plane already holds their prompts.
-3. **Compact offset canary** — confirm PreCompact's transcript size equals the offset where post-compact content begins.
-4. **Pid stability across `/clear`** — the clear link (§4.3) assumes the same `claude` pid; confirm with a hook that records the `claude` pid, not the hook shell's.
-5. **Nested session-id inheritance** — observed in a cloud container; test on a plain machine. Bot workers are unaffected (Claudlobby never resumes; every launch is fresh), but every `claude -p` *child* — ours and Claudlobby's digest — gets an explicit `--session-id` and a hook-suppression marker ([Claudlobby#1961](https://github.com/Claudfather/Claudlobby/issues/1961)).
+3. **Compact offset canary** — confirm PreCompact's transcript size equals the offset where post-compact content begins. **Held headless** (the phase 3 plan's canary table); a plain-machine run is `scripts/session_canary.py`.
+4. **Pid stability across `/clear`** — the clear link (§4.3) assumes the same `claude` pid; confirm with a hook that records the `claude` pid, not the hook shell's. **Held headless** (same table); plain machine: the same script.
+5. **Nested session-id inheritance** — observed in a cloud container (same table); test on a plain machine with the same script, which also asks the store's child guard whether it would ignore every child event. Bot workers are unaffected (Claudlobby never resumes; every launch is fresh), but every `claude -p` *child* — ours and Claudlobby's digest — gets an explicit `--session-id` and a hook-suppression marker ([Claudlobby#1961](https://github.com/Claudfather/Claudlobby/issues/1961)).
 6. **Claudron pull verb** — Claudron-side work; this spec defines only the door it calls.
 7. **#203 — decided 2026-09-30: reversed.** `R-record` is ratified as a clauDNA-local SessionEnd role (§4.4). #203's only stated reason was the role split, and `R-record` duplicates no role: it never touches the vault or git, never blocks, and returns fast. The phase 2 hooks PR updates `SETUP_GUIDE.md` §7.4. Claudron's session-loop table needs no amendment, because `R-record` owes the knowledge layer nothing.
 8. **Memory homes and tag registry** — Claudron schema work ([Claudron#200](https://github.com/Claudfather/Claudron/issues/200)); block `home` values track it.

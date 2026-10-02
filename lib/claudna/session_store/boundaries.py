@@ -17,7 +17,7 @@ Guards, in order (each makes the hook record nothing):
 * ``CLAUDNA_SESSION_CHILD=1`` — a ``claude -p`` child clauDNA spawned itself.
 * An inherited session id — a nested ``claude -p`` can reuse its parent's
   session id (canary, spec §11.5) and must not seal, close, or otherwise write
-  into the parent (see :func:`_inherited`).
+  into the parent (see :func:`inherited`).
 * An event or payload this adapter doesn't know.
 
 After a seal, the adapter starts the summarizer for that segment as a detached
@@ -284,7 +284,7 @@ def _facts(handle: SessionHandle) -> SessionFacts:
     return session_facts(load_lifecycle(handle.paths).events if handle.exists() else [])
 
 
-def _inherited(event: str, payload: dict, facts: SessionFacts, env: Mapping[str, str]) -> bool:
+def inherited(event: str, payload: dict, facts: SessionFacts, env: Mapping[str, str]) -> bool:
     """Is this hook a nested ``claude`` reusing an existing session's id? (spec §11.5)
 
     A nested child inherits ``CLAUDE_CODE_SESSION_ID`` — and its entrypoint,
@@ -333,7 +333,7 @@ def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str
     except InvalidSessionId:
         return "ignored: no valid session id"
     facts = _facts(session)
-    if _inherited(event, payload, facts, env):
+    if inherited(event, payload, facts, env):
         return "ignored: nested child with an inherited session id"
     if event in activity.EVENTS:
         return _record_activity(session, event, payload, facts, env)
