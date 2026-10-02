@@ -40,6 +40,7 @@ SESSION_STORE_LAYERS = {
     "events": 2,
     "project": 3,
     "digest": 5,
+    "filing": 5,
     "ops": 2,
     "store": 4,
     "rollup": 4,

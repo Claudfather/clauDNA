@@ -212,6 +212,51 @@ def _log_hook_error(root: Path | None, event: str, exc: BaseException) -> None:
         print(f"session_store hook {event}: {type(exc).__name__}: {exc}", file=sys.stderr)
 
 
+def _review(store, digest, item: str, vault: str | None, revision: int | None, *, outcome: str,
+            promote: bool) -> int:
+    """``digest --promote`` / ``--done``: one person's decision on one item, as they saw it.
+
+    Under harvest's own lock, so no fact lands in a note between the check and
+    the decision. A draft's decision covers the note at ``revision`` (the
+    item's, as shown): promoting it promotes every fact in it, and a review
+    covers what was seen, so a note written to since is shown again first. A
+    promotion runs ``claudron promote`` and is marked done only on its yes.
+    """
+    from . import claudron
+    from .fsio import ensure_dir, exclusive_lock
+
+    with exclusive_lock(ensure_dir(store.root / "harvest") / "lock", blocking=False) as taken:
+        if not taken:
+            print("error: a harvest is running; try again in a minute", file=sys.stderr)
+            return 1
+        try:
+            match = digest.find(store.root, item, vault)
+        except LookupError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        if promote and match.kind != "draft":
+            print("error: only a draft is promoted; a person fact is captured, then --done", file=sys.stderr)
+            return 1
+        if match.kind == "draft":
+            if revision is None:
+                print("error: a draft needs --revision, the item's revision as shown", file=sys.stderr)
+                return 2
+            if match.revision != revision:
+                print(f"error: the note has changed since revision {revision} (now {match.revision}); show it "
+                      "again first", file=sys.stderr)
+                return 1
+        if promote:
+            try:
+                claudron.promote(item, vault, os.environ)
+            except claudron.PromoteError as exc:
+                print(f"error: {exc}", file=sys.stderr)  # not marked reviewed: it stays in the digest
+                return 1
+        digest.mark_reviewed(store.root, item, outcome=outcome, vault=vault,
+                             revision=match.revision if match.kind == "draft" else None)
+    print(json.dumps({"item": item, "vault": vault, "outcome": outcome}))
+    return 0
+
+
 def _export(args) -> int:
     """The export door (spec §8): the envelope, or an ack."""
     from . import export
@@ -333,6 +378,7 @@ def main(argv: list[str] | None = None) -> int:
     act.add_argument("--promote", metavar="ITEM", help="promote a draft to verified (runs claudron), then take it off")
     act.add_argument("--done", metavar="ITEM", help="take an item (a note path or a held fact's person: id) off")
     dig.add_argument("--vault", help="with --promote/--done: the item's vault, as the digest gave it")
+    dig.add_argument("--revision", type=int, help="with --promote/--done on a draft: its revision, as shown")
     dig.add_argument("--outcome", choices=("promoted", "discarded", "kept"), help="with --done: what the person did")
     rns = sub.add_parser("runs", help="the ops log: the store's background runs, newest first", parents=[rooted])
     rns.add_argument("--kind", choices=("summarize", "harvest", "sweep"))
@@ -439,35 +485,18 @@ def main(argv: list[str] | None = None) -> int:
             print("error: --done needs --outcome (promoted, discarded or kept)", file=sys.stderr)
             return 2
         if item:
-            try:
-                match = digest.find(store.root, item, args.vault)
-            except LookupError as exc:
-                print(f"error: {exc}", file=sys.stderr)
-                return 1
-            outcome = "promoted" if args.promote else args.outcome
-            if args.promote:
-                if match.kind != "draft":
-                    print("error: only a draft is promoted; a person fact is captured, then --done", file=sys.stderr)
-                    return 1
-                from . import claudron
-
-                try:
-                    claudron.promote(item, args.vault, os.environ)
-                except claudron.PromoteError as exc:
-                    print(f"error: {exc}", file=sys.stderr)  # not marked reviewed: it stays in the digest
-                    return 1
-            digest.mark_reviewed(store.root, item, outcome=outcome, vault=args.vault)
-            print(json.dumps({"item": item, "vault": args.vault, "outcome": outcome}))
-            return 0
+            return _review(store, digest, item, args.vault, args.revision,
+                           outcome="promoted" if args.promote else args.outcome, promote=bool(args.promote))
         found = [i.as_dict() for i in digest.items(store.root, limit=args.limit)]
         if args.json:
             print(json.dumps(found, indent=2))
         else:
             for n, i in enumerate(found, 1):
                 seen = f"{i['sessions']} session(s)" + (", user-asserted" if i["asserted_by"] == "user" else "")
-                title, claim = readers.printable(i["title"]), readers.printable(i["claim"] or "")
-                print(f"{n}. [{i['kind']}] {title}  ({seen})\n   {claim}\n   item: {i['item']}"
-                      + (f"  vault: {i['vault']}" if i["vault"] else ""))
+                title = readers.printable(i["title"])
+                claims = "".join(f"\n   - {readers.printable(c or '')}" for c in (i["claims"] or [i["claim"]]))
+                print(f"{n}. [{i['kind']}] {title}  ({seen}){claims}\n   item: {i['item']}"
+                      + (f"  vault: {i['vault']}" if i["vault"] else "") + f"  revision: {i['revision']}")
             if not found:
                 print("nothing to review")
         return 0

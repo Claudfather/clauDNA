@@ -13,17 +13,22 @@ from before a newer pattern). This module reads that ledger:
   reviewed, the most-reinforced first, a user-asserted claim ahead of an
   agent's on a tie, then the most recent; and the other-person facts harvest
   held back (``held.jsonl``), of which one always shows.
+* **A note is one item, with every claim written into it.** A subject note
+  (``filing``) gathers facts from many blocks; its item lists them all
+  (``claims``), because promoting it promotes all of them. A review covers the
+  note as it was then: a fact filed later puts it back in the digest.
 * **Review** (``/claudna:capture --review``) is a person's choice per item.
   The mechanical half is deterministic: ``digest --promote`` runs ``claudron
-  promote`` itself and marks the item done only when the envelope says so;
-  ``digest --done`` records a discard or a captured person fact, in
+  promote`` itself and marks the item done only when the envelope says so,
+  and only if the note is still as the person saw it (``--revision``, the
+  item's count of writes, checked under the harvest lock, so no harvest
+  writes in between); ``digest --done`` records a discard or a captured person fact, in
   ``reviewed.jsonl``. Nothing promotes without a person's pick.
 
 ``review.txt`` holds the one line SessionStart shows, rewritten after every
 harvest run and every review.
 
-Blocked on Claudron#200 and not here: subject resolution, section-targeted
-writes, risk tiers, the inbox and ambiguous queues, and ``revert-run``.
+Not here yet (spec §7.2): risk tiers, and the inbox and ambiguous queues.
 """
 
 from __future__ import annotations
@@ -57,18 +62,20 @@ def person_item(key: str) -> str:
 
 
 def record_capture(root: Path, *, sid: str, seg: int, block: dict, title: str, action: str,
-                   path: str | None, vault: str | None) -> None:
-    """One ledger line for one ``claudron capture`` answer: its vault-relative path and the vault it is in.
+                   path: str | None, vault: str | None, run_id: str | None = None) -> None:
+    """One ledger line for one write's answer (a capture, or an amend into a subject draft).
 
     Harvest's capture adapter makes the path relative to the root Claudron
     reports, so the digest's ``item``/``vault`` are exactly what ``claudron
-    --vault <vault> promote <item>`` takes.
+    --vault <vault> promote <item>`` takes. ``run_id`` (an engine with runs)
+    is what ``claudron --vault <vault> revert-run`` takes.
     """
     key = claim_key(block)  # keyed on the claim as summarized, so the same claim keys alike however redaction evolves
     block, title = redact_strings(block), redact_strings(title)  # the ledger holds what the vault got (#387 B2)
     append_jsonl(ensure_dir(home(root)) / "ledger.jsonl", {
         "ts": now_ts(), "sid": sid, "seg": seg, "key": key, "title": title, "claim": block.get("claim"),
         "asserted_by": block.get("asserted_by"), "action": action, "path": path, "vault": vault,
+        **({"run_id": run_id} if run_id else {}),
     })  # fsynced: harvest acks right after, and the ack is durable — a crash must not keep it and lose this
 
 
@@ -86,21 +93,29 @@ class Item:
     kind: str  #: "draft" (a note to promote or discard) or "person" (a held other-person fact)
     item: str  #: what marks it reviewed: the note's vault path, or the held fact's :func:`person_item` id
     title: str
-    claim: str | None
+    claim: str | None  #: the first claim written into the note
     vault: str | None
     sessions: int
     asserted_by: str | None
     last_ts: str
+    claims: tuple = ()  #: every claim written into the note, oldest first (a subject note holds many)
+    revision: int = 0  #: writes into the note so far: what a review covers, and ``promote --revision`` must match
 
     def as_dict(self) -> dict:
         return asdict(self)
 
 
-def _records(root: Path) -> tuple[list[dict], list[dict], set[tuple[str | None, str]]]:
-    """``(ledger, held, reviewed (vault, item) pairs)``, each file read once."""
+def _records(root: Path) -> tuple[list[dict], list[dict], dict[tuple[str | None, str], float]]:
+    """``(ledger, held, {(vault, item): the revision its last review covered})``, each file read once.
+
+    A review line without one (a person fact, or from before revisions) covers every write: ``inf``.
+    """
     h = home(root)
-    reviewed = {(r.get("vault"), r["item"]) for r in read_jsonl(h / "reviewed.jsonl").records
-                if isinstance(r.get("item"), str)}
+    reviewed: dict[tuple[str | None, str], float] = {}
+    for r in read_jsonl(h / "reviewed.jsonl").records:
+        if isinstance(r.get("item"), str):
+            key, rev = (r.get("vault"), r["item"]), r.get("revision")
+            reviewed[key] = max(reviewed.get(key, 0), rev if isinstance(rev, int) else float("inf"))
     held = []
     for rec in read_jsonl(h / "held.jsonl").records:
         block = rec.get("block") if isinstance(rec.get("block"), dict) else {}
@@ -131,7 +146,8 @@ def items(root: Path, *, limit: int | None = DIGEST_SIZE) -> list[Item]:
     Redacted again here (a line written before a newer pattern, or by 0.22),
     and only what is returned: never every ledger line.
     """
-    return [replace(i, title=redact_strings(i.title), claim=redact_strings(i.claim)) for i in _pending(root, limit)]
+    return [replace(i, title=redact_strings(i.title), claim=redact_strings(i.claim),
+                    claims=tuple(redact_strings(list(i.claims)))) for i in _pending(root, limit)]
 
 
 def _pending(root: Path, limit: int | None) -> list[Item]:
@@ -139,22 +155,29 @@ def _pending(root: Path, limit: int | None) -> list[Item]:
     ledger, held, done = _records(root)
     seen = evidence(root, ledger, held)
     drafts: dict[tuple[str | None, str], dict] = {}
+    tainted: set[tuple[str | None, str]] = set()
     for rec in ledger:
         path, vault = rec.get("path"), rec.get("vault")
-        if rec.get("action") not in ("created", "updated") or not isinstance(path, str) or (vault, path) in done:
+        if rec.get("action") not in ("created", "updated") or not isinstance(path, str):
             continue  # a note is (vault, path): the same relative path in two vaults is two notes
         if tripped({"title": rec.get("title"), "claim": rec.get("claim")}):
-            continue  # instruction-shaped (claudna.screen): never offered for promotion, however it got here
-        d = drafts.setdefault((vault, path), {"title": rec.get("title") or path, "claim": rec.get("claim"),
-                                              "vault": vault, "sessions": 0, "user": False, "last_ts": ""})
+            tainted.add((vault, path))  # instruction-shaped (claudna.screen): never offered for promotion, nor
+            continue                    # is a note holding it (promoting the note would promote it too)
+        d = drafts.setdefault((vault, path), {"title": rec.get("title") or path, "claims": [], "vault": vault,
+                                              "sessions": 0, "user": False, "last_ts": "", "revision": 0})
+        d["revision"] += 1
+        if rec.get("claim") not in d["claims"]:
+            d["claims"].append(rec.get("claim"))
         d["sessions"] = max(d["sessions"], len(seen.get((vault, rec.get("key")), ())))
         d["user"] = d["user"] or rec.get("asserted_by") == "user"
         d["last_ts"] = max(d["last_ts"], rec.get("ts") or "")
+    # Reviewed means reviewed as it was then: a note written to after its review is back in the digest.
+    drafts = {k: d for k, d in drafts.items() if k not in tainted and d["revision"] > done.get(k, 0)}
     newest = sorted(drafts.items(), key=lambda kv: kv[1]["last_ts"], reverse=True)  # stable: the tiebreak below
     # Ranked by evidence, then newest. Not by asserted_by: the summarizing model picks that label, so text
     # planted in a transcript could claim "user" and climb the list (the hardening note, path 2).
-    ranked = [Item("draft", path, d["title"], d["claim"], d["vault"], d["sessions"],
-                   "user" if d["user"] else "agent", d["last_ts"])
+    ranked = [Item("draft", path, d["title"], d["claims"][0], d["vault"], d["sessions"],
+                   "user" if d["user"] else "agent", d["last_ts"], tuple(d["claims"]), d["revision"])
               for (_, path), d in sorted(newest, key=lambda kv: -kv[1]["sessions"])]
     people: dict[str, Item] = {}
     for rec in held:
@@ -184,17 +207,20 @@ def find(root: Path, item: str, vault: str | None) -> Item:
                                                                         else ""))
 
 
-def mark_reviewed(root: Path, item: str, *, outcome: str, vault: str | None = None) -> None:
+def mark_reviewed(root: Path, item: str, *, outcome: str, vault: str | None = None,
+                  revision: int | None = None) -> None:
     """Take ``item`` out of the digest, recording what the person did.
 
     ``item`` and ``vault`` are the digest item's own fields: a note's
     vault-relative path and its vault, or a held fact's ``person:`` id (no
-    vault).
+    vault). ``revision`` is the item's: a later write into the note brings it back (``None``: every write,
+    for a person fact).
     """
     if outcome not in ("promoted", "discarded", "kept"):
         raise ValueError(f"invalid outcome: {outcome!r}")
     append_jsonl(ensure_dir(home(root)) / "reviewed.jsonl",
-                 {"ts": now_ts(), "item": item, "vault": vault, "outcome": outcome}, durable=False)
+                 {"ts": now_ts(), "item": item, "vault": vault, "outcome": outcome,
+                  **({"revision": revision} if revision is not None else {})}, durable=False)
     write_review_line(root)
 
 
