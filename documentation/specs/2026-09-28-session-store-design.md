@@ -188,7 +188,7 @@ Schemas ship as JSON Schema (draft 2020-12) beside the code in `lib/claudna/sess
 | `SessionId` | string, as issued by Claude Code (UUID today; treat as opaque) |
 | `SegIndex` | integer ≥ 1; directory name `seg-%03d` (widens past 999 without breaking sort for readers that parse the int) |
 | `ByteRange` | `{ "start": int ≥ 0, "end": int ≥ start \| null }` — `end: null` means open |
-| `TranscriptRef` | `{ "path": string, "range": ByteRange }` (a `sha256` over the range was never set by any writer and was dropped in `claudna.segment/2`) |
+| `TranscriptRef` | `{ "path": string, "range": ByteRange }` |
 | `Actor` | `{ "kind": "interactive" \| "headless" \| "bot", "fleet": string \| null, "bot_id": string \| null, "bot_name": string \| null, "model": string \| null, "entrypoint": string \| null }` — `fleet`/`bot_id` from `FLEET_NAME`/`BOT_ID`, matching the plane's `bot:<fleet>/<BOT_ID>` alias |
 | `Origin` | `{ "cwd": string, "repo": string \| null, "branch": string \| null, "head": string \| null }` — repo = `owner/name` from the git remote |
 | `Text` | scrubbed string, capped per field (caps listed where used); `null` when capture is off |
@@ -218,10 +218,10 @@ Every line in every log:
 | `session.child_linked` | `{ child_sid: SessionId }` |
 | `session.privacy_set` | `{ private: bool, by: "user"\|"policy" }` |
 | `segment.opened` | `{ opened_by: "session_open"\|"compact", start: int }` |
-| `segment.sealed` | `{ end: int ≥ start, sealed_by: "precompact"\|"compact"\|"session_end"\|"resume"\|"abandoned" }` (0.23 also wrote `trigger` and allowed `sha256`; readers ignore both) |
+| `segment.sealed` | `{ end: int ≥ start, sealed_by: "precompact"\|"compact"\|"session_end"\|"resume"\|"abandoned" }` |
 | `segment.retired` | `{ reason: "acked"\|"age" }` — appended by retention (§9) before the segment's directory is removed |
 | `summary.requested` | `{ job_id: string }` |
-| `summary.completed` | `{ job_id: string }` — the input hash and duration live in the summary (`input.sha256`, `producer.duration_ms`); 0.23 copied them here, and readers ignore those keys |
+| `summary.completed` | `{ job_id: string }` — the input hash and duration live in the summary (`input.sha256`, `producer.duration_ms`) |
 | `summary.failed` | `{ job_id: string, error: string (≤200), retryable: bool }` |
 | `summary.skipped` | `{ reason: "private"\|"disabled"\|"trivial"\|"headless"\|"no_transcript" }` |
 | `session.closed` | `{ reason: "clear"\|"resume"\|"logout"\|"prompt_input_exit"\|"other"\|"abandoned" }`. `abandoned` is the store's own (`seal`, the sweep: a session whose SessionEnd never ran); a SessionEnd payload can't claim it |

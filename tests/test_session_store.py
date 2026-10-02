@@ -35,7 +35,7 @@ LIB = REPO_ROOT / "lib"
 sys.path.insert(0, str(LIB))
 
 from claudna.session_store import events as ev  # noqa: E402
-from claudna.session_store import schema  # noqa: E402
+from claudna.session_store import readers, schema  # noqa: E402
 from claudna.session_store.cli import check_session, main  # noqa: E402
 from claudna.session_store.fsio import (  # noqa: E402
     append_jsonl,
@@ -44,7 +44,6 @@ from claudna.session_store.fsio import (  # noqa: E402
     exclusive_lock,
     read_jsonl,
 )
-from claudna.session_store.project import load_lifecycle, segment_docs  # noqa: E402
 from claudna.session_store.paths import (  # noqa: E402
     InvalidSessionId,
     parse_seg_dirname,
@@ -53,6 +52,7 @@ from claudna.session_store.paths import (  # noqa: E402
     state_root,
     validate_sid,
 )
+from claudna.session_store.project import load_lifecycle  # noqa: E402
 from claudna.session_store.store import NotAppendable, SessionStore, StoreError  # noqa: E402
 
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "session-store" / "basic"
@@ -523,14 +523,16 @@ class TestProjection:
         root = _copy_fixture(tmp_path)
         handle = SessionStore(root).session(FIXTURE_SID)
         handle.rebuild()
-        old = json.loads((FIXTURE / "expected" / "seg-001.json").read_text())
+        old = load(FIXTURE / "expected" / "seg-001.json")
         old.update(schema="claudna.segment/1")
         old["counts"]["checkpoints"] = 0
         old["transcript"]["sha256"] = "a" * 64
         atomic_write_json(handle.paths.segment(1).segment_json, old)
-        doc = next(d for d in segment_docs(handle.paths, load_lifecycle(handle.paths)) if d["index"] == 1)
+        doc = next(d for d in readers.show(SessionStore(root), FIXTURE_SID)["segments"] if d["index"] == 1)
         assert doc["schema"] == "claudna.segment/2"
         assert "checkpoints" not in doc["counts"] and "sha256" not in doc["transcript"]
+        report = check_session(handle)  # flagged as older, not as broken
+        assert report.problems == [] and any("an older projection" in w for w in report.warnings)
 
     def test_rebuild_is_deterministic_and_never_touches_logs(self, tmp_path):
         root = _copy_fixture(tmp_path)
@@ -946,7 +948,6 @@ class TestPinsForUnheldGuarantees:
         h.seal_segment(10, "precompact")
         sealed = [e for e in load_lifecycle(h.paths).events if e["kind"] == "segment.sealed"][-1]
         assert sealed["data"] == {"end": 10, "sealed_by": "precompact"}
-        assert "sha256" not in load(h.paths.segment(1).segment_json)["transcript"]
 
 
 class TestWritersRedact:

@@ -130,6 +130,12 @@ def check_session(handle: SessionHandle) -> CheckReport:
         if obj is None:
             problems.append(f"{path}: missing or unparseable (run rebuild)")
             continue
+        current = target_schema["properties"]["schema"]["const"]
+        if isinstance(obj.get("schema"), str) and obj["schema"] != current:
+            # written by an older release: readers re-fold it, and the next write or a rebuild replaces it
+            warnings.append(f"{path}: an older projection ({obj['schema']}, now {current}); "
+                            "readers re-fold it, and the next write or a rebuild rewrites it")
+            continue
         errors = schema.validate(obj, target_schema)
         problems.extend(f"{path}: {err}" for err in errors)
         # A projection behind its log means a refresh was lost (a killed hook): the
