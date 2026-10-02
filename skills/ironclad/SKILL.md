@@ -1,6 +1,6 @@
 ---
 name: ironclad
-description: "Use to harden a plan or review a PR with a panel of independent lenses — primary target a §4.1 plan Issue produced by /claudna:forge; also reviews implementation PRs. Subagent-preferred: dispatch it rather than following it inline."
+description: "Use to harden a plan or review a PR with a panel of independent lenses, or to step back and challenge a plan's premise (are we solving the right problem?) — primary target a §4.1 plan Issue produced by /claudna:forge; also reviews implementation PRs. To choose between viable approaches, use /claudna:weigh-development-paths. Subagent-preferred: dispatch it rather than following it inline."
 argument-hint: "<issue-or-pr-url> [--loops N] [--lens first-principles|align-to-mission|extension-check|precedent-check|plan-health-audit|cost-benefit] [--auto]"
 requires:
   - cli: gh

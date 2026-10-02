@@ -8,10 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - **A design note for hardening the session store** ([documentation/plans/2026-10-01-session-store-hardening.md](./documentation/plans/2026-10-01-session-store-hardening.md)), proposed: a screen for instruction-shaped text in summaries, and a who-reads-this audit of the store's events, files and hooks with ranked cut candidates.
-- **Routing evals run headless.** `make routing-eval` (`scripts/routing_eval.py`) automates the routing matrix's live layer, which was manual: each row marked `eval: true` runs through `claude -p --plugin-dir` and passes when 2 of 3 runs pick the expected skill; two controls must pick no clauDNA skill. It costs money, so it isn't in `make check`; a PR labelled `routing-eval` runs it in CI (needs the `ANTHROPIC_API_KEY` secret). The 2026-10-01 baseline on Sonnet is 11 of 12; the ironclad row ("step back — are we even solving the right problem?") resolves elsewhere and is marked `known_failure`.
+- **Routing evals run headless.** `make routing-eval` (`scripts/routing_eval.py`) automates the routing matrix's live layer, which was manual: each row marked `eval: true` runs through `claude -p --plugin-dir` and passes when 2 of 3 runs pick the expected skill; two controls must pick no clauDNA skill. It costs money, so it isn't in `make check`; a PR labelled `routing-eval` runs it in CI (needs the `ANTHROPIC_API_KEY` secret). On Sonnet all 12 pass, once the ironclad fix below is in.
 - **The always-loaded catalog has a budget.** `make check` now holds the summed skill and agent listings to ceilings in `scripts/catalog-budget.json` (skills 11,806 characters, agents 1,216): a PR that grows a catalog raises its number in the same diff. `python3 scripts/check_catalog_budget.py` prints the bill of materials. Rule: SKILL_CONTRACT §5.1.
 
 ### Fixed
+- **`/claudna:ironclad` routes from a premise question.** "Step back — are we even solving the right problem?" picked no skill, or `recall`, so the routing eval marked it a known failure. The description now names that trigger (and points choosing between approaches to `/claudna:weigh-development-paths`); the eval picks ironclad 3 of 3 and the marker is gone. The catalog budget rises by the 159 characters (skills 11,965).
 - **The session store's `__main__.py` docstring** called `python3 -m` the preferred form; hooks must use the directory form, since `-m` lets a project's `json.py` shadow the stdlib.
 
 ## [0.23.0] - 2026-10-01
