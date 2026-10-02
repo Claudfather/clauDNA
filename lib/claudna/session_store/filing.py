@@ -40,6 +40,19 @@ from claudna.redact import redact_strings
 from . import claudron
 
 RUN_CAP = "runs"
+#: Claudron ≥ 0.8 files a block under its memory home's own type (#200 §2) rather than ``knowledge``.
+HOMES_CAP = "memory-homes"
+#: Where a fact goes in each home when the block's ``section_hint`` names none of the home's sections.
+#: Placement is clauDNA's judgment (Claudron files where it is told): the home's section for facts.
+HOME_SECTIONS = {
+    "entity": ("Summary", "Facts", "Behavior & gotchas", "Operating it", "Open questions"),
+    "concept": ("Definition", "Why it matters", "Examples", "Related"),
+    "project": ("Goal", "Status", "Current state", "Timeline", "Open threads", "Decisions"),
+    "decision": ("Context", "Decision", "Rationale", "Alternatives"),
+    "practice": ("When", "What", "Why", "Exceptions"),
+}
+HOME_DEFAULT_SECTION = {"entity": "Facts", "concept": "Definition", "project": "Current state",
+                        "decision": "Context", "practice": "What"}
 TRUST_CAP = "trust-aware-reads"  #: makes ``source_type: session`` both accepted and withheld (Claudron#200 §1)
 #: What filing needs: the 0.7 pipes, trust-aware reads (a subject draft is ``source_type: session``), and
 #: 0.7.1's ``subject-filing`` (``exact``, ``--project``, ``--alias``, ``expect_trust``, the refusal envelope).
@@ -90,9 +103,17 @@ def subject_title(name: str) -> str:
     return DRAFT_BANNER + one_line(name)
 
 
-def section_of(block: dict) -> str:
-    """The section a block's fact goes under: its ``section_hint`` when the fact format can carry it."""
+def section_of(block: dict, *, homes: bool = False) -> str:
+    """The section a block's fact goes under: its ``section_hint`` when the fact format can carry it.
+
+    With ``homes`` (the note is the block's memory home), only one of that home's own sections:
+    a hint naming one (case-insensitively), else the home's section for facts. A home's sections
+    are fixed (#200 §2), so a model's invented heading never becomes one.
+    """
     hint = one_line(str(block.get("section_hint") or "").replace("#", " "))
+    if homes and block.get("home") in HOME_SECTIONS:
+        own = {s.lower(): s for s in HOME_SECTIONS[block["home"]]}
+        return own.get(hint.lower(), HOME_DEFAULT_SECTION[block["home"]])
     if not hint or hint == "History" or any(m in hint for m in FACT_MARKERS):
         return DEFAULT_SECTION  # History holds superseded facts; Claudron refuses a write into it
     return hint
@@ -128,6 +149,8 @@ def _subject_finding(block: dict, finding: dict, title: str, ref: str) -> dict:
     }
     if finding.get("project"):
         subject["project"] = finding["project"]
+    if finding.get("kind"):
+        subject["kind"] = finding["kind"]
     return subject
 
 
@@ -159,7 +182,8 @@ def file_block(block: dict, finding: dict, *, sid: str, index: int, target: Targ
             return per_claim(finding, target, record)  # dedup routed it elsewhere: the claim's answer decides
         created = {**answer, "title": title}
         path = answer["path"]
-    request = {"note": path, "op": "append_fact", "section": section_of(block), "fact": claim,
+    request = {"note": path, "op": "append_fact", "section": section_of(block, homes=finding["type"] == block["home"]),
+               "fact": claim,
                "evidence": {"ref": ref, "asserted_by": block["asserted_by"]}, "expect_trust": "external"}
     answer = claudron.amend(request, target.cwd, target.env, target.vault, run_id=target.run_id)
     if answer["action"] == "rejected":

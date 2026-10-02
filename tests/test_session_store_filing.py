@@ -317,3 +317,34 @@ class TestDoor:
         claudron.capture({"type": "knowledge", "title": "t"}, "/w", env, "/v")
         stdins = [json.loads(c["stdin"]) for c in self.calls(env) if "capture" in c["argv"]]
         assert [s.get("run_id") for s in stdins] == ["harvest-1", None]
+
+
+class TestMemoryHomes:
+    """With ``memory-homes`` (Claudron#200 §2) a block is filed under its home's own type, kind and sections."""
+
+    def test_a_block_becomes_its_homes_type_with_its_kind(self):
+        finding = harvest.finding_of(BLOCK, sid="s1", index=1, project="webapp", trust_aware=True, homes=True)
+        assert (finding["type"], finding["kind"]) == ("entity", "service")
+        assert harvest.finding_of({**BLOCK, "home": "practice"}, sid="s1", index=1, project="w",
+                                  homes=True)["type"] == "practice"
+        assert harvest.finding_of(BLOCK, sid="s1", index=1, project="w")["type"] == "knowledge"  # older engine
+
+    def test_a_person_block_is_still_held_back(self):
+        person = {**BLOCK, "home": "person", "subject_hint": {"name": "Dana", "kind": "person"}}
+        assert harvest.finding_of(person, sid="s1", index=1, project="w", homes=True) is None
+
+    @pytest.mark.parametrize("home,hint,section", [
+        ("entity", "behavior & GOTCHAS", "Behavior & gotchas"), ("entity", "Operations", "Facts"),
+        ("concept", None, "Definition"), ("practice", "why", "Why"), ("decision", "History", "Context"),
+    ])
+    def test_a_fact_goes_only_under_one_of_its_homes_sections(self, home, hint, section):
+        assert filing.section_of({"home": home, "section_hint": hint}, homes=True) == section
+
+    def test_the_subject_draft_is_the_home_and_the_fact_lands_in_its_section(self, fake):
+        block = {**BLOCK, "section_hint": "Operating it"}
+        finding = harvest.finding_of(block, sid="s1", index=1, project="webapp", trust_aware=True, homes=True)
+        target = filing.Target(cwd="/w", env={}, vault="/v", project="webapp", run_id="r", capture=fake.capture)
+        filing.file_block(block, finding, sid="s1", index=1, target=target, record=[].append)
+        ((subject, _),) = fake.captures
+        assert (subject["type"], subject["kind"]) == ("entity", "service")
+        assert fake.amends[0][0]["section"] == "Operating it"
