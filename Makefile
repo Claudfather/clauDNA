@@ -18,7 +18,7 @@
 #                    (CI forwards PR labels via this env var; consumed
 #                    by scripts/skill_checks.py)
 
-.PHONY: check deps deps-runtime deps-eval test-runtime routing-eval check-skills check-integration check-agents check-manifest check-changelog lint test
+.PHONY: check deps deps-runtime deps-eval deps-contract test-contract test-runtime routing-eval check-skills check-integration check-agents check-manifest check-changelog lint test
 
 check: check-skills check-integration check-agents check-manifest check-changelog lint test
 
@@ -63,6 +63,20 @@ deps-runtime:
 
 test-runtime:
 	python3 -m pytest $(RUNTIME_TESTS)
+
+# The contract leg: clauDNA's Claudron door and harvest against the real engine,
+# at the release contracts/claudron.ref names (tests/test_claudron_live.py).
+# `make check` never needs an engine: it checks clauDNA's mirrors against the
+# vendored copy, contracts/claudron.json (tests/test_claudron_contract.py).
+# Claudron's CI runs the same live suite with CLAUDNA_CONTRACT=compat against
+# every Claudron change. Moving to a new release: install it, run
+# scripts/sync_claudron_contract.py, set contracts/claudron.ref, commit both.
+CLAUDRON_REF = $(shell cat contracts/claudron.ref)
+deps-contract:
+	python3 -m pip install -r requirements-dev.txt "claudron @ git+https://github.com/Claudfather/Claudron.git@$(CLAUDRON_REF)"
+
+test-contract:
+	CLAUDNA_CONTRACT=exact python3 -m pytest tests/test_claudron_live.py
 
 # Live routing evals (scripts/routing_eval.py): paid, so not in `make check`.
 # The Claude Code CI evals on is pinned: an upgrade can change the picker or the

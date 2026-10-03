@@ -1,0 +1,283 @@
+{
+  "contract_version": 1,
+  "capabilities": [
+    "navigation",
+    "doctor",
+    "doctor-settings",
+    "trust-aware-reads",
+    "subjects",
+    "amend",
+    "runs",
+    "memory-homes",
+    "tags",
+    "ops-log",
+    "contract",
+    "subject-filing"
+  ],
+  "types": [
+    "knowledge",
+    "decision",
+    "runbook",
+    "plan",
+    "audit",
+    "review",
+    "entity",
+    "concept",
+    "person",
+    "project",
+    "practice"
+  ],
+  "type_dirs": {
+    "knowledge": "knowledge",
+    "decision": "decisions",
+    "runbook": "runbooks",
+    "plan": "planning/active",
+    "audit": "planning/active",
+    "review": "planning/active",
+    "entity": "entity",
+    "concept": "concept",
+    "project": "project",
+    "practice": "practice",
+    "person": "person"
+  },
+  "statuses": {
+    "knowledge": {
+      "canonical": [
+        "current",
+        "stale",
+        "superseded",
+        "archived"
+      ],
+      "terminal": [
+        "superseded",
+        "archived"
+      ],
+      "legacy": {
+        "active": "current",
+        "draft": "use maturity: draft"
+      },
+      "default": "current"
+    },
+    "decision": {
+      "canonical": [
+        "draft",
+        "ratified",
+        "superseded",
+        "archived"
+      ],
+      "terminal": [
+        "ratified",
+        "superseded",
+        "archived"
+      ],
+      "legacy": {},
+      "default": "draft"
+    },
+    "runbook": {
+      "canonical": [
+        "current",
+        "stale",
+        "superseded",
+        "archived"
+      ],
+      "terminal": [
+        "superseded",
+        "archived"
+      ],
+      "legacy": {
+        "active": "current",
+        "draft": "use maturity: draft"
+      },
+      "default": "current"
+    },
+    "plan": {
+      "canonical": [
+        "draft",
+        "active",
+        "completed",
+        "superseded",
+        "archived"
+      ],
+      "terminal": [
+        "completed",
+        "superseded",
+        "archived"
+      ],
+      "legacy": {},
+      "default": "draft"
+    },
+    "audit": {
+      "canonical": [
+        "draft",
+        "completed",
+        "archived"
+      ],
+      "terminal": [
+        "completed",
+        "archived"
+      ],
+      "legacy": {},
+      "default": "draft"
+    },
+    "review": {
+      "canonical": [
+        "draft",
+        "completed",
+        "archived"
+      ],
+      "terminal": [
+        "completed",
+        "archived"
+      ],
+      "legacy": {},
+      "default": "draft"
+    },
+    "entity": {
+      "canonical": [
+        "current",
+        "stale",
+        "superseded",
+        "archived"
+      ],
+      "terminal": [
+        "superseded",
+        "archived"
+      ],
+      "legacy": {
+        "active": "current",
+        "draft": "use maturity: draft"
+      },
+      "default": "current"
+    },
+    "concept": {
+      "canonical": [
+        "current",
+        "stale",
+        "superseded",
+        "archived"
+      ],
+      "terminal": [
+        "superseded",
+        "archived"
+      ],
+      "legacy": {
+        "active": "current",
+        "draft": "use maturity: draft"
+      },
+      "default": "current"
+    },
+    "project": {
+      "canonical": [
+        "current",
+        "stale",
+        "superseded",
+        "archived"
+      ],
+      "terminal": [
+        "superseded",
+        "archived"
+      ],
+      "legacy": {
+        "active": "current",
+        "draft": "use maturity: draft"
+      },
+      "default": "current"
+    },
+    "practice": {
+      "canonical": [
+        "current",
+        "stale",
+        "superseded",
+        "archived"
+      ],
+      "terminal": [
+        "superseded",
+        "archived"
+      ],
+      "legacy": {
+        "active": "current",
+        "draft": "use maturity: draft"
+      },
+      "default": "current"
+    },
+    "person": {
+      "canonical": [
+        "current",
+        "archived"
+      ],
+      "terminal": [
+        "archived"
+      ],
+      "legacy": {},
+      "default": "current"
+    }
+  },
+  "homes": {
+    "entity": [
+      "Summary",
+      "Facts",
+      "Behavior & gotchas",
+      "Operating it",
+      "History",
+      "Open questions"
+    ],
+    "concept": [
+      "Definition",
+      "Why it matters",
+      "Examples",
+      "Related"
+    ],
+    "person": [
+      "Role",
+      "Preferences",
+      "Working style",
+      "Notes"
+    ],
+    "project": [
+      "Goal",
+      "Status",
+      "Current state",
+      "Timeline",
+      "Open threads",
+      "Decisions"
+    ],
+    "decision": [
+      "Context",
+      "Decision",
+      "Rationale",
+      "Alternatives",
+      "Supersedes"
+    ],
+    "practice": [
+      "When",
+      "What",
+      "Why",
+      "Exceptions"
+    ]
+  },
+  "relations": [
+    "part_of",
+    "instance_of",
+    "depends_on",
+    "owned_by",
+    "supersedes",
+    "related"
+  ],
+  "maturity": [
+    "draft",
+    "verified",
+    "canonical"
+  ],
+  "source_types": [
+    "url",
+    "file",
+    "inline",
+    "session"
+  ],
+  "trust_classes": [
+    "trusted",
+    "draft",
+    "external"
+  ],
+  "person_dir": "_personal/person/"
+}
