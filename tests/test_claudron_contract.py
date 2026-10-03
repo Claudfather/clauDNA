@@ -3,7 +3,7 @@
 ``contracts/claudron.json`` is ``claudron contract --json`` from the release
 ``contracts/claudron.ref`` names (``scripts/sync_claudron_contract.py``). These
 tests read only that copy, so they run everywhere, with no engine installed.
-Whether the copy still matches a real engine is ``tests/contract/``'s job: it
+Whether the copy still matches a real engine is ``tests/test_claudron_live.py``'s job: it
 runs in this repo's contract CI leg against the pinned release, and in
 Claudron's CI against every Claudron change.
 """

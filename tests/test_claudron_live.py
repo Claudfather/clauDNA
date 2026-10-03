@@ -24,6 +24,7 @@ import re
 import shutil
 import subprocess
 import sys
+import sysconfig
 from pathlib import Path
 
 import pytest
@@ -41,10 +42,10 @@ MODES = ("exact", "compat")
 MODE = os.environ.get("CLAUDNA_CONTRACT", "")
 COPY = json.loads(sync.SNAPSHOT.read_text(encoding="utf-8"))
 
+if MODE and MODE not in MODES:  # a typo must not turn the gate into a green skip
+    raise pytest.UsageError(f"CLAUDNA_CONTRACT={MODE!r} is not one of {MODES}")
 pytestmark = pytest.mark.skipif(
-    MODE not in MODES,
-    reason=f"CLAUDNA_CONTRACT={MODE!r} is not one of {MODES}" if MODE
-    else "the live contract suite runs with CLAUDNA_CONTRACT=exact|compat (make test-contract)")
+    not MODE, reason="the live contract suite runs with CLAUDNA_CONTRACT=exact|compat (make test-contract)")
 
 #: A block the summarizer could write: one fact about a service, with a section the home doesn't have.
 BLOCK = {"home": "entity", "subject_hint": {"name": "staging DB", "kind": "service", "aliases": []},
@@ -63,7 +64,11 @@ def _no_real_claudron_status():
 
 @pytest.fixture(scope="module")
 def claudron_bin() -> str:
-    found = shutil.which(os.environ.get(claudron.CLAUDRON_ENV) or "claudron")
+    name = os.environ.get(claudron.CLAUDRON_ENV) or "claudron"
+    # `make deps-contract` may be a user install whose scripts dir isn't on PATH (see the Makefile header).
+    found = shutil.which(name) or next((p for d in (sysconfig.get_path("scripts"),
+                                                    sysconfig.get_path("scripts", f"{os.name}_user"))
+                                        if d and (p := shutil.which(name, path=d))), None)
     if not found:
         pytest.fail(f"CLAUDNA_CONTRACT={MODE} but no claudron is installed (make deps-contract)")
     return found
@@ -126,8 +131,7 @@ def _section(note: Path, heading: str) -> str:
 class TestTheContract:
     @pytest.mark.skipif(MODE != "exact", reason="exact mode only: a newer engine may add to the contract")
     def test_the_copy_is_the_installed_engines_contract(self, claudron_bin):
-        assert sync.render(sync.installed_contract(claudron_bin)) == sync.SNAPSHOT.read_text(encoding="utf-8"), \
-            "contracts/claudron.json is not this engine's contract: run scripts/sync_claudron_contract.py"
+        assert sync.main(["--check", "--claudron", claudron_bin]) == 0
 
     def test_the_engine_keeps_everything_the_copy_promises(self, claudron_bin):
         """Additions are fine; a removal or rename breaks clauDNA, so it fails here, in the engine's own CI."""
@@ -165,7 +169,7 @@ class TestHarvest:
 
         _session(store, "s2", [BLOCK], vault=vault, work=work)  # the same fact, from another session
         _harvest(store, env)
-        assert _section(note, "Facts").count(BLOCK["claim"]) == 1
+        assert _section(note, filing.HOME_DEFAULT_SECTION["entity"]).count(BLOCK["claim"]) == 1
 
     def test_every_write_carries_the_run_and_revert_run_undoes_it(self, tmp_path, vault, work, env, claudron_bin):
         store = SessionStore(tmp_path / "store")
