@@ -23,10 +23,10 @@ shape 2 is ``RESTATES_LADDER``. Shape 2 went unenforced in the first cut of this
 gate, and ``skills/index/SKILL.md`` promptly demonstrated why — it forked the
 order while citing the section that owns it, in the same sentence.
 
-Scope note: this gate is **textual and offline**, unlike ``check_schema_drift``
-which fetches the SSOT at a stamped commit. That is deliberate rather than lazy
-— §10 now holds a *pointer*, not a rendered copy, so there is no local copy to
-diff. What can be pinned is that the dead name is gone, that nobody re-derives
+Scope note: this gate is **textual**, unlike ``check_schema_drift``, which
+diffs a rendered copy against Claudron's vendored contract. That is deliberate
+rather than lazy — §10 now holds a *pointer*, not a rendered copy, so there is
+no copy to diff. What can be pinned is that the dead name is gone, that nobody re-derives
 the order, and that the owner is cited — which is what fails first when this
 drifts.
 

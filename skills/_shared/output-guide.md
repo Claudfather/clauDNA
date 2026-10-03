@@ -49,7 +49,7 @@ The output target is a persistence decision, not a quality decision.
 
 ## 3. The Publishable Doc — Frontmatter
 
-> **SSOT: [Claudron `SCHEMA.md`](https://github.com/Claudfather/Claudron/blob/main/SCHEMA.md)** (ratified with Claudron 0.2.0, enforced in code by `claudron validate`). Rendered from [Claudfather/Claudron `SCHEMA.md`](https://github.com/Claudfather/Claudron/blob/bb84ee3ab9325c3a49c4f0274069c29eb2270768/SCHEMA.md) @ `bb84ee3` (2026-07-08) — the vocabulary below is publish's operational summary of that contract and the **only** type/status enum table in clauDNA: `/claudna:publish` Step 1a and `/claudna:index` Step 2 point here instead of restating it, and CI diffs this rendered copy against the stamped source (`scripts/check_schema_drift.py`) — update by re-rendering + restamping, never by hand-editing. Deltas worth knowing: Claudron adds `archived` as a terminal status for every type; accepts `active` on knowledge/runbook as a legacy alias for `current` (warns, never errors on adopted docs); and adds an optional `maturity: draft | verified | canonical` trust axis, orthogonal to `status` — agent-written notes enter as `maturity: draft`. The body skeleton (Section 4.1) remains this guide's own contract.
+> **SSOT: [Claudron `SCHEMA.md`](https://github.com/Claudfather/Claudron/blob/main/SCHEMA.md)** (ratified with Claudron 0.2.0, enforced in code by `claudron validate`). Rendered from Claudron's `claudron contract --json` @ `v0.9.0`, the copy vendored in `contracts/claudron.json` — the vocabulary below is publish's operational summary of that contract and the **only** type/status enum table in clauDNA: `/claudna:publish` Step 1a and `/claudna:index` Step 2 point here instead of restating it, and `make check` holds this table to the vendored contract (`scripts/check_schema_drift.py`) — update by re-rendering (in the clauDNA repo, `scripts/check_schema_drift.py --write`), never by hand-editing. Deltas worth knowing: Claudron adds `archived` as a terminal status for every type; accepts `active` on knowledge/runbook as a legacy alias for `current` (warns, never errors on adopted docs); and adds an optional `maturity: draft | verified | canonical` trust axis, orthogonal to `status` — agent-written notes enter as `maturity: draft`. The body skeleton (Section 4.1) remains this guide's own contract.
 >
 > **Claudron is not required.** This table remains the complete contract `/claudna:publish` enforces, and no skill invokes `claudron` at runtime — the SSOT link governs where vocabulary *changes* are ratified, not what users must install. Docs written without Claudron adopt cleanly later: its lenient tier accepts this vocabulary as-is (warnings at most, never errors).
 >
@@ -68,17 +68,22 @@ Every doc an author hands to `/claudna:publish` carries YAML frontmatter. Publis
 | `repos` | Target repo(s); a single value lets the github/vault adapters infer destination. |
 | `links` | Publish writes the destination URL back here after publishing. |
 
-**Type and status vocabulary** — SCHEMA.md's per-type status table, rendered verbatim. Canonical values are what clauDNA skills write; accepted legacy values validate with a one-line mapping note (never a rejection); terminal statuses mark a doc done or replaced. Absent `status` defaults per type: `current` for knowledge/runbook, `draft` for the rest.
+**Type and status vocabulary** — Claudron's per-type statuses (SCHEMA.md's status table), rendered from the vendored contract. Canonical values are what clauDNA skills write; accepted legacy values validate with a one-line mapping note (never a rejection); terminal statuses mark a doc done or replaced. Absent `status` defaults to the type's `default`.
 
-<!-- schema-drift: STATUS_TABLE — rendered copy; do not hand-edit. Re-render from the stamped SCHEMA.md and update the stamp above. -->
-| type | canonical | terminal | accepted legacy → mapping |
-|---|---|---|---|
-| knowledge | `current`, `stale`, `superseded`, `archived` | `superseded`, `archived` | `active` → `current`; `draft` → use `maturity: draft` |
-| decision | `draft`, `ratified`, `superseded`, `archived` | `ratified`, `superseded`, `archived` | — |
-| runbook | `current`, `stale`, `superseded`, `archived` | `superseded`, `archived` | `active` → `current`; `draft` → use `maturity: draft` |
-| plan | `draft`, `active`, `completed`, `superseded`, `archived` | `completed`, `superseded`, `archived` | — |
-| audit | `draft`, `completed`, `archived` | `completed`, `archived` | — |
-| review | `draft`, `completed`, `archived` | `completed`, `archived` | — |
+<!-- schema-drift: STATUS_TABLE — rendered from contracts/claudron.json; do not hand-edit. Re-render in the clauDNA repo with scripts/check_schema_drift.py --write -->
+| type | canonical | terminal | default | accepted legacy → mapping |
+|---|---|---|---|---|
+| knowledge | `current`, `stale`, `superseded`, `archived` | `superseded`, `archived` | `current` | `active` → `current`; `draft` → use `maturity: draft` |
+| decision | `draft`, `ratified`, `superseded`, `archived` | `ratified`, `superseded`, `archived` | `draft` | — |
+| runbook | `current`, `stale`, `superseded`, `archived` | `superseded`, `archived` | `current` | `active` → `current`; `draft` → use `maturity: draft` |
+| plan | `draft`, `active`, `completed`, `superseded`, `archived` | `completed`, `superseded`, `archived` | `draft` | — |
+| audit | `draft`, `completed`, `archived` | `completed`, `archived` | `draft` | — |
+| review | `draft`, `completed`, `archived` | `completed`, `archived` | `draft` | — |
+| entity | `current`, `stale`, `superseded`, `archived` | `superseded`, `archived` | `current` | `active` → `current`; `draft` → use `maturity: draft` |
+| concept | `current`, `stale`, `superseded`, `archived` | `superseded`, `archived` | `current` | `active` → `current`; `draft` → use `maturity: draft` |
+| project | `current`, `stale`, `superseded`, `archived` | `superseded`, `archived` | `current` | `active` → `current`; `draft` → use `maturity: draft` |
+| practice | `current`, `stale`, `superseded`, `archived` | `superseded`, `archived` | `current` | `active` → `current`; `draft` → use `maturity: draft` |
+| person | `current`, `archived` | `archived` | `current` | — |
 
 **Second axis + pass-through fields.** `maturity: draft | verified | canonical` is the trust axis, orthogonal to `status` (a doc can be `maturity: canonical` and `status: superseded` at once); absent means unrated. `schema_version` (int) is stamped by Claudron's write paths. Both are **pass-through** everywhere clauDNA validates frontmatter: present = fine, never rejected, never required. clauDNA skills don't write them today; docs carrying them publish untouched.
 

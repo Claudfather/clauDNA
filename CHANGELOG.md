@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **A Claudron release now opens its own clauDNA PR.** A daily workflow, `claudron-release`, checks whether Claudron has a release newer than `contracts/claudron.ref`. If so, it installs it, moves the contract copy, the pin and output-guide §3 with `scripts/sync_claudron_contract.py --ref <tag>` (new), runs `make check` and the live contract suite, and opens a PR with the results (a draft when something failed). A PR opened with the workflow's token doesn't start CI, and the PR says how to start it. It needs "Allow GitHub Actions to create and approve pull requests" in the repo's Actions settings.
+- **Harvest is tested on Claudron releases older than memory homes.** A new CI job, `harvest on Claudron <ref>`, installs v0.2.0 (the floor the skills declare), v0.6.1, v0.7.0 and v0.7.1, one per code path harvest keeps for older engines, and runs the live suite in `floor` mode (`make test-contract-floor`). Harvest must take the path the engine's capabilities call for: one `knowledge` subject note with each fact under the block's section on 0.7.1; one draft per claim before it, with `session` provenance on 0.7.0, `inline` on 0.4–0.6, and none on an engine older than 0.4, which drops provenance; a replay adding nothing; run trailers only where the engine declares `runs`. A test keeps the matrix in step with the Makefile's `CLAUDRON_FLOOR_REFS` and its oldest row at the declared floor.
+
+### Changed
+- **output-guide §3's status table is rendered from Claudron's contract, offline.** `scripts/check_schema_drift.py` used to fetch Claudron's `SCHEMA.md` over the network and only warned when the table fell behind, which it had: the five memory-home types were missing. It now holds the table to `contracts/claudron.json`'s `statuses` and `maturity` and to the release `contracts/claudron.ref` names, with no network, and `--write` re-renders it. The table gains the memory homes and a `default` column. `/claudna:publish`'s frozen no-engine fallback has no folder for a home type, so it stops there and says the doc needs the engine.
 
 ## [0.25.0] - 2026-10-03
 ### Added

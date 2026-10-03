@@ -63,3 +63,26 @@ jobs:
 
       - name: Run the live contract suite
         run: make test-contract
+
+  claudron-floor:
+    # Harvest against Claudron releases older than memory homes: one per code
+    # path harvest keeps for them (Makefile CLAUDRON_FLOOR_REFS; a test there
+    # keeps this matrix in step).
+    name: harvest on Claudron ${{ matrix.ref }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ref: [v0.2.0, v0.6.1, v0.7.0, v0.7.1]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install the toolchain and Claudron ${{ matrix.ref }}
+        run: make deps-contract CLAUDRON_REF=${{ matrix.ref }}
+
+      - name: Run the live suite in floor mode
+        run: make test-contract-floor

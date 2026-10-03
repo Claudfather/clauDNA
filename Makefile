@@ -18,7 +18,7 @@
 #                    (CI forwards PR labels via this env var; consumed
 #                    by scripts/skill_checks.py)
 
-.PHONY: check deps deps-runtime deps-eval deps-contract test-contract test-runtime routing-eval check-skills check-integration check-agents check-manifest check-changelog lint test
+.PHONY: check deps deps-runtime deps-eval deps-contract test-contract test-contract-floor test-runtime routing-eval check-skills check-integration check-agents check-manifest check-changelog lint test
 
 check: check-skills check-integration check-agents check-manifest check-changelog lint test
 
@@ -69,14 +69,22 @@ test-runtime:
 # `make check` never needs an engine: it checks clauDNA's mirrors against the
 # vendored copy, contracts/claudron.json (tests/test_claudron_contract.py).
 # Claudron's CI runs the same live suite with CLAUDNA_CONTRACT=compat against
-# every Claudron change. Moving to a new release: install it, run
-# scripts/sync_claudron_contract.py, set contracts/claudron.ref, commit both.
+# every Claudron change. A new release arrives as a PR from the claudron-release
+# workflow; by hand, install it and run scripts/sync_claudron_contract.py --ref <tag>.
 CLAUDRON_REF = $(shell cat contracts/claudron.ref)
 deps-contract:
 	python3 -m pip install -r requirements-dev.txt "claudron @ git+https://github.com/Claudfather/Claudron.git@$(CLAUDRON_REF)"
 
 test-contract:
 	CLAUDNA_CONTRACT=exact python3 -m pytest tests/test_claudron_live.py
+
+# The floor leg: harvest against an engine older than memory homes, one per
+# code path it keeps for them. CI installs each (make deps-contract
+# CLAUDRON_REF=<tag>) and runs this; the tags are CLAUDRON_FLOOR_REFS, down to
+# the oldest the skills declare (`requires: claudron>=0.2`).
+CLAUDRON_FLOOR_REFS = v0.2.0 v0.6.1 v0.7.0 v0.7.1
+test-contract-floor:
+	CLAUDNA_CONTRACT=floor python3 -m pytest tests/test_claudron_live.py
 
 # Live routing evals (scripts/routing_eval.py): paid, so not in `make check`.
 # The Claude Code CI evals on is pinned: an upgrade can change the picker or the

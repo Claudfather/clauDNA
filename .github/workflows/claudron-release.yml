@@ -1,0 +1,101 @@
+name: claudron-release
+
+# When Claudron publishes a release newer than contracts/claudron.ref, open a
+# PR that moves clauDNA to it: the contract copy, the pin and output-guide §3
+# re-rendered (scripts/sync_claudron_contract.py --ref), with the check-set's
+# results in the body. The logic lives in scripts/claudron_bump.py; the checks
+# are the Makefile's. Idempotent: a release that already has a PR stops the
+# run; a branch without one (a failed `gh pr create`) fails it, every day.
+#
+# Needs "Allow GitHub Actions to create and approve pull requests" (Settings →
+# Actions → General). A PR opened with the workflow token doesn't start CI;
+# the body says so and how to start it.
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: claudron-release
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash  # -eo pipefail: a failed `detect | tee` must fail the step, not leave the run green
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # check-changelog diffs against origin/main
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Is there a newer Claudron release?
+        id: latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/claudron_bump.py detect | tee -a "$GITHUB_OUTPUT"
+          echo "pinned=$(cat contracts/claudron.ref)" >> "$GITHUB_OUTPUT"
+
+      - name: Stop if this release already has a PR
+        id: branch
+        if: steps.latest.outputs.newer == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.latest.outputs.tag }}
+        run: |
+          name="claudron/$TAG"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          # Assigned first: under -e a failed `gh` aborts here, where inside `[ ]` it would read as "has a PR".
+          prs=$(gh pr list --head "$name" --state all --json number -q length)
+          if [ "$prs" -gt 0 ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "$name already has a PR"
+          elif git ls-remote --exit-code --heads origin "$name" >/dev/null; then
+            # A pushed branch with no PR: an earlier run's `gh pr create` failed. Fail loudly, every day,
+            # rather than read the branch as done (the Actions setting in the header is the usual cause).
+            echo "::error::$name is on the remote but has no PR: open one from it, or delete the branch to retry"
+            exit 1
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Move to the release and run the checks
+        id: move
+        if: steps.latest.outputs.newer == 'true' && steps.branch.outputs.exists == 'false'
+        env:
+          TAG: ${{ steps.latest.outputs.tag }}
+        run: |
+          printf '%s\n' "$TAG" > contracts/claudron.ref
+          make deps-contract
+          python3 scripts/sync_claudron_contract.py --ref "$TAG"
+          python3 scripts/claudron_bump.py changelog "$TAG"
+          git switch -c "${{ steps.branch.outputs.name }}"
+          git -c user.name="github-actions[bot]" -c user.email="41898299+github-actions[bot]@users.noreply.github.com" \
+            commit -am "Move to Claudron $TAG"
+          if make check; then echo "check=pass" >> "$GITHUB_OUTPUT"; else echo "check=fail" >> "$GITHUB_OUTPUT"; fi
+          if make test-contract; then echo "contract=pass" >> "$GITHUB_OUTPUT"; else echo "contract=fail" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Open the PR
+        if: steps.move.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.latest.outputs.tag }}
+        run: |
+          git push origin "${{ steps.branch.outputs.name }}"
+          python3 scripts/claudron_bump.py body "$TAG" "${{ steps.latest.outputs.pinned }}" \
+            "${{ steps.move.outputs.check }}" "${{ steps.move.outputs.contract }}" > "$RUNNER_TEMP/body.md"
+          draft=""
+          if [ "${{ steps.move.outputs.check }}${{ steps.move.outputs.contract }}" != "passpass" ]; then draft="--draft"; fi
+          gh pr create $draft --base main --head "${{ steps.branch.outputs.name }}" \
+            --title "Move to Claudron $TAG" --body-file "$RUNNER_TEMP/body.md"

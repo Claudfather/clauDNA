@@ -91,6 +91,8 @@ Write the finding as JSON to `<finding-file>`, a file in `<scratch>` (`../_share
 | runbook | `shared/runbooks/` |
 | audit, review | `shared/planning/active/` |
 
+A memory-home type (`entity`, `concept`, `person`, `project`, `practice`) has no raw-tree destination: Claudron files homes itself (`memory-homes`), and this fallback is frozen. Stop and say the doc needs the engine; in `--auto`, the outcome is `blocked`, with installing Claudron as the unblock.
+
 If the file already exists, compare and warn before overwriting (the raw adapter's dedup). After writing: (1) run `/claudna:index` on the destination to update INDEX.md; (2) report the path. In `--auto`, the fallback sets `artifacts.engine: "fallback"` and puts the §3.1 notice verbatim in `errors[]` (claudron-engine.md §3) — the degradation is never inferred from `artifacts.engine` alone.
 
 **Plane-fit advisory** (either path): a `plan`/`audit`/`review` doc landing vault-ward gets a one-line note — "unusual plane for this type: work-in-flight planning usually belongs in the repo's `documentation/` tree (docs adapter)". Advisory only, never a block — fleet workflows legitimately share plans vault-side.

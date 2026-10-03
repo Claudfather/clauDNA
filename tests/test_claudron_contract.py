@@ -79,3 +79,31 @@ class TestVocabulary:
         assert {"session", "inline"} <= set(CONTRACT["source_types"])
         assert "draft" in CONTRACT["maturity"]
         assert "external" in CONTRACT["trust_classes"]  # filing._is_subject_draft reads it
+
+
+class TestTheFloorLeg:
+    """The floor CI leg runs harvest on releases older than memory homes, down to the declared floor."""
+
+    def _makefile_refs(self) -> list[str]:
+        text = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
+        return re.search(r"^CLAUDRON_FLOOR_REFS = (.+)$", text, re.M).group(1).split()
+
+    def test_the_ci_matrix_is_the_makefiles_list(self):
+        import yaml
+
+        ci = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
+        assert ci["jobs"]["claudron-floor"]["strategy"]["matrix"]["ref"] == self._makefile_refs()
+
+    def test_its_oldest_release_is_the_floor_the_skills_declare(self):
+        floors = set()
+        for skill in (REPO_ROOT / "skills").glob("*/SKILL.md"):
+            floors.update(re.findall(r"cli: claudron>=(\d+\.\d+(?:\.\d+)?)", skill.read_text(encoding="utf-8")))
+        assert floors, "no skill declares a claudron floor: this test reads the wrong place"
+        oldest = min(tuple(int(n) for n in f.split(".")) for f in floors)
+        refs = [tuple(int(n) for n in ref[1:].split(".")) for ref in self._makefile_refs()]
+        assert refs == sorted(refs), "keep CLAUDRON_FLOOR_REFS oldest first"
+        assert refs[0][:len(oldest)] == oldest
+
+    def test_every_floor_release_predates_the_pin(self):
+        pinned = tuple(int(n) for n in (REPO_ROOT / "contracts" / "claudron.ref").read_text().strip()[1:].split("."))
+        assert all(tuple(int(n) for n in ref[1:].split(".")) < pinned for ref in self._makefile_refs())
