@@ -10,10 +10,15 @@ so ``make check`` never depends on whichever engine a machine has installed:
   installed. The vendored copy must be exactly that engine's contract.
 * ``CLAUDNA_CONTRACT=compat``: Claudron's CI, on every Claudron change. The
   engine may add to the contract but must keep everything the copy promises.
+* ``CLAUDNA_CONTRACT=floor``: this repo's floor leg (``make
+  test-contract-floor``), with a release older than memory homes installed:
+  one per harvest code path, down to the oldest the skills declare
+  (``claudron>=0.2``). Harvest must take the path the engine's capabilities
+  call for, and still work.
 
-Either way, harvest must work end to end through the engine. And with the
-mode set, a missing engine fails the run rather than skipping it: a contract
-leg that skips is a gate that never closes.
+In exact and compat, harvest must work end to end through the engine. And
+with any mode set, a missing engine fails the run rather than skipping it: a
+contract leg that skips is a gate that never closes.
 """
 
 from __future__ import annotations
@@ -38,14 +43,16 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import sync_claudron_contract as sync  # noqa: E402
 
-MODES = ("exact", "compat")
+MODES = ("exact", "compat", "floor")
 MODE = os.environ.get("CLAUDNA_CONTRACT", "")
 COPY = json.loads(sync.SNAPSHOT.read_text(encoding="utf-8"))
 
 if MODE and MODE not in MODES:  # a typo must not turn the gate into a green skip
     raise pytest.UsageError(f"CLAUDNA_CONTRACT={MODE!r} is not one of {MODES}")
 pytestmark = pytest.mark.skipif(
-    not MODE, reason="the live contract suite runs with CLAUDNA_CONTRACT=exact|compat (make test-contract)")
+    not MODE, reason="the live contract suite runs with CLAUDNA_CONTRACT=exact|compat|floor (make test-contract)")
+#: The current engine's tests: an engine older than the contract has neither `contract` nor memory homes.
+current = pytest.mark.skipif(MODE == "floor", reason="floor mode runs an engine older than memory homes")
 
 #: A block the summarizer could write: one fact about a service, with a section the home doesn't have.
 BLOCK = {"home": "entity", "subject_hint": {"name": "staging DB", "kind": "service", "aliases": []},
@@ -128,6 +135,7 @@ def _section(note: Path, heading: str) -> str:
     return match.group(1)
 
 
+@current
 class TestTheContract:
     @pytest.mark.skipif(MODE != "exact", reason="exact mode only: a newer engine may add to the contract")
     def test_the_copy_is_the_installed_engines_contract(self, claudron_bin):
@@ -146,6 +154,7 @@ class TestTheContract:
         assert live["person_dir"] == COPY["person_dir"]
 
 
+@current
 class TestTheDoor:
     def test_status_reports_the_root_and_every_capability_harvest_gates_on(self, vault, work, env):
         found = claudron.status(str(work), str(vault), env)
@@ -153,6 +162,7 @@ class TestTheDoor:
         assert {*filing.FILING_CAPS, filing.HOMES_CAP} <= found.capabilities
 
 
+@current
 class TestHarvest:
     def test_a_block_files_under_its_home_and_a_replay_adds_nothing(self, tmp_path, vault, work, env):
         store = SessionStore(tmp_path / "store")
@@ -194,3 +204,61 @@ class TestHarvest:
         report = _harvest(store, env)
         assert later["claim"] not in (vault / SUBJECT).read_text(encoding="utf-8")
         assert report.created == 1  # a per-claim draft instead
+
+
+@pytest.mark.skipif(MODE != "floor", reason="floor mode only: an engine older than memory homes")
+class TestAnOlderEngine:
+    """Harvest on an engine older than memory homes takes the path its capabilities call for (harvest.py):
+
+    * with ``subject-filing`` (0.7.1): one ``knowledge`` subject note, each fact under the block's own section;
+    * without it: one ``knowledge`` draft per claim, ``session`` provenance with ``trust-aware-reads`` (0.7.0),
+      ``inline`` before it (an engine older than 0.4 drops provenance it doesn't know).
+
+    Every path dedups a replay, and every write carries the run's trailer once the engine declares ``runs``.
+    """
+
+    @pytest.fixture
+    def caps(self, vault, work, env) -> frozenset:
+        found = claudron.capabilities(str(work), str(vault), env)
+        assert found is not None, "claudron status failed"
+        assert filing.HOMES_CAP not in found, "floor mode needs an engine older than memory homes"
+        return found
+
+    def _drafts(self, vault: Path) -> list[Path]:
+        return sorted(p for p in (vault / "projects" / "webapp").glob("unverified-*.md"))
+
+    def test_harvest_takes_the_engines_path_and_a_replay_adds_nothing(self, tmp_path, vault, work, env, caps):
+        store = SessionStore(tmp_path / "store")
+        second = {**BLOCK, "claim": "Staging restores from Monday's prod snapshot."}
+        _session(store, "s1", [BLOCK, second], vault=vault, work=work)
+        _harvest(store, env)
+        drafts = self._drafts(vault)
+        if "subject-filing" in caps:
+            assert [p.name for p in drafts] == [Path(SUBJECT).name]
+            facts = _section(drafts[0], BLOCK["section_hint"])  # no homes: the block's hint is the section
+            assert BLOCK["claim"] in facts and second["claim"] in facts
+        else:
+            assert len(drafts) == 2  # one per claim
+            assert sorted(BLOCK["claim"] in p.read_text() for p in drafts) == [False, True]
+        for note in drafts:
+            meta = _frontmatter(note)
+            assert (meta["type"], meta["maturity"]) == ("knowledge", "draft")
+            assert "kind" not in meta
+            assert meta.get("source_type") in (("session",) if filing.TRUST_CAP in caps else ("inline", None))
+
+        before = {p: p.read_text(encoding="utf-8") for p in drafts}
+        _session(store, "s2", [BLOCK], vault=vault, work=work)  # the same fact, from another session
+        _harvest(store, env)
+        assert self._drafts(vault) == drafts
+        if "subject-filing" in caps:  # the fact is there once; the new session may add its evidence
+            assert _section(drafts[0], BLOCK["section_hint"]).count(BLOCK["claim"]) == 1
+        else:  # a per-claim replay writes nothing
+            assert {p: p.read_text(encoding="utf-8") for p in drafts} == before
+
+    def test_writes_carry_the_run_only_when_the_engine_declares_runs(self, tmp_path, vault, work, env, caps):
+        store = SessionStore(tmp_path / "store")
+        _session(store, "s1", [BLOCK], vault=vault, work=work)
+        report = _harvest(store, env)
+        trailers = subprocess.run(["git", "log", "--format=%(trailers:key=Claudron-Run,valueonly,separator=)"],
+                                  cwd=vault, capture_output=True, text=True, check=True).stdout.split()
+        assert set(trailers) == ({report.run_id} if filing.RUN_CAP in caps else set())

@@ -18,7 +18,7 @@
 #                    (CI forwards PR labels via this env var; consumed
 #                    by scripts/skill_checks.py)
 
-.PHONY: check deps deps-runtime deps-eval deps-contract test-contract test-runtime routing-eval check-skills check-integration check-agents check-manifest check-changelog lint test
+.PHONY: check deps deps-runtime deps-eval deps-contract test-contract test-contract-floor test-runtime routing-eval check-skills check-integration check-agents check-manifest check-changelog lint test
 
 check: check-skills check-integration check-agents check-manifest check-changelog lint test
 
@@ -77,6 +77,14 @@ deps-contract:
 
 test-contract:
 	CLAUDNA_CONTRACT=exact python3 -m pytest tests/test_claudron_live.py
+
+# The floor leg: harvest against an engine older than memory homes, one per
+# code path it keeps for them. CI installs each (make deps-contract
+# CLAUDRON_REF=<tag>) and runs this; the tags are CLAUDRON_FLOOR_REFS, down to
+# the oldest the skills declare (`requires: claudron>=0.2`).
+CLAUDRON_FLOOR_REFS = v0.2.0 v0.7.0 v0.7.1
+test-contract-floor:
+	CLAUDNA_CONTRACT=floor python3 -m pytest tests/test_claudron_live.py
 
 # Live routing evals (scripts/routing_eval.py): paid, so not in `make check`.
 # The Claude Code CI evals on is pinned: an upgrade can change the picker or the
