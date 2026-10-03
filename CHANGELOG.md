@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **Session resume lists the PRs awaiting your review again** (#389). Step 2 of `skills/session/resume.md` ran `gh pr list --review-requested`, a flag `gh pr list` does not have (`unknown flag: --review-requested`, exit 1, on `gh 2.92.0`), so the "PRs awaiting your review" section was empty on every resume. It now uses the search qualifier, `--search "review-requested:<you>"`, the form repo-health already uses.
 
 ## [0.26.0] - 2026-10-03
 ### Added

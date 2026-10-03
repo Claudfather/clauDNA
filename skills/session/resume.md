@@ -23,7 +23,7 @@ Run in parallel:
 - `git branch --list`
 - `git stash list`
 - `gh pr list --author @me --json number,title,state,updatedAt`
-- `gh pr list --review-requested @me --json number,title,updatedAt`
+- `gh pr list --search "review-requested:@me" --json number,title,updatedAt`
 - If `documentation/planning/` exists, run `grep -rE "IN PROGRESS|PENDING|✅ COMPLETE" documentation/planning/ --include="*.md"`
 
 ### 3. Reaper pass
