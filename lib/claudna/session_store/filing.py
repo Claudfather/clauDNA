@@ -79,6 +79,7 @@ class Target:
     project: str | None
     run_id: str | None
     capture: Callable[..., dict]
+    homes: bool = False  #: the engine declares HOMES_CAP: a note's type is its memory home
 
 
 def short_title(text: str, limit: int = 100) -> str:
@@ -103,17 +104,18 @@ def subject_title(name: str) -> str:
     return DRAFT_BANNER + one_line(name)
 
 
-def section_of(block: dict, *, homes: bool = False) -> str:
+def section_of(block: dict, home: str | None = None) -> str:
     """The section a block's fact goes under: its ``section_hint`` when the fact format can carry it.
 
-    With ``homes`` (the note is the block's memory home), only one of that home's own sections:
-    a hint naming one (case-insensitively), else the home's section for facts. A home's sections
-    are fixed (#200 §2), so a model's invented heading never becomes one.
+    ``home`` is the memory home of the NOTE the fact goes into (not the block's: a concept block can
+    land in an entity subject). In a home, only one of its own sections: a hint naming one
+    (case-insensitively), else the home's section for facts. A home's sections are fixed (#200 §2),
+    so a model's invented heading never becomes one.
     """
     hint = one_line(str(block.get("section_hint") or "").replace("#", " "))
-    if homes and block.get("home") in HOME_SECTIONS:
-        own = {s.lower(): s for s in HOME_SECTIONS[block["home"]]}
-        return own.get(hint.lower(), HOME_DEFAULT_SECTION[block["home"]])
+    if home in HOME_SECTIONS:
+        own = {s.lower(): s for s in HOME_SECTIONS[home]}
+        return own.get(hint.lower(), HOME_DEFAULT_SECTION[home])
     if not hint or hint == "History" or any(m in hint for m in FACT_MARKERS):
         return DEFAULT_SECTION  # History holds superseded facts; Claudron refuses a write into it
     return hint
@@ -175,14 +177,15 @@ def file_block(block: dict, finding: dict, *, sid: str, index: int, target: Targ
             return per_claim(finding, target, record)  # a note harvest didn't write owns the name
         created = None
         path, title = exact[0].get("path"), exact[0].get("title") or title
+        note_type = exact[0].get("type") or finding["type"]  # the section is the target note's home's
     else:
         answer = target.capture(_subject_finding(block, finding, title, ref), target.cwd, target.env, target.vault,
                                 run_id=target.run_id)
         if answer["action"] != "created" or not answer.get("path"):
             return per_claim(finding, target, record)  # dedup routed it elsewhere: the claim's answer decides
         created = {**answer, "title": title}
-        path = answer["path"]
-    request = {"note": path, "op": "append_fact", "section": section_of(block, homes=finding["type"] == block["home"]),
+        path, note_type = answer["path"], finding["type"]
+    request = {"note": path, "op": "append_fact", "section": section_of(block, note_type if target.homes else None),
                "fact": claim,
                "evidence": {"ref": ref, "asserted_by": block["asserted_by"]}, "expect_trust": "external"}
     answer = claudron.amend(request, target.cwd, target.env, target.vault, run_id=target.run_id)

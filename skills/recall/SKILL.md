@@ -41,7 +41,7 @@ claudron recall [--query="$(cat <terms-file>)"] [--project <name>] --limit <n> -
 
 ## Step 2: Render the orientation briefing
 
-Two parts, in this order:
+Up to three parts, in this order:
 
 ### Vault conventions (never capped)
 

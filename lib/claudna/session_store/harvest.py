@@ -141,8 +141,8 @@ def finding_of(block: dict, *, sid: str, index: int, project: str | None,
         finding.update(source_type="session", source_url=evidence_ref(sid, index))
     if project:
         finding["project"] = project
-    if homes and one_line(block["subject_hint"].get("kind")):
-        finding["kind"] = one_line(block["subject_hint"]["kind"])
+    if homes and (kind := one_line(block["subject_hint"].get("kind"))):
+        finding["kind"] = kind
     return redact_strings(finding)  # defense in depth: the summary was redacted when written
 
 
@@ -213,7 +213,7 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
         report.errors.append(f"{sid}: claudron status failed for its vault; left for the next run")
         return
     target = Target(cwd=origin.get("cwd"), env=env, vault=vault, project=origin["repo"],
-                    run_id=report.run_id if RUN_CAP in caps else None, capture=capture)
+                    run_id=report.run_id if RUN_CAP in caps else None, capture=capture, homes=HOMES_CAP in caps)
     filing = FILING_CAPS <= caps
     trust_aware, homes = TRUST_CAP in caps, HOMES_CAP in caps
     indices = handle.paths.segment_indices()
