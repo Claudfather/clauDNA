@@ -106,9 +106,8 @@ class TestRendering:
                            "| `current` | `active` → `current`; `draft` → use `maturity: draft` |")
         assert rows[3].endswith("| `draft` | — |")
 
-    def test_the_real_table_renders_in_the_existing_house_format(self):
-        """The renderer reproduces the rows §3 already had (plus the default column), so a re-render
-        changes only what the contract changed."""
+    def test_legacy_cells_keep_the_house_format(self):
+        """Mappings render as §3 always wrote them: a status in backticks, a hint as `use <code>`."""
         legacy = csd._legacy_cell({"active": "current", "draft": "use maturity: draft"})
         assert legacy == "`active` → `current`; `draft` → use `maturity: draft`"
         assert csd._legacy_cell({}) == "—"

@@ -100,7 +100,9 @@ class TestTheFloorLeg:
             floors.update(re.findall(r"cli: claudron>=(\d+\.\d+(?:\.\d+)?)", skill.read_text(encoding="utf-8")))
         assert floors, "no skill declares a claudron floor: this test reads the wrong place"
         oldest = min(tuple(int(n) for n in f.split(".")) for f in floors)
-        assert tuple(int(n) for n in self._makefile_refs()[0][1:].split("."))[:len(oldest)] == oldest
+        refs = [tuple(int(n) for n in ref[1:].split(".")) for ref in self._makefile_refs()]
+        assert refs == sorted(refs), "keep CLAUDRON_FLOOR_REFS oldest first"
+        assert refs[0][:len(oldest)] == oldest
 
     def test_every_floor_release_predates_the_pin(self):
         pinned = tuple(int(n) for n in (REPO_ROOT / "contracts" / "claudron.ref").read_text().strip()[1:].split("."))

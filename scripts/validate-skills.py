@@ -231,13 +231,11 @@ def main() -> int:
         )
 
     # Schema-drift gate (#199, epic #197 P2): skills/_shared/output-guide.md §3
-    # is a stamped rendered copy of Claudron SCHEMA.md and the repo's only
-    # type/status enum table; publish/index must point at it, and (network
-    # permitting) the copy must match the SSOT at the stamped ref. Errors are
-    # ALWAYS-BLOCKING, like removed-name hits: vocabulary at an immutable
-    # stamped ref cannot change on its own, so any failure was introduced by
-    # the change under test. Network failures degrade to notes, never errors
-    # -- CI must not flake when the SSOT host is unreachable.
+    # is the repo's only type/status enum table, rendered from Claudron's
+    # vendored contract (contracts/claudron.json); publish/index must point at
+    # it, and the copy must match the contract. Errors are ALWAYS-BLOCKING,
+    # like removed-name hits: the copy and the contract both live in this
+    # repo, so any failure was introduced by the change under test.
     drift_errors, drift_warnings, drift_notes = run_schema_drift_check(REPO_ROOT)
 
     # Vault-address conformance (boundary phase D1). ALWAYS-BLOCKING for the

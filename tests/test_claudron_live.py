@@ -212,7 +212,7 @@ class TestAnOlderEngine:
 
     * with ``subject-filing`` (0.7.1): one ``knowledge`` subject note, each fact under the block's own section;
     * without it: one ``knowledge`` draft per claim, ``session`` provenance with ``trust-aware-reads`` (0.7.0),
-      ``inline`` before it (an engine older than 0.4 drops provenance it doesn't know).
+      ``inline`` before it (0.4–0.6), none at all on an engine older than 0.4, which drops provenance.
 
     Every path dedups a replay, and every write carries the run's trailer once the engine declares ``runs``.
     """
@@ -227,7 +227,18 @@ class TestAnOlderEngine:
     def _drafts(self, vault: Path) -> list[Path]:
         return sorted(p for p in (vault / "projects" / "webapp").glob("unverified-*.md"))
 
-    def test_harvest_takes_the_engines_path_and_a_replay_adds_nothing(self, tmp_path, vault, work, env, caps):
+    @pytest.fixture
+    def expected_source(self, caps, claudron_bin) -> str | None:
+        """``session`` with trust-aware reads; else ``inline``, which an engine before 0.4 drops (no provenance)."""
+        if filing.TRUST_CAP in caps:
+            return "session"
+        out = subprocess.run([claudron_bin, "version"], capture_output=True, text=True, check=True).stdout
+        found = re.search(r"(\d+)\.(\d+)\.(\d+)", out)
+        assert found, f"unreadable `claudron version`: {out!r}"
+        return "inline" if tuple(int(n) for n in found.groups()) >= (0, 4, 0) else None
+
+    def test_harvest_takes_the_engines_path_and_a_replay_adds_nothing(self, tmp_path, vault, work, env, caps,
+                                                                      expected_source):
         store = SessionStore(tmp_path / "store")
         second = {**BLOCK, "claim": "Staging restores from Monday's prod snapshot."}
         _session(store, "s1", [BLOCK, second], vault=vault, work=work)
@@ -244,7 +255,7 @@ class TestAnOlderEngine:
             meta = _frontmatter(note)
             assert (meta["type"], meta["maturity"]) == ("knowledge", "draft")
             assert "kind" not in meta
-            assert meta.get("source_type") in (("session",) if filing.TRUST_CAP in caps else ("inline", None))
+            assert meta.get("source_type") == expected_source
 
         before = {p: p.read_text(encoding="utf-8") for p in drafts}
         _session(store, "s2", [BLOCK], vault=vault, work=work)  # the same fact, from another session

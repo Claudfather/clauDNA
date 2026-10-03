@@ -4,8 +4,8 @@ name: claudron-release
 # PR that moves clauDNA to it: the contract copy, the pin and output-guide §3
 # re-rendered (scripts/sync_claudron_contract.py --ref), with the check-set's
 # results in the body. The logic lives in scripts/claudron_bump.py; the checks
-# are the Makefile's. Idempotent: a branch for that release already on the
-# remote means a PR was opened, so the run stops.
+# are the Makefile's. Idempotent: a release that already has a PR stops the
+# run; a branch without one (a failed `gh pr create`) fails it, every day.
 #
 # Needs "Allow GitHub Actions to create and approve pull requests" (Settings →
 # Actions → General). A PR opened with the workflow token doesn't start CI;
@@ -27,6 +27,9 @@ concurrency:
 jobs:
   bump:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash  # -eo pipefail: a failed `detect | tee` must fail the step, not leave the run green
     steps:
       - uses: actions/checkout@v7
         with:
@@ -44,17 +47,23 @@ jobs:
           python3 scripts/claudron_bump.py detect | tee -a "$GITHUB_OUTPUT"
           echo "pinned=$(cat contracts/claudron.ref)" >> "$GITHUB_OUTPUT"
 
-      - name: Stop if this release already has a branch
+      - name: Stop if this release already has a PR
         id: branch
         if: steps.latest.outputs.newer == 'true'
         env:
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.latest.outputs.tag }}
         run: |
           name="claudron/$TAG"
           echo "name=$name" >> "$GITHUB_OUTPUT"
-          if git ls-remote --exit-code --heads origin "$name" >/dev/null; then
+          if [ "$(gh pr list --head "$name" --state all --json number -q length)" != 0 ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "$name is already on the remote: a PR for $TAG was opened before"
+            echo "$name already has a PR"
+          elif git ls-remote --exit-code --heads origin "$name" >/dev/null; then
+            # A pushed branch with no PR: an earlier run's `gh pr create` failed. Fail loudly, every day,
+            # rather than read the branch as done (the Actions setting in the header is the usual cause).
+            echo "::error::$name is on the remote but has no PR: open one from it, or delete the branch to retry"
+            exit 1
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi

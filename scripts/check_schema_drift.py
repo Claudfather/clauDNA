@@ -227,8 +227,9 @@ def find_inline_enum_rows(text: str, *, exclude_marked: bool = False) -> list[st
 # --- the gate ---
 
 
-def run_check(repo_root: Path = REPO_ROOT, **_legacy: object) -> tuple[list[str], list[str], list[str]]:
-    """Run the schema-drift gate. Returns (errors, warnings, notes); the gate is offline, so no warnings."""
+def run_check(repo_root: Path = REPO_ROOT) -> tuple[list[str], list[str], list[str]]:
+    """Run the schema-drift gate. Returns (errors, warnings, notes), the shape validate-skills reads for every
+    gate; this one is offline and exact, so it only ever has errors."""
     errors: list[str] = []
     guide_path = repo_root / OUTPUT_GUIDE_REL
     if not guide_path.is_file():
@@ -303,7 +304,6 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(description="Check output-guide §3 against Claudron's vendored contract.")
     parser.add_argument("--write", action="store_true", help="re-render §3's table and stamp from the contract")
-    parser.add_argument("--offline", action="store_true", help=argparse.SUPPRESS)  # always offline now
     args = parser.parse_args(argv)
     if args.write:
         errors = write()

@@ -66,7 +66,11 @@ def add_changelog_line(text: str, tag: str) -> str:
     if "### Changed\n" in section:
         at = start + section.index("### Changed\n") + len("### Changed\n")
         return text[:at] + line + text[at:]
-    # A new subsection goes after any ### Added block, ahead of the next release heading.
+    # A new subsection goes in Keep a Changelog's order: after Added, ahead of Deprecated/Removed/Fixed/Security.
+    later = re.search(r"^### (?:Deprecated|Removed|Fixed|Security)\n", section, re.M)
+    if later:
+        at = start + later.start()
+        return text[:at] + "### Changed\n" + line + "\n" + text[at:]
     return text[:end].rstrip("\n") + "\n### Changed\n" + line + "\n" + text[end:]
 
 
