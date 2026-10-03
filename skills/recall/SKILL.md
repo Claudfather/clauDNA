@@ -41,11 +41,15 @@ claudron recall [--query="$(cat <terms-file>)"] [--project <name>] --limit <n> -
 
 ## Step 2: Render the orientation briefing
 
-Two parts, in this order:
+Up to three parts, in this order:
 
 ### Vault conventions (never capped)
 
 If `data.conventions` is non-null, render it under a `## Vault conventions` heading — verbatim and uncapped. These are the fleet's standing operating rules; surfacing all of them is the point. (Drop only a leading `# ` H1, since you supply the heading.)
+
+### About me (engine `memory-homes`)
+
+If `data.me` is a non-empty string, render it under a `## About me` heading, verbatim, right after the conventions. It is the operator's own reviewed about-me note (the vault's personal tier, `person/me`); the engine sends it only when the note is trusted, and never to a bot's session. Absent or `null` → skip the heading.
 
 ### Recalled notes — two tiers, adaptive lead
 

@@ -107,7 +107,7 @@ Validate the envelope (claudron-engine.md §2), then branch on `data.action`:
 
 - **`created`** → done. Report `data.path` (absolute).
 - **`suggest_update`** (a *current* note already covers this) → present `data.reason` and the existing note (`data.path`, vault-relative). Ask: **"A current note already covers this — append to it, create a new note anyway, or cancel? (append/create/cancel)"**
-  - *append* → write the addendum to a file in `<scratch>` with the Write tool, then `claudron capture --update <path> --body "$(cat <addendum-file>)" --json` (→ `updated`).
+  - *append* → write the addendum to a file in `<scratch>` with the Write tool, then `claudron capture --update <path> --body "$(cat <addendum-file>)" --json` (→ `updated`). When the pre-flight's `data.capabilities` includes `memory-homes`, add `--asserted-by user` (the person chose it; that engine requires it to edit a person note, and an older engine doesn't have the flag).
   - *create* → re-run Step 4 with `--force` (→ `created`, `-N` slug suffix).
   - *cancel* → stop, nothing written.
 - **`suggest_supersede`** (the near-dup is **stale**) → present `data.reason` (the CLI emits this action when the matched note's status is `stale`). Automatic supersession — marking the old note superseded for you — is Claudron curation, not this skill's job; offer the same three routes: **"A stale note is near this — append, create fresh, or cancel? (append/create/cancel)"**
@@ -116,7 +116,7 @@ Validate the envelope (claudron-engine.md §2), then branch on `data.action`:
 
 **`--auto` (no prompts, never `--force`):**
 - `created` → done.
-- `suggest_update` → take the suggested route: write the body to a file in `<scratch>` with the Write tool, then `claudron capture --update <path> --body "$(cat <body-file>)" --json`.
+- `suggest_update` → take the suggested route: write the body to a file in `<scratch>` with the Write tool, then `claudron capture --update <path> --body "$(cat <body-file>)" --json` (no `--asserted-by`: nobody asserted it). If that exits 2 because the note is a person note, a person's facts are the user's to assert: `outcome: "needs-input"`, naming the note.
 - `suggest_supersede` → do **not** write (force is forbidden; appending current knowledge to a stale note mislabels it). Record the suggestion in `errors[]`, set `outcome: "needs-input"` naming the stale path.
 - `rejected` → `outcome: "blocked"`, `blocker_description` = the validation reason.
 - anything else (unlisted/absent `action`, partial/unrecognized envelope) → `outcome: "blocked"`, `blocker_description` = the engine failure, the raw envelope + stderr verbatim in `errors[]`. No `artifacts.action`/`artifacts.path` from an unrecognized envelope, and no raw-tree fallback (vault state unknown) — a loud blocked result, never an improvised success.

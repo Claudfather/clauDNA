@@ -55,8 +55,8 @@ from . import schema
 from .fsio import atomic_write_json, atomic_write_text, ensure_dir, exclusive_lock, read_json, utc_seconds
 from . import claudron
 from .claudron import _STATUS, CLAUDRON_ENV, CaptureError, claudron_bin  # noqa: F401 (re-exported)
-from .filing import (DRAFT_BANNER, FILING_CAPS, HARVEST_TAG, RUN_CAP, TRUST_CAP, Target, evidence_ref, file_block,
-                     per_claim, short_title)
+from .filing import (DRAFT_BANNER, FILING_CAPS, HARVEST_TAG, HOMES_CAP, RUN_CAP, TRUST_CAP, Target, evidence_ref,
+                     file_block, one_line, per_claim, short_title)
 from .project import (HARVEST_CONSUMER, MAX_ATTEMPTS, abandoned_at, by_segment, harvest_skip, latest_origin,
                       load_lifecycle, session_facts, summary_verdict)
 from .store import SessionStore
@@ -108,7 +108,7 @@ def is_due(root: Path, env: Mapping[str, str], now: float | None = None) -> bool
 
 
 def finding_of(block: dict, *, sid: str, index: int, project: str | None,
-               trust_aware: bool = False) -> dict | None:
+               trust_aware: bool = False, homes: bool = False) -> dict | None:
     """The per-claim ``claudron capture`` JSON for one block, or ``None`` when it is held back.
 
     The tag namespaces (``home:``, ``asserted-by:``, ``origin:``) are
@@ -116,10 +116,14 @@ def finding_of(block: dict, *, sid: str, index: int, project: str | None,
     goes after the claim, never before it: the first body line is the summary
     recall shows. ``trust_aware`` (the engine declares :data:`TRUST_CAP`) marks
     it ``source_type: session``; the tag stays either way, for older readers.
+    ``homes`` (the engine declares :data:`HOMES_CAP`) files it under its memory
+    home's own type and the subject's ``kind``, instead of ``knowledge``.
     """
     note_type = NOTE_TYPES.get(block["home"])
     if note_type is None:
         return None
+    if homes:
+        note_type = block["home"]
     body = block["claim"]
     if block.get("section_hint"):
         body += f"\n\nSection: {block['section_hint']}"
@@ -137,6 +141,8 @@ def finding_of(block: dict, *, sid: str, index: int, project: str | None,
         finding.update(source_type="session", source_url=evidence_ref(sid, index))
     if project:
         finding["project"] = project
+    if homes and (kind := one_line(block["subject_hint"].get("kind"))):
+        finding["kind"] = kind
     return redact_strings(finding)  # defense in depth: the summary was redacted when written
 
 
@@ -207,9 +213,9 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
         report.errors.append(f"{sid}: claudron status failed for its vault; left for the next run")
         return
     target = Target(cwd=origin.get("cwd"), env=env, vault=vault, project=origin["repo"],
-                    run_id=report.run_id if RUN_CAP in caps else None, capture=capture)
+                    run_id=report.run_id if RUN_CAP in caps else None, capture=capture, homes=HOMES_CAP in caps)
     filing = FILING_CAPS <= caps
-    trust_aware = TRUST_CAP in caps
+    trust_aware, homes = TRUST_CAP in caps, HOMES_CAP in caps
     indices = handle.paths.segment_indices()
     for index in indices:
         if index <= through:
@@ -259,7 +265,8 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
             return  # never step past a segment whose blocks can't be read: the cursor holds
         blocks = [b for b in summary["blocks"] if not tripped(b)]  # a summary written before the screen existed
         report.screened += len(summary["blocks"]) - len(blocks) + _dropped_when_written(lifecycle, index, boundary)
-        findings = [(b, finding_of(b, sid=sid, index=index, project=origin["repo"], trust_aware=trust_aware))
+        findings = [(b, finding_of(b, sid=sid, index=index, project=origin["repo"], trust_aware=trust_aware,
+                                         homes=homes))
                     for b in blocks]
         wanted = [f for _, f in findings if f is not None]
         if report.captures and report.captures + len(wanted) > MAX_CAPTURES:
