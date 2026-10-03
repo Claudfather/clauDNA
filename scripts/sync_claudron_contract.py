@@ -9,12 +9,16 @@ every run of the suite, with no engine installed
 Claudron release the copy was taken from, which clauDNA's contract CI leg
 installs (``make deps-contract``) and checks the copy against.
 
-    python3 scripts/sync_claudron_contract.py           # write the installed engine's contract
-    python3 scripts/sync_claudron_contract.py --check   # exit 1 if the copy differs from it
+    python3 scripts/sync_claudron_contract.py --ref vX.Y.Z  # move to the installed release
+    python3 scripts/sync_claudron_contract.py --check       # exit 1 if the copy differs from it
 
-Run it after installing the Claudron release you are moving to, set
-``contracts/claudron.ref`` to that release's tag, and commit both with
-whatever the move changes on this side.
+Install the Claudron release you are moving to, then run it with that
+release's tag: it writes the contract and ``contracts/claudron.ref``, and
+re-renders output-guide §3's status table from the new contract
+(``scripts/check_schema_drift.py``). Commit the result with whatever the move
+changes on this side; ``make check`` names the mirrors that have to follow.
+``.github/workflows/claudron-release.yml`` does this on its own when Claudron
+releases.
 """
 
 from __future__ import annotations
@@ -22,12 +26,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SNAPSHOT = REPO_ROOT / "contracts" / "claudron.json"
+REF = REPO_ROOT / "contracts" / "claudron.ref"
 
 
 def installed_contract(claudron: str) -> dict:
@@ -51,9 +57,13 @@ def render(contract: dict) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--check", action="store_true", help="compare only; exit 1 on a difference")
+    parser.add_argument("--ref", help="the installed release's tag (vX.Y.Z): also write contracts/claudron.ref "
+                        "and re-render output-guide §3")
     parser.add_argument("--claudron", default=os.environ.get("CLAUDNA_CLAUDRON_BIN") or "claudron",
                         help="the claudron binary (default: $CLAUDNA_CLAUDRON_BIN, else claudron on PATH)")
     args = parser.parse_args(argv)
+    if args.ref is not None and (args.check or not re.fullmatch(r"v\d+\.\d+\.\d+", args.ref)):
+        parser.error("--ref takes a release tag (vX.Y.Z) and doesn't go with --check")
     try:
         text = render(installed_contract(args.claudron))
     except RuntimeError as exc:
@@ -68,7 +78,21 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     SNAPSHOT.parent.mkdir(exist_ok=True)
     SNAPSHOT.write_text(text, encoding="utf-8")
-    print(f"wrote {SNAPSHOT.relative_to(REPO_ROOT)}; set contracts/claudron.ref to the installed release's tag")
+    if args.ref is None:
+        print(f"wrote {SNAPSHOT.relative_to(REPO_ROOT)}; rerun with --ref <the installed release's tag> "
+              "to move the pin and re-render output-guide §3")
+        return 0
+    REF.write_text(args.ref + "\n", encoding="utf-8")
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    import check_schema_drift
+
+    errors = check_schema_drift.write(REPO_ROOT)
+    for error in errors:
+        print(error, file=sys.stderr)
+    if errors:
+        return 1
+    print(f"wrote {SNAPSHOT.relative_to(REPO_ROOT)}, {REF.relative_to(REPO_ROOT)} ({args.ref}) and "
+          "output-guide §3")
     return 0
 
 
