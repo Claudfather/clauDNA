@@ -45,3 +45,21 @@ jobs:
 
       - name: Run the runtime suites
         run: make test-runtime
+
+  claudron-contract:
+    # clauDNA's Claudron door and harvest against the real engine, at the
+    # release contracts/claudron.ref names. Targets live in the Makefile.
+    name: contract with Claudron
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install the toolchain and the pinned Claudron
+        run: make deps-contract
+
+      - name: Run the live contract suite
+        run: make test-contract

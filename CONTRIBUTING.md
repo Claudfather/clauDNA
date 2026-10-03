@@ -105,6 +105,15 @@ Before opening a PR, verify:
 - [ ] `make check` passes — the exact check-set CI runs, defined once in the `Makefile`
 - [ ] You tested the affected skill/hook locally with `claude --plugin-dir`
 
+### The Claudron contract
+
+clauDNA drives the Claudron engine through its CLI, and mirrors a few parts of its schema (each memory home's sections, the capabilities harvest gates on, the summary schema's home enum). Two checks keep the two repos in step:
+
+- **`make check`** checks those mirrors against `contracts/claudron.json`, a copy of `claudron contract --json` from the release `contracts/claudron.ref` names (`tests/test_claudron_contract.py`). No engine needed.
+- **The `contract with Claudron` CI job** (`make deps-contract test-contract`) installs that release and runs `tests/test_claudron_live.py`: the copy must be exactly that engine's contract, and harvest must work end to end through it. Claudron's own CI runs the same file against every Claudron change (`CLAUDNA_CONTRACT=compat`), so a Claudron change that would break clauDNA fails there, before it ships.
+
+**Moving to a new Claudron release:** install it, run `python3 scripts/sync_claudron_contract.py`, set `contracts/claudron.ref` to its tag, and commit both along with whatever the move changes here. `make check` then tells you which mirror has to follow.
+
 CI runs the same `make check` target, so local green means CI green. If CI fails where local passed, your checkout is either behind `origin/main` or missing the pinned toolchain (`make deps`); CI runs Python 3.12.
 
 ## PR Expectations

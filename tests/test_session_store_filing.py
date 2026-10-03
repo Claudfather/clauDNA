@@ -359,16 +359,6 @@ class TestMemoryHomes:
         filing.file_block(block, finding, sid="s1", index=1, target=target, record=[].append)
         assert fake.amends[0][0]["section"] == "Background"
 
-    def test_the_section_table_is_the_engines(self):
-        """HOME_SECTIONS is a rendered copy of Claudron's HOMES (CLAUDE.md: a copy with a drift gate)."""
-        schema = pytest.importorskip("claudron.schema")
-        if not hasattr(schema, "HOMES"):
-            pytest.skip("this claudron predates memory homes")
-        engine = {home: tuple(s for s in sections if s not in ("History", "Supersedes"))
-                  for home, sections in schema.HOMES.items() if home != "person"}
-        assert filing.HOME_SECTIONS == engine
-        assert all(filing.HOME_DEFAULT_SECTION[h] in filing.HOME_SECTIONS[h] for h in filing.HOME_SECTIONS)
-
     def test_the_subject_draft_is_the_home_and_the_fact_lands_in_its_section(self, fake):
         block = {**BLOCK, "section_hint": "Operating it"}
         finding = harvest.finding_of(block, sid="s1", index=1, project="webapp", trust_aware=True, homes=True)
