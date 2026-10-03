@@ -56,7 +56,9 @@ jobs:
         run: |
           name="claudron/$TAG"
           echo "name=$name" >> "$GITHUB_OUTPUT"
-          if [ "$(gh pr list --head "$name" --state all --json number -q length)" != 0 ]; then
+          # Assigned first: under -e a failed `gh` aborts here, where inside `[ ]` it would read as "has a PR".
+          prs=$(gh pr list --head "$name" --state all --json number -q length)
+          if [ "$prs" -gt 0 ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "$name already has a PR"
           elif git ls-remote --exit-code --heads origin "$name" >/dev/null; then

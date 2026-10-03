@@ -142,3 +142,14 @@ class TestWorkflowFailsLoudly:
         step = next(s for s in self._job()["steps"] if s.get("id") == "branch")
         assert "gh pr list --head" in step["run"]
         assert "exit 1" in step["run"]  # a branch without a PR fails the run
+
+    def test_a_failed_pr_lookup_fails_the_step_rather_than_reading_as_a_pr(self):
+        """A failed command substitution inside `[ ]` escapes -e; assigned on its own line, it aborts."""
+        import subprocess
+
+        step = next(s for s in self._job()["steps"] if s.get("id") == "branch")["run"]
+        assert "prs=$(gh pr list" in step and '[ "$prs" -gt 0 ]' in step
+        script = "gh() { return 1; }\nGITHUB_OUTPUT=/dev/null\nname=claudron/v9.9.9\n" + step.split(
+            'echo "name=$name" >> "$GITHUB_OUTPUT"\n', 1)[1]
+        run = subprocess.run(["bash", "-eo", "pipefail", "-c", script], capture_output=True, text=True)
+        assert run.returncode != 0 and "already has a PR" not in run.stdout
