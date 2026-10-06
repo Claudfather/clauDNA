@@ -16,6 +16,7 @@ What these guard:
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
 import pytest
 from conftest import ACTOR, ORIGIN, complete_segment, rewrite_log, segment_summary
@@ -172,14 +173,24 @@ class TestReaders:
         assert top["last"]["tool_use_id"] in ("toolu_a", "toolu_b") and other["count"] == 1
         assert [r["signature"] for r in readers.failures(store, "b")] == ["Bash: gh: not logged in"]
 
-    @pytest.mark.parametrize("since, ok", [("7d", True), ("12h", True), ("2w", True), ("2026-01-01", True),
-                                           ("yesterday", False)])
+    @pytest.mark.parametrize("since, ok", [("30m", True), ("7d", True), ("12h", True), ("2w", True),
+                                           ("2026-01-01", True), ("yesterday", False), ("15s", False)])
     def test_since(self, since, ok):
         if ok:
             assert readers.since_cutoff(since).endswith("Z")
         else:
-            with pytest.raises(ValueError):
+            with pytest.raises(ValueError, match=r"--since takes 30m, 12h, 7d, 2w, or an ISO date/time"):
                 readers.since_cutoff(since)
+
+    @pytest.mark.parametrize("since, minutes", [("15m", 15), ("2h", 120), ("1d", 1440), ("1w", 10080)])
+    def test_since_units(self, since, minutes):
+        now = 1_800_000_000.0
+        expected = datetime.fromtimestamp(now - minutes * 60, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        assert readers.since_cutoff(since, now=now) == expected
+
+    def test_since_help_matches_the_parser(self):
+        from claudna.session_store import cli as cli_mod
+        assert cli_mod._SINCE_HELP == readers.SINCE_HELP
 
 
 class TestCli:

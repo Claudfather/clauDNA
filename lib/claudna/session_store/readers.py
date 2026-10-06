@@ -24,19 +24,25 @@ from .project import load_activity, load_lifecycle, segment_docs, session_doc
 from .rollup import current, rollup_path, trusted
 from .store import SessionStore
 
-_SINCE = re.compile(r"^(\d+)([hdw])$")
+_SINCE = re.compile(r"^(\d+)([mhdw])$")
+_SINCE_MINUTES = {"m": 1, "h": 60, "d": 60 * 24, "w": 60 * 24 * 7}
+SINCE_HELP = "30m, 12h, 7d, 2w, or an ISO date/time"
 
 
 def since_cutoff(since: str | None, *, now: float | None = None) -> str | None:
-    """``--since``: ``7d``, ``12h``, ``2w`` or an ISO date/time, as an event timestamp to compare against."""
+    """``--since``: ``30m``, ``12h``, ``7d``, ``2w`` or an ISO date/time, as an event timestamp to compare against."""
     if not since:
         return None
     match = _SINCE.match(since.strip())
     if match:
-        hours = int(match.group(1)) * {"h": 1, "d": 24, "w": 24 * 7}[match.group(2)]
-        moment = datetime.fromtimestamp(time.time() if now is None else now, tz=timezone.utc) - timedelta(hours=hours)
+        minutes = int(match.group(1)) * _SINCE_MINUTES[match.group(2)]
+        moment = datetime.fromtimestamp(time.time() if now is None else now, tz=timezone.utc)
+        moment -= timedelta(minutes=minutes)
     else:
-        moment = datetime.fromisoformat(since.strip().replace("Z", "+00:00"))
+        try:
+            moment = datetime.fromisoformat(since.strip().replace("Z", "+00:00"))
+        except ValueError:
+            raise ValueError(f"--since takes {SINCE_HELP}, not {since!r}") from None
         moment = moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
     return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + f"{moment.microsecond // 1000:03d}Z"
 

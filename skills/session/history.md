@@ -10,7 +10,7 @@ python3 "<claudna-root>/lib/claudna/session_store" <verb> [args]
 
 | Verb | Args | Shows |
 |------|------|-------|
-| `list` | `[--since 7d\|12h\|2w\|<ISO date>] [--repo <name>] [--bot <name>] [--limit N]` | sessions, newest first: status, segment count, repo, title |
+| `list` | `[--since 30m\|12h\|7d\|2w\|<ISO date>] [--repo <name>] [--bot <name>] [--limit N]` | sessions, newest first: status, segment count, repo, title |
 | `show` | `<session-id>` | one session: status and lineage (parent, children), each segment's counts and summary state, the rolled-up summary |
 | `timeline` | `<session-id>` | every lifecycle and activity event, in time order |
 | `failures` | `[<session-id>] [--group] [--since …]` | failing tool calls, newest first; `--group` folds them by signature across sessions |

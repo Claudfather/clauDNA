@@ -56,6 +56,9 @@ from .paths import InvalidSessionId, InvalidStateDir, state_root
 from .project import OLDER_PROJECTIONS, SUMMARY_ENV
 from .store import SessionHandle, SessionStore
 
+# readers.SINCE_HELP, kept literal: the parser must not import readers (loaded lazily, per verb).
+_SINCE_HELP = "30m, 12h, 7d, 2w, or an ISO date/time"
+
 if TYPE_CHECKING:
     import argparse
 
@@ -342,7 +345,7 @@ def main(argv: list[str] | None = None) -> int:
                          parents=[rooted])
     swp.add_argument("--dry-run", action="store_true", help="list what would be closed; write nothing")
     lst = sub.add_parser("list", help="sessions, newest first", parents=[rooted])
-    lst.add_argument("--since", help="7d, 12h, 2w, or an ISO date")
+    lst.add_argument("--since", help=_SINCE_HELP)
     lst.add_argument("--repo")
     lst.add_argument("--bot", help="a bot name or id")
     lst.add_argument("--limit", type=int, default=50)
@@ -357,7 +360,7 @@ def main(argv: list[str] | None = None) -> int:
                            parents=[rooted])
     fails.add_argument("sid", nargs="?")
     fails.add_argument("--group", action="store_true")
-    fails.add_argument("--since", help="7d, 12h, 2w, or an ISO date")
+    fails.add_argument("--since", help=_SINCE_HELP)
     fails.add_argument("--json", action="store_true")
     fails.add_argument("--include-private", action="store_true",
                        help="across sessions, also fold in private ones (a named sid is always read)")
@@ -382,7 +385,7 @@ def main(argv: list[str] | None = None) -> int:
     dig.add_argument("--outcome", choices=("promoted", "discarded", "kept"), help="with --done: what the person did")
     rns = sub.add_parser("runs", help="the ops log: the store's background runs, newest first", parents=[rooted])
     rns.add_argument("--kind", choices=("summarize", "harvest", "sweep"))
-    rns.add_argument("--since", help="7d, 12h, 2w, or an ISO date")
+    rns.add_argument("--since", help=_SINCE_HELP)
     rns.add_argument("--limit", type=int, default=50)
     rns.add_argument("--json", action="store_true")
     harv = sub.add_parser("harvest", help="write summarized blocks to the vault as drafts (via claudron)",
