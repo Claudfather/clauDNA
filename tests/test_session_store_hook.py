@@ -120,6 +120,23 @@ class TestBoundaries:
         fire(store, "SessionStart", transcript, source="compact")  # a compaction never starts one
         assert harvests == [store.root]
 
+    def test_a_session_end_killed_before_projecting_leaves_the_log_closed(self, store, transcript, monkeypatch):
+        """The seal and the close land in one write: a stop that kills SessionEnd after it can't strand them."""
+        fire(store, "SessionStart", transcript, source="startup")
+        grow(transcript, 20)
+
+        def killed(*args, **kwargs):
+            raise KeyboardInterrupt("the bot's stop killed the hook")
+
+        real_refresh = store_module.refresh
+        monkeypatch.setattr(store_module, "refresh", killed)
+        with pytest.raises(KeyboardInterrupt):
+            fire(store, "SessionEnd", transcript, reason="other")
+        kinds = [json.loads(line)["kind"] for line in store.session(SID).paths.lifecycle.read_text().splitlines()]
+        assert kinds[-2:] == ["segment.sealed", "session.closed"]
+        monkeypatch.setattr(store_module, "refresh", real_refresh)
+        assert fire(store, "SessionEnd", transcript, reason="other") == "ignored: no open session"
+
     def test_a_blocked_compaction_reseals_later(self, store, transcript):
         fire(store, "SessionStart", transcript, source="startup")
         fire(store, "PreCompact", transcript, trigger="manual")

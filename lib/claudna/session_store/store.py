@@ -23,7 +23,8 @@ from pathlib import Path
 from typing import Iterator
 
 from . import events as ev
-from .fsio import DIR_MODE, append_jsonl, atomic_write_json, ensure_dir, exclusive_lock, file_size, read_json
+from .fsio import (DIR_MODE, append_jsonl, append_jsonl_many, atomic_write_json, ensure_dir, exclusive_lock,
+                   file_size, read_json)
 from .paths import SessionPaths, session_ids, session_paths, state_root, validate_root
 from .project import (
     SESSION_SCHEMA,
@@ -318,6 +319,31 @@ class SessionHandle:
 
     def close_session(self, reason: str) -> dict:
         return self.append("session.closed", {"reason": reason})
+
+    def end_session(self, end: int, reason: str, *, sealed_by: str = "session_end") -> int | None:
+        """Seal the current segment at ``end`` (clamped to its start) and close the session: one locked step.
+
+        Both lifecycle lines go down in one fsynced write, before either is
+        projected, so a hook killed mid-way (a bot stop tears its session down
+        while SessionEnd runs) leaves the session either still open or sealed
+        *and* closed, never sealed but open. Returns the index sealed, or
+        ``None`` when the session had no segment.
+        """
+        if not self.exists():
+            raise StoreError(f"session {self.sid} is not open")
+        with self._locked():
+            index = self.current_segment()
+            events = []
+            if index is not None:
+                end = max(end, self.boundary(index).start or 0)
+                events.append(ev.make_event("segment.sealed", self.sid,
+                                            {"end": end, "sealed_by": sealed_by, "trigger": None}, seg=index))
+            events.append(ev.make_event("session.closed", self.sid, {"reason": reason}))
+            bytes_before = file_size(self.paths.lifecycle)
+            append_jsonl_many(self.paths.lifecycle, events, durable=True)
+            # The first event: its segment is re-folded, and session.json folds the whole log, close included.
+            refresh(self.paths, events[0], bytes_before=bytes_before)
+            return index
 
     def close_abandoned(self, *, owner_pid: int | None = None) -> int | None:
         """Seal the open segment at its transcript's size and close as ``abandoned``: one locked step.

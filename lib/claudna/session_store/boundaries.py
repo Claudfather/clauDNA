@@ -353,9 +353,10 @@ def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str
         trigger = payload.get("trigger") if payload.get("trigger") in _TRIGGERS else None
         return "segment sealed" if _seal(session, payload, sealed_by="precompact", trigger=trigger) is not None \
             else "ignored: no segment"
-    index = _seal(session, payload, sealed_by="session_end", trigger=None)
     reason = payload.get("reason") if payload.get("reason") in _CLOSE_REASONS else "other"
-    session.close_session(reason)  # closed before anything that could fail after it (#373, M2)
+    # Sealed and closed in one write, before anything that could fail after it (#373, M2): a stop
+    # that kills this hook part-way must not leave a sealed segment in a session still open.
+    index = session.end_session(file_size(payload.get("transcript_path")), reason)
     if index is not None:  # before the link: a failed link write must not strand the seal unsummarized
         _summarize_segment(session, index, facts, env, spawn)
     if reason == "clear":  # spec §4.3: leave the link the next SessionStart(clear) from this claude consumes
