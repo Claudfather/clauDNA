@@ -154,7 +154,15 @@ def cap_log(path: Path, limit: int = LOG_LIMIT) -> Path:
 
 
 def append_jsonl(path: Path, record: dict, *, durable: bool = True) -> None:
-    """Append ``record`` as one line to ``path`` (created ``0600``); fsync it when ``durable``.
+    """Append ``record`` as one line to ``path``: :func:`append_jsonl_many` with one record."""
+    append_jsonl_many(path, [record], durable=durable)
+
+
+def append_jsonl_many(path: Path, records: list[dict], *, durable: bool = True) -> None:
+    """Append ``records`` as lines to ``path`` (created ``0600``) in one write; fsync once when ``durable``.
+
+    One write, so a writer killed after it returns leaves every record or (a
+    torn tail aside) none: the store uses it for events that must land together.
 
     If the file ends mid-line (a previous writer was killed), a newline is
     written first so the fragment stays one skippable line and ``record`` lands
@@ -166,7 +174,8 @@ def append_jsonl(path: Path, record: dict, *, durable: bool = True) -> None:
     (tens of ms on an SD card), and a caller whose records are derivable can
     trade a crash-lost line for that.
     """
-    line = json.dumps(record, sort_keys=True, ensure_ascii=False, separators=(",", ":")) + "\n"
+    line = "".join(json.dumps(record, sort_keys=True, ensure_ascii=False, separators=(",", ":")) + "\n"
+                   for record in records)
     fd = os.open(path, os.O_RDWR | os.O_APPEND | os.O_CREAT, FILE_MODE)
     try:
         size = os.fstat(fd).st_size

@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- **SessionEnd closes the session in the same write that seals its last segment.** It used to seal, re-project, then close: three steps, and a stop that killed the hook between the first and the last left the session sealed but `open`, waiting for the unclosed sweep. That is what a bot restart did on a busy Pi, where re-projecting is slow and the bot's stop tears its session down while SessionEnd runs. `SessionHandle.end_session` now appends `segment.sealed` and `session.closed` in one locked, fsynced write and projects afterwards; `fsio.append_jsonl_many` is the one-write append it uses.
 - **`session_store`'s `--since` takes minutes** (`list`, `failures`, `runs`). `30m` now works beside `12h`, `7d` and `2w`. A value it can't read now names the accepted forms (`--since takes 30m, 12h, 7d, 2w, or an ISO date/time, not '15s'`) instead of Python's `Invalid isoformat string`. Found in a live Claudlobby check, where `--since 15m` was the natural way to ask "anything since the restart?".
 - **Session resume lists the PRs awaiting your review again** (#389). Step 2 of `skills/session/resume.md` ran `gh pr list --review-requested`, a flag `gh pr list` does not have (`unknown flag: --review-requested`, exit 1, on `gh 2.92.0`), so the "PRs awaiting your review" section was empty on every resume. It now uses the search qualifier, `--search "review-requested:<you>"`, the form repo-health already uses.
 
