@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.27.0] - 2026-10-07
 ### Added
 - **Sessions record which agent CLI opened them** (Claudlobby#2145 P1). `session.opened` gains an optional top-level `agent_cli`, `claude` or `codex`; a log without it reads as `claude`. `SessionHandle.open_session(..., agent_cli=)` takes it and the Claude Code hook records `claude`. `session.json` and the export item's `session` subset carry it; `claudna.export/1` keeps its tag, because the key is additive. Spec §8 now documents the export item fields and the rule that lets them grow without a new tag.
 - **Harvest provenance names the agent CLI for non-Claude sessions** (Claudlobby#2145 F9): `session:<agent_cli>/<sid>:<seg>`, so two vendors' ids never collide in one vault, and a draft's "Harvested from" line names the agent CLI too. Claude refs and drafts are byte-identical to before.
