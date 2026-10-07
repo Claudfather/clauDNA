@@ -108,7 +108,7 @@ def is_due(root: Path, env: Mapping[str, str], now: float | None = None) -> bool
 
 
 def finding_of(block: dict, *, sid: str, index: int, project: str | None,
-               trust_aware: bool = False, homes: bool = False, agent_cli: str = "claude") -> dict | None:
+               trust_aware: bool = False, homes: bool = False, ref: str | None = None) -> dict | None:
     """The per-claim ``claudron capture`` JSON for one block, or ``None`` when it is held back.
 
     The tag namespaces (``home:``, ``asserted-by:``, ``origin:``) are
@@ -118,6 +118,8 @@ def finding_of(block: dict, *, sid: str, index: int, project: str | None,
     it ``source_type: session``; the tag stays either way, for older readers.
     ``homes`` (the engine declares :data:`HOMES_CAP`) files it under its memory
     home's own type and the subject's ``kind``, instead of ``knowledge``.
+    ``ref`` is the segment's :func:`evidence_ref`, which names the agent CLI
+    (F9); without one it is the Claude form.
     """
     note_type = NOTE_TYPES.get(block["home"])
     if note_type is None:
@@ -138,7 +140,7 @@ def finding_of(block: dict, *, sid: str, index: int, project: str | None,
         "source_type": "inline",
     }
     if trust_aware:
-        finding.update(source_type="session", source_url=evidence_ref(sid, index, agent_cli))
+        finding.update(source_type="session", source_url=ref or evidence_ref(sid, index))
     if project:
         finding["project"] = project
     if homes and (kind := one_line(block["subject_hint"].get("kind"))):
@@ -265,8 +267,9 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
             return  # never step past a segment whose blocks can't be read: the cursor holds
         blocks = [b for b in summary["blocks"] if not tripped(b)]  # a summary written before the screen existed
         report.screened += len(summary["blocks"]) - len(blocks) + _dropped_when_written(lifecycle, index, boundary)
+        ref = evidence_ref(sid, index, facts.agent_cli)  # one provenance per segment (F9)
         findings = [(b, finding_of(b, sid=sid, index=index, project=origin["repo"], trust_aware=trust_aware,
-                                         homes=homes, agent_cli=facts.agent_cli))
+                                         homes=homes, ref=ref))
                     for b in blocks]
         wanted = [f for _, f in findings if f is not None]
         if report.captures and report.captures + len(wanted) > MAX_CAPTURES:
@@ -277,8 +280,7 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
                                       action=answer["action"], path=answer["path"],
                                       vault=answer.get("vault", vault), run_id=target.run_id)
 
-            outcome = file_block(block, finding, sid=sid, index=index, target=target, record=record,
-                                 agent_cli=facts.agent_cli) if filing \
+            outcome = file_block(block, finding, ref=ref, target=target, record=record) if filing \
                 else per_claim(finding, target, record)
             setattr(report, outcome, getattr(report, outcome) + 1)  # created · filed · known · rejected
         for block, _ in (pair for pair in findings if pair[1] is None):

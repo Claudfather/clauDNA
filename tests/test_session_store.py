@@ -526,6 +526,24 @@ def _copy_fixture(tmp_path: Path) -> Path:
     return root
 
 
+def _fixture_with_0_26_session_json(tmp_path: Path):
+    """The golden fixture, rebuilt, with what a 0.26 rebuild leaves as its ``session.json``."""
+    root = _copy_fixture(tmp_path)
+    handle = SessionStore(root).session(FIXTURE_SID)
+    handle.rebuild()
+    atomic_write_json(handle.paths.session_json, load(OLDER_SESSION))
+    return root, handle
+
+
+def spy_rebuilds(monkeypatch, *modules) -> list:
+    """Count ``rebuild`` calls through each module's own binding (``store`` imports its own)."""
+    calls: list = []
+    for module in modules:
+        real = module.rebuild
+        monkeypatch.setattr(module, "rebuild", lambda paths, real=real: calls.append(paths) or real(paths))
+    return calls
+
+
 class TestProjection:
     def test_golden_fixture_projects_byte_for_byte(self, tmp_path):
         root = _copy_fixture(tmp_path)
@@ -578,10 +596,7 @@ class TestProjection:
 
     def test_a_0_26_session_projection_is_refolded_to_the_current_schema(self, tmp_path):
         """A ``claudna.session/1`` file (0.26, no ``agent_cli``) is folded from the log, never served."""
-        root = _copy_fixture(tmp_path)
-        handle = SessionStore(root).session(FIXTURE_SID)
-        handle.rebuild()
-        atomic_write_json(handle.paths.session_json, load(OLDER_SESSION))
+        root, handle = _fixture_with_0_26_session_json(tmp_path)
         doc = readers.show(SessionStore(root), FIXTURE_SID)["session"]
         assert doc["schema"] == "claudna.session/2" and doc["agent_cli"] == "claude"
         report = check_session(handle)
@@ -589,11 +604,8 @@ class TestProjection:
         assert any("an older projection" in w and "session.json" in w for w in report.warnings)
 
     def test_the_sweep_rewrites_a_0_26_session_projection_once(self, tmp_path):
-        root = _copy_fixture(tmp_path)
+        root, handle = _fixture_with_0_26_session_json(tmp_path)
         store = SessionStore(root)
-        handle = store.session(FIXTURE_SID)
-        handle.rebuild()
-        atomic_write_json(handle.paths.session_json, load(OLDER_SESSION))
         assert retention.sweep(store, {}).upgraded == [FIXTURE_SID]
         assert load(handle.paths.session_json)["schema"] == "claudna.session/2"
         assert retention.sweep(store, {}).upgraded == []  # once
@@ -604,9 +616,7 @@ class TestProjection:
         0.26 differs from 0.27 at one seam: the tag ``read_projection``/``session_doc`` ask for.
         ``store.py`` keeps its own ``/2`` binding, so the writer stays 0.27.
         """
-        rebuilds = []
-        real_rebuild = project_module.rebuild
-        monkeypatch.setattr(project_module, "rebuild", lambda paths: rebuilds.append(paths) or real_rebuild(paths))
+        rebuilds = spy_rebuilds(monkeypatch, project_module)
         h = opened(store)
         h.open_segment("session_open", 0)
         for _ in range(3):
@@ -624,10 +634,7 @@ class TestProjection:
 
     def test_a_0_26_writers_file_is_rebuilt_to_session_2_once(self, store, monkeypatch):
         """The writer side, honestly: a 0.26 rebuild leaves ``/1``; the next 0.27 append rebuilds it once."""
-        rebuilds = []
-        for module in (project_module, store_module):
-            real = module.rebuild
-            monkeypatch.setattr(module, "rebuild", lambda paths, real=real: rebuilds.append(paths) or real(paths))
+        rebuilds = spy_rebuilds(monkeypatch, project_module, store_module)
         h = opened(store)
         h.open_segment("session_open", 0)
         prompt(h)

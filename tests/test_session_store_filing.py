@@ -84,11 +84,12 @@ def fake(monkeypatch):
 
 
 def file(fake, block=BLOCK, sid="s1", index=1, recorded=None, agent_cli="claude"):
-    finding = harvest.finding_of(block, sid=sid, index=index, project="webapp", trust_aware=True, agent_cli=agent_cli)
+    ref = filing.evidence_ref(sid, index, agent_cli)
+    finding = harvest.finding_of(block, sid=sid, index=index, project="webapp", trust_aware=True, ref=ref)
     target = filing.Target(cwd="/work", env={}, vault="/v", project="webapp", run_id="harvest-1",
                            capture=fake.capture)
-    return filing.file_block(block, finding, sid=sid, index=index, target=target,
-                             record=(recorded if recorded is not None else []).append, agent_cli=agent_cli)
+    return filing.file_block(block, finding, ref=ref, target=target,
+                             record=(recorded if recorded is not None else []).append)
 
 
 def test_evidence_refs_qualify_every_agent_cli_but_claude():
@@ -374,14 +375,14 @@ class TestMemoryHomes:
         finding = harvest.finding_of(block, sid="s1", index=1, project="webapp", trust_aware=True, homes=True)
         target = filing.Target(cwd="/w", env={}, vault="/v", project="webapp", run_id="r", capture=fake.capture,
                                homes=True)
-        filing.file_block(block, finding, sid="s1", index=1, target=target, record=[].append)
+        filing.file_block(block, finding, ref="session:s1:1", target=target, record=[].append)
         assert fake.amends[0][0]["section"] == "Facts"
 
     def test_an_engine_without_homes_keeps_the_hint_even_for_a_decision(self, fake):
         block = {**BLOCK, "home": "decision", "section_hint": "Background"}
         finding = harvest.finding_of(block, sid="s1", index=1, project="webapp", trust_aware=True)
         target = filing.Target(cwd="/w", env={}, vault="/v", project="webapp", run_id="r", capture=fake.capture)
-        filing.file_block(block, finding, sid="s1", index=1, target=target, record=[].append)
+        filing.file_block(block, finding, ref="session:s1:1", target=target, record=[].append)
         assert fake.amends[0][0]["section"] == "Background"
 
     def test_the_subject_draft_is_the_home_and_the_fact_lands_in_its_section(self, fake):
@@ -389,7 +390,7 @@ class TestMemoryHomes:
         finding = harvest.finding_of(block, sid="s1", index=1, project="webapp", trust_aware=True, homes=True)
         target = filing.Target(cwd="/w", env={}, vault="/v", project="webapp", run_id="r", capture=fake.capture,
                                homes=True)
-        filing.file_block(block, finding, sid="s1", index=1, target=target, record=[].append)
+        filing.file_block(block, finding, ref="session:s1:1", target=target, record=[].append)
         ((subject, _),) = fake.captures
         assert (subject["type"], subject["kind"]) == ("entity", "service")
         assert fake.amends[0][0]["section"] == "Operating it"

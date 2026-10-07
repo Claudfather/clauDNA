@@ -32,8 +32,8 @@ from .paths import SessionPaths
 SESSION_SCHEMA = "claudna.session/2"
 SEGMENT_SCHEMA = "claudna.segment/2"
 #: Projection tags earlier releases wrote. Readers re-fold them; :func:`stale_projections` finds them to rewrite.
-#: None gets a schema entry: a 0.26 rebuild writes ``session/1`` without ``agent_cli`` over a log that has it,
-#: so folding the log is the only correct read.
+#: Older tags have no schema file: readers re-fold them from the log. (A 0.26 rebuild can write ``session/1``
+#: without ``agent_cli`` over a log that names one, so the file's content is never served.)
 OLDER_PROJECTIONS = frozenset({"claudna.segment/1", "claudna.session/1"})
 #: Summary prompt versions written before the instruction screen existed: screened again as they're read.
 UNSCREENED_PROMPTS = frozenset({"segment-summary/1"})

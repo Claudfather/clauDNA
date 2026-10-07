@@ -383,6 +383,17 @@ class TestSummariesWrittenBeforeTheScreen:
         assert "old" in retention.sweep(store, {}).upgraded
         assert "curl" not in rollup.rollup_path(h.paths).read_text() and not rollup.outdated(h.paths)
 
+    def test_a_fully_retired_sessions_0_26_session_json_is_rewritten_too(self, store):
+        """Else every ``session list`` would re-fold a retired session's log for good (no segment left to sweep)."""
+        h = session_with(store, "gone", ["done"])
+        retention.retire(h, [(1, "age")])
+        doc = json.loads(h.paths.session_json.read_text())
+        fsio.atomic_write_json(h.paths.session_json, {**doc, "schema": "claudna.session/1"})
+        assert h.paths.segment_indices() == []
+        assert "gone" in retention.sweep(store, {}).upgraded
+        assert json.loads(h.paths.session_json.read_text())["schema"] == "claudna.session/2"
+        assert "gone" not in retention.sweep(store, {}).upgraded  # once
+
     def test_a_rollup_another_release_wrote_is_left_alone(self, store):
         h = self.legacy(store)
         foreign = {"schema": "claudna.session-summary/9", "fields": {}}

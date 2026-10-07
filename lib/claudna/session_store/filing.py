@@ -161,8 +161,7 @@ def _subject_finding(block: dict, finding: dict, title: str, ref: str) -> dict:
     return subject
 
 
-def file_block(block: dict, finding: dict, *, sid: str, index: int, target: Target, record: Record,
-               agent_cli: str = "claude") -> str:
+def file_block(block: dict, finding: dict, *, ref: str, target: Target, record: Record) -> str:
     """File one block under its subject (see the module doc); the block's outcome.
 
     ``finding`` is the block's per-claim draft (``harvest.finding_of``), the
@@ -177,7 +176,6 @@ def file_block(block: dict, finding: dict, *, sid: str, index: int, target: Targ
     names = list(dict.fromkeys(n for n in [name, *(one_line(a) for a in hint.get("aliases", [])), title] if n))
     exact = [c for c in claudron.resolve(names, project=target.project, cwd=target.cwd, env=target.env,
                                          vault=target.vault) if c.get("exact")]
-    ref = evidence_ref(sid, index, agent_cli)
     if exact:
         if not all(_is_subject_draft(c) for c in exact):
             return per_claim(finding, target, record)  # a note harvest didn't write owns the name
