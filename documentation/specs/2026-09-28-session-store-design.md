@@ -442,6 +442,20 @@ session export --consumer claudron --ack --sid <sid> --through <seg>
 
 Returns an envelope: `{ schema: "claudna.export/1", items: [{ sid, seg, session: <session.json subset>, summary: <segment summary> }], next: <cursor> }`. Claudron reads through this command and never parses the store's files — the storage layout stays clauDNA's to change; only the export envelope is contract.
 
+### Item fields and rules
+
+Contract text (Claudron register rule R3: consumers conform to this). This subsection is the one home of the item fields: later changes extend the table in place and never define an item field anywhere else.
+
+| Field | Type | Source | Rule |
+|---|---|---|---|
+| `sid` | string | the id the agent CLI gave its hooks | with `session.agent_cli`, the join key (Claudlobby#2145 §2.2) |
+| `seg` | integer ≥ 1 | the segment index | one item per final, `done` segment past the consumer's cursor |
+| `session.{sid,status,opened_at,closed_at,close_reason,chain_id,parent_sid,actor,origin}` | as §6.4 | `session.json` (the first `session.opened`, the lifecycle log) | unchanged since 0.23 |
+| `session.agent_cli` | `"claude"` \| `"codex"` | `session.opened.agent_cli`; `claude` when the log predates 0.27 | **new in 0.27**; a consumer that sees no key (an older clauDNA) treats it as `claude` |
+| `summary` | a `claudna.segment-summary/1` document | `seg-NNN/summary.json`, or the archived copy of a retired segment | always a `done` summary; a skipped segment emits no item |
+
+The envelope is `{schema: "claudna.export/1", consumer, items, next}`; `next[sid]` is the segment the consumer may ack through, present only for a session whose cursor moved. **Consumer names** match `^[a-z][a-z0-9_-]{0,31}$`; `harvest` is **reserved** (the store's own consumer, acked only by its code). `--since-seg N`, `--limit N` (default 100). Private sessions are never exported. **Ack:** `--ack --sid <sid> --through <seg>` replies `{consumer, sid, through_seg}`; `through` may not exceed the session's highest final-or-retired index, and a cursor never moves back. **Additive rule (new in 0.27):** new item keys may land under `claudna.export/1`, and a consumer ignores keys it does not know; removing or retyping a key is `claudna.export/2`. Until 0.27, §8 had no such rule, and the standing position was "leave the export fields alone" (`documentation/plans/2026-10-01-session-store-hardening.md`); this rule says how they may grow without a bump.
+
 ## 9. Retention
 
 - A segment is deletable once every registered consumer has acked it, or once it passes the hard cap (default 30 days), whichever comes first. **As built (phase 6), owner-approved 2026-09-30:** an acked segment also waits a 7-day floor (`CLAUDNA_RETAIN_ACKED_DAYS`), because harvest acks at once and would otherwise erase recent history. The rollup keeps what a retired segment summarized. A consumer is registered for a session by its first ack, so one that never ran holds nothing back. The exception, owner-decided 2026-10-01: a session opened with harvest enabled registers harvest from its first segment, so its segments wait for harvest even before harvest's first ack.

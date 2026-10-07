@@ -9,7 +9,8 @@ contract::
 
 The envelope is ``{schema: "claudna.export/1", consumer, items: [...], next: {...}}``.
 Each item is ``{sid, seg, session: <a session.json subset>, summary: <the
-segment summary>}``. ``next`` maps each session to the segment index the
+segment summary>}`` (the subset's ``agent_cli`` since 0.27; absent in an older
+envelope means ``claude``). Spec §8 "Item fields and rules" is the contract. ``next`` maps each session to the segment index the
 consumer may ack once it has taken that session's items.
 
 Per session, segments are walked in order past the consumer's cursor (or
@@ -44,7 +45,7 @@ RESERVED = frozenset({HARVEST_CONSUMER})
 #: acked-retention floor, so the wait never outlasts what retention would keep anyway.
 RETRY_WAIT_DAYS = 7
 SESSION_FIELDS = ("sid", "status", "opened_at", "closed_at", "close_reason", "chain_id", "parent_sid", "actor",
-                  "origin")
+                  "origin", "agent_cli")
 
 
 def check_consumer(name: str) -> str:
