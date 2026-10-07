@@ -2,7 +2,7 @@
 
 ## What this project is
 
-clauDNA is the canonical set of skills, hooks, and agents for Claude Code, distributed as a marketplace plugin. Install it and any Claude Code instance gains a curated set of well-tested capabilities.
+clauDNA is the canonical set of skills, hooks, and agents for Claude Code, distributed as a marketplace plugin; another agent host receives the surfaces its plugin model can carry, each by an approval-gated decision — Cursor: skills and agents, no hooks (#315); Codex: the session store's hooks only (Claudlobby#2145 F7/F12; skills on Codex are clauDNA#404's). Install it and any Claude Code instance gains a curated set of well-tested capabilities.
 
 It's the "genome" of the Claudfather ecosystem — what every bot inherits at startup. Skills here are procedural (how to do X), not referential (what we know about X). Reference knowledge lives in Claudron, evaluation happens in Claudosseum, runtime is Claudlobby. clauDNA's job is just: ship the canonical capabilities, predictably, with version discipline.
 
@@ -21,16 +21,18 @@ Materially smarter Claude Code with one install.
 - **Procedural content only.** If it's a how-to with a clear "when X, do Y" trigger, it belongs here. If it's reference material, it belongs in Claudron.
 - **Marketplace-native distribution.** Plugin install is the only supported channel. Git clone is fine for development; production use goes through the marketplace.
 - **Versioned, changelog'd, documented.** Every release ships with notes on what changed, what got promoted, what got demoted, and what users need to know.
-- **No hosted dependencies for the user.** Installing clauDNA never requires an account or API key. The plugin is self-contained.
+- **No hosted dependencies for the user.** Installing clauDNA never requires an account or API key; a Codex host's summaries run through `claude -p` under F10(a). The plugin is self-contained.
+
+> **Amendment note (2026-10-07):** Claudlobby#2145 decision D2, ratified 2026-10-05, amends the first sentence of "What this project is", the `claude -p` clause above, and the telemetry lines under "Sibling boundaries" and "What we choose not to build". F7/F12 decide which surfaces Codex receives; F8 (the activity layer: the store records what the agent CLI's own telemetry doesn't) is the direction behind the telemetry lines. The north star is unchanged.
 
 ## Position in the ecosystem
 
 **Consumes:** promotions from Claudosseum (champions ready to ship); manual additions during the early phase.
 
-**Produces:** a marketplace plugin that Claudlobby bots install and any Claude Code user can install — the "what skills exist" answer for the entire ecosystem.
+**Produces:** a marketplace plugin that Claudlobby bots install and any Claude Code (or Cursor) user can install — the "what skills exist" answer for the entire ecosystem.
 
 **Sibling boundaries:**
-- clauDNA does not handle telemetry. Claudosseum does.
+- clauDNA writes only to the user's disk — the session store (spec `documentation/specs/2026-09-28-session-store-design.md`) and, with `CLAUDNA_TELEMETRY=1`, the `skill_invocation` lines Claudosseum ingests (`plugin-hooks/telemetry-emit.sh`, `lib/claudna/session_store/telemetry.py`); it never transmits. Scoring and any hosted telemetry are Claudosseum's.
 - clauDNA does not store reference knowledge. Claudron does.
 - clauDNA does not run bots. Claudlobby does.
 - clauDNA does not evaluate skills. Claudosseum does.
@@ -59,6 +61,6 @@ Materially smarter Claude Code with one install.
 
 - **Runtime skill distribution via MCP.** That was Claudosseum's old role. clauDNA is plugin-only.
 - **A hosted dashboard or web UI.** clauDNA is files in a plugin. Discovery happens via the marketplace and the README.
-- **Telemetry collection.** No phone-home. Telemetry lives in Claudosseum, opt-in.
+- **Telemetry collection.** No phone-home. clauDNA writes only to the user's disk — the session store, which exports on request (spec §1.1 rule 1, §8), and, with `CLAUDNA_TELEMETRY=1`, the `skill_invocation` lines Claudosseum ingests; scoring and any hosted telemetry live in Claudosseum.
 - **Per-user customization.** clauDNA is the canonical set. Users wanting personalized skill sets layer their own atop, or run Claudosseum locally to produce their own promotions.
 - **Skills that depend on hosted services.** A skill requiring third-party auth narrows the audience and adds fragility. Skills here should work standalone.
