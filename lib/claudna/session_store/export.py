@@ -10,8 +10,9 @@ contract::
 The envelope is ``{schema: "claudna.export/1", consumer, items: [...], next: {...}}``.
 Each item is ``{sid, seg, session: <a session.json subset>, summary: <the
 segment summary>}`` (the subset's ``agent_cli`` since 0.27; absent in an older
-envelope means ``claude``). Spec §8 "Item fields and rules" is the contract. ``next`` maps each session to the segment index the
-consumer may ack once it has taken that session's items.
+envelope means ``claude``). Spec §8 "Item fields and rules" is the contract.
+``next`` maps each session to the segment index the consumer may ack once it
+has taken that session's items.
 
 Per session, segments are walked in order past the consumer's cursor (or
 ``--since-seg``): a final segment with a ``done`` summary is an item, and so
