@@ -187,7 +187,7 @@ class TestHarvest:
         assert _section(note, filing.HOME_DEFAULT_SECTION["entity"]).count(BLOCK["claim"]) == 1
 
     def test_a_codex_sessions_provenance_is_agent_cli_qualified(self, tmp_path, vault, work, env):
-        """Claudlobby#2145 F9: Claude refs stay as they were; a Codex session's name its agent CLI."""
+        """Claudlobby#2145 F9: Claude refs stay as they were; a Codex session's refs name its agent CLI."""
         store = SessionStore(tmp_path / "store")
         _session(store, "s1", [BLOCK], vault=vault, work=work)
         _session(store, "s2", [CODEX_BLOCK], vault=vault, work=work, agent_cli="codex")

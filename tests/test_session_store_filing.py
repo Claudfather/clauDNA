@@ -85,16 +85,23 @@ def fake(monkeypatch):
 
 def file(fake, block=BLOCK, sid="s1", index=1, recorded=None, agent_cli="claude"):
     ref = filing.evidence_ref(sid, index, agent_cli)
-    finding = harvest.finding_of(block, sid=sid, index=index, project="webapp", trust_aware=True, ref=ref)
+    finding = harvest.finding_of(block, sid=sid, index=index, agent_cli=agent_cli, project="webapp", trust_aware=True)
     target = filing.Target(cwd="/work", env={}, vault="/v", project="webapp", run_id="harvest-1",
                            capture=fake.capture)
     return filing.file_block(block, finding, ref=ref, target=target,
                              record=(recorded if recorded is not None else []).append)
 
 
+def test_a_codex_drafts_body_names_its_agent_cli_and_claudes_is_unchanged():
+    codex = harvest.finding_of(BLOCK, sid="s1", index=1, agent_cli="codex", project="w")
+    claude = harvest.finding_of(BLOCK, sid="s1", index=1, agent_cli="claude", project="w")
+    assert "Harvested from codex session s1, segment 1 " in codex["body"]
+    assert "Harvested from session s1, segment 1 " in claude["body"]
+
+
 def test_evidence_refs_qualify_every_agent_cli_but_claude():
     """Claude refs stay byte-identical to every ref written before 0.27 (Claudlobby#2145 F9)."""
-    assert filing.evidence_ref("s1", 1) == "session:s1:1" == filing.evidence_ref("s1", 1, "claude")
+    assert filing.evidence_ref("s1", 1, "claude") == "session:s1:1"
     assert filing.evidence_ref("s1", 1, "codex") == "session:codex/s1:1"
 
 
@@ -196,7 +203,7 @@ class TestFileBlock:
         assert [r["title"][:25] for r in recorded] == ["(unverified) staging DB: "]
 
     def test_a_model_written_harvest_tag_never_reaches_a_draft(self):
-        finding = harvest.finding_of({**BLOCK, "tags": ["harvest:subject", "env:staging"]}, sid="s1", index=1,
+        finding = harvest.finding_of({**BLOCK, "tags": ["harvest:subject", "env:staging"]}, sid="s1", index=1, agent_cli="claude",
                                      project="webapp")
         assert filing.SUBJECT_TAG not in finding["tags"] and "env:staging" in finding["tags"]
 
@@ -349,15 +356,15 @@ class TestMemoryHomes:
     """With ``memory-homes`` (Claudron#200 §2) a block is filed under its home's own type, kind and sections."""
 
     def test_a_block_becomes_its_homes_type_with_its_kind(self):
-        finding = harvest.finding_of(BLOCK, sid="s1", index=1, project="webapp", trust_aware=True, homes=True)
+        finding = harvest.finding_of(BLOCK, sid="s1", index=1, agent_cli="claude", project="webapp", trust_aware=True, homes=True)
         assert (finding["type"], finding["kind"]) == ("entity", "service")
-        assert harvest.finding_of({**BLOCK, "home": "practice"}, sid="s1", index=1, project="w",
+        assert harvest.finding_of({**BLOCK, "home": "practice"}, sid="s1", index=1, agent_cli="claude", project="w",
                                   homes=True)["type"] == "practice"
-        assert harvest.finding_of(BLOCK, sid="s1", index=1, project="w")["type"] == "knowledge"  # older engine
+        assert harvest.finding_of(BLOCK, sid="s1", index=1, agent_cli="claude", project="w")["type"] == "knowledge"  # older engine
 
     def test_a_person_block_is_still_held_back(self):
         person = {**BLOCK, "home": "person", "subject_hint": {"name": "Dana", "kind": "person"}}
-        assert harvest.finding_of(person, sid="s1", index=1, project="w", homes=True) is None
+        assert harvest.finding_of(person, sid="s1", index=1, agent_cli="claude", project="w", homes=True) is None
 
     @pytest.mark.parametrize("home,hint,section", [
         ("entity", "behavior & GOTCHAS", "Behavior & gotchas"), ("entity", "Operations", "Facts"),
@@ -372,7 +379,7 @@ class TestMemoryHomes:
         fake.add("projects/webapp/s.md", "(unverified) staging DB", tags=[filing.SUBJECT_TAG])
         fake.notes["projects/webapp/s.md"]["type"] = "entity"
         block = {**BLOCK, "home": "concept", "section_hint": "Definition"}
-        finding = harvest.finding_of(block, sid="s1", index=1, project="webapp", trust_aware=True, homes=True)
+        finding = harvest.finding_of(block, sid="s1", index=1, agent_cli="claude", project="webapp", trust_aware=True, homes=True)
         target = filing.Target(cwd="/w", env={}, vault="/v", project="webapp", run_id="r", capture=fake.capture,
                                homes=True)
         filing.file_block(block, finding, ref="session:s1:1", target=target, record=[].append)
@@ -380,14 +387,14 @@ class TestMemoryHomes:
 
     def test_an_engine_without_homes_keeps_the_hint_even_for_a_decision(self, fake):
         block = {**BLOCK, "home": "decision", "section_hint": "Background"}
-        finding = harvest.finding_of(block, sid="s1", index=1, project="webapp", trust_aware=True)
+        finding = harvest.finding_of(block, sid="s1", index=1, agent_cli="claude", project="webapp", trust_aware=True)
         target = filing.Target(cwd="/w", env={}, vault="/v", project="webapp", run_id="r", capture=fake.capture)
         filing.file_block(block, finding, ref="session:s1:1", target=target, record=[].append)
         assert fake.amends[0][0]["section"] == "Background"
 
     def test_the_subject_draft_is_the_home_and_the_fact_lands_in_its_section(self, fake):
         block = {**BLOCK, "section_hint": "Operating it"}
-        finding = harvest.finding_of(block, sid="s1", index=1, project="webapp", trust_aware=True, homes=True)
+        finding = harvest.finding_of(block, sid="s1", index=1, agent_cli="claude", project="webapp", trust_aware=True, homes=True)
         target = filing.Target(cwd="/w", env={}, vault="/v", project="webapp", run_id="r", capture=fake.capture,
                                homes=True)
         filing.file_block(block, finding, ref="session:s1:1", target=target, record=[].append)

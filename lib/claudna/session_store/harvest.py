@@ -51,6 +51,7 @@ from typing import Callable, Mapping
 
 from claudna.redact import redact_strings
 
+from . import events as ev
 from . import schema
 from .fsio import atomic_write_json, atomic_write_text, ensure_dir, exclusive_lock, read_json, utc_seconds
 from . import claudron
@@ -107,8 +108,8 @@ def is_due(root: Path, env: Mapping[str, str], now: float | None = None) -> bool
     return _skip_reason(root, env, now) is None and shutil.which(claudron_bin(env), path=env.get("PATH")) is not None
 
 
-def finding_of(block: dict, *, sid: str, index: int, project: str | None,
-               trust_aware: bool = False, homes: bool = False, ref: str | None = None) -> dict | None:
+def finding_of(block: dict, *, sid: str, index: int, agent_cli: str, project: str | None,
+               trust_aware: bool = False, homes: bool = False) -> dict | None:
     """The per-claim ``claudron capture`` JSON for one block, or ``None`` when it is held back.
 
     The tag namespaces (``home:``, ``asserted-by:``, ``origin:``) are
@@ -118,8 +119,8 @@ def finding_of(block: dict, *, sid: str, index: int, project: str | None,
     it ``source_type: session``; the tag stays either way, for older readers.
     ``homes`` (the engine declares :data:`HOMES_CAP`) files it under its memory
     home's own type and the subject's ``kind``, instead of ``knowledge``.
-    ``ref`` is the segment's :func:`evidence_ref`, which names the agent CLI
-    (F9); without one it is the Claude form.
+    ``agent_cli`` is the session's (``SessionFacts.agent_cli``): a non-Claude
+    session's provenance names it (F9), and Claude's reads as it always has.
     """
     note_type = NOTE_TYPES.get(block["home"])
     if note_type is None:
@@ -129,7 +130,8 @@ def finding_of(block: dict, *, sid: str, index: int, project: str | None,
     body = block["claim"]
     if block.get("section_hint"):
         body += f"\n\nSection: {block['section_hint']}"
-    body += f"\n\nHarvested from session {sid}, segment {index} (asserted by the {block['asserted_by']})."
+    source = "session" if agent_cli == ev.DEFAULT_AGENT_CLI else f"{agent_cli} session"  # Claude's line as it was
+    body += f"\n\nHarvested from {source} {sid}, segment {index} (asserted by the {block['asserted_by']})."
     finding = {
         "type": note_type,
         "title": DRAFT_BANNER + short_title(f"{block['subject_hint']['name']}: {block['claim']}"),
@@ -140,7 +142,7 @@ def finding_of(block: dict, *, sid: str, index: int, project: str | None,
         "source_type": "inline",
     }
     if trust_aware:
-        finding.update(source_type="session", source_url=ref or evidence_ref(sid, index))
+        finding.update(source_type="session", source_url=evidence_ref(sid, index, agent_cli))
     if project:
         finding["project"] = project
     if homes and (kind := one_line(block["subject_hint"].get("kind"))):
@@ -269,7 +271,7 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
         report.screened += len(summary["blocks"]) - len(blocks) + _dropped_when_written(lifecycle, index, boundary)
         ref = evidence_ref(sid, index, facts.agent_cli)  # one provenance per segment (F9)
         findings = [(b, finding_of(b, sid=sid, index=index, project=origin["repo"], trust_aware=trust_aware,
-                                         homes=homes, ref=ref))
+                                         homes=homes, agent_cli=facts.agent_cli))
                     for b in blocks]
         wanted = [f for _, f in findings if f is not None]
         if report.captures and report.captures + len(wanted) > MAX_CAPTURES:

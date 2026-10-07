@@ -161,7 +161,7 @@ class TestHarvest:
     def test_a_long_title_is_cut_at_a_word(self):
         long = {**BLOCK, "claim": "Do not keep persistent test fixtures in the staging database because it is reset "
                                   "every night at two in the morning UTC"}
-        title = harvest.finding_of(long, sid="s1", index=1, project=None)["title"]
+        title = harvest.finding_of(long, sid="s1", index=1, agent_cli="claude", project=None)["title"]
         assert len(title) <= len(harvest.DRAFT_BANNER) + 101 and title.endswith("…") and not title[:-1].endswith(" ")
 
     def test_a_segment_is_taken_once(self, store):

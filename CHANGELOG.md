@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - **Sessions record which agent CLI opened them** (Claudlobby#2145 P1). `session.opened` gains an optional top-level `agent_cli`, `claude` or `codex`; a log without it reads as `claude`. `SessionHandle.open_session(..., agent_cli=)` takes it and the Claude Code hook records `claude`. `session.json` and the export item's `session` subset carry it; `claudna.export/1` keeps its tag, because the key is additive. Spec §8 now documents the export item fields and the rule that lets them grow without a new tag.
-- **Harvest provenance names the agent CLI for non-Claude sessions** (Claudlobby#2145 F9): `session:<agent_cli>/<sid>:<seg>`, so two vendors' ids never collide in one vault. Claude refs are byte-identical to before.
+- **Harvest provenance names the agent CLI for non-Claude sessions** (Claudlobby#2145 F9): `session:<agent_cli>/<sid>:<seg>`, so two vendors' ids never collide in one vault, and a draft's "Harvested from" line names the agent CLI too. Claude refs and drafts are byte-identical to before.
 
 ### Changed
 - **Heads-up: `session.json` is now `claudna.session/2`.** 0.27 reads a `/1` file by folding its log, `check` warns on it, and the sweep rewrites it once. A 0.26 *writer* sharing the store (a bot not yet restarted, or its detached summarizer, harvest or sweep) rewrites it to `/1`, and 0.27 rebuilds it forward: one rebuild each way, nothing lost, until every 0.26 process has restarted (on a Claudlobby fleet, each bot's next restart). Run `check` from 0.27.

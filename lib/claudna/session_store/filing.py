@@ -38,6 +38,7 @@ from typing import Callable, Mapping
 from claudna.redact import redact_strings
 
 from . import claudron
+from . import events as ev
 
 RUN_CAP = "runs"
 #: Claudron ≥ 0.8 files a block under its memory home's own type (#200 §2) rather than ``knowledge``.
@@ -94,14 +95,16 @@ def one_line(text: object) -> str:
     return "".join(ch for ch in " ".join(str(text or "").split()) if ch.isprintable())
 
 
-def evidence_ref(sid: str, index: int, agent_cli: str = "claude") -> str:
+def evidence_ref(sid: str, index: int, agent_cli: str) -> str:
     """Where a harvested claim came from, as a ``source_url`` and an evidence ref.
 
     ``session:<sid>:<seg>`` for a Claude Code session, byte-identical to every ref written before 0.27,
     and ``session:<agent_cli>/<sid>:<seg>`` for any other agent CLI (Claudlobby#2145 F9, mirroring F2):
     ids from two vendors must not collide in one vault. Claudron treats the string as opaque.
     """
-    return f"session:{sid}:{index}" if agent_cli == "claude" else f"session:{agent_cli}/{sid}:{index}"
+    if agent_cli == ev.DEFAULT_AGENT_CLI:
+        return f"session:{sid}:{index}"
+    return f"session:{agent_cli}/{sid}:{index}"
 
 
 def subject_title(name: str) -> str:

@@ -236,11 +236,15 @@ class TestStore:
         assert session_facts(load_lifecycle(codex.paths).events).agent_cli == "codex"
         assert session_facts(load_lifecycle(plain.paths).events).agent_cli == "claude"
 
-    def test_the_first_session_opened_that_names_an_agent_cli_wins(self, store):
-        h = opened(store)  # a log written before 0.27 names none
+    def test_the_first_session_opened_decides_the_agent_cli(self, store):
+        """Spec §6.4: a log from before 0.27 names none and is claude, whatever a later open records."""
+        h = opened(store)
         h.open_session("resume", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl", agent_cli="codex")
-        h.open_session("resume", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl", agent_cli="claude")
-        assert session_facts(load_lifecycle(h.paths).events).agent_cli == "codex"
+        assert session_facts(load_lifecycle(h.paths).events).agent_cli == "claude"
+        codex = store.session("codex-2")
+        codex.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl", agent_cli="codex")
+        codex.open_session("resume", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl", agent_cli="claude")
+        assert session_facts(load_lifecycle(codex.paths).events).agent_cli == "codex"
 
     def test_segments_increment_from_the_directories(self, store):
         h = opened(store)

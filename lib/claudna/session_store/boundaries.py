@@ -49,7 +49,7 @@ _TRIGGERS = ev.REGISTRY["segment.sealed"].choices["trigger"]
 INTERACTIVE_ENTRYPOINTS = ("cli", "claude-vscode", "claude-desktop")
 #: The agent CLI this adapter serves, recorded at open as ``session.opened.agent_cli`` (Claudlobby#2145 P1).
 #: P4's host split replaces the literal with the selected host's name.
-AGENT_CLI = ev.DEFAULT_AGENT_CLI
+AGENT_CLI = "claude"
 
 
 def actor_from_env(env: Mapping[str, str]) -> dict:
