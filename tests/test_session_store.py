@@ -52,11 +52,13 @@ from claudna.session_store.paths import (  # noqa: E402
     state_root,
     validate_sid,
 )
+from claudna.session_store import project as project_module  # noqa: E402
 from claudna.session_store.project import load_lifecycle, session_facts  # noqa: E402
 from claudna.session_store.store import NotAppendable, SessionStore, StoreError  # noqa: E402
 
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "session-store" / "basic"
 FIXTURE_SID = "5f0c2d1e-0000-4000-8000-000000000001"
+OLDER_SESSION = FIXTURE / "older" / "session-0.26.json"  # what a 0.26 rebuild leaves: claudna.session/1
 STORE_PKG = LIB / "claudna" / "session_store"
 
 ACTOR = {"kind": "interactive", "fleet": None, "bot_id": None, "bot_name": None, "model": None, "entrypoint": "cli"}
@@ -323,7 +325,7 @@ class TestStore:
     def test_a_tagged_but_malformed_projection_is_healed_not_trusted(self, store):
         h = opened(store)
         h.open_segment("session_open", 0)
-        h.paths.session_json.write_text(json.dumps({"schema": "claudna.session/1"}))
+        h.paths.session_json.write_text(json.dumps({"schema": "claudna.session/2"}))
         prompt(h)
         assert schema.validate(load(h.paths.session_json), schema.load("session")) == []
 
@@ -574,6 +576,70 @@ class TestProjection:
         assert load(handle.paths.segment(1).segment_json)["schema"] == "claudna.segment/2"
         assert retention.sweep(store, {}).upgraded == []  # once
 
+    def test_a_0_26_session_projection_is_refolded_to_the_current_schema(self, tmp_path):
+        """A ``claudna.session/1`` file (0.26, no ``agent_cli``) is folded from the log, never served."""
+        root = _copy_fixture(tmp_path)
+        handle = SessionStore(root).session(FIXTURE_SID)
+        handle.rebuild()
+        atomic_write_json(handle.paths.session_json, load(OLDER_SESSION))
+        doc = readers.show(SessionStore(root), FIXTURE_SID)["session"]
+        assert doc["schema"] == "claudna.session/2" and doc["agent_cli"] == "claude"
+        report = check_session(handle)
+        assert report.problems == []
+        assert any("an older projection" in w and "session.json" in w for w in report.warnings)
+
+    def test_the_sweep_rewrites_a_0_26_session_projection_once(self, tmp_path):
+        root = _copy_fixture(tmp_path)
+        store = SessionStore(root)
+        handle = store.session(FIXTURE_SID)
+        handle.rebuild()
+        atomic_write_json(handle.paths.session_json, load(OLDER_SESSION))
+        assert retention.sweep(store, {}).upgraded == [FIXTURE_SID]
+        assert load(handle.paths.session_json)["schema"] == "claudna.session/2"
+        assert retention.sweep(store, {}).upgraded == []  # once
+
+    def test_a_0_26_reader_and_a_0_27_writer_alternating_converge_on_session_2(self, store, monkeypatch):
+        """Readers write nothing, so a 0.26 reader never flips a 0.27 file back (epic #2145 P1).
+
+        0.26 differs from 0.27 at one seam: the tag ``read_projection``/``session_doc`` ask for.
+        ``store.py`` keeps its own ``/2`` binding, so the writer stays 0.27.
+        """
+        rebuilds = []
+        real_rebuild = project_module.rebuild
+        monkeypatch.setattr(project_module, "rebuild", lambda paths: rebuilds.append(paths) or real_rebuild(paths))
+        h = opened(store)
+        h.open_segment("session_open", 0)
+        for _ in range(3):
+            prompt(h)  # 0.27 write
+            h.seal_segment(10, "precompact", trigger="auto")
+            h.open_segment("compact", 10)
+            assert load(h.paths.session_json)["schema"] == "claudna.session/2"
+            before, rebuilds[:] = h.paths.session_json.read_bytes(), []
+            with monkeypatch.context() as m:  # 0.26 read
+                m.setattr(project_module, "SESSION_SCHEMA", "claudna.session/1")
+                m.setattr(project_module, "OLDER_PROJECTIONS", frozenset({"claudna.segment/1"}))
+                doc = project_module.session_doc(h.paths)
+            assert doc["status"] == "open" and doc["segments"]["open"] == h.current_segment()
+            assert h.paths.session_json.read_bytes() == before and rebuilds == []
+
+    def test_a_0_26_writers_file_is_rebuilt_to_session_2_once(self, store, monkeypatch):
+        """The writer side, honestly: a 0.26 rebuild leaves ``/1``; the next 0.27 append rebuilds it once."""
+        rebuilds = []
+        for module in (project_module, store_module):
+            real = module.rebuild
+            monkeypatch.setattr(module, "rebuild", lambda paths, real=real: rebuilds.append(paths) or real(paths))
+        h = opened(store)
+        h.open_segment("session_open", 0)
+        prompt(h)
+        atomic_write_json(h.paths.session_json, load(OLDER_SESSION))
+        rebuilds.clear()
+        prompt(h)
+        assert len(rebuilds) == 1
+        doc = load(h.paths.session_json)
+        assert doc["schema"] == "claudna.session/2" and doc["agent_cli"] == "claude"
+        prompt(h)
+        assert len(rebuilds) == 1  # the fast path again
+
     def test_rebuild_is_deterministic_and_never_touches_logs(self, tmp_path):
         root = _copy_fixture(tmp_path)
         handle = SessionStore(root).session(FIXTURE_SID)
@@ -655,6 +721,7 @@ class TestSchemas:
             ("segment", "sealed_by", "segment.sealed", "sealed_by", [None]),
             ("session", "opened_by", "session.opened", "source", [None]),
             ("session", "close_reason", "session.closed", "reason", [None]),
+            ("session", "agent_cli", "session.opened", "agent_cli", []),
         ],
     )
     def test_projection_vocabularies_match_the_registry(self, schema_name, prop, kind, field, extra):
@@ -691,6 +758,8 @@ class TestSchemas:
             ("session", lambda d: d.update(unexpected=1)),
             ("session", lambda d: d["segments"].update(count=-1)),
             ("session", lambda d: d.update(opened_at="2026-09-28 10:00")),
+            ("session", lambda d: d.update(agent_cli="gpt")),
+            ("session", lambda d: d.pop("agent_cli")),
             ("segment", lambda d: d.update(index=0)),
             ("segment", lambda d: d["transcript"]["range"].update(start=-1)),
             ("segment", lambda d: d["summary"].update(status="maybe")),

@@ -244,13 +244,14 @@ Every line in every log:
 
 ```json
 {
-  "schema": "claudna.session/1",
+  "schema": "claudna.session/2",
   "sid": "3fbb…",
   "parent_sid": "533c…",
   "chain_id": "533c…",
   "children": [],
   "status": "open",
   "private": false,
+  "agent_cli": "claude",
   "actor":  { "kind": "interactive", "bot_name": null, "model": "…", "entrypoint": "cli" },
   "origin": { "cwd": "/…/clauDNA", "repo": "Claudfather/clauDNA", "branch": "main", "head": "abc123" },
   "transcript_path": "/…/3fbb….jsonl",
@@ -263,6 +264,8 @@ Every line in every log:
 ```
 
 `status`: `open` → `closed`. `segments.open` is the open segment's index or `null`; `segments.retired` counts segments retention has removed (§9). `projected_from` is a watermark: `session.json` carries the lifecycle log's (lines, bytes, skipped), each `segment.json` its activity log's. Before re-folding, a write compares the watermark with the log's size before its append; a mismatch means an earlier refresh never ran (a killed hook), and the store rebuilds. Every write checks `session.json` against the lifecycle log — activity appends included — so a lost lifecycle refresh is healed by the next write to either log; a lost activity refresh is healed by the next activity append. Until a write comes, `check` reports each projection whose watermark lags its log as a warning.
+
+`agent_cli` is the first `session.opened`'s (`claude` for a log written before 0.27). `claudna.session/1` is an older tag: readers fold it from the log, `check` warns, the sweep rewrites it once (as for `claudna.segment/1`).
 
 ### 6.5 `segment.json` — projection
 

@@ -29,10 +29,12 @@ from .fsio import atomic_write_json, epoch_of, file_size, read_json, read_jsonl
 from .schema import is_instance
 from .paths import SessionPaths
 
-SESSION_SCHEMA = "claudna.session/1"
+SESSION_SCHEMA = "claudna.session/2"
 SEGMENT_SCHEMA = "claudna.segment/2"
 #: Projection tags earlier releases wrote. Readers re-fold them; :func:`stale_projections` finds them to rewrite.
-OLDER_PROJECTIONS = frozenset({"claudna.segment/1"})
+#: None gets a schema entry: a 0.26 rebuild writes ``session/1`` without ``agent_cli`` over a log that has it,
+#: so folding the log is the only correct read.
+OLDER_PROJECTIONS = frozenset({"claudna.segment/1", "claudna.session/1"})
 #: Summary prompt versions written before the instruction screen existed: screened again as they're read.
 UNSCREENED_PROMPTS = frozenset({"segment-summary/1"})
 _SCHEMA_FILES = {SESSION_SCHEMA: "session", SEGMENT_SCHEMA: "segment"}
@@ -356,7 +358,7 @@ def project_session(sid: str, lifecycle: Log, segments: list[dict], *, transcrip
     for e in lifecycle.events:
         if e["kind"] == "session.child_linked" and e["data"]["child_sid"] not in children:
             children.append(e["data"]["child_sid"])
-    private = session_facts(lifecycle.events).private
+    facts = session_facts(lifecycle.events)
 
     retired = retired_indices(lifecycle.events)
     segments = [s for s in segments if s["index"] not in retired]  # the log, not a directory, says what's retired
@@ -373,7 +375,8 @@ def project_session(sid: str, lifecycle: Log, segments: list[dict], *, transcrip
         "chain_id": first["data"]["chain_id"] if first else sid,
         "children": children,
         "status": status,
-        "private": private,
+        "private": facts.private,
+        "agent_cli": facts.agent_cli,
         "actor": first["data"]["actor"] if first else None,
         "origin": first["data"]["origin"] if first else None,
         "transcript_path": transcript_path,
@@ -419,13 +422,13 @@ def rebuild(paths: SessionPaths) -> RebuildReport:
 
 
 def stale_projections(paths: SessionPaths) -> bool:
-    """Does any ``segment.json`` carry a tag an earlier release wrote (:data:`OLDER_PROJECTIONS`)?
+    """Does ``session.json`` or any ``segment.json`` carry a tag an earlier release wrote (:data:`OLDER_PROJECTIONS`)?
 
     Readers re-fold such a file in memory every time; a closed session never
     writes again, so the sweep rebuilds it once instead.
     """
-    for index in paths.segment_indices():
-        doc = read_json(paths.segment(index).segment_json)
+    for path in (paths.session_json, *(paths.segment(i).segment_json for i in paths.segment_indices())):
+        doc = read_json(path)
         if isinstance(doc, dict) and doc.get("schema") in OLDER_PROJECTIONS:
             return True
     return False

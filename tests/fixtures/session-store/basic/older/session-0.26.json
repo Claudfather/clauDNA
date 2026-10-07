@@ -7,7 +7,6 @@
     "kind": "bot",
     "model": "claude-haiku"
   },
-  "agent_cli": "claude",
   "chain_id": "root-sid-0",
   "children": [
     "child-sid-2"
@@ -29,7 +28,7 @@
     "lines": 11,
     "skipped": 0
   },
-  "schema": "claudna.session/2",
+  "schema": "claudna.session/1",
   "segments": {
     "count": 2,
     "open": null,
