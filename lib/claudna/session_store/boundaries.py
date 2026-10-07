@@ -47,6 +47,9 @@ _CLOSE_REASONS = ev.HOOK_CLOSE_REASONS
 _TRIGGERS = ev.REGISTRY["segment.sealed"].choices["trigger"]
 #: Entrypoints a person drives. Anything else (``sdk-*``, CI actions, chat bots) is headless (#373, M5).
 INTERACTIVE_ENTRYPOINTS = ("cli", "claude-vscode", "claude-desktop")
+#: The agent CLI this adapter serves, recorded at open as ``session.opened.agent_cli`` (Claudlobby#2145 P1).
+#: P4's host split replaces the literal with the selected host's name.
+AGENT_CLI = "claude"
 
 
 def actor_from_env(env: Mapping[str, str]) -> dict:
@@ -144,6 +147,7 @@ def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str],
     handle.open_session(source, actor=actor_from_env(env),
                         origin=origin_from_cwd(payload.get("cwd") or os.getcwd()),
                         transcript_path=transcript, claude_pid=claude_pid_of(env), harvest=harvest_choice(env),
+                        agent_cli=AGENT_CLI,
                         parent_sid=parent["sid"] if parent else None,
                         chain_id=parent["chain_id"] if parent else None)
     handle.open_segment("session_open", file_size(transcript))  # before the parent's write, which can fail

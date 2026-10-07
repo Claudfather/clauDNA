@@ -1,5 +1,7 @@
 # Pre-registration: session-end summarizer comparison
 
+**Withdrawn:** 2026-10-04 — Claudlobby#2145 F15; the battery period never started; the digest retires in #2145 P3. Below is the document as ratified and frozen on 2026-09-30; nothing else in it changes.
+
 **Status:** ratified by the owner as written, 2026-09-30, and frozen: any change is a new pre-registration with its own date. Arm B is therefore pinned to Claudlobby `main` as of 2026-09-30; its SHA goes in the results doc. The 3 battery bots are still to be named before the period starts.
 **Context:** session store spec §1.1 rule 4; [Claudlobby#1961](https://github.com/Claudfather/Claudlobby/issues/1961).
 

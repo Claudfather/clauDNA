@@ -59,6 +59,9 @@ BLOCK = {"home": "entity", "subject_hint": {"name": "staging DB", "kind": "servi
          "claim": "The staging DB is reset nightly at 02:00 UTC.", "asserted_by": "user", "tags": [],
          "section_hint": "Operations"}
 SUBJECT = "projects/webapp/unverified-staging-db.md"
+CODEX_BLOCK = {**BLOCK, "subject_hint": {"name": "rollout store", "kind": "service", "aliases": []},
+               "claim": "The rollout store keeps one file per session."}
+CODEX_SUBJECT = "projects/webapp/unverified-rollout-store.md"
 
 
 @pytest.fixture(autouse=True)
@@ -104,11 +107,13 @@ def work(tmp_path: Path) -> Path:
     return path
 
 
-def _session(store: SessionStore, sid: str, blocks: list[dict], *, vault: Path, work: Path) -> None:
+def _session(store: SessionStore, sid: str, blocks: list[dict], *, vault: Path, work: Path,
+             agent_cli: str | None = None) -> None:
     """A closed session in ``webapp`` whose one segment's summary carries ``blocks``, harvest-enabled."""
     handle = store.session(sid)
     handle.open_session("startup", actor=ACTOR, origin={**ORIGIN, "repo": "webapp", "cwd": str(work)},
-                        transcript_path="/t.jsonl", harvest={"enabled": True, "vault": str(vault)})
+                        transcript_path="/t.jsonl", harvest={"enabled": True, "vault": str(vault)},
+                        agent_cli=agent_cli)
     handle.open_segment("session_open", 10)
     handle.seal_segment(15, "precompact")
     complete_segment(handle, 1, segment_summary(sid, 1, blocks, start=10, end=15))
@@ -180,6 +185,16 @@ class TestHarvest:
         _session(store, "s2", [BLOCK], vault=vault, work=work)  # the same fact, from another session
         _harvest(store, env)
         assert _section(note, filing.HOME_DEFAULT_SECTION["entity"]).count(BLOCK["claim"]) == 1
+
+    def test_a_codex_sessions_provenance_is_agent_cli_qualified(self, tmp_path, vault, work, env):
+        """Claudlobby#2145 F9: Claude refs stay as they were; a Codex session's refs name its agent CLI."""
+        store = SessionStore(tmp_path / "store")
+        _session(store, "s1", [BLOCK], vault=vault, work=work)
+        _session(store, "s2", [CODEX_BLOCK], vault=vault, work=work, agent_cli="codex")
+        _harvest(store, env)
+        assert _frontmatter(vault / SUBJECT)["source_url"] == "session:s1:1"
+        assert _frontmatter(vault / CODEX_SUBJECT)["source_url"] == "session:codex/s2:1"
+        assert "  - evidence: session:codex/s2:1" in (vault / CODEX_SUBJECT).read_text(encoding="utf-8")
 
     def test_every_write_carries_the_run_and_revert_run_undoes_it(self, tmp_path, vault, work, env, claudron_bin):
         store = SessionStore(tmp_path / "store")

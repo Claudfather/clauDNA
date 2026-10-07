@@ -181,16 +181,18 @@ def sweep(store: SessionStore, env: Mapping[str, str], *, now: float | None = No
             if rollup.outdated(handle.paths):  # 0.23's unscreened rollup: before the fully-retired skip below
                 rollup.refresh(handle.paths)
                 report.upgraded.append(sid)
+            # An earlier release's session.json or segment.json: rewrite once, so readers stop re-folding it.
+            # Before the fully-retired skip, or a retired session's session/1 would be re-folded on every list.
+            if stale_projections(handle.paths):
+                handle.rebuild()
+                if sid not in report.upgraded:
+                    report.upgraded.append(sid)
             if not handle.paths.segment_indices():
                 continue  # fully retired: a directory listing, no log read
             lifecycle = load_lifecycle(handle.paths).events
             if session_facts(lifecycle).status == "closed" and handle.seal_after_close() is not None:
                 report.repaired.append(sid)  # a 0.22 leftover, sealed under the lock: fold the log again
                 lifecycle = load_lifecycle(handle.paths).events
-            if stale_projections(handle.paths):  # an earlier release's segment.json: rewrite once, not re-fold
-                handle.rebuild()
-                if sid not in report.upgraded:
-                    report.upgraded.append(sid)
             batch = due(handle, env, now=now, lifecycle=lifecycle)
             report.retired += [f"{sid}/seg-{index:03d} ({reason})"
                                for index, reason in retire(handle, batch, deadline=spent)]

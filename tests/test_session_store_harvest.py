@@ -59,11 +59,11 @@ class FakeCapture:
 
 
 def summarized_session(store, sid: str, blocks_per_segment: list[list[dict]], *, repo="webapp", done=True,
-                       closed=True, opted_in=True, vault="/vaults/default", cwd="/work"):
+                       closed=True, opted_in=True, vault="/vaults/default", cwd="/work", agent_cli=None):
     """A session whose segments each carry a completed summary with the given blocks (closed: all final)."""
     h = store.session(sid)
     h.open_session("startup", actor=ACTOR, origin={**ORIGIN, "repo": repo, "cwd": cwd}, transcript_path="/t.jsonl",
-                   harvest={"enabled": opted_in, "vault": vault})
+                   harvest={"enabled": opted_in, "vault": vault}, agent_cli=agent_cli)
     for i, blocks in enumerate(blocks_per_segment, 1):
         h.open_segment("session_open" if i == 1 else "compact", i * 10)
         h.seal_segment(i * 10 + 5, "precompact")
@@ -161,7 +161,7 @@ class TestHarvest:
     def test_a_long_title_is_cut_at_a_word(self):
         long = {**BLOCK, "claim": "Do not keep persistent test fixtures in the staging database because it is reset "
                                   "every night at two in the morning UTC"}
-        title = harvest.finding_of(long, sid="s1", index=1, project=None)["title"]
+        title = harvest.finding_of(long, sid="s1", index=1, agent_cli="claude", project=None)["title"]
         assert len(title) <= len(harvest.DRAFT_BANNER) + 101 and title.endswith("…") and not title[:-1].endswith(" ")
 
     def test_a_segment_is_taken_once(self, store):

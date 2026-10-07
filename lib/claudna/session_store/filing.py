@@ -38,6 +38,7 @@ from typing import Callable, Mapping
 from claudna.redact import redact_strings
 
 from . import claudron
+from . import events as ev
 
 RUN_CAP = "runs"
 #: Claudron ≥ 0.8 files a block under its memory home's own type (#200 §2) rather than ``knowledge``.
@@ -94,9 +95,16 @@ def one_line(text: object) -> str:
     return "".join(ch for ch in " ".join(str(text or "").split()) if ch.isprintable())
 
 
-def evidence_ref(sid: str, index: int) -> str:
-    """Where a harvested claim came from, as a ``source_url`` and an evidence ref: ``session:<sid>:<seg>``."""
-    return f"session:{sid}:{index}"
+def evidence_ref(sid: str, index: int, agent_cli: str) -> str:
+    """Where a harvested claim came from, as a ``source_url`` and an evidence ref.
+
+    ``session:<sid>:<seg>`` for a Claude Code session, byte-identical to every ref written before 0.27,
+    and ``session:<agent_cli>/<sid>:<seg>`` for any other agent CLI (Claudlobby#2145 F9, mirroring F2):
+    ids from two vendors must not collide in one vault. Claudron treats the string as opaque.
+    """
+    if agent_cli == ev.DEFAULT_AGENT_CLI:
+        return f"session:{sid}:{index}"
+    return f"session:{agent_cli}/{sid}:{index}"
 
 
 def subject_title(name: str) -> str:
@@ -156,7 +164,7 @@ def _subject_finding(block: dict, finding: dict, title: str, ref: str) -> dict:
     return subject
 
 
-def file_block(block: dict, finding: dict, *, sid: str, index: int, target: Target, record: Record) -> str:
+def file_block(block: dict, finding: dict, *, ref: str, target: Target, record: Record) -> str:
     """File one block under its subject (see the module doc); the block's outcome.
 
     ``finding`` is the block's per-claim draft (``harvest.finding_of``), the
@@ -171,7 +179,6 @@ def file_block(block: dict, finding: dict, *, sid: str, index: int, target: Targ
     names = list(dict.fromkeys(n for n in [name, *(one_line(a) for a in hint.get("aliases", [])), title] if n))
     exact = [c for c in claudron.resolve(names, project=target.project, cwd=target.cwd, env=target.env,
                                          vault=target.vault) if c.get("exact")]
-    ref = evidence_ref(sid, index)
     if exact:
         if not all(_is_subject_draft(c) for c in exact):
             return per_claim(finding, target, record)  # a note harvest didn't write owns the name

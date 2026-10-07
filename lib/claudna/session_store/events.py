@@ -42,6 +42,11 @@ _BOOL = (bool,)
 _OPT_BOOL = (bool, type(None))
 _DICT = (dict,)
 
+#: The agent CLIs a session can be opened by (``session.opened.agent_cli``). With ``session_id`` it is the
+#: join key the plane, Claudlobby and Claudron share (Claudlobby#2145 F2); a log that names none is ``claude``.
+AGENT_CLIS = ("claude", "codex")
+DEFAULT_AGENT_CLI = "claude"
+
 
 class EventError(ValueError):
     """A writer tried to build an event that violates the registry."""
@@ -90,11 +95,15 @@ REGISTRY: dict[str, KindSpec] = {
             "origin": _DICT,
             "transcript_path": _OPT_STR,
         },
-        # claude_pid: the owning Claude Code process ($CLAUDE_PID), so a nested child reusing the id is
-        # told apart. harvest: this session's own consumer choice and vault, so a harvest another
-        # session starts files it where *this* session would have (#373 review, B2).
-        optional={"claude_pid": _OPT_INT, "harvest": _DICT},
-        choices={"source": ("startup", "clear", "resume", "fork")},
+        # claude_pid: the owning agent process (Claude Code's $CLAUDE_PID today), so a nested child reusing
+        # the id is told apart; the name holds until the next envelope major (Claudlobby#2145 F13).
+        # harvest: this session's own consumer choice and vault, so a harvest another session starts files
+        # it where *this* session would have (#373 review, B2).
+        # agent_cli: the agent CLI that opened the session (Claudlobby#2145 P1). Absent on logs written
+        # before 0.27 and read as "claude". Top-level on purpose: actor is additionalProperties: false, so
+        # a key nested there would make a 0.23-0.26 reader skip the event.
+        optional={"claude_pid": _OPT_INT, "harvest": _DICT, "agent_cli": _STR},
+        choices={"source": ("startup", "clear", "resume", "fork"), "agent_cli": AGENT_CLIS},
         constraints={"actor": _SESSION_DEFS["actor_or_null"], "origin": _SESSION_DEFS["origin_or_null"],
                      "claude_pid": {"type": ["integer", "null"], "minimum": 1},
                      "harvest": {"type": "object", "required": ["enabled", "vault"], "additionalProperties": False,

@@ -29,10 +29,12 @@ from .fsio import atomic_write_json, epoch_of, file_size, read_json, read_jsonl
 from .schema import is_instance
 from .paths import SessionPaths
 
-SESSION_SCHEMA = "claudna.session/1"
+SESSION_SCHEMA = "claudna.session/2"
 SEGMENT_SCHEMA = "claudna.segment/2"
 #: Projection tags earlier releases wrote. Readers re-fold them; :func:`stale_projections` finds them to rewrite.
-OLDER_PROJECTIONS = frozenset({"claudna.segment/1"})
+#: Older tags have no schema file: readers re-fold them from the log. (A 0.26 rebuild can write ``session/1``
+#: without ``agent_cli`` over a log that names one, so the file's content is never served.)
+OLDER_PROJECTIONS = frozenset({"claudna.segment/1", "claudna.session/1"})
 #: Summary prompt versions written before the instruction screen existed: screened again as they're read.
 UNSCREENED_PROMPTS = frozenset({"segment-summary/1"})
 _SCHEMA_FILES = {SESSION_SCHEMA: "session", SEGMENT_SCHEMA: "segment"}
@@ -173,6 +175,9 @@ class SessionFacts:
     chain_id: str | None = None  # the first session.opened's, as session.json has it: a resume records its own sid
     claude_pid: int | None = None  # the latest session.opened's owning Claude Code process
     harvest: dict | None = None  # the latest session.opened's {enabled, vault}: its own consumer choice
+    # The first session.opened's; a log written before 0.27 reads as claude. Detached workers
+    # (summarizer, harvest, sweep) dispatch on this, never on a hook flag (Claudlobby#2145 P1).
+    agent_cli: str = ev.DEFAULT_AGENT_CLI
 
 
 def latest_origin(lifecycle: list[dict]) -> dict:
@@ -288,15 +293,17 @@ def summary_gate(facts: SessionFacts, env) -> str | None:
 
 
 def session_facts(lifecycle: list[dict]) -> SessionFacts:
-    actor, private, chain_id, claude_pid, harvest = None, False, None, None, None
+    actor, private, chain_id, claude_pid, harvest, agent_cli = None, False, None, None, None, None
     for e in lifecycle:
         if e["kind"] == "session.opened":
             actor, chain_id = e["data"]["actor"], chain_id or e["data"]["chain_id"]
             claude_pid, harvest = e["data"].get("claude_pid"), e["data"].get("harvest")
+            if agent_cli is None:  # the first session.opened's, like chain_id; a log from before 0.27 names none
+                agent_cli = e["data"].get("agent_cli", ev.DEFAULT_AGENT_CLI)
         elif e["kind"] == "session.privacy_set":
             private = e["data"]["private"]
     return SessionFacts(status=session_status(lifecycle)[0], actor=actor, private=private, chain_id=chain_id,
-                        claude_pid=claude_pid, harvest=harvest)
+                        claude_pid=claude_pid, harvest=harvest, agent_cli=agent_cli or ev.DEFAULT_AGENT_CLI)
 
 
 def next_segment_index(paths: SessionPaths) -> int:
@@ -351,7 +358,7 @@ def project_session(sid: str, lifecycle: Log, segments: list[dict], *, transcrip
     for e in lifecycle.events:
         if e["kind"] == "session.child_linked" and e["data"]["child_sid"] not in children:
             children.append(e["data"]["child_sid"])
-    private = session_facts(lifecycle.events).private
+    facts = session_facts(lifecycle.events)
 
     retired = retired_indices(lifecycle.events)
     segments = [s for s in segments if s["index"] not in retired]  # the log, not a directory, says what's retired
@@ -368,7 +375,8 @@ def project_session(sid: str, lifecycle: Log, segments: list[dict], *, transcrip
         "chain_id": first["data"]["chain_id"] if first else sid,
         "children": children,
         "status": status,
-        "private": private,
+        "private": facts.private,
+        "agent_cli": facts.agent_cli,
         "actor": first["data"]["actor"] if first else None,
         "origin": first["data"]["origin"] if first else None,
         "transcript_path": transcript_path,
@@ -414,13 +422,13 @@ def rebuild(paths: SessionPaths) -> RebuildReport:
 
 
 def stale_projections(paths: SessionPaths) -> bool:
-    """Does any ``segment.json`` carry a tag an earlier release wrote (:data:`OLDER_PROJECTIONS`)?
+    """Does ``session.json`` or any ``segment.json`` carry a tag an earlier release wrote (:data:`OLDER_PROJECTIONS`)?
 
     Readers re-fold such a file in memory every time; a closed session never
     writes again, so the sweep rebuilds it once instead.
     """
-    for index in paths.segment_indices():
-        doc = read_json(paths.segment(index).segment_json)
+    for path in (paths.session_json, *(paths.segment(i).segment_json for i in paths.segment_indices())):
+        doc = read_json(path)
         if isinstance(doc, dict) and doc.get("schema") in OLDER_PROJECTIONS:
             return True
     return False

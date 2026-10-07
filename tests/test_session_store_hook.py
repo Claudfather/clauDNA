@@ -522,6 +522,11 @@ class TestNestedChildren:
         opened = json.loads(store.session(SID).paths.lifecycle.read_text().splitlines()[0])
         assert opened["data"]["claude_pid"] == 4242
 
+    def test_the_agent_cli_is_recorded_as_claude(self, store, transcript):
+        fire(store, "SessionStart", transcript, env=self.env("cli", 4242), source="startup")
+        opened = json.loads(store.session(SID).paths.lifecycle.read_text().splitlines()[0])
+        assert opened["data"]["agent_cli"] == "claude"
+
 
 class TestSpend:
     def test_a_blocked_compaction_is_summarized_once(self, store, transcript, spawned):

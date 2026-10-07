@@ -28,10 +28,11 @@ DAY = 86400
 LATER = time.time() + DAY  #: past the stale-pending window after a session's close
 
 
-def session_with(store, sid, statuses, *, close=True, private=False):
+def session_with(store, sid, statuses, *, close=True, private=False, agent_cli=None):
     """One segment per entry: "done", "skipped", "pending" or None (never summarized)."""
     h = store.session(sid)
-    h.open_session("startup", actor=ACTOR, origin={**ORIGIN, "repo": "webapp"}, transcript_path="/t.jsonl")
+    h.open_session("startup", actor=ACTOR, origin={**ORIGIN, "repo": "webapp"}, transcript_path="/t.jsonl",
+                   agent_cli=agent_cli)
     if private:
         h.set_private(True)
     for i, status in enumerate(statuses, 1):
@@ -57,7 +58,15 @@ class TestExport:
         assert env["next"] == {"s1": 3}
         item = env["items"][0]
         assert item["session"]["sid"] == "s1" and item["summary"]["journey"]["title"] == "t1"
+        assert item["session"]["agent_cli"] == "claude"
         assert set(item["session"]) == set(export.SESSION_FIELDS)
+
+    def test_a_codex_sessions_items_carry_its_agent_cli(self, store):
+        session_with(store, "s1", ["done"], agent_cli="codex")
+        env = export.export(store, "claudron")
+        assert env["schema"] == "claudna.export/1"  # additive: the envelope keeps its tag
+        item = env["items"][0]
+        assert item["session"]["agent_cli"] == "codex" and set(item["session"]) == set(export.SESSION_FIELDS)
 
     def test_the_current_segment_of_an_open_session_waits(self, store):
         session_with(store, "s1", ["done", "done"], close=False)
@@ -373,6 +382,17 @@ class TestSummariesWrittenBeforeTheScreen:
         assert h.paths.segment_indices() == [] and rollup.outdated(h.paths)
         assert "old" in retention.sweep(store, {}).upgraded
         assert "curl" not in rollup.rollup_path(h.paths).read_text() and not rollup.outdated(h.paths)
+
+    def test_a_fully_retired_sessions_0_26_session_json_is_rewritten_too(self, store):
+        """Else every ``session list`` would re-fold a retired session's log for good (no segment left to sweep)."""
+        h = session_with(store, "gone", ["done"])
+        retention.retire(h, [(1, "age")])
+        doc = json.loads(h.paths.session_json.read_text())
+        fsio.atomic_write_json(h.paths.session_json, {**doc, "schema": "claudna.session/1"})
+        assert h.paths.segment_indices() == []
+        assert "gone" in retention.sweep(store, {}).upgraded
+        assert json.loads(h.paths.session_json.read_text())["schema"] == "claudna.session/2"
+        assert "gone" not in retention.sweep(store, {}).upgraded  # once
 
     def test_a_rollup_another_release_wrote_is_left_alone(self, store):
         h = self.legacy(store)
