@@ -108,7 +108,7 @@ def is_due(root: Path, env: Mapping[str, str], now: float | None = None) -> bool
 
 
 def finding_of(block: dict, *, sid: str, index: int, project: str | None,
-               trust_aware: bool = False, homes: bool = False) -> dict | None:
+               trust_aware: bool = False, homes: bool = False, agent_cli: str = "claude") -> dict | None:
     """The per-claim ``claudron capture`` JSON for one block, or ``None`` when it is held back.
 
     The tag namespaces (``home:``, ``asserted-by:``, ``origin:``) are
@@ -138,7 +138,7 @@ def finding_of(block: dict, *, sid: str, index: int, project: str | None,
         "source_type": "inline",
     }
     if trust_aware:
-        finding.update(source_type="session", source_url=evidence_ref(sid, index))
+        finding.update(source_type="session", source_url=evidence_ref(sid, index, agent_cli))
     if project:
         finding["project"] = project
     if homes and (kind := one_line(block["subject_hint"].get("kind"))):
@@ -266,7 +266,7 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
         blocks = [b for b in summary["blocks"] if not tripped(b)]  # a summary written before the screen existed
         report.screened += len(summary["blocks"]) - len(blocks) + _dropped_when_written(lifecycle, index, boundary)
         findings = [(b, finding_of(b, sid=sid, index=index, project=origin["repo"], trust_aware=trust_aware,
-                                         homes=homes))
+                                         homes=homes, agent_cli=facts.agent_cli))
                     for b in blocks]
         wanted = [f for _, f in findings if f is not None]
         if report.captures and report.captures + len(wanted) > MAX_CAPTURES:
@@ -277,7 +277,8 @@ def _harvest_session(store: SessionStore, sid: str, report: RunReport, capture: 
                                       action=answer["action"], path=answer["path"],
                                       vault=answer.get("vault", vault), run_id=target.run_id)
 
-            outcome = file_block(block, finding, sid=sid, index=index, target=target, record=record) if filing \
+            outcome = file_block(block, finding, sid=sid, index=index, target=target, record=record,
+                                 agent_cli=facts.agent_cli) if filing \
                 else per_claim(finding, target, record)
             setattr(report, outcome, getattr(report, outcome) + 1)  # created · filed · known · rejected
         for block, _ in (pair for pair in findings if pair[1] is None):

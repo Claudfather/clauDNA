@@ -83,15 +83,29 @@ def fake(monkeypatch):
     return vault
 
 
-def file(fake, block=BLOCK, sid="s1", index=1, recorded=None):
-    finding = harvest.finding_of(block, sid=sid, index=index, project="webapp", trust_aware=True)
+def file(fake, block=BLOCK, sid="s1", index=1, recorded=None, agent_cli="claude"):
+    finding = harvest.finding_of(block, sid=sid, index=index, project="webapp", trust_aware=True, agent_cli=agent_cli)
     target = filing.Target(cwd="/work", env={}, vault="/v", project="webapp", run_id="harvest-1",
                            capture=fake.capture)
     return filing.file_block(block, finding, sid=sid, index=index, target=target,
-                             record=(recorded if recorded is not None else []).append)
+                             record=(recorded if recorded is not None else []).append, agent_cli=agent_cli)
+
+
+def test_evidence_refs_qualify_every_agent_cli_but_claude():
+    """Claude refs stay byte-identical to every ref written before 0.27 (Claudlobby#2145 F9)."""
+    assert filing.evidence_ref("s1", 1) == "session:s1:1" == filing.evidence_ref("s1", 1, "claude")
+    assert filing.evidence_ref("s1", 1, "codex") == "session:codex/s1:1"
 
 
 class TestFileBlock:
+    def test_a_codex_sessions_subject_and_fact_carry_the_qualified_ref(self, fake):
+        assert file(fake, agent_cli="codex") == "created"
+        ((subject, _),) = fake.captures
+        assert subject["source_url"] == "session:codex/s1:1"
+        assert "session:codex/s1:1" in subject["body"]
+        ((request, _),) = fake.amends
+        assert request["evidence"]["ref"] == "session:codex/s1:1"
+
     def test_a_new_subject_is_a_session_draft_with_the_fact_appended(self, fake):
         recorded = []
         assert file(fake, recorded=recorded) == "created"
@@ -210,9 +224,9 @@ class TestFileBlock:
 
 
 class TestHarvestGate:
-    def run(self, store, fake, monkeypatch, caps, blocks):
+    def run(self, store, fake, monkeypatch, caps, blocks, agent_cli=None):
         monkeypatch.setattr(claudron, "capabilities", lambda cwd, vault, env: caps)
-        summarized_session(store, "s1", [blocks], vault="/v")
+        summarized_session(store, "s1", [blocks], vault="/v", agent_cli=agent_cli)
         return harvest.harvest(store, env=ON, capture=fake.capture)
 
     def ledger(self, store) -> list[dict]:
@@ -233,6 +247,17 @@ class TestHarvestGate:
         ((finding, run_id),) = fake.captures
         assert fake.amends == [] and run_id is not None
         assert (finding["source_type"], finding["source_url"]) == ("session", "session:s1:1")
+
+    def test_a_codex_session_files_with_qualified_provenance(self, store, fake, monkeypatch):
+        self.run(store, fake, monkeypatch, ALL_CAPS, [BLOCK], agent_cli="codex")
+        ((subject, _),) = fake.captures
+        assert subject["source_url"] == "session:codex/s1:1"
+        assert fake.amends[0][0]["evidence"]["ref"] == "session:codex/s1:1"
+
+    def test_a_codex_sessions_per_claim_draft_carries_the_qualified_ref(self, store, fake, monkeypatch):
+        self.run(store, fake, monkeypatch, ALL_CAPS - {"subject-filing"}, [BLOCK], agent_cli="codex")
+        ((finding, _),) = fake.captures
+        assert finding["source_url"] == "session:codex/s1:1"
 
     def test_an_engine_before_trust_aware_reads_gets_inline_and_no_run_id(self, store, fake, monkeypatch):
         self.run(store, fake, monkeypatch, frozenset(), [BLOCK])
