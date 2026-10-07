@@ -173,6 +173,9 @@ class SessionFacts:
     chain_id: str | None = None  # the first session.opened's, as session.json has it: a resume records its own sid
     claude_pid: int | None = None  # the latest session.opened's owning Claude Code process
     harvest: dict | None = None  # the latest session.opened's {enabled, vault}: its own consumer choice
+    # The first session.opened's that names one; a log written before 0.27 reads as claude. Detached workers
+    # (summarizer, harvest, sweep) dispatch on this, never on a hook flag (Claudlobby#2145 P1).
+    agent_cli: str = ev.DEFAULT_AGENT_CLI
 
 
 def latest_origin(lifecycle: list[dict]) -> dict:
@@ -288,15 +291,17 @@ def summary_gate(facts: SessionFacts, env) -> str | None:
 
 
 def session_facts(lifecycle: list[dict]) -> SessionFacts:
-    actor, private, chain_id, claude_pid, harvest = None, False, None, None, None
+    actor, private, chain_id, claude_pid, harvest, agent_cli = None, False, None, None, None, None
     for e in lifecycle:
         if e["kind"] == "session.opened":
             actor, chain_id = e["data"]["actor"], chain_id or e["data"]["chain_id"]
             claude_pid, harvest = e["data"].get("claude_pid"), e["data"].get("harvest")
+            # First wins, like chain_id: two agent CLIs' ids never meet in one session directory.
+            agent_cli = agent_cli or e["data"].get("agent_cli")
         elif e["kind"] == "session.privacy_set":
             private = e["data"]["private"]
     return SessionFacts(status=session_status(lifecycle)[0], actor=actor, private=private, chain_id=chain_id,
-                        claude_pid=claude_pid, harvest=harvest)
+                        claude_pid=claude_pid, harvest=harvest, agent_cli=agent_cli or ev.DEFAULT_AGENT_CLI)
 
 
 def next_segment_index(paths: SessionPaths) -> int:

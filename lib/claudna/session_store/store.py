@@ -215,11 +215,14 @@ class SessionHandle:
         chain_id: str | None = None,
         claude_pid: int | None = None,
         harvest: dict | None = None,
+        agent_cli: str | None = None,
     ) -> dict:
         """Record ``session.opened``. A session with no parent is its own chain root.
 
-        ``claude_pid`` (the owning Claude Code process) and ``harvest`` (this
-        session's own ``{enabled, vault}``) are optional, recorded by the hook.
+        ``claude_pid`` (the owning Claude Code process), ``harvest`` (this
+        session's own ``{enabled, vault}``) and ``agent_cli`` (the agent CLI that
+        opened it: ``claude``, ``codex``) are optional, recorded by the hook; a
+        log written before 0.27 has no ``agent_cli`` and reads as ``claude``.
         """
         data = {
             "source": source,
@@ -233,6 +236,8 @@ class SessionHandle:
             data["claude_pid"] = claude_pid
         if harvest is not None:
             data["harvest"] = harvest
+        if agent_cli is not None:
+            data["agent_cli"] = agent_cli
         return self.append("session.opened", data)
 
     def boundary(self, index: int, lifecycle: list[dict] | None = None):

@@ -52,7 +52,7 @@ from claudna.session_store.paths import (  # noqa: E402
     state_root,
     validate_sid,
 )
-from claudna.session_store.project import load_lifecycle  # noqa: E402
+from claudna.session_store.project import load_lifecycle, session_facts  # noqa: E402
 from claudna.session_store.store import NotAppendable, SessionStore, StoreError  # noqa: E402
 
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "session-store" / "basic"
@@ -224,6 +224,22 @@ class TestEvents:
 
 
 class TestStore:
+    def test_open_session_records_the_agent_cli_only_when_given(self, store):
+        codex = store.session("codex-1")
+        codex.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl", agent_cli="codex")
+        first = json.loads(codex.paths.lifecycle.read_text().splitlines()[0])
+        assert first["data"]["agent_cli"] == "codex"
+        plain = opened(store)
+        assert "agent_cli" not in json.loads(plain.paths.lifecycle.read_text().splitlines()[0])["data"]
+        assert session_facts(load_lifecycle(codex.paths).events).agent_cli == "codex"
+        assert session_facts(load_lifecycle(plain.paths).events).agent_cli == "claude"
+
+    def test_the_first_session_opened_that_names_an_agent_cli_wins(self, store):
+        h = opened(store)  # a log written before 0.27 names none
+        h.open_session("resume", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl", agent_cli="codex")
+        h.open_session("resume", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl", agent_cli="claude")
+        assert session_facts(load_lifecycle(h.paths).events).agent_cli == "codex"
+
     def test_segments_increment_from_the_directories(self, store):
         h = opened(store)
         assert h.current_segment() is None
@@ -838,6 +854,23 @@ class TestWritersAreStrictAboutDataKeys:
         h = store.session("forked")
         h.open_session("fork", actor=ACTOR, origin=ORIGIN, transcript_path="/f.jsonl", parent_sid="sess-1")
         assert load(h.paths.session_json)["opened_by"] == "fork"
+
+    def test_agent_cli_is_an_optional_top_level_choice(self):
+        base = {"source": "startup", "parent_sid": None, "chain_id": "s1", "actor": ACTOR, "origin": ORIGIN,
+                "transcript_path": None}
+        assert ev.classify(ev.make_event("session.opened", "s1", {**base, "agent_cli": "codex"})) == "ok"
+        assert ev.classify(ev.make_event("session.opened", "s1", base)) == "ok"
+        with pytest.raises(ev.EventError, match="must be one of"):
+            ev.make_event("session.opened", "s1", {**base, "agent_cli": "gpt"})
+        with pytest.raises(ev.EventError):  # unknown means omit the key, never null
+            ev.make_event("session.opened", "s1", {**base, "agent_cli": None})
+
+    def test_agent_cli_never_nests_in_actor(self):
+        """Epic #2145 §11: actor is additionalProperties: false, so a 0.23-0.26 reader would classify the
+        whole session.opened invalid if agent_cli were nested there."""
+        base = {"source": "startup", "parent_sid": None, "chain_id": "s1", "origin": ORIGIN, "transcript_path": None}
+        with pytest.raises(ev.EventError):
+            ev.make_event("session.opened", "s1", {**base, "actor": {**ACTOR, "agent_cli": "claude"}})
 
 
 class TestCheckSeesALostRefresh:
