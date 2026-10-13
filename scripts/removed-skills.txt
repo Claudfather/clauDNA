@@ -81,13 +81,13 @@ notifications
 review-self
 clauDNA-migrate
 #
-# Heisted from artemis-skills' upstream evolution of this clauDNA-originated skill —
+# Heisted from an upstream skills repo's evolution of this clauDNA-originated skill —
 # /implement-plan renamed /build (challenge round collapses to one adaptive flow,
 # no more named 3A/3B split; the multi-phase-epic runner /build-all is new alongside it).
 implement-plan
 #
 # /commit-push-pr and /quick-commit consolidate into /ship (commit mode + PR mode),
-# tracking artemis-skills' multi-mode ship host — PR mode gains base-branch rebase,
+# tracking an upstream skills repo's multi-mode ship host — PR mode gains base-branch rebase,
 # a verify-completion gate, review-work diff review, and version/CHANGELOG bump.
 commit-push-pr
 quick-commit
