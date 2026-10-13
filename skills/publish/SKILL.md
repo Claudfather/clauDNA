@@ -241,11 +241,11 @@ Requires the Notion MCP server to be configured. If not available, report the er
 When `--dry-run` is set, show exactly what would happen without doing it (including the result of Step 1 validation, the resolved adapter/plane — with any plane-fit advisory — and, in family mode, the per-doc validation verdicts):
 
 ```
-Dry run: /claudna:publish doc.md --to github-issue --repo shuffify
+Dry run: /claudna:publish doc.md --to github-issue --repo example-repo
 
 House style: OK (type=audit, skeleton valid)
 Would create GitHub issue:
-  Repo: chrisrogers37/shuffify
+  Repo: example-org/example-repo
   Title: Spotify API Rate Limits & Quirks
   Labels: api, spotify, rate-limits
   Dedup: 3 queries vs OPEN issues, --limit 20 each — "rate-limits" 2 hits,

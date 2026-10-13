@@ -160,7 +160,7 @@ def test_falls_back_to_the_derived_default_when_nothing_redirects(tmp_path):
 
 
 def test_project_slug_replaces_every_separator(tmp_path):
-    assert project_slug(Path("/home/crog/work")) == "-home-crog-work"
+    assert project_slug(Path("/home/user/work")) == "-home-user-work"
 
 
 # --- which settings choose the directory ------------------------------------

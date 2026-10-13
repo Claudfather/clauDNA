@@ -123,7 +123,7 @@ class TestDeclaredCursorSkills:
         assert is_explicit is True
 
     def test_list_entry_nested_folder_of_skills_is_expanded(self, tmp_path):
-        # The shape ArisGuimera/MobiAI-Core actually ships: a folder-of-skills
+        # The shape a real third-party plugin actually ships: a folder-of-skills
         # nested inside skills/, not skills/ itself.
         root = _make_skills_fixture(tmp_path)
         nested = root / "skills" / "core" / "skills"
