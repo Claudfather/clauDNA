@@ -32,6 +32,8 @@ BLOCK = {**HARVEST_BLOCK, "subject_hint": {**HARVEST_BLOCK["subject_hint"], "ali
          "section_hint": "Operations"}
 ALL_CAPS = filing.FILING_CAPS
 REAL = {name: getattr(claudron, name) for name in ("capabilities", "vault_root")}  # before any stub
+CANDIDATE = {"path": "k/a.md", "title": "(unverified) staging DB", "type": "knowledge", "exact": True,
+             "trust": "external", "source_type": "session", "tags": [filing.SUBJECT_TAG]}
 
 
 class FakeVault:
@@ -291,13 +293,22 @@ with open(os.environ["FAKE_LOG"], "a") as fh:
     fh.write(json.dumps({"argv": argv, "stdin": stdin}) + "\\n")
 amend = os.environ.get("FAKE_AMEND", "updated")
 replies = {
-    "status": {"root": os.environ["FAKE_ROOT"], "capabilities": ["subjects", "amend", "runs", 7]},
-    "resolve": {"name": "x", "candidates": [{"path": "k/a.md", "exact": True}, "junk"]},
+    "status": {"root": os.environ["FAKE_ROOT"], "capabilities": ["subjects", "amend", "runs"]},
+    "resolve": {"name": "x", "candidates": [{"path": "k/a.md", "title": "(unverified) staging DB",
+                  "type": "knowledge", "exact": True, "trust": "external", "source_type": "session",
+                  "tags": ["harvest:subject"]}]},
     "amend": {"action": amend, "path": os.environ["FAKE_ROOT"] + "/k/a.md", "reason": "refused" * (amend == "rejected")},
     "capture": {"action": "created", "path": "k/n.md"},
 }
-print(json.dumps({"ok": amend != "rejected" or verb != "amend", "command": verb, "errors": [], "warnings": [],
-                  "data": replies[verb]}))
+if verb == "status" and "FAKE_STATUS" in os.environ:
+    replies[verb] = json.loads(os.environ["FAKE_STATUS"])
+if verb == "resolve" and "FAKE_CANDIDATES" in os.environ:
+    replies[verb]["candidates"] = json.loads(os.environ["FAKE_CANDIDATES"])
+envelope = {"ok": amend != "rejected" or verb != "amend", "command": verb, "errors": [], "warnings": [],
+            "data": replies[verb]}
+if verb == "status":
+    envelope.update(json.loads(os.environ.get("FAKE_STATUS_ENVELOPE", "{}")))
+print(json.dumps(envelope))
 sys.exit(2 if verb == "amend" and amend == "rejected" else 0)
 """
 
@@ -321,19 +332,87 @@ class TestDoor:
         return [json.loads(line) for line in Path(env["FAKE_LOG"]).read_text().splitlines()]
 
     def test_capabilities_come_from_the_same_cached_status_as_the_root(self, env):
-        assert claudron.capabilities("/w", "/v", env) == {"subjects", "amend", "runs"}  # non-strings dropped
+        assert claudron.capabilities("/w", "/v", env) == {"subjects", "amend", "runs"}
         assert claudron.vault_root("/w", "/v", env) == Path(env["FAKE_ROOT"])
         assert len(self.calls(env)) == 1
+
+    @pytest.mark.parametrize("data, expected", [({}, set()), ({"capabilities": []}, set()),
+                                               ({"capabilities": ["runs", "future-feature"]},
+                                                {"runs", "future-feature"})])
+    def test_legacy_absence_empty_and_unknown_string_capabilities_are_valid(self, env, data, expected):
+        env = {**env, "FAKE_STATUS": json.dumps({"root": env["FAKE_ROOT"], "future": {}, **data})}
+        assert claudron.capabilities("/w", "/v", env) == expected
+        assert claudron.vault_root("/w", "/v", env) == Path(env["FAKE_ROOT"])
+        assert len(self.calls(env)) == 1
+
+    @pytest.mark.parametrize("caps", [7, None, "runs", {}, [7], ["subjects", "amend", "runs", 7]])
+    def test_malformed_capabilities_stop_harvest_and_allow_a_valid_retry(self, store, env, caps):
+        handle = summarized_session(store, "s1", [[], [BLOCK]], vault=env["FAKE_ROOT"])
+        handle.ack(harvest.CONSUMER, 1)
+        before = handle.paths.consumers.read_bytes()
+        invalid = {**env, **ON, "FAKE_STATUS": json.dumps({"root": env["FAKE_ROOT"], "capabilities": caps})}
+        report = harvest.harvest(store, env=invalid, capture=claudron.capture, force=True)
+        assert "claudron status failed" in report.errors[0] and report.segments == 0
+        assert handle.paths.consumers.read_bytes() == before and handle.cursor(harvest.CONSUMER) == 1
+        assert claudron._STATUS == {}
+        assert all("capture" not in c["argv"] and "amend" not in c["argv"] for c in self.calls(env))
+
+        valid = {**env, **ON, "FAKE_STATUS": json.dumps({"root": env["FAKE_ROOT"], "capabilities": sorted(ALL_CAPS)})}
+        report = harvest.harvest(store, env=valid, capture=claudron.capture, force=True)
+        assert not report.errors and report.filed == report.segments == 1
+        assert handle.cursor(harvest.CONSUMER) == 2
+        calls = self.calls(env)
+        assert sum("status" in c["argv"] for c in calls) == 2
+        (amend,) = [json.loads(c["stdin"]) for c in calls if "amend" in c["argv"]]
+        assert amend["expect_trust"] == "external" and amend["run_id"] == report.run_id
+
+    @pytest.mark.parametrize("patch", [{"ok": False}, {"ok": "true"}, {"ok": 1},
+                                       {"command": "capture"}, {"command": None}])
+    def test_a_malformed_status_envelope_is_not_cached(self, env, patch):
+        assert claudron.status("/w", "/v", {**env, "FAKE_STATUS_ENVELOPE": json.dumps(patch)}) is None
+        assert claudron._STATUS == {}
+        assert claudron.status("/w", "/v", env) is not None
+        assert len(self.calls(env)) == 2
 
     def test_a_failed_status_is_unknown_capabilities_not_none(self, env):
         assert claudron.capabilities("/w", "/v", {**env, "CLAUDNA_CLAUDRON_BIN": "/nonexistent"}) is None
 
     def test_resolve_sends_one_alias_flag_per_name_and_the_project(self, env):
         found = claudron.resolve(["-rf staging", "a, b", "c"], project="webapp", cwd="/w", env=env, vault="/v")
-        assert found == [{"path": "k/a.md", "exact": True}]
+        assert found == [CANDIDATE]
         (call,) = self.calls(env)
         assert call["argv"] == ["--vault", "/v", "resolve", "--name=-rf staging", "--alias=a, b", "--alias=c",
                                 "--limit=10", "--json", "--project=webapp"]
+
+    @pytest.mark.parametrize("candidates", [None, 7, {}, ["existing"], [CANDIDATE, "junk"], [{}],
+                                            [{**CANDIDATE, "exact": "true"}],
+                                            [{k: v for k, v in CANDIDATE.items() if k != "exact"}],
+                                            [{**CANDIDATE, "path": None}],
+                                            [{**CANDIDATE, "tags": "harvest:subject"}]])
+    def test_malformed_candidates_stop_harvest_and_allow_a_valid_retry(self, store, env, candidates):
+        handle = summarized_session(store, "s1", [[], [BLOCK]], vault=env["FAKE_ROOT"])
+        handle.ack(harvest.CONSUMER, 1)
+        before = handle.paths.consumers.read_bytes()
+        env = {**env, **ON, "FAKE_STATUS": json.dumps({"root": env["FAKE_ROOT"], "capabilities": sorted(ALL_CAPS)})}
+        report = harvest.harvest(store, env={**env, "FAKE_CANDIDATES": json.dumps(candidates)},
+                                 capture=claudron.capture, force=True)
+        assert report.status == "error" and "claudron resolve" in report.errors[0]
+        assert handle.paths.consumers.read_bytes() == before and handle.cursor(harvest.CONSUMER) == 1
+        assert all("capture" not in c["argv"] and "amend" not in c["argv"] for c in self.calls(env))
+
+        report = harvest.harvest(store, env={**env, "FAKE_CANDIDATES": "[]"}, capture=claudron.capture, force=True)
+        assert not report.errors and report.created == report.segments == 1
+        assert handle.cursor(harvest.CONSUMER) == 2
+        (finding,) = [json.loads(c["stdin"]) for c in self.calls(env) if "capture" in c["argv"]]
+        assert finding["source_type"] == "session" and finding["run_id"] == report.run_id
+
+    @pytest.mark.parametrize("candidate", [CANDIDATE, {**CANDIDATE, "exact": False, "trust": "draft",
+                                                     "source_type": "", "tags": []}])
+    def test_resolve_preserves_additive_fields_and_authored_sources(self, env, candidate):
+        candidate = {**candidate, "future": {"value": 7}}
+        found = claudron.resolve(["staging DB"], project="webapp", cwd="/w",
+                                 env={**env, "FAKE_CANDIDATES": json.dumps([candidate])}, vault="/v")
+        assert found == [candidate]
 
     def test_amend_sends_the_request_and_run_id_on_stdin_and_answers_vault_relative(self, env):
         answer = claudron.amend({"note": "k/a.md", "op": "append_fact"}, "/w", env, "/v", run_id="harvest-1")
