@@ -269,6 +269,9 @@ class TestRunClaude:
         (None, "claudna.role=summarizer"),
         ("claudlobby.agent_cli=claude", "claudlobby.agent_cli=claude,claudna.role=summarizer"),
         ("claudna.role=summarizer", "claudna.role=summarizer"),
+        ("claudna.role=worker", "claudna.role=summarizer"),
+        ("claudna.role=summarizer,claudna.role=worker", "claudna.role=summarizer"),
+        ("service.name=worker, claudna.role = summarizer ", "service.name=worker,claudna.role=summarizer"),
     ])
     def test_the_child_tags_its_telemetry(self, monkeypatch, inherited, expected):
         captured = {}

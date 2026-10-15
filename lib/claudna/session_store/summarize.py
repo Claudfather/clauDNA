@@ -81,10 +81,9 @@ def run_claude(system_prompt: str, dialogue: str, output_schema: dict, model: st
         "--system-prompt", system_prompt, "--json-schema", json.dumps(output_schema),
     ]
     child_env = {**env, CHILD_ENV: "1"}
-    attrs = child_env.get("OTEL_RESOURCE_ATTRIBUTES", "")
-    role = "claudna.role=summarizer"
-    if role not in attrs.split(","):
-        child_env["OTEL_RESOURCE_ATTRIBUTES"] = f"{attrs},{role}" if attrs else role
+    attrs = [a for a in child_env.get("OTEL_RESOURCE_ATTRIBUTES", "").split(",")
+             if a and a.partition("=")[0].strip() != "claudna.role"]
+    child_env["OTEL_RESOURCE_ATTRIBUTES"] = ",".join([*attrs, "claudna.role=summarizer"])
     child_env.pop("CLAUDE_CODE_SESSION_ID", None)  # never let the child inherit this session's id
     try:
         proc = subprocess.run(cmd, input=dialogue, capture_output=True, text=True,
