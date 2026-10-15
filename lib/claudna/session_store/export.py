@@ -114,13 +114,13 @@ def export(store: SessionStore, consumer: str, *, since_seg: int | None = None, 
         live = handle.paths.segment_indices()
         lifecycle = load_lifecycle(handle.paths)
         retired = {i for i in retired_indices(lifecycle.events) if i > start}
-        if max(live, default=0) <= start and max(handle.paths.archived_indices(), default=0) <= start and not retired:
+        if max(live, default=0) <= start and not retired:
             continue  # nothing past the cursor, including retired segments with no archive: no projections
         facts = session_facts(lifecycle.events)
         if not lifecycle.events or facts.private:
             continue
         through, subset = start, None
-        live_docs: dict[int, dict] = {}
+        live_docs: dict[int, dict] | None = None
         buckets, abandoned = by_segment(lifecycle.events), abandoned_at(lifecycle.events)
         retried = harvest_skip(facts, lifecycle.events) is None
         states = {s.index: s for s in segment_states(handle.paths, lifecycle.events) if s.index > start}
@@ -153,9 +153,10 @@ def export(store: SessionStore, consumer: str, *, since_seg: int | None = None, 
                 if subset is None:
                     session = session_doc(handle.paths, lifecycle)
                     subset = {k: session.get(k) for k in SESSION_FIELDS}
+                if live_docs is None and index in states:
                     live_docs = {d["index"]: d for d in segment_docs(handle.paths, lifecycle)}
                 item = {"sid": sid, "seg": index, "session": subset, "summary": doc,
-                        "segment": segment_record(index, buckets.get(index, []), live_docs)}
+                        "segment": segment_record(index, buckets.get(index, []), live_docs or {})}
                 if doc is None:
                     item["skipped"] = {"reason": reason}
                 items.append(item)

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Retired segments without archived summaries still advance the export cursor**, even when no live segment or later archive remains. With `--include-skipped` they yield `retired` status items; a private skip remains withheld. This also repairs the previous unflagged cursor edge.
 
 ### Changed
+- **Export defers segment-count projection reads until a live item needs them** and removes a redundant archive-directory scan; the envelope and cursors are unchanged.
 - **Summarizer telemetry carries one `claudna.role=summarizer`**, replacing inherited values for that key while preserving other `OTEL_RESOURCE_ATTRIBUTES` (Claudlobby#2145 Q15), so the fleet intake can identify child exports without contradictory role tags.
 - **The activity layer is frozen** (Claudlobby#2145 F8): its four kinds and three hooks stay wired and are pinned by tests; new intra-session detail comes from the agent CLI's native telemetry.
 - **Setup guidance names the owning agent process** and corrects the fleet skill-telemetry default to off. The child guard remains based on pid and entrypoint; a regression test pins that `CLAUDE_CODE_CHILD_SESSION=1`, set on every Claude hook, suppresses nothing.
