@@ -9,8 +9,9 @@ contract::
 
 The envelope is ``{schema: "claudna.export/1", consumer, items: [...], next: {...}}``.
 Each item is ``{sid, seg, session: <a session.json subset>, summary: <the
-segment summary>, segment: {sealed_at, sealed_by, counts}}`` (the subset's ``agent_cli`` since 0.27; absent in an older
-envelope means ``claude``). Spec §8 "Item fields and rules" is the contract.
+segment summary>, segment: {sealed_at, sealed_by, counts}}`` (the subset's
+``agent_cli`` since 0.27; absent in an older envelope means ``claude``).
+Spec §8 "Item fields and rules" is the contract.
 ``next`` maps each session to the segment index the consumer may ack once it
 has taken that session's items.
 
@@ -111,9 +112,10 @@ def export(store: SessionStore, consumer: str, *, since_seg: int | None = None, 
         handle = store.session(sid)
         start = max(handle.cursor(consumer), since_seg or 0)
         live = handle.paths.segment_indices()
-        if max(live, default=0) <= start and max(handle.paths.archived_indices(), default=0) <= start:
-            continue  # nothing past the cursor, live or archived: no log read
         lifecycle = load_lifecycle(handle.paths)
+        retired = {i for i in retired_indices(lifecycle.events) if i > start}
+        if max(live, default=0) <= start and max(handle.paths.archived_indices(), default=0) <= start and not retired:
+            continue  # nothing past the cursor, including retired segments with no archive: no projections
         facts = session_facts(lifecycle.events)
         if not lifecycle.events or facts.private:
             continue
@@ -122,7 +124,6 @@ def export(store: SessionStore, consumer: str, *, since_seg: int | None = None, 
         buckets, abandoned = by_segment(lifecycle.events), abandoned_at(lifecycle.events)
         retried = harvest_skip(facts, lifecycle.events) is None
         states = {s.index: s for s in segment_states(handle.paths, lifecycle.events) if s.index > start}
-        retired = {i for i in retired_indices(lifecycle.events) if i > start}  # the log says what's retired
 
         def take(index: int) -> tuple[bool, dict | None, str | None]:
             """``(go on, summary, pass-over reason)`` for one segment past the cursor."""

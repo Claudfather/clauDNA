@@ -311,6 +311,21 @@ class TestIncludeSkipped:
         assert item["seg"] == 1 and item["summary"] is None
         assert item["skipped"] == {"reason": "retired"} and item["segment"]["counts"] is None
 
+    @pytest.mark.parametrize("acked_archive", [False, True])
+    def test_retired_status_survives_when_no_live_or_unacked_archive_remains(self, store, acked_archive):
+        h = session_with(store, "s1", ["done", "skipped"] if acked_archive else ["skipped"])
+        last = 2 if acked_archive else 1
+        retention.retire(h, [(i, "age") for i in range(1, last + 1)])
+        if acked_archive:
+            export.ack(store, "c", "s1", 1)
+        assert h.paths.segment_indices() == []
+        flagged = export.export(store, "c", include_skipped=True)
+        assert [(i["seg"], i["skipped"]) for i in flagged["items"]] == [(last, {"reason": "retired"})]
+        plain = export.export(store, "c")
+        assert plain["items"] == [] and plain["next"] == flagged["next"] == {"s1": last}
+        export.ack(store, "c", "s1", last)
+        assert export.export(store, "c", include_skipped=True)["items"] == []
+
     @pytest.mark.parametrize("retryable,harvest_on", [(False, True), (True, False)])
     def test_a_settled_give_up_is_gave_up(self, store, retryable, harvest_on):
         TestExportReviewFixes().stranded(store, "s1", retryable=retryable, harvest_on=harvest_on)

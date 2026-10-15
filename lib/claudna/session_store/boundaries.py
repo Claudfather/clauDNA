@@ -136,7 +136,10 @@ def write_entrypoint(root: Path, *, agent_cli: str) -> Path:
     propagate to the hook's error log instead of silently keeping a stale path.
     """
     plugin_root = ENTRYPOINT.parents[2]
-    manifest = read_json(plugin_root / ".claude-plugin" / "plugin.json")
+    try:
+        manifest = read_json(plugin_root / ".claude-plugin" / "plugin.json")
+    except OSError:
+        manifest = None
     version = manifest.get("version") if isinstance(manifest, dict) else None
     path = ensure_dir(root) / "entrypoint.json"
     atomic_write_json(path, {

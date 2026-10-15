@@ -121,6 +121,17 @@ class TestEntrypoint:
             doc = json.loads(boundaries.write_entrypoint(root, agent_cli="claude").read_text())
             assert doc["plugin_version"] is None and doc["plugin_root"] == str(tmp_path)
 
+    def test_an_unreadable_manifest_refreshes_the_record_with_a_null_version(self, store, monkeypatch):
+        def unreadable(*args):
+            raise PermissionError("manifest is unreadable")
+
+        store.root.mkdir(exist_ok=True)
+        (store.root / "entrypoint.json").write_text('{"stale": true}')
+        monkeypatch.setattr(boundaries, "read_json", unreadable)
+        doc = json.loads(boundaries.write_entrypoint(store.root, agent_cli="claude").read_text())
+        assert doc["plugin_version"] is None
+        assert schema.validate(doc, schema.load("entrypoint")) == []
+
     def test_a_failed_write_is_logged_and_the_session_is_still_open(self, store, transcript, monkeypatch):
         def fail(*args):
             raise OSError("entrypoint write failed")
