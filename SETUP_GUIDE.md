@@ -313,11 +313,12 @@ In an opted-in interactive session, a detached worker summarizes each segment af
 | `CLAUDNA_SESSION_SUMMARY` | follows `CLAUDNA_HARVEST` in interactive sessions (`cli`, `claude-vscode`, `claude-desktop`); off for every other entrypoint and Claudlobby bots | `1` turns summaries on everywhere, `0` off everywhere. Each summary is one Haiku call (about $0.02, 15–40 s, in the background). |
 | `CLAUDNA_SUMMARY_MODEL` | `haiku` | The model the summarizer asks for. |
 | `CLAUDNA_HARVEST_INTERVAL_H` | `6` | Minimum hours between harvest runs. |
-| `CLAUDNA_UNCLOSED_AFTER_H` | `24` | How long a session whose `claude` process is gone may sit open before the sweep closes it as `abandoned`. Never under 1. |
+| `CLAUDNA_UNCLOSED_AFTER_H` | `24` | How long a session whose owning agent process (the `claude` that opened it, recorded as `claude_pid`) is gone may sit open before the sweep closes it as `abandoned`. Never under 1. |
 | `CLAUDNA_STATE_DIR` | `~/.claudna` | Where all clauDNA state lives: the store, hook markers, logs. It must be an absolute path. A relative one keeps no state instead of writing into your project. |
 
 - **What it never does:** it never writes to the vault except through `claudron`, never writes to git (it reads the branch and HEAD once, at SessionStart), never prints into your session, and never blocks. It always exits 0.
-- **Sessions that never ended:** a crash or a kill skips SessionEnd and leaves a session open. About every 6 hours, a SessionStart starts a detached sweep. It closes up to 5 sessions that have sat idle for `CLAUDNA_UNCLOSED_AFTER_H` and whose `claude` process is gone, and marks them `abandoned`. Their last segment is summarized as usual if the session opted in. A session that recorded no process id is never closed automatically. `python3 "<plugin>/lib/claudna/session_store" sweep --dry-run` lists the candidates, and `seal <session-id>` closes one by hand. `seal` applies the summary gate with your shell's environment, so a `CLAUDNA_SESSION_SUMMARY` set there counts; the session's own harvest opt-in, recorded at open, still applies.
+- **Sessions that never ended:** a crash or a kill skips SessionEnd and leaves a session open. About every 6 hours, a SessionStart starts a detached sweep. It closes up to 5 sessions that have sat idle for `CLAUDNA_UNCLOSED_AFTER_H` and whose owning agent process is gone, and marks them `abandoned`. Their last segment is summarized as usual if the session opted in. A session that recorded no process id is never closed automatically. `python3 "<plugin>/lib/claudna/session_store" sweep --dry-run` lists the candidates, and `seal <session-id>` closes one by hand. `seal` applies the summary gate with your shell's environment, so a `CLAUDNA_SESSION_SUMMARY` set there counts; the session's own harvest opt-in, recorded at open, still applies.
+- **For fleet tooling:** each opening SessionStart rewrites `<state root>/entrypoint.json` (`$CLAUDNA_STATE_DIR`, default `~/.claudna`), naming the store's entrypoint, plugin version and agent CLI. A consumer runs the store by contract instead of guessing a plugin-cache path (spec §8). `session export --include-skipped` includes status items for final segments without a summary; private segments and sessions never export.
 - **`/clear` lineage:** the session a `/clear` starts records the one it cleared (`parent_sid`), and every session in that chain shares one `chain_id`.
 - **Looking back:** `/claudna:session list`, `show <id>`, `timeline <id>` and `failures [--group]` read what the store recorded. `failures --group` shows which tool errors recur across sessions. Each session's rolled-up summary is `sessions/<id>/summary.json`.
 - **What the background work did:** `python3 "<plugin>/lib/claudna/session_store" runs` lists the summarizer, harvest and sweep runs, newest first, from `~/.claudna/runs/runs.jsonl`.
@@ -701,7 +702,7 @@ Override the path with `CLAUDNA_TELEMETRY_PATH`.
 | Context | Default | How to change |
 |---------|---------|---------------|
 | Interactive users | **Off** | Set `CLAUDNA_TELEMETRY=1` to enable |
-| Fleet bots | **On** (Claudlobby sets `CLAUDNA_TELEMETRY=1`) | Set `CLAUDNA_TELEMETRY=0` to disable |
+| Fleet bots | **Off** — Claudlobby composes no `CLAUDNA_TELEMETRY` default | Opt a bot in with `CLAUDNA_TELEMETRY=1` in its `env:` |
 
 The hook checks `CLAUDNA_TELEMETRY` on every Skill call and writes nothing unless it's `1`. It runs async, so no call waits on it.
 

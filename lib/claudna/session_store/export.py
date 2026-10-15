@@ -9,7 +9,7 @@ contract::
 
 The envelope is ``{schema: "claudna.export/1", consumer, items: [...], next: {...}}``.
 Each item is ``{sid, seg, session: <a session.json subset>, summary: <the
-segment summary>}`` (the subset's ``agent_cli`` since 0.27; absent in an older
+segment summary>, segment: {sealed_at, sealed_by, counts}}`` (the subset's ``agent_cli`` since 0.27; absent in an older
 envelope means ``claude``). Spec §8 "Item fields and rules" is the contract.
 ``next`` maps each session to the segment index the consumer may ack once it
 has taken that session's items.
@@ -33,8 +33,8 @@ import re
 import time
 
 from .fsio import epoch_of
-from .project import (HARVEST_CONSUMER, abandoned_at, by_segment, harvest_skip, load_lifecycle, retired_indices,
-                      segment_states, session_doc, session_facts, summary_verdict)
+from .project import (HARVEST_CONSUMER, abandoned_at, by_segment, fold_boundary, harvest_skip, load_lifecycle,
+                      retired_indices, segment_docs, segment_states, session_doc, session_facts, summary_verdict)
 from .rollup import read_archived
 from .store import SessionStore
 
@@ -80,8 +80,26 @@ def _settled(summary: str, events: list[dict], *, retried: bool, abandoned: str 
     return verdict == "give up" or (verdict == "retry" and not retried)
 
 
+def segment_record(index: int, bucket: list[dict], live: dict[int, dict]) -> dict:
+    """The seal from the lifecycle fold and counts from the live projection (spec §8).
+
+    A retired segment still has its seal in the log; its activity counts are
+    unavailable because the directory and activity log have been retired.
+    """
+    seal = fold_boundary(bucket).last_seal
+    doc = live.get(index)
+    return {"sealed_at": seal["ts"] if seal else None,
+            "sealed_by": seal["data"]["sealed_by"] if seal else None,
+            "counts": dict(doc["counts"]) if doc else None}
+
+
+def skip_reason(bucket: list[dict]) -> str | None:
+    """The reason in the segment's last ``summary.skipped`` event."""
+    return next((e["data"]["reason"] for e in reversed(bucket) if e["kind"] == "summary.skipped"), None)
+
+
 def export(store: SessionStore, consumer: str, *, since_seg: int | None = None, limit: int = 100,
-           now: float | None = None) -> dict:
+           now: float | None = None, include_skipped: bool = False) -> dict:
     """The envelope of everything ``consumer`` hasn't taken yet, up to ``limit`` items."""
     check_consumer(consumer)
     now = time.time() if now is None else now
@@ -100,34 +118,46 @@ def export(store: SessionStore, consumer: str, *, since_seg: int | None = None, 
         if not lifecycle.events or facts.private:
             continue
         through, subset = start, None
+        live_docs: dict[int, dict] = {}
         buckets, abandoned = by_segment(lifecycle.events), abandoned_at(lifecycle.events)
         retried = harvest_skip(facts, lifecycle.events) is None
         states = {s.index: s for s in segment_states(handle.paths, lifecycle.events) if s.index > start}
         retired = {i for i in retired_indices(lifecycle.events) if i > start}  # the log says what's retired
 
-        def take(index: int) -> tuple[bool, dict | None]:
-            """``(go on, item summary or None)`` for one segment past the cursor."""
+        def take(index: int) -> tuple[bool, dict | None, str | None]:
+            """``(go on, summary, pass-over reason)`` for one segment past the cursor."""
             if index in retired and index not in states:  # its archived summary, final and done (owner, #387 S4)
-                return True, read_archived(handle.paths, index)  # none archived (it had no summary): passes
+                doc = read_archived(handle.paths, index)
+                if doc is not None:
+                    return True, doc, None
+                reason = "private" if skip_reason(buckets.get(index, [])) == "private" else "retired"
+                return True, None, reason
             state = states[index]
             if not state.final:
-                return False, None
-            if state.summary in ("done", "skipped"):
-                return True, state.doc if state.summary == "done" else None
+                return False, None, None
+            if state.summary == "done":
+                return True, state.doc, None
+            if state.summary == "skipped":
+                return True, None, skip_reason(buckets.get(index, []))
             settled = _settled(state.summary, buckets.get(index, []), retried=retried, abandoned=abandoned, now=now)
-            return settled, None  # not settled: still in flight, stale or unreadable — the cursor holds here
+            return settled, None, "gave_up" if settled else None
 
         for index in sorted({*states, *retired}):
             if len(items) >= limit:
                 break
-            go_on, doc = take(index)
+            go_on, doc, reason = take(index)
             if not go_on:
                 break
-            if doc is not None:
+            if doc is not None or (include_skipped and reason not in (None, "private")):
                 if subset is None:
                     session = session_doc(handle.paths, lifecycle)
                     subset = {k: session.get(k) for k in SESSION_FIELDS}
-                items.append({"sid": sid, "seg": index, "session": subset, "summary": doc})
+                    live_docs = {d["index"]: d for d in segment_docs(handle.paths, lifecycle)}
+                item = {"sid": sid, "seg": index, "session": subset, "summary": doc,
+                        "segment": segment_record(index, buckets.get(index, []), live_docs)}
+                if doc is None:
+                    item["skipped"] = {"reason": reason}
+                items.append(item)
             through = index
         if through > start:
             nxt[sid] = through

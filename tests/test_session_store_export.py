@@ -21,7 +21,7 @@ from conftest import ACTOR, ORIGIN, PLANTED, complete_segment, segment_summary
 from test_session_store_readers import BLOCK_A
 
 from claudna.screen import WITHHELD
-from claudna.session_store import export, fsio, readers, retention, rollup
+from claudna.session_store import export, fsio, readers, retention, rollup, schema
 from claudna.session_store.cli import check_session, main
 
 DAY = 86400
@@ -50,6 +50,24 @@ def session_with(store, sid, statuses, *, close=True, private=False, agent_cli=N
 
 
 class TestExport:
+    def test_every_item_carries_the_segment_object(self, store):
+        h = store.session("s1")
+        h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl")
+        h.open_segment("session_open", 0)
+        for _ in range(2):
+            h.append("prompt.submitted", {"prompt_id": None, "chars": 3}, seg=1)
+        h.append("tool.failed", {"tool": "Bash", "signature": "Bash: x", "exit_code": 1}, seg=1)
+        h.seal_segment(100, "precompact")
+        complete_segment(h, 1, segment_summary("s1", 1, [BLOCK_A], end=100))
+        h.close_session("other")
+        item = export.export(store, "c")["items"][0]
+        seg = json.loads(h.paths.segment(1).segment_json.read_text())
+        assert item["segment"] == {
+            "sealed_at": seg["sealed_at"], "sealed_by": "precompact",
+            "counts": {"prompts": 2, "skills": 0, "failures": 1, "interrupts": 0},
+        }
+        assert set(item) == {"sid", "seg", "session", "summary", "segment"}
+
     def test_items_and_the_next_cursor(self, store):
         session_with(store, "s1", ["done", "skipped", "done", "pending", "done"])
         env = export.export(store, "claudron")
@@ -273,6 +291,87 @@ class TestExportReviewFixes:
         assert export.ack(store, "claudron", "s1", 2) == 2 and h.cursor("claudron") == 2
 
 
+class TestIncludeSkipped:
+    def test_a_skipped_summary_is_a_status_item_with_the_flag(self, store):
+        session_with(store, "s1", ["done", "skipped", "done"])
+        plain = export.export(store, "c")
+        flagged = export.export(store, "c", include_skipped=True)
+        assert [(i["seg"], i["summary"] is not None) for i in flagged["items"]] == [(1, True), (2, False), (3, True)]
+        skipped = flagged["items"][1]
+        assert skipped["skipped"] == {"reason": "trivial"}
+        assert skipped["session"] == flagged["items"][0]["session"]
+        assert skipped["segment"]["sealed_by"] == "precompact"
+        assert plain["next"] == flagged["next"] == {"s1": 3}
+        assert [i["seg"] for i in plain["items"]] == [1, 3]
+
+    def test_a_retired_segment_with_no_archive_is_retired(self, store):
+        h = session_with(store, "s1", ["skipped", "done"])
+        retention.retire(h, [(1, "age")])
+        item = export.export(store, "c", include_skipped=True)["items"][0]
+        assert item["seg"] == 1 and item["summary"] is None
+        assert item["skipped"] == {"reason": "retired"} and item["segment"]["counts"] is None
+
+    @pytest.mark.parametrize("retryable,harvest_on", [(False, True), (True, False)])
+    def test_a_settled_give_up_is_gave_up(self, store, retryable, harvest_on):
+        TestExportReviewFixes().stranded(store, "s1", retryable=retryable, harvest_on=harvest_on)
+        item = export.export(store, "c", include_skipped=True, now=LATER)["items"][0]
+        assert item["seg"] == 1 and item["summary"] is None and item["skipped"] == {"reason": "gave_up"}
+
+    @pytest.mark.parametrize("retired", [False, True])
+    def test_a_private_skip_never_exports_even_with_the_flag(self, store, retired):
+        h = session_with(store, "s1", [None, "done"])
+        h.append("summary.skipped", {"reason": "private"}, seg=1)
+        if retired:
+            retention.retire(h, [(1, "age")])
+        env = export.export(store, "c", include_skipped=True)
+        assert [i["seg"] for i in env["items"]] == [2] and env["next"] == {"s1": 2}
+
+    def test_private_sessions_never_export_even_with_the_flag(self, store):
+        session_with(store, "s1", ["done", "skipped"], private=True)
+        assert export.export(store, "c", include_skipped=True)["items"] == []
+
+    def test_without_the_flag_the_envelope_is_unchanged(self, store):
+        session_with(store, "s1", ["done", "skipped", "done"])
+        plain = export.export(store, "c")
+        flagged = export.export(store, "c", include_skipped=True)
+        assert plain == export.export(store, "c", include_skipped=False)
+        assert all("skipped" not in item for item in plain["items"])
+        assert {**flagged, "items": [i for i in flagged["items"] if "skipped" not in i]} == plain
+
+    def test_status_items_count_against_the_limit(self, store):
+        session_with(store, "s1", ["skipped", "done"])
+        env = export.export(store, "c", limit=1, include_skipped=True)
+        assert len(env["items"]) == 1 and env["items"][0]["skipped"] == {"reason": "trivial"}
+        assert env["next"] == {"s1": 1}
+
+    def test_the_flag_never_passes_an_unsettled_summary(self, store):
+        session_with(store, "s1", ["pending", "done"])
+        env = export.export(store, "c", include_skipped=True)
+        assert env["items"] == [] and env["next"] == {}
+
+    def test_the_cli_emits_status_items_only_with_the_flag(self, store, capsys):
+        session_with(store, "s1", ["skipped", "done"])
+        args = ["export", "--consumer", "c", "--json", "--root", str(store.root)]
+        assert main([*args, "--include-skipped"]) == 0
+        flagged = json.loads(capsys.readouterr().out)
+        assert len(flagged["items"]) == 2 and flagged["items"][0]["skipped"] == {"reason": "trivial"}
+        assert main(args) == 0
+        plain = json.loads(capsys.readouterr().out)
+        assert len(plain["items"]) == 1 and "skipped" not in plain["items"][0]
+
+    def test_the_envelope_validates_against_the_published_schema(self, store):
+        session_with(store, "s1", ["done", "skipped", "done"])
+        env = export.export(store, "c", include_skipped=True)
+        published = schema.load("export")
+        assert schema.validate(env, published) == []
+        env["items"][0]["skipped"] = None
+        assert schema.validate(env, published)
+        del env["items"][0]["skipped"]
+        for target in (env["items"][0], env["items"][0]["session"], env["items"][0]["segment"]):
+            target["future"] = "additive"
+        assert schema.validate(env, published) == []
+
+
 class TestReviewRound387:
     """Owner decisions S4 (no data loss through the door) and Q1 (harvest registered at open)."""
 
@@ -282,6 +381,10 @@ class TestReviewRound387:
         assert h.paths.segment_indices() == []
         env = export.export(store, "claudron")
         assert [(i["seg"], i["summary"]["index"]) for i in env["items"]] == [(1, 1), (2, 2)]
+        seals = {e["seg"]: e["ts"] for e in map(json.loads, h.paths.lifecycle.read_text().splitlines())
+                 if e["kind"] == "segment.sealed"}
+        for item in env["items"]:
+            assert item["segment"] == {"sealed_at": seals[item["seg"]], "sealed_by": "precompact", "counts": None}
         assert env["next"] == {"s1": 2}
         export.ack(store, "claudron", "s1", 2)
         assert export.export(store, "claudron")["items"] == []  # nothing twice

@@ -1,6 +1,6 @@
 """Skill telemetry for Claudosseum: a projection of ``skill.invoked`` (phase 4).
 
-With ``CLAUDNA_TELEMETRY=1`` (Claudlobby sets it for fleet bots), every
+With ``CLAUDNA_TELEMETRY=1`` (a fleet sets it per bot through ``env:``; Claudlobby composes no default), every
 ``claudna:*`` Skill call appends one line to
 ``${CLAUDNA_TELEMETRY_PATH:-~/.claude/telemetry/skill-events.jsonl}``, in
 Claudosseum's ingestion format::

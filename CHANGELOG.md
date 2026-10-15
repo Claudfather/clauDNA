@@ -6,7 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **The export door carries segment metadata and optional coverage status** (Claudlobby#2145 P3). Every `claudna.export/1` item gains `segment: {sealed_at, sealed_by, counts}`; retired segments keep their seal and report `counts: null`. `session export --include-skipped` adds `{summary: null, skipped: {reason}}` items for final segments without a summary (`disabled`, `trivial`, `headless`, `no_transcript`, `gave_up` or `retired`). Private skips and private sessions never export. Status items count against `--limit`; default exports still omit them. `schemas/export.schema.json` publishes the additive envelope contract.
+- **Each opening SessionStart publishes the store's entrypoint** in `<state root>/entrypoint.json`, mode 0600 and atomically replaced (`claudna.entrypoint/1`). It records the package path, plugin root, version, Python and `agent_cli`, so a fleet consumer can run the export door without guessing an installed plugin path. Compact starts leave it alone; write failures are logged after the session is saved.
+
 ### Changed
+- **Summarizer telemetry carries `claudna.role=summarizer`**, appended to inherited `OTEL_RESOURCE_ATTRIBUTES` without repeating the tag (Claudlobby#2145 Q15), so the fleet intake can identify child exports.
+- **The activity layer is frozen** (Claudlobby#2145 F8): its four kinds and three hooks stay wired and are pinned by tests; new intra-session detail comes from the agent CLI's native telemetry.
+- **Setup guidance names the owning agent process** and corrects the fleet skill-telemetry default to off. The child guard remains based on pid and entrypoint; a regression test pins that `CLAUDE_CODE_CHILD_SESSION=1`, set on every Claude hook, suppresses nothing.
 - **Removed external references from the current tree**, replacing each with a neutral placeholder or dropping the passage. Wording only; no behavior change.
 
 ## [0.27.0] - 2026-10-07

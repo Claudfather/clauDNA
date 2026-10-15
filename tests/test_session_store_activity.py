@@ -27,7 +27,9 @@ import pytest
 from conftest import CLI_ENV, fire
 
 from claudna.session_store import activity, telemetry
+from claudna.session_store import events as ev
 from claudna.session_store.fsio import read_jsonl
+from claudna.session_store.project import _COUNTED
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WRAPPER = REPO_ROOT / "plugin-hooks" / "session-store.sh"
@@ -47,6 +49,25 @@ def events(store, sid, seg=1) -> list[dict]:
 
 def counts(store, sid, seg=1) -> dict:
     return json.loads(store.session(sid).paths.segment(seg).segment_json.read_text())["counts"]
+
+
+class TestFrozenLayer:
+    """F8: no new activity kinds or hooks; intra-session detail comes from native telemetry.
+
+    Claudosseum's separate skill_invocation telemetry writer is outside this layer.
+    Hook wiring remains covered by test_session_store_hook.TestWiring.
+    """
+
+    KINDS = ("prompt.submitted", "skill.invoked", "tool.failed", "tool.interrupted")
+
+    def test_the_activity_kinds_are_exactly_todays(self):
+        assert tuple(k for k, spec in ev.REGISTRY.items() if spec.log == ev.ACTIVITY) == self.KINDS
+
+    def test_the_activity_hooks_are_exactly_todays(self):
+        assert activity.EVENTS == ("UserPromptSubmit", "PostToolUse", "PostToolUseFailure")
+
+    def test_every_frozen_kind_is_counted_by_the_projection(self):
+        assert tuple(_COUNTED) == self.KINDS
 
 
 class TestEventFor:

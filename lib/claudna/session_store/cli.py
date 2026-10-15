@@ -274,7 +274,8 @@ def _export(args) -> int:
             cursor = export.ack(store, args.consumer, args.sid, args.through)
             print(json.dumps({"consumer": args.consumer, "sid": args.sid, "through_seg": cursor}))
         else:
-            print(json.dumps(export.export(store, args.consumer, since_seg=args.since_seg, limit=args.limit)))
+            print(json.dumps(export.export(store, args.consumer, since_seg=args.since_seg, limit=args.limit,
+                                           include_skipped=args.include_skipped)))
     except (LookupError, InvalidSessionId, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -369,6 +370,8 @@ def main(argv: list[str] | None = None) -> int:
     exp.add_argument("--consumer", required=True)
     exp.add_argument("--since-seg", type=int)
     exp.add_argument("--limit", type=int, default=100)
+    exp.add_argument("--include-skipped", action="store_true",
+                     help="also emit a status item {summary: null, skipped: {reason}} for unsummarized segments")
     exp.add_argument("--json", action="store_true", help="the envelope is always JSON; accepted for the contract")
     exp.add_argument("--ack", action="store_true", help="record that the consumer took --sid through --through")
     exp.add_argument("--sid")

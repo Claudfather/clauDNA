@@ -26,7 +26,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "lib"))
 
 import claudna.session_store.store as store_module  # noqa: E402
-from claudna.session_store import boundaries, harvest, paths  # noqa: E402
+from claudna.session_store import boundaries, harvest, paths, schema  # noqa: E402
 from claudna.session_store.cli import run_hook  # noqa: E402
 from claudna.session_store.fsio import append_jsonl  # noqa: E402
 
@@ -74,6 +74,64 @@ def segment(store, index: int) -> dict:
 
 
 # ── the boundary table ───────────────────────────────────────────────────────
+
+
+class TestEntrypoint:
+    @pytest.mark.parametrize("source", ["startup", "clear", "resume", "fork"])
+    def test_an_opening_session_start_writes_the_record(self, store, transcript, source):
+        fire(store, "SessionStart", transcript, source=source)
+        path = store.root / "entrypoint.json"
+        doc = json.loads(path.read_text())
+        assert schema.validate(doc, schema.load("entrypoint")) == []
+        assert doc["entrypoint"] == str(Path(boundaries.__file__).resolve().parent)
+        assert doc["plugin_root"] == str(REPO_ROOT)
+        assert doc["plugin_version"] == json.loads((REPO_ROOT / ".claude-plugin/plugin.json").read_text())["version"]
+        assert doc["agent_cli"] == "claude" and doc["python"] == sys.executable
+        assert path.stat().st_mode & 0o777 == 0o600
+
+    def test_the_record_is_rewritten_on_every_opening_start_and_never_on_compact(self, store, transcript):
+        fire(store, "SessionStart", transcript, source="startup")
+        path = store.root / "entrypoint.json"
+        path.write_text('{"stale": true}')
+        fire(store, "PreCompact", transcript, trigger="auto")
+        fire(store, "SessionStart", transcript, source="compact")
+        assert json.loads(path.read_text()) == {"stale": True}
+        fire(store, "SessionEnd", transcript, reason="other")
+        fire(store, "SessionStart", transcript, source="resume")
+        assert schema.validate(json.loads(path.read_text()), schema.load("entrypoint")) == []
+
+    def test_the_recorded_entrypoint_runs_the_export_door(self, store, transcript):
+        fire(store, "SessionStart", transcript, source="startup")
+        doc = json.loads((store.root / "entrypoint.json").read_text())
+        proc = subprocess.run([sys.executable, "-S", doc["entrypoint"], "export", "--consumer", "test", "--json",
+                               "--root", str(store.root)], capture_output=True, text=True, timeout=10)
+        assert proc.returncode == 0, proc.stderr
+        assert json.loads(proc.stdout)["schema"] == "claudna.export/1"
+
+    def test_a_missing_or_malformed_manifest_leaves_the_version_null(self, tmp_path, monkeypatch):
+        package = tmp_path / "lib/claudna/session_store"
+        package.mkdir(parents=True)
+        monkeypatch.setattr(boundaries, "ENTRYPOINT", package)
+        root = tmp_path / "state"
+        for manifest in (None, "broken JSON", "[]", '{"version": 3}', '{"version": ""}'):
+            if manifest is not None:
+                path = tmp_path / ".claude-plugin/plugin.json"
+                path.parent.mkdir(exist_ok=True)
+                path.write_text(manifest)
+            doc = json.loads(boundaries.write_entrypoint(root, agent_cli="claude").read_text())
+            assert doc["plugin_version"] is None and doc["plugin_root"] == str(tmp_path)
+
+    def test_a_failed_write_is_logged_and_the_session_is_still_open(self, store, transcript, monkeypatch):
+        def fail(*args):
+            raise OSError("entrypoint write failed")
+
+        monkeypatch.setattr(boundaries, "atomic_write_json", fail)
+        payload = {"session_id": SID, "transcript_path": str(transcript), "cwd": str(transcript.parent),
+                   "source": "startup"}
+        result = run_hook("SessionStart", json.dumps(payload), env={**CLI_ENV, "CLAUDNA_STATE_DIR": str(store.root)})
+        assert result.startswith("error:")
+        assert "entrypoint write failed" in (store.root / "hooks/errors.log").read_text()
+        assert session(store)["status"] == "open" and store.session(SID).paths.segment(1).dir.is_dir()
 
 
 class TestBoundaries:
@@ -323,6 +381,8 @@ class TestWrapper:
         assert (proc.returncode, proc.stdout) == (0, "")
         state = tmp_path / "home" / ".claudna"
         assert (state / "sessions" / SID / "seg-001").is_dir()
+        doc = json.loads((state / "entrypoint.json").read_text())
+        assert doc["entrypoint"] == str(REPO_ROOT / "lib/claudna/session_store")
         assert state.stat().st_mode & 0o077 == 0
 
     @pytest.mark.parametrize("env", [{"CLAUDNA_SESSION_STORE": "0"}, {"CLAUDNA_SESSION_CHILD": "1"},
@@ -454,6 +514,14 @@ class TestLogsAreCapped:
 class TestNestedChildren:
     def env(self, entrypoint, pid):
         return {"CLAUDE_CODE_ENTRYPOINT": entrypoint, "CLAUDE_PID": str(pid), "CLAUDNA_HARVEST": "1"}
+
+    def test_claude_codes_child_marker_is_not_a_nested_signal(self, store, transcript):
+        """Claudlobby#2145 C11, 2026-10-05: every top-level hook also carries this marker."""
+        env = {**self.env("cli", 100), "CLAUDE_CODE_CHILD_SESSION": "1"}
+        assert fire(store, "SessionStart", transcript, env=env, source="startup") == "session opened (startup)"
+        assert fire(store, "PreCompact", transcript, env=env, trigger="auto") == "segment sealed"
+        assert fire(store, "SessionEnd", transcript, env=env, reason="other") == "session closed (other)"
+        assert session(store)["status"] == "closed" and segment(store, 1)["sealed_by"] == "session_end"
 
     @pytest.mark.parametrize("entrypoint", ["claude-vscode", "claude-desktop", "sdk-cli"])
     def test_a_nested_child_under_any_entrypoint_cannot_touch_its_parent(self, store, transcript, entrypoint):
