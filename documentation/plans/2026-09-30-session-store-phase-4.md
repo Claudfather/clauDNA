@@ -65,7 +65,7 @@ P4 says free text (prompts, stderr) is off unless opted in. `tool.failed.command
 
 ## 5. Migrating `telemetry-emit.sh`
 
-`telemetry-emit.sh` (PostToolUse, `Skill`) appends one line per `claudna:*` skill call to `${CLAUDNA_TELEMETRY_PATH:-~/.claude/telemetry/skill-events.jsonl}`. It only does so with `CLAUDNA_TELEMETRY=1`, which Claudlobby sets for fleet bots. That file is a **Claudosseum ingestion contract**: `{ts, bot, type: "skill_invocation", source: "vitals", data: {skill_slug, duration_ms, success, session_id}}`. Changing that contract needs the owner's approval (CLAUDE.md, "Requires approval").
+`telemetry-emit.sh` (PostToolUse, `Skill`) appends one line per `claudna:*` skill call to `${CLAUDNA_TELEMETRY_PATH:-~/.claude/telemetry/skill-events.jsonl}`. It only does so with `CLAUDNA_TELEMETRY=1`; a fleet sets it per bot through `env:`, and Claudlobby composes no default (corrected 2026-10-15). That file is a **Claudosseum ingestion contract**: `{ts, bot, type: "skill_invocation", source: "vitals", data: {skill_slug, duration_ms, success, session_id}}`. Changing that contract needs the owner's approval (CLAUDE.md, "Requires approval").
 
 **Proposal:** the store's `skill.invoked` path writes that line itself, and `telemetry-emit.sh` retires.
 - The same opt-in, path, `claudna:` filter, bare slug and field names apply. It's a projection of `skill.invoked`, written in the same hook call, so there's one PostToolUse(Skill) hook instead of two.

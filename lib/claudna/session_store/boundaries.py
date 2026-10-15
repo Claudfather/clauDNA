@@ -38,7 +38,7 @@ from typing import Callable, Mapping
 from . import events as ev
 from . import activity
 from .paths import CHILD_ENV, InvalidSessionId
-from .fsio import cap_log, ensure_dir, file_size
+from .fsio import atomic_write_json, cap_log, ensure_dir, file_size, read_json
 from .project import SessionFacts, load_lifecycle, session_facts, summary_gate
 from .store import NotAppendable, SessionHandle, SessionStore
 
@@ -47,6 +47,9 @@ _CLOSE_REASONS = ev.HOOK_CLOSE_REASONS
 _TRIGGERS = ev.REGISTRY["segment.sealed"].choices["trigger"]
 #: Entrypoints a person drives. Anything else (``sdk-*``, CI actions, chat bots) is headless (#373, M5).
 INTERACTIVE_ENTRYPOINTS = ("cli", "claude-vscode", "claude-desktop")
+#: The directory entrypoint used by workers and published for external consumers (spec §8).
+ENTRYPOINT = Path(__file__).resolve().parent
+ENTRYPOINT_SCHEMA = "claudna.entrypoint/1"
 #: The agent CLI this adapter serves, recorded at open as ``session.opened.agent_cli`` (Claudlobby#2145 P1).
 #: P4's host split replaces the literal with the selected host's name.
 AGENT_CLI = "claude"
@@ -125,6 +128,28 @@ def harvest_choice(env: Mapping[str, str]) -> dict:
     return {"enabled": env.get("CLAUDNA_HARVEST") == "1", "vault": env.get("CLAUDRON_VAULT_PATH") or None}
 
 
+def write_entrypoint(root: Path, *, agent_cli: str) -> Path:
+    """Publish this plugin's store entrypoint atomically, mode 0600 (spec §8).
+
+    An opening SessionStart refreshes the record after the session is saved.
+    A missing or unreadable manifest leaves the version null; write errors
+    propagate to the hook's error log instead of silently keeping a stale path.
+    """
+    plugin_root = ENTRYPOINT.parents[2]
+    try:
+        manifest = read_json(plugin_root / ".claude-plugin" / "plugin.json")
+    except OSError:
+        manifest = None
+    version = manifest.get("version") if isinstance(manifest, dict) else None
+    path = ensure_dir(root) / "entrypoint.json"
+    atomic_write_json(path, {
+        "schema": ENTRYPOINT_SCHEMA, "entrypoint": str(ENTRYPOINT), "plugin_root": str(plugin_root),
+        "plugin_version": version if isinstance(version, str) and version else None, "python": sys.executable,
+        "agent_cli": agent_cli, "written_at": ev.now_ts(),
+    })
+    return path
+
+
 def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str], *,
                    spawn: Callable[..., None], find_pid: Callable[[], int | None]) -> str:
     source = payload.get("source")
@@ -163,6 +188,7 @@ def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str],
     if unclosed.sweep_due(root):  # one stat; the walk over the store runs detached
         unclosed.mark_swept(root)
         spawn_sweep(root, env)
+    write_entrypoint(root, agent_cli=AGENT_CLI)
     return f"session opened ({source})"
 
 
@@ -175,10 +201,9 @@ def spawn_worker(root: Path, args: list[str], env: Mapping[str, str], *, log: st
     """
     import subprocess
 
-    package = Path(__file__).resolve().parent
     with open(cap_log(ensure_dir(root / "hooks") / log), "ab") as err:
         subprocess.Popen(
-            [sys.executable, "-S", str(package), *args, "--root", str(root)],
+            [sys.executable, "-S", str(ENTRYPOINT), *args, "--root", str(root)],
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=err,
             env={**env, CHILD_ENV: "1"}, start_new_session=True, close_fds=True,
         )
@@ -307,6 +332,8 @@ def inherited(event: str, payload: dict, facts: SessionFacts, env: Mapping[str, 
 
     A ``resume`` is always let through: ``claude --resume`` must reopen the
     session, from whatever process, whether a crash left it open or it closed.
+    Claude Code's ``CLAUDE_CODE_CHILD_SESSION=1`` is on every hook and tool
+    process, a top-level session's included (Claudlobby#2145 C11), so it is not read.
     """
     if facts.status == "unknown" or (event == "SessionStart" and payload.get("source") == "resume"):
         return False

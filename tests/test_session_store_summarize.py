@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -264,6 +265,29 @@ print(json.dumps({"is_error": False, "structured_output": json.loads(os.environ[
 
 
 class TestRunClaude:
+    @pytest.mark.parametrize("inherited,expected", [
+        (None, "claudna.role=summarizer"),
+        ("claudlobby.agent_cli=claude", "claudlobby.agent_cli=claude,claudna.role=summarizer"),
+        ("claudna.role=summarizer", "claudna.role=summarizer"),
+        ("claudna.role=worker", "claudna.role=summarizer"),
+        ("claudna.role=summarizer,claudna.role=worker", "claudna.role=summarizer"),
+        ("service.name=worker, claudna.role = summarizer ", "service.name=worker,claudna.role=summarizer"),
+    ])
+    def test_the_child_tags_its_telemetry(self, monkeypatch, inherited, expected):
+        captured = {}
+
+        def run(*args, **kwargs):
+            captured.update(kwargs["env"])
+            return subprocess.CompletedProcess(args[0], 0, '{"structured_output": {}}', "")
+
+        monkeypatch.setattr(subprocess, "run", run)
+        env = {"PATH": "/fake-bin", "CLAUDE_CODE_SESSION_ID": "parent"}
+        if inherited is not None:
+            env["OTEL_RESOURCE_ATTRIBUTES"] = inherited
+        summarize.run_claude("s", "d", {}, "haiku", env)
+        assert captured == {"PATH": "/fake-bin", "CLAUDNA_SESSION_CHILD": "1", "OTEL_RESOURCE_ATTRIBUTES": expected}
+        assert env["CLAUDE_CODE_SESSION_ID"] == "parent"
+
     def test_the_child_is_isolated_and_reads_the_transcript_from_stdin(self, tmp_path):
         fake = tmp_path / "claude"
         fake.write_text(FAKE_CLAUDE)
