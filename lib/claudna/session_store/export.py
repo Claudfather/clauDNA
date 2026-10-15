@@ -4,26 +4,39 @@ Claudron (or any consumer) reads the store only through this, never its files,
 so the storage layout stays clauDNA's to change and only the envelope is
 contract::
 
-    session export --consumer claudron [--since-seg N] [--limit N] --json
+    session export --consumer claudron [--since-seg N] [--limit N] [--include-skipped] --json
     session export --consumer claudron --ack --sid <sid> --through <seg>
 
 The envelope is ``{schema: "claudna.export/1", consumer, items: [...], next: {...}}``.
 Each item is ``{sid, seg, session: <a session.json subset>, summary: <the
 segment summary>, segment: {sealed_at, sealed_by, counts}}`` (the subset's
 ``agent_cli`` since 0.27; absent in an older envelope means ``claude``).
+``segment`` is additive metadata under the same schema tag: its counts are
+``{prompts, skills, failures, interrupts}``, or ``null`` for a retired segment
+whose activity log is gone; its seal remains in the lifecycle log.
 Spec §8 "Item fields and rules" is the contract.
 ``next`` maps each session to the segment index the consumer may ack once it
 has taken that session's items.
 
 Per session, segments are walked in order past the consumer's cursor (or
 ``--since-seg``): a final segment with a ``done`` summary is an item, and so
-is a retired one, from its archived summary (no data loss: a consumer behind
-retention still gets everything; the archive is read only past the cursor).
-A skipped segment passes, and so does one whose summary will never come (its
-last attempt spent, or a retry no harvest will run: :func:`_settled`).
+is a retired one with an archived summary (the archive is read only past the
+cursor). By default, skipped segments and those whose summary will never
+come pass without an item: their last attempt is spent, or a retry no harvest
+will run is settled (:func:`_settled`). A retired segment without an archived
+summary also passes.
+With ``--include-skipped``, these final segments instead emit status items:
+``summary: null`` and ``skipped: {reason}``, alongside the same session and
+segment metadata. Reasons are ``disabled``, ``trivial``, ``headless`` or
+``no_transcript`` from the skip event; ``gave_up`` for a settled summary; or
+``retired`` when no summary was archived. Consumers treat an unknown reason
+as a skip. Regular items never carry ``skipped``. Status items count against
+``--limit``, so a flagged page may stop earlier; without page truncation its
+``next`` is unchanged and removing status items yields the unflagged envelope.
 Anything still in flight stops that session, so a cursor never skips work
-that is still coming — harvest's rule, from the same verdict. Private
-sessions are never exported. An ack goes through ``SessionHandle.ack``: one
+that is still coming — harvest's rule, from the same verdict. Private skips,
+including after retirement, and private sessions never export, even with the
+flag. An ack goes through ``SessionHandle.ack``: one
 locked writer, never past the session's last *final* segment, and a cursor
 never moves back. The store's own consumers (``harvest``) are reserved names.
 """
