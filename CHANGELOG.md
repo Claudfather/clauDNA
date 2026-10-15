@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.28.0] - 2026-10-15
 ### Added
 - **The export door carries segment metadata and optional coverage status** (Claudlobby#2145 P3). Every `claudna.export/1` item gains `segment: {sealed_at, sealed_by, counts}`; retired segments keep their seal and report `counts: null`. `session export --include-skipped` adds `{summary: null, skipped: {reason}}` items for final segments without a summary (`disabled`, `trivial`, `headless`, `no_transcript`, `gave_up` or `retired`). Private skips and private sessions never export. Status items count against `--limit`; default exports still omit them. `schemas/export.schema.json` publishes the additive envelope contract.
 - **Each opening SessionStart publishes the store's entrypoint** in `<state root>/entrypoint.json`, mode 0600 and atomically replaced (`claudna.entrypoint/1`). It records the package path, plugin root, version, Python and `agent_cli`, so a fleet consumer can run the export door without guessing an installed plugin path. Compact starts leave it alone; write failures are logged after the session is saved.
