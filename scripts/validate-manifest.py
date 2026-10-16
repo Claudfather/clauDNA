@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate .claude-plugin/ and .cursor-plugin/ manifest files.
+"""Validate Claude Code, Cursor and Codex manifest files.
 
 Checks:
   1. All JSON files in each plugin dir are valid JSON
@@ -9,7 +9,7 @@ Checks:
   5. marketplace.json has required fields (name, plugins list)
   6. Each plugin listed in marketplace.json matches a known plugin name
   7. plugin.json version >= latest git tag (no version regression)
-  8. Claude and Cursor plugin.json versions stay in sync
+  8. Claude Code, Cursor and Codex plugin.json versions stay in sync
 
 Cursor-only checks, mirroring the submission checklist at
 https://cursor.com/docs/reference/plugins and the validator in

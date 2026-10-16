@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-10-16
+
 ### Added
 - **Codex session-store hooks** use explicitly selected runtime adapters, record the owning native process and `agent_cli`, and read captured append-only rollout prose for detached summaries. The Codex plugin/marketplace exposes store hooks only, with skill/agent discovery disabled and hook trust separate from installation. Claude activity and summarizer behavior are preserved; Cursor remains hook-free. Manifest validation and releases synchronize all three front-end versions (Claudlobby#2145 P4).
 
