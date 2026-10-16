@@ -8,6 +8,8 @@ allowed-tools: Bash(git log *), Bash(git diff *), Bash(git status *), Read, Glob
 
 # Development Retro
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 Surface observations from the implementation journey — things you noticed *while doing the work* that fell outside the PR's scope.
 
 **This is NOT a code review.** Code review finds bugs in the diff. A retro surfaces insights from the journey: patterns you noticed across files, friction you experienced, inconsistencies you worked around, areas you suspect have similar issues but didn't verify.

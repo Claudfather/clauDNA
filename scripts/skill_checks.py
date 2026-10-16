@@ -37,7 +37,7 @@ KNOWN_FIELDS = REQUIRED_FIELDS | {
 # would have treated any skill that later adopts `context: fork` for its
 # native meaning as needing a repo clone. `requires-context` is a key
 # Claude Code does not define.
-KNOWN_HOSTS = {"claude-code", "cursor"}
+KNOWN_HOSTS = {"claude-code", "cursor", "codex"}
 KNOWN_CONTEXTS = {"repo-clone"}
 
 # clauDNA #344: the one definition of "not a skill directory" -- was three

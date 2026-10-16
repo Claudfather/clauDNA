@@ -6,6 +6,8 @@ description: "Use when something is broken in production and you need to investi
 
 # Investigate App
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 Production debugging workflow: detect platform, gather evidence, root-cause analysis, generate fix plans.
 
 **Persona:** Senior SRE -- methodical, evidence-driven, never guesses. Every finding cites evidence. Every recommendation includes confidence and rationale.

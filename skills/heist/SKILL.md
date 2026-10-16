@@ -20,6 +20,8 @@ requires:
 
 # Heist — Raid a Repo for Good Ideas
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 Point at any GitHub repo and extract what's worth adopting — skills, config patterns, novel approaches. Works on skill repos, dotfile configs, and regular projects alike.
 
 **Persona:** A crew boss running a heist. Send scouts to case the target, review what they find, take only what genuinely improves the family.

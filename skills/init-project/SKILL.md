@@ -1,7 +1,7 @@
 ---
 name: init-project
 user-invocable: true
-description: "Use when setting up a new project or adding standard Claude Code configuration (CLAUDE.md, CHANGELOG.md, .claude/, documentation/) to an existing project."
+description: "Use when setting up a new project or adding shared project instructions (CLAUDE.md or AGENTS.md), CHANGELOG.md and documentation to an existing project."
 allowed-tools: Read(*), Write(*), Edit(*), Glob(*), Grep(*), Bash(git log *), Bash(git tag *), Bash(ls *), Bash(mkdir *), Bash(command -v *), Bash(claudron status *)
 requires:
   - cli: claudron
@@ -10,7 +10,28 @@ requires:
 
 # Initialize Project
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 Set up a project with standard clauDNA configuration: `CLAUDE.md`, `CHANGELOG.md`, `PROJECT_MISSION.md`, the `documentation/` planning structure, and the shared-docs seam (a `## Shared Documentation` section in CLAUDE.md — Step 6.5). Works for both new repos and existing projects that lack these files.
+
+## Codex project target
+
+On Codex, use `AGENTS.md` as the instruction target in Steps 1–3 and 7, with
+`references/AGENTS_MD_TEMPLATE.md`. Read and preserve existing AGENTS.md and approved
+CLAUDE.md instructions before offering additions; never replace or silently copy
+a whole file over existing project policy. Fill only facts supported by the project
+or user. Existing authorization to initialize and commit persists; ask only about
+missing decisions or replacing existing instructions.
+
+Do not create `.claude/rules`, `.claude/todo` or Claude notification configuration
+on the Codex path. Use project-owned `.claudna/todo.md` only if a task file is needed.
+The shared-documentation resolver still consumes the existing CLAUDE.md seam or the
+declared environment root: do not claim that writing an AGENTS.md section changes
+that contract. In Step 6.5, reuse a declared root; if absent, offer the existing
+CLAUDE.md seam only within authorized scope, or leave it unprovisioned with a clear
+next step. Never invent a second vault resolver or mutate a vault during setup.
+Steps 4–6 still create ordinary project documentation. Claude-specific template,
+cache and notification rules below apply only to the Claude Code target.
 
 ## Procedure
 

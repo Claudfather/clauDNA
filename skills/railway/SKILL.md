@@ -10,6 +10,8 @@ requires:
 
 # Railway
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 One engine for Railway — `deploy`, `logs`, and `status` as verb modes over the Railway CLI. Shared behavior lives in `../_shared/infra-cli-contract.md`; this file supplies only routing and the Railway deltas.
 
 ## Mode dispatch (contract §3)

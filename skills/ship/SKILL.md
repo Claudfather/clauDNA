@@ -10,6 +10,8 @@ requires:
 
 # Ship
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 Two-mode pipeline for landing work. Use whichever scope you want.
 
 - **Commit mode** — stage and commit locally, push if tracked. No PR. (`/claudna:ship commit`, or say "commit"/"quick commit")

@@ -149,13 +149,13 @@ clauDNA ships to three hosts from one tree, and the manifests are not interchang
 |---|---|---|---|
 | Manifest | `.claude-plugin/plugin.json` | `.cursor-plugin/plugin.json` | `.codex-plugin/plugin.json` |
 | Marketplace manifest | `.claude-plugin/marketplace.json` (name `Claudfather`) | `.cursor-plugin/marketplace.json` (name `claudfather`) | `.agents/plugins/marketplace.json` (name `Claudfather`) |
-| Components | `skills/`, `agents/`, `plugin-hooks/` | `skills/`, `agents/` — no hooks | `plugin-hooks/codex-hooks.json` — session-store hooks only; inert skill/agent paths |
+| Components | `skills/`, `agents/`, `plugin-hooks/` | `skills/`, `agents/` — no hooks | 36 explicit skills; store hooks + startup briefing; inert native agents |
 
 These asymmetries are deliberate and gated by `scripts/validate-manifest.py`:
 
 - **The marketplace names differ in case.** Claude Code's stays `Claudfather` because the documented install command is `/plugin install claudna@Claudfather`. Cursor's must be `claudfather` because Cursor's marketplace identifier grammar allows only lowercase alphanumerics and hyphens.
 - **The Cursor manifest declares no hooks**, so the Claude Code shell hooks never fire in a Cursor-based environment. This is enforced two ways: the validator rejects a `hooks` field in the Cursor manifest, and it rejects a `hooks/hooks.json` at the repo root, which is where Cursor's folder discovery would find hooks with no manifest change to notice.
-- **The Codex manifest carries only session-store hooks.** Its explicit inert skill/agent paths prevent default discovery. Workflow skills and agents belong to the execution companion; installing the plugin does not grant hook trust.
+- **The Codex manifest explicitly selects 36 skills**, preserving the Claude-only and source-checkout exclusions. Eight bundled role prompts use actual same-host read-and-dispatch controls; no native agent registrations. Five store handlers plus the startup briefing are distinct from hook trust/execution. Cursor still ships 35 skills; Claude Code ships 39. Installing does not grant hook trust.
 
 ### Submitting to the Cursor marketplace
 
@@ -172,3 +172,16 @@ Be respectful, constructive, and assume good intent. We're building tools that m
 ## Questions?
 
 Open an [issue](https://github.com/Claudfather/clauDNA/issues) — no question is too small.
+
+### Codex verification
+
+`make routing-eval-codex` checks the deterministic catalog floor and is part of
+`make check`. Explicit `--live` mode measures bounded `catalog_selection` choices
+with isolated HOME/CODEX_HOME/work/tmp paths; see the runner's `--help`. The input is actual installed names, descriptions and invocation hints, with exact schema responses retained privately outside the public report. Prompt and schema define mode as the routing invocation suffix, preserving installed verbs/selector flags rather than an inferred semantic label. It does
+not execute skills or prove native automatic routing. Keep `make routing-eval`
+unchanged for Claude-only evaluation; do not run it in Codex-only verification.
+Native skill-read/action, same-host fresh reviewer spawn/wait, and packaged startup
+execution/context-delivery evidence are separate gates in the
+[Codex workflow plan](documentation/plans/2026-10-16-codex-engineering-workflows.md).
+Do not transfer desktop delegation proof to native CLI or mark the mixed-fleet
+week complete from a local source/native canary.

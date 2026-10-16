@@ -10,6 +10,8 @@ requires:
 
 # dbt Command Runner
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 Quick dbt operations.
 
 ## Authentication

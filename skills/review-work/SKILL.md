@@ -10,6 +10,8 @@ requires:
 
 # Review Work
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 One engine for code review — `changes`, `pr`, and `multi-pr` as modes over the same verification discipline: evidence before approval, findings ranked by severity, never a rubber stamp.
 
 ## Mode dispatch

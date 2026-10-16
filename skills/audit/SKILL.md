@@ -10,6 +10,8 @@ requires:
 
 # Audit
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 One engine for codebase audits — concern lenses as verb modes. Shared behavior (arguments, output routing, autonomous mode, orchestration) lives in `../_shared/audit-lens-contract.md`; this file supplies only the lens table and dispatch rules.
 
 ## Lens dispatch (contract §2, §4)

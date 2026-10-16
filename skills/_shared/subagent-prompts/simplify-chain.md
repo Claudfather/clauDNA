@@ -1,5 +1,7 @@
 # /simplify Chain — Subagent Dispatch Prompt
 
+**Codex:** Read `../../_shared/codex-tools.md` before dispatch. Required independent review cannot be replaced by an inline self-review. Use `../../_shared/subagent-prompts/simplify-codex.md` for the complete Codex procedure and skip the Claude-only steps below.
+
 Used by `/claudna:build` (Step 6.5) to run `/simplify` against changed files after verification passes. /simplify operates non-interactively on the working tree by design — this file documents the chain pattern so other skills can adopt it later if needed.
 
 ## When this chain runs

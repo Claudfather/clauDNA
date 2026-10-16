@@ -41,7 +41,7 @@ def build_repo(tmp_path: Path) -> Path:
     # validate-manifest.py imports check_cursor_scope, which imports
     # skill_checks (#340) -- both travel with it so the subprocess's
     # top-level import resolves.
-    for module in ("check_cursor_scope.py", "skill_checks.py"):
+    for module in ("check_cursor_scope.py", "check_codex_scope.py", "plugin_scope.py", "skill_checks.py"):
         shutil.copy2(REPO_ROOT / "scripts" / module, root / "scripts" / module)
 
     for manifest_dir in (".claude-plugin", ".cursor-plugin"):
@@ -68,6 +68,10 @@ def build_repo(tmp_path: Path) -> Path:
             # fixture exists to guard (harmless today, since every real entry
             # starts with "./skills/", but the fixture should match the fix).
             (root / entry).mkdir(parents=True, exist_ok=True)
+    for directory in (REPO_ROOT / "skills").iterdir():
+        if (directory / "SKILL.md").is_file():
+            (root / "skills" / directory.name).mkdir(exist_ok=True)
+            shutil.copy2(directory / "SKILL.md", root / "skills" / directory.name / "SKILL.md")
     (root / "agents").mkdir()
     (root / "assets").mkdir()
     (root / "assets" / "logo.svg").write_text("<svg />\n")
@@ -252,20 +256,13 @@ def test_a_dot_leading_path_that_exists_passes(tmp_path):
 
 
 def test_component_path_accepts_a_list(tmp_path):
-    """Cursor allows a list of paths per component; each entry is checked.
-
-    Nested under skills/, not a repo-root sibling: the cursor-scope gate
-    (#340/#343) refuses a skills[] entry outside skills/ by design, so a
-    fixture testing this UNRELATED generic path-existence check must not
-    also trip that one.
-    """
+    """Generic component lists validate every path independently of skill scope."""
     root = build_repo(tmp_path)
-    (root / "skills" / "extra-skills").mkdir()
-    patch(root, CURSOR, "skills", ["./skills/", "./skills/extra-skills/"])
+    patch(root, CURSOR, "agents", ["./agents/"])
     code, output = run_gate(root)
     assert code == 0, output
 
-    patch(root, CURSOR, "skills", ["./skills/", "./ghost/"])
+    patch(root, CURSOR, "agents", ["./agents/", "./ghost/"])
     code, output = run_gate(root)
     assert code != 0
     assert "./ghost/" in output
@@ -388,12 +385,12 @@ def test_codex_version_mismatch_is_rejected(tmp_path):
     assert "version mismatch" in output
 
 
-def test_codex_skill_discovery_is_explicitly_disabled(tmp_path):
+def test_codex_skill_directory_discovery_is_rejected(tmp_path):
     root = build_repo(tmp_path)
     patch(root, ".codex-plugin/plugin.json", "skills", "./skills")
     code, output = run_gate(root)
     assert code != 0
-    assert "store hooks only" in output
+    assert "explicit nonempty" in output
 
 
 def test_codex_unsupported_hook_is_rejected(tmp_path):
@@ -413,7 +410,7 @@ def test_codex_empty_arrays_do_not_accidentally_allow_default_discovery(tmp_path
         patch(root, ".codex-plugin/plugin.json", component, [])
     code, output = run_gate(root)
     assert code != 0
-    assert "store hooks only" in output
+    assert "explicit nonempty" in output
 
 
 def test_codex_inert_component_directory_cannot_grow_content(tmp_path):
@@ -448,3 +445,25 @@ def test_codex_marketplace_uses_native_source_grammar(tmp_path):
     code, output = run_gate(root)
     assert code != 0
     assert "measured local source grammar" in output
+
+
+def test_codex_startup_timeout_and_matcher_are_exact(tmp_path):
+    root = build_repo(tmp_path)
+    path = root / "plugin-hooks/codex-hooks.json"
+    doc = json.loads(path.read_text())
+    doc["hooks"]["SessionStart"][1]["hooks"][0]["timeout"] = 600
+    path.write_text(json.dumps(doc))
+    code, output = run_gate(root)
+    assert code != 0
+    assert "startup-only briefing contract" in output
+
+
+def test_codex_store_handler_cannot_be_displaced_by_briefing(tmp_path):
+    root = build_repo(tmp_path)
+    path = root / "plugin-hooks/codex-hooks.json"
+    doc = json.loads(path.read_text())
+    del doc["hooks"]["SessionStart"][0]
+    path.write_text(json.dumps(doc))
+    code, output = run_gate(root)
+    assert code != 0
+    assert "startup-only briefing contract" in output

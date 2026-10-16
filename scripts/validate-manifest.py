@@ -26,6 +26,9 @@ cursor/plugin-template (scripts/validate-template.mjs):
  13. The Cursor manifest stays hook-free: no `hooks` field, and no
      `hooks/hooks.json` for Cursor's folder discovery to find
 
+Codex checks: explicit curated skill set, inert agent component, exact five store
+handlers plus startup-only briefing, and a same-identity local-source marketplace.
+
 Run: python scripts/validate-manifest.py
 Exits non-zero on any violation.
 """
@@ -40,6 +43,7 @@ import sys
 from pathlib import Path, PurePosixPath
 
 from check_cursor_scope import run_check as run_cursor_scope_check
+from check_codex_scope import run_check as run_codex_scope_check
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CLAUDE_PLUGIN_DIR = REPO_ROOT / ".claude-plugin"
@@ -327,17 +331,20 @@ def validate_version_sync() -> None:
         error("plugin.json version mismatch: " + ", ".join(f"{k} has {v!r}" for k, v in versions.items()))
 
 
-def validate_codex_store_hooks() -> None:
-    """P4 exposes the measured store hook surface, with no skill/agent discovery."""
+def validate_codex_behavior_scope() -> None:
+    """Curated Codex workflows plus measured store/startup hooks; agents stay inert."""
     data = load_json(CODEX_PLUGIN_DIR / "plugin.json")
     if not isinstance(data, dict):
         return
     empty = "./.codex-plugin/store-only"
-    if data.get("skills") != empty or data.get("agents") != empty:
-        error("Codex ships store hooks only: skills and agents must select the inert store-only directory")
+    if data.get("agents") != empty:
+        error("Codex agents must select the inert store-only directory")
+    scope_errors, _, _ = run_codex_scope_check(REPO_ROOT)
+    for message in scope_errors:
+        error(message)
     empty_path = REPO_ROOT / empty
     if not empty_path.is_dir() or any(p.name != ".gitkeep" for p in empty_path.iterdir()):
-        error("Codex store hooks only directory must contain only its inert .gitkeep")
+        error("Codex agent directory must contain only its inert .gitkeep")
     path = data.get("hooks")
     if not isinstance(path, str) or not is_safe_relative(path):
         return  # the generic path validator reports this
@@ -355,8 +362,13 @@ def validate_codex_store_hooks() -> None:
         entry = {"hooks": [expected]}
         if event == "PostToolUse":
             entry["matcher"] = "Skill"
-        if entries != [entry]:
-            error(f"Codex {event} must run only its explicitly selected store command")
+        expected_entries = [entry]
+        if event == "SessionStart":
+            expected_entries.append({"matcher": "startup", "hooks": [{
+                "type": "command", "command": '\"${PLUGIN_ROOT}/plugin-hooks/session-start.sh\"',
+                "timeout": 5}]})
+        if entries != expected_entries:
+            error(f"Codex {event} must preserve its store command and the startup-only briefing contract")
     market = load_json(REPO_ROOT / ".agents/plugins/marketplace.json")
     plugins = market.get("plugins") if isinstance(market, dict) else None
     if not isinstance(plugins, list) or len(plugins) != 1 or not isinstance(plugins[0], dict) or \
@@ -402,7 +414,7 @@ def main() -> int:
     validate_marketplace_json(CURSOR_PLUGIN_DIR, cursor=True)
     validate_all_json_files(CODEX_PLUGIN_DIR)
     validate_plugin_json(CODEX_PLUGIN_DIR, require_hooks=True)
-    validate_codex_store_hooks()
+    validate_codex_behavior_scope()
     validate_cursor_hook_free()
     validate_version_sync()
 

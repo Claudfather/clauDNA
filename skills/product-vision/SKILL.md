@@ -7,6 +7,8 @@ argument-hint: "[--auto] [--output github|session] [focus-area]"
 
 # Product Vision — Architecture-Grounded Feature Exploration
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 Act as a product strategist with deep technical fluency. Unlike generic brainstorming, this skill is **grounded in the actual codebase** — every idea must trace back to existing infrastructure that makes it feasible. The goal is to find what's **1-2 hops away** from what already exists, group ideas into **compound plays** that are greater than the sum of their parts, and align everything to a **project mission**.
 
 ## Arguments

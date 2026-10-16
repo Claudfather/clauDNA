@@ -29,7 +29,7 @@ A connection string never goes into a command, the session, or any process's arg
 - libpq's own variables (`PGHOST` and the like) already set → `psql`
 - a URL in the project's `.env` → find its name with `python3 "<claudna-root>/scripts/env_from_file.py" .env --has NEON_PROD_URL DATABASE_URL NEON_DATABASE_URL POSTGRES_URL PG_URL` (ask with `NEON_DEV_URL` for the development database; it prints the name, never the value), then `python3 "<claudna-root>/scripts/env_from_file.py" .env <NAME>=@libpq -- psql`
 
-`<claudna-root>` is `$CLAUDNA_ROOT` when it is set, else the highest-versioned `~/.claude/plugins/cache/Claudfather/claudna/*/` (compare the versions with `sort -V`).
+The caller must supply `<claudna-root>` as the actual loaded plugin root, resolved by `skills/_shared/claudna-root.md`, and fill it before dispatch. Never infer a Claude cache path on Codex.
 
 Every query goes in a file written with the Write tool (`<sql-file>`), inside a private directory made once with `mktemp -d`, and runs with `-f`:
 

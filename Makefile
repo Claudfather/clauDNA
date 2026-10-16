@@ -18,9 +18,9 @@
 #                    (CI forwards PR labels via this env var; consumed
 #                    by scripts/skill_checks.py)
 
-.PHONY: check deps deps-runtime deps-eval deps-contract test-contract test-contract-floor test-runtime routing-eval check-skills check-integration check-agents check-manifest check-changelog lint test
+.PHONY: routing-eval-codex check deps deps-runtime deps-eval deps-contract test-contract test-contract-floor test-runtime routing-eval check-skills check-integration check-agents check-manifest check-changelog lint test
 
-check: check-skills check-integration check-agents check-manifest check-changelog lint test
+check: routing-eval-codex check-skills check-integration check-agents check-manifest check-changelog lint test
 
 deps:
 	python3 -m pip install -r requirements-dev.txt
@@ -98,3 +98,8 @@ deps-eval:
 ROUTING_EVAL_ARGS ?=
 routing-eval:
 	python3 scripts/routing_eval.py $(ROUTING_EVAL_ARGS)
+
+# Codex catalog-choice floor is deterministic. --live explicitly opts into inference.
+ROUTING_CODEX_ARGS ?=
+routing-eval-codex:
+	python3 scripts/routing_eval_codex.py $(ROUTING_CODEX_ARGS)

@@ -6,6 +6,8 @@ description: "Use when starting feature work that needs isolation from the curre
 
 # Git Worktree Manager
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 Create worktrees and orchestrate parallel subagents for concurrent feature work.
 
 ## Instructions
@@ -29,6 +31,8 @@ Use `git worktree add` with **absolute paths**. `mkdir -p` the parent first. Use
 **Critical**: `cd` does not persist between Bash calls from the orchestrator. Always use absolute paths.
 
 ### Step 3b: Permission boundaries
+
+**On Codex:** follow `../_shared/codex-tools.md` for actual checkout permissions and ownership. The orchestrator may edit/test/commit in its authorized owned checkout. Use real exposed subagent and wait controls; Claude-only `run_in_background` and `subagent_type` labels below are not Codex controls. Reuse suitable app-managed worktrees and clean them up only through their owner controls. Do not remove them to enable branch deletion; omit branch deletion when needed. Existing merge authority persists. The legacy permission assumptions below apply to Claude Code.
 
 Worktrees are sibling directories — **outside the orchestrating session's project scope**. Every Bash/Read/Edit command targeting a worktree triggers a permission prompt.
 
