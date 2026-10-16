@@ -33,9 +33,10 @@ Use the supported Codex plugin marketplace interface to add `Claudfather/clauDNA
 and install `claudna@Claudfather`. The manifest explicitly selects 36 skills:
 Claude-only cleanup and the two source-checkout contribution skills are excluded.
 Use skill mentions or read the installed skill file; all selected entrypoints link
-the [Codex tool mapping](skills/_shared/codex-tools.md). Eight role prompts are
-read-and-dispatch content when the current host exposes real subagent controls,
-with no native agent registration. A desktop result does not establish CLI support.
+the [Codex tool mapping](skills/_shared/codex-tools.md). All eight role prompts map to a read-and-dispatch procedure, with no native agent
+registration. A route is supported only where actual same-host controls and the
+required fixture proof pass; unsupported routes remain explicit. A desktop result
+does not establish CLI support.
 
 Hooks require a separate operator trust action. This set preserves five store
 handlers and adds only the startup briefing; it carries no Claude permission,

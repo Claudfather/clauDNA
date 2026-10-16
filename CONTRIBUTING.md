@@ -155,7 +155,7 @@ These asymmetries are deliberate and gated by `scripts/validate-manifest.py`:
 
 - **The marketplace names differ in case.** Claude Code's stays `Claudfather` because the documented install command is `/plugin install claudna@Claudfather`. Cursor's must be `claudfather` because Cursor's marketplace identifier grammar allows only lowercase alphanumerics and hyphens.
 - **The Cursor manifest declares no hooks**, so the Claude Code shell hooks never fire in a Cursor-based environment. This is enforced two ways: the validator rejects a `hooks` field in the Cursor manifest, and it rejects a `hooks/hooks.json` at the repo root, which is where Cursor's folder discovery would find hooks with no manifest change to notice.
-- **The Codex manifest explicitly selects 36 skills**, preserving the Claude-only and source-checkout exclusions. Eight bundled role prompts use actual same-host read-and-dispatch controls; no native agent registrations. Five store handlers plus the startup briefing are distinct from hook trust/execution. Cursor still ships 35 skills; Claude Code ships 39. Installing does not grant hook trust.
+- **The Codex manifest explicitly selects 36 skills**, preserving the Claude-only and source-checkout exclusions. All eight bundled role prompts map to a read-and-dispatch procedure. A route is supported only on execution hosts where actual same-host availability and its required fixture proof pass; unsupported routes remain explicit. No native agent registrations. Five store handlers plus the startup briefing are distinct from hook trust/execution. Cursor still ships 35 skills; Claude Code ships 39. Installing does not grant hook trust.
 
 ### Submitting to the Cursor marketplace
 

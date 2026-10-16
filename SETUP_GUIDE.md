@@ -855,8 +855,10 @@ The clauDNA project template (`project-template/CLAUDE.md`) embeds these princip
 The `Claudfather/claudna` Codex plugin selects 36 engineering skills explicitly,
 plus five store handlers and a startup-only briefing. It excludes Claude-only
 `cleanup-legacy-install` and repo-clone `promotion-intake`/`skill-scaffold`.
-Bundled agent prompts are ordinary content read and dispatched through actual
-same-host controls; no `.codex/agents` or global configuration is written.
+Bundled agent prompts map to a read-and-dispatch procedure. Support requires
+actual same-host controls and the required fixture proof on that execution host;
+unsupported routes remain explicit. No `.codex/agents` or global configuration is
+written.
 
 Use Codex's supported plugin marketplace interface to add `Claudfather/clauDNA`
 and install `claudna@Claudfather`; `.agents/plugins/marketplace.json` preserves
