@@ -239,9 +239,11 @@ class TestRealMarkedSkills:
         fm, _ = parsed
         return fm
 
-    def test_using_claudna_is_claude_code_only(self):
+    def test_using_claudna_includes_codex_and_excludes_cursor(self):
+        from check_codex_scope import selected_names
         fm = self._fm("using-claudna")
-        assert fm.get("hosts") == ["claude-code"]
+        assert fm.get("hosts") == ["claude-code", "codex"]
+        assert "using-claudna" in selected_names(REPO_ROOT)
         assert cursor_should_exclude(fm) is True
 
     def test_cleanup_legacy_install_is_claude_code_only(self):

@@ -1,0 +1,1553 @@
+{
+  "acceptance": "source, native and mixed-week proof remain unperformed in this planning audit",
+  "baseline_refresh": {
+    "before_source_manifest_sha256": "958b3140381a9462e17f25161ee56dd1ed0fd2703d660ecc3fe3e1da688b78fe",
+    "catalog_dependency_counts_unchanged": true,
+    "changed_audited_paths": [
+      "scripts/validate-manifest.py"
+    ],
+    "changed_bytes": 6,
+    "classification": "baseline refresh, not provenance correction",
+    "old194_verified": true,
+    "routing_empty_mode_histogram_correction": {
+      "after": 2,
+      "before": 0
+    }
+  },
+  "challenge_findings_addressed": 4,
+  "challenge_revision": 2,
+  "counts": {
+    "agents": 8,
+    "canonical": 39,
+    "claude": 39,
+    "codex_selected": 36,
+    "cursor": 35,
+    "hook_files": 12
+  },
+  "document": {
+    "label": "claudna-404-codex-workflows-plan",
+    "path": "documentation/plans/2026-10-16-codex-engineering-workflows.md",
+    "sha256": "7925be1f5458962c28f4f3bb26a4ba2a53fa54cd6dd818d900110b38d23d9201",
+    "status": "active; implementation and native acceptance pending"
+  },
+  "evidence": [
+    {
+      "label": "p0-final-report",
+      "sha256": "4d13c914c1227807d736293573b24e10ac9f055a504f298c6955288369bc9cb7"
+    },
+    {
+      "label": "claudna-404-issue-snapshot",
+      "sha256": "fed1310c41723d33cdf050bccf8d4394be4754f090705d21a9ad70294a3c029f"
+    },
+    {
+      "label": "installed-artemis-codex-tool-adapter",
+      "sha256": "02554cb4a08168bfd78fac22c184d97444351db08c9f4fbecd8633eb0266675b"
+    },
+    {
+      "label": "original-82d9-planning-inventory-verification",
+      "sha256": "a4763e7a62470b8324d675cbe38f1fc7a6b4542d27187c02f306696da97468ac"
+    },
+    {
+      "label": "released-3c56-single-git-export-proof",
+      "sha256": "961cf3e7b491bd4d06c4cc4f1c26c6fc87232ae91b0609db204824daf17b10c8"
+    },
+    {
+      "label": "released-3c56-baseline-refresh-deltas",
+      "sha256": "92b2bc20843cca40c88f6f12e1942dbb6947bae87390dac28ce6580eddae840d"
+    }
+  ],
+  "excluded": [
+    "cleanup-legacy-install",
+    "promotion-intake",
+    "skill-scaffold"
+  ],
+  "historical_inventory": {
+    "all194_entries_match_original_commit": true,
+    "classification": "verified original planning inventory; retained before the baseline refresh",
+    "old_pin_proof_sha256": "a4763e7a62470b8324d675cbe38f1fc7a6b4542d27187c02f306696da97468ac",
+    "source": {
+      "implementation_base": "3c56fb6c6b3e01546ee264e684a383d741a0a497",
+      "inventory_commit": "82d9ceae0f9602f792e6005f3c2b397cbfa0a2cf",
+      "inventory_tree": "729f63879e61f50b09cfbddf6931fcc662623205",
+      "manifest_label": "claudna-404-frozen-source-manifest",
+      "manifest_sha256": "ba35e78f433a77078b85cc43d9389c3c0eec7f71e0cf16da7e9bbed2b4b47a83",
+      "source_files": 194
+    }
+  },
+  "implementation_measurement_revision": {
+    "catalog_input": "Actual installed names, descriptions and argument-hint; no fixture-derived answers",
+    "correction": "Retain private schema responses and perform one fresh bounded complete epoch",
+    "final_epoch": "17/18 actual result retained; selection mode gate unresolved and inference stopped",
+    "first_complete_epoch": "16/18 normalized choices; exact two missed modes unavailable",
+    "independent_residual_disposition": "Bounded exact-mode limitation; failed unchanged oracle, no rescore or mandatory18/18 threshold",
+    "second_contract_correction": "Independent review: generic mode was ambiguous; prompt/schema now share invocation-suffix rule without changing judge or expectations",
+    "source_metadata_scope": "Codex description accurately identifies engineering skills and read-and-dispatch roles"
+  },
+  "independent_rereview": "NO FINDINGS on converged draft ed3dca43c5630b4ee3092297cdbc8097c0870922b6c9ba53e6e3de6deb3f78b2",
+  "kind": "sanitized-planning-document-receipt",
+  "prerequisites": {
+    "claudna": "v0.29.0",
+    "claudron": "v0.10.0",
+    "proof_source": "root-supplied release/readback status"
+  },
+  "promotion_input": {
+    "classification": "baseline refresh, not provenance correction",
+    "document_sha256": "10ab5cd78f9e294fe90a42f7049ed1393b4898c654b5e1798f423e2cd28fb17e",
+    "private_audit_receipt_sha256": "5c1b491a015ccb493de121b8bae013e5b74daf6dd39cfc0e54673007f384f80e",
+    "receipt_sha256": "18436fe0934e496b661a5d08bd5112415078930869152bd11546347671e8dec1"
+  },
+  "regeneration_rule": "Recompute document hash after any promotion/sanitization or subsequent edit.",
+  "routing_source_summary": {
+    "controls": 2,
+    "expected_skills": [
+      "audit",
+      "ironclad",
+      "modal",
+      "neon",
+      "promotion-intake",
+      "railway",
+      "review-work",
+      "session",
+      "using-claudna",
+      "vercel"
+    ],
+    "known_failure_rows": [],
+    "live_rows": 10,
+    "mode_counts": {
+      "": 2,
+      "--lens": 6,
+      "access-path": 1,
+      "branch": 1,
+      "changes": 1,
+      "checkpoint": 1,
+      "data-model": 1,
+      "data-model-redesign": 1,
+      "deploy": 3,
+      "design": 2,
+      "docs": 1,
+      "frontend-perf": 2,
+      "handoff": 1,
+      "health": 1,
+      "info": 1,
+      "logs": 3,
+      "name": 1,
+      "pr": 1,
+      "query": 1,
+      "repo-health": 1,
+      "resume": 1,
+      "scale": 3,
+      "security": 1,
+      "status": 3,
+      "tech-debt": 1
+    },
+    "rows": 41
+  },
+  "selected": [
+    "adversarial-review",
+    "audit",
+    "build",
+    "build-all",
+    "capture",
+    "claudron",
+    "dbt",
+    "development-retro",
+    "extract-system-spec",
+    "file-github-issue",
+    "find-skills",
+    "forge",
+    "github-activity-report",
+    "heist",
+    "index",
+    "init-project",
+    "investigate-app",
+    "ironclad",
+    "kindle",
+    "modal",
+    "neon",
+    "product-enhance",
+    "product-vision",
+    "publish",
+    "qa",
+    "railway",
+    "recall",
+    "review-work",
+    "session",
+    "ship",
+    "sync-branches",
+    "using-claudna",
+    "vercel",
+    "verify-completion",
+    "weigh-development-paths",
+    "worktree"
+  ],
+  "source": {
+    "full_export_files": 425,
+    "git_export_sha256": "fb826309024cc88cc556c71b29a64d57cf6f480d3ddee05ae4a60c2aa8c42ed0",
+    "implementation_base": "3c56fb6c6b3e01546ee264e684a383d741a0a497",
+    "inventory_commit": "3c56fb6c6b3e01546ee264e684a383d741a0a497",
+    "inventory_tree": "33244925ae8a541eb0520612880506d48c99115f",
+    "manifest_label": "claudna-404-frozen-source-manifest",
+    "manifest_sha256": "38694510ff37f90a59879649ff717000b1826589a512223de3d08d093b6cf320",
+    "source_files": 194
+  },
+  "source_manifest": {
+    "CLAUDE.md": {
+      "blob": "b8c7d6c12b699a5bf1e0f120c2a663f508c16080",
+      "bytes": 9159,
+      "git_mode": "100644",
+      "lines": 102,
+      "sha256": "ac177e1d80fc0c21e3e9eeb1052725d8e66e9d7d281d1e88d7d4a92c56803197"
+    },
+    "SKILL_CONTRACT.md": {
+      "blob": "27af0a86b43fd94de5b9d5542bd4def08f04b080",
+      "bytes": 27121,
+      "git_mode": "100644",
+      "lines": 228,
+      "sha256": "9d71306b29db5edeb857ea5716e4c9385c26b8c617482839cfa7eec761d463f0"
+    },
+    "agents/code-reviewer.md": {
+      "blob": "fde4d3d09ac3d19b9e0afd910d6910c0ba849eb0",
+      "bytes": 2463,
+      "git_mode": "100644",
+      "lines": 56,
+      "sha256": "260d1778677c62d58a74520cea6278f075e3fa4e7e3fdb0af4e6ecdef46639ed"
+    },
+    "agents/dbt-engineer.md": {
+      "blob": "a79ad658d2e65924653b211df73e350382ef3184",
+      "bytes": 3355,
+      "git_mode": "100644",
+      "lines": 135,
+      "sha256": "c55ddcb82753741ce346cdad65448e6a26944cbf642333c065f5d28e83378229"
+    },
+    "agents/modal-ops.md": {
+      "blob": "399c55884f8578c7d139389f36db5163ad195a74",
+      "bytes": 11614,
+      "git_mode": "100644",
+      "lines": 226,
+      "sha256": "2ec8ed9d67fa942efd95e3ed9803004f10ad359b2304c30a147620ca2813867f"
+    },
+    "agents/neon-analyst.md": {
+      "blob": "827b05b36f85b4b4d0c65868fb497ca81424f135",
+      "bytes": 8442,
+      "git_mode": "100644",
+      "lines": 207,
+      "sha256": "7874bb1d192732e6e10de10a2cc487e5f9348a4cc0470f234220759235a6efae"
+    },
+    "agents/railway-ops.md": {
+      "blob": "acf46165f16195f96e4e7d5dc744e703faaa2158",
+      "bytes": 7697,
+      "git_mode": "100644",
+      "lines": 145,
+      "sha256": "40b7f5cde6711d99161bae38e9bd740fc8ea0edb030cd6e0fd7e16496d9f1eb5"
+    },
+    "agents/snowflake-analyst.md": {
+      "blob": "4169207a3a5cacf6cb76c27fc374b4e5a5ff3cdb",
+      "bytes": 2220,
+      "git_mode": "100644",
+      "lines": 86,
+      "sha256": "f245290c49545b2ff5f03b91b3e94a5f1d206212140cbe1708f35c74b092fd11"
+    },
+    "agents/spec-reviewer.md": {
+      "blob": "f57e29dd4e69a5fc715a95776103fd553acf1310",
+      "bytes": 2554,
+      "git_mode": "100644",
+      "lines": 63,
+      "sha256": "27422c452fe226bf12c00a83b5337d0d836697c3e0ec44c1fcb8bec959607185"
+    },
+    "agents/vercel-ops.md": {
+      "blob": "2c2d147133d30c97c111cb61c8be321b1e126174",
+      "bytes": 11333,
+      "git_mode": "100644",
+      "lines": 236,
+      "sha256": "f724612f520f945193a909319cc0a3cd1928d1bc9bcdf005b22eac4c003da5ee"
+    },
+    "plugin-hooks/auto-format.sh": {
+      "blob": "8364f321bb976e03f04d9cef056c63802a1a35b8",
+      "bytes": 4185,
+      "git_mode": "100755",
+      "lines": 94,
+      "sha256": "6619ea9f9ae2694716762d7a271705f37354a91879f77c318556d213f9f6dc01"
+    },
+    "plugin-hooks/codex-hooks.json": {
+      "blob": "f2e8ab39283dc1772dd955788a70a1a32a48cd45",
+      "bytes": 1217,
+      "git_mode": "100644",
+      "lines": 56,
+      "sha256": "85089292490f18364bc887bd0985c2028b6aeae25a554f8a7d49c52795ad24c7"
+    },
+    "plugin-hooks/gh-guard-decide.py": {
+      "blob": "3672492522bd609931faca2661f9744f0a23ce72",
+      "bytes": 19222,
+      "git_mode": "100644",
+      "lines": 485,
+      "sha256": "a6135fffa0762a78f12fb13ffb38868e35af80a07fa85fcaec2e6c8df81ba8c3"
+    },
+    "plugin-hooks/hooks.json": {
+      "blob": "d465d391675394b9e688d0dfba4dc42c12d0e63c",
+      "bytes": 2919,
+      "git_mode": "100644",
+      "lines": 131,
+      "sha256": "d64bf123e5c8a8faab67f8f7d2061b7c8a81d94e842d018f921b35a35d961a4e"
+    },
+    "plugin-hooks/lib/state-dir.sh": {
+      "blob": "f0957899e78eb400a7a2d93a04aeb01ac4fec66c",
+      "bytes": 1011,
+      "git_mode": "100644",
+      "lines": 24,
+      "sha256": "4542b0b99ef6b0cd970135eb247165b8d8931572bc6e1718916dab228f6224e9"
+    },
+    "plugin-hooks/notify.sh": {
+      "blob": "c25a6ffb803d81e2047a7ee01ca6e5923951d976",
+      "bytes": 1086,
+      "git_mode": "100755",
+      "lines": 27,
+      "sha256": "a268d01e9e0b1deb00b9a841d86513ae08cfb5fe64c612444e6099875c58adaa"
+    },
+    "plugin-hooks/precompact-reflect.sh": {
+      "blob": "8cd370ba1b705374849d67d2c7954bc4cac2fce2",
+      "bytes": 9011,
+      "git_mode": "100755",
+      "lines": 188,
+      "sha256": "5b18de08f1807f7c9112f9d9baa95536c289e4decb7c4e90d55d516fe352e249"
+    },
+    "plugin-hooks/pretooluse-permissions.sh": {
+      "blob": "d47fde850e6aea60ce6fe99bcf3508d46d109861",
+      "bytes": 17859,
+      "git_mode": "100755",
+      "lines": 431,
+      "sha256": "20193cca021ef6a39e9bafa572ae100605b194f409c05fc532afe109f24044f3"
+    },
+    "plugin-hooks/session-start.sh": {
+      "blob": "5363c84e93f2bc9e481bc3d8114b7db1a3f4b02f",
+      "bytes": 6880,
+      "git_mode": "100755",
+      "lines": 129,
+      "sha256": "e9f2643e71fb4bc20e5c11b3d32ece354907019f403835a89bd6a2308f75b337"
+    },
+    "plugin-hooks/session-store.sh": {
+      "blob": "4624c6935d0d629224f8edecd5310b8c2c82716b",
+      "bytes": 2159,
+      "git_mode": "100755",
+      "lines": 44,
+      "sha256": "8668fc5bcaeb37dd0c492f439c5404cd3069146d6f4b5c2f63e9f2ca1f39d9ec"
+    },
+    "plugin-hooks/statusline.sh": {
+      "blob": "bbfd4cc12b24b8b548202f4b42daf0875cc8ba6f",
+      "bytes": 2010,
+      "git_mode": "100755",
+      "lines": 76,
+      "sha256": "ac6202f5bfd8d9034b8eb9c7217068665ca7f104c781f1ce5c06ebc6d8d9f58e"
+    },
+    "plugin-hooks/telemetry-emit.sh": {
+      "blob": "5b05fa3aec4cc87733abc881dc2ae9ba20c27e47",
+      "bytes": 1728,
+      "git_mode": "100755",
+      "lines": 35,
+      "sha256": "d5b523cb3ed1f3cb6e832e942aa5ebd0389ae9b8469b7dccb21978f19bbc652d"
+    },
+    "scripts/catalog-budget.json": {
+      "blob": "776b8c71c89371db44ddeea5422c16f5f2c0ffaf",
+      "bytes": 174,
+      "git_mode": "100644",
+      "lines": 5,
+      "sha256": "3bdfa5b087e5c4485f8805a44afb33d2d782110c459941a0c65913e498e89c80"
+    },
+    "scripts/check-changelog.sh": {
+      "blob": "5a7654a3ddf19b658ed4e9180c351409d4633c2d",
+      "bytes": 1335,
+      "git_mode": "100755",
+      "lines": 35,
+      "sha256": "f08ac3e57be62fcd789b86b07dcf7d34b372da1191b3c66c53e19100683af703"
+    },
+    "scripts/check_catalog_budget.py": {
+      "blob": "e3d2d51642f919eb2c0ce296c45de24111d1de48",
+      "bytes": 5346,
+      "git_mode": "100644",
+      "lines": 125,
+      "sha256": "d1787b24d4024fa2c258dc60c522c9b552d85b0dbaccd2c481822976f3debeee"
+    },
+    "scripts/check_cursor_scope.py": {
+      "blob": "e1415e832b51c33b9b2d31877f4995701f0336da",
+      "bytes": 7275,
+      "git_mode": "100644",
+      "lines": 160,
+      "sha256": "183a8a2abb58ab82cba9e70ce4c3caae6da2abcece2d8c0388c8319204c4f60a"
+    },
+    "scripts/check_provenance.py": {
+      "blob": "d8b95c1df8be71aca5b04f100faa982b98e8f674",
+      "bytes": 6139,
+      "git_mode": "100755",
+      "lines": 159,
+      "sha256": "273b2b609c356d62fad1513d39382b7ddeb259db57a449122ea91d2543b817fc"
+    },
+    "scripts/check_schema_drift.py": {
+      "blob": "dfd6df3346bbb2555173e7272aaf9ac34f4e75b7",
+      "bytes": 14248,
+      "git_mode": "100644",
+      "lines": 326,
+      "sha256": "be1c610e3a034ba1bc26efe9f79fd5775f09b028d1d7a45974d67febbd373300"
+    },
+    "scripts/check_vault_address.py": {
+      "blob": "f288d3d246092e964ddc30ce623afc162625575d",
+      "bytes": 13084,
+      "git_mode": "100644",
+      "lines": 296,
+      "sha256": "418c8295a8c9f742ecbce0aa9b58d3c81ac88688b53f60a1503339fc548ebdef"
+    },
+    "scripts/claudron_bump.py": {
+      "blob": "b28548131bee0f19e6e67108f7b377743b82cb94",
+      "bytes": 5583,
+      "git_mode": "100644",
+      "lines": 132,
+      "sha256": "6c416982418ec00f65a1f7b3988f4bbf902a7fd4951b2155a812a4d2261a2d8d"
+    },
+    "scripts/crawl_page.py": {
+      "blob": "0bd40aa02fc094a52654bf238da129e9534f2061",
+      "bytes": 16159,
+      "git_mode": "100644",
+      "lines": 389,
+      "sha256": "b6b26f383d9b8c7f5b98812f900004d06ecbfc053a4770df083265fbc759807d"
+    },
+    "scripts/env_from_file.py": {
+      "blob": "10f7018e59b35a1e3072ae6ac34e4b19324a4d8f",
+      "bytes": 7928,
+      "git_mode": "100644",
+      "lines": 201,
+      "sha256": "ed5c09c39456638970ccd57aa1263c20d4a09602e42d0bcf12a106027146fe44"
+    },
+    "scripts/fix_shared_paths.py": {
+      "blob": "72d5ff1b401a50a6c929d8540231ab22bf34ecd2",
+      "bytes": 2465,
+      "git_mode": "100755",
+      "lines": 60,
+      "sha256": "d2dd8d4d7d52e685607aefa0d4ef8d4ea5738474c9d6e3a7804931313838e547"
+    },
+    "scripts/integration-test.py": {
+      "blob": "caea7a81048988676b26042b138ac9eeed30c94f",
+      "bytes": 19433,
+      "git_mode": "100644",
+      "lines": 561,
+      "sha256": "1c03aeb122146d0ea3c8edc6f19208a59aa05ee524d5bec57273483a2a50e74c"
+    },
+    "scripts/redact.py": {
+      "blob": "c14c8343dabea78ee3b6f33ed8b05d96e28e6b52",
+      "bytes": 2008,
+      "git_mode": "100644",
+      "lines": 54,
+      "sha256": "c51b246e02ee8f552528f375aeb6ca686514512147de8fc98836f38a208418f9"
+    },
+    "scripts/release.sh": {
+      "blob": "49093f335064ad2135a6f6218725336081a8de2b",
+      "bytes": 6520,
+      "git_mode": "100755",
+      "lines": 203,
+      "sha256": "e71d722ceb0052386b806bcaf18b0a228632452adf9ed1aaa8577d4554e6169f"
+    },
+    "scripts/removed-skills.txt": {
+      "blob": "ce8fef4ca5c0bb735d487b7038300cf563ca5d5b",
+      "bytes": 3288,
+      "git_mode": "100644",
+      "lines": 97,
+      "sha256": "a0ee0d8cdb990347b497cd94315ef1d6360674e9c78aa8d88fbb32dfa9436227"
+    },
+    "scripts/resolve_memory_dir.py": {
+      "blob": "50d7a183abbd096ad03a82d7600a2cc8e43297a8",
+      "bytes": 7550,
+      "git_mode": "100644",
+      "lines": 188,
+      "sha256": "dbdb82ecad004c5c4b8b9dfb30cb6643a6b719a5c9eeee8e3c14d46950dbef5b"
+    },
+    "scripts/routing_eval.py": {
+      "blob": "ba8dbdee5a0149a8487b9ae29792a983fe93f385",
+      "bytes": 14441,
+      "git_mode": "100644",
+      "lines": 290,
+      "sha256": "db3ef21101ee2b8a4a088a067998ea29d7c3cbfa811c8d9203f932ca4e8e76d0"
+    },
+    "scripts/session_canary.py": {
+      "blob": "d2064ea65c70b754483722297b49ad2eebd7fcca",
+      "bytes": 14767,
+      "git_mode": "100644",
+      "lines": 320,
+      "sha256": "861dcaddab69ba2ca519374c963fbf6a829dbc25850ea992174d2654e452bd0e"
+    },
+    "scripts/skill_checks.py": {
+      "blob": "a23d7a54931bb8796f47ec4e79cb09811e7b97af",
+      "bytes": 62406,
+      "git_mode": "100644",
+      "lines": 1474,
+      "sha256": "ef2f2b090c501fc5a9ec34827abde16cc985bba0660001bf003e2929aec7f20a"
+    },
+    "scripts/sync_claudron_contract.py": {
+      "blob": "45bfe8f0589d3cb1c8ea4a085a297269a75403ad",
+      "bytes": 4567,
+      "git_mode": "100644",
+      "lines": 100,
+      "sha256": "707388161eca16e0682fc829a6a4e4bab438af00979a49492a68c3b23394514a"
+    },
+    "scripts/validate-agents.py": {
+      "blob": "618fe90cd8426104fde91bf50916364835c326f5",
+      "bytes": 6929,
+      "git_mode": "100644",
+      "lines": 208,
+      "sha256": "a33ce28c02fb7f8ec0087d64bddd201a0b96f39a0fd22b1d53f4983d3178b86e"
+    },
+    "scripts/validate-manifest.py": {
+      "blob": "666dba134f8b866c2140031c3f77a7f10a366b1b",
+      "bytes": 16859,
+      "git_mode": "100644",
+      "lines": 428,
+      "sha256": "926fa8268f8a241399734c36e3f2af559f1f6c7165a048f7a3b5abe072f262d7"
+    },
+    "scripts/validate-promotion-package.py": {
+      "blob": "246218ad12425234637be8e7c0e50d864cb8dba2",
+      "bytes": 20327,
+      "git_mode": "100644",
+      "lines": 584,
+      "sha256": "556af331b7f2cf368a41acd47652b7060c7cf7b4cc35b20501aed187d1417cfc"
+    },
+    "scripts/validate-skills.py": {
+      "blob": "e40985bb82e26103050e2ac918e1bc79298e3181",
+      "bytes": 15960,
+      "git_mode": "100755",
+      "lines": 351,
+      "sha256": "993ce64ae3c629ba9837b251e86500d677d2c8e1c67b55774957acb6b818de05"
+    },
+    "skills/CLAUDE.md": {
+      "blob": "e8ad1ea491ae7d516e61a395ada1d9fbb31aff9a",
+      "bytes": 1706,
+      "git_mode": "100644",
+      "lines": 27,
+      "sha256": "7c1d8f434c95f3fe51a4efbd33360a95ebca7d9800e57ed3623a2df0ec4eedf7"
+    },
+    "skills/_shared/CLAUDE.md": {
+      "blob": "33423950fbd864bea93afd5c0876418115d52ad0",
+      "bytes": 1224,
+      "git_mode": "100644",
+      "lines": 21,
+      "sha256": "8c881a6a30e1c05a336991e085cf92279b6e4d12168396b5bf4a222bc07cf672"
+    },
+    "skills/_shared/audit-lens-contract.md": {
+      "blob": "6d6667bf4aaff445f14682561aa7f6ecb3520830",
+      "bytes": 4525,
+      "git_mode": "100644",
+      "lines": 43,
+      "sha256": "0a8209dec4f8f91175f19fbc9caafcde232c824bd7cb61a1185dfb77490ff051"
+    },
+    "skills/_shared/claudna-root.md": {
+      "blob": "bcfafceeecbb99f7370918d15e71aa83daf547c2",
+      "bytes": 1922,
+      "git_mode": "100644",
+      "lines": 16,
+      "sha256": "2ee6842504752b3a2f35bb99f416e6870c32e6725288434dbd48b0ecb631f8f5"
+    },
+    "skills/_shared/claudron-engine.md": {
+      "blob": "94cf3129eaf2027ae84e7a96718a40eefd17cd29",
+      "bytes": 12812,
+      "git_mode": "100644",
+      "lines": 114,
+      "sha256": "62d422fa3c5947fbbb4ea637e5c3ac1d58065307054ecb7fc4263e22b3a2646e"
+    },
+    "skills/_shared/contracts/lens-result-contract.md": {
+      "blob": "4f31d09d37c8cb0cf234dcbe1eb732f20d5da7dc",
+      "bytes": 7892,
+      "git_mode": "100644",
+      "lines": 162,
+      "sha256": "eb79a1903f0ab1ed2f4ce6a865a370679659e1ea88c3f341b53d92e5b7c094dd"
+    },
+    "skills/_shared/contracts/synthesis-contract.md": {
+      "blob": "4d5a64fe5d68a26293f5f568e3358823e2961ce4",
+      "bytes": 5855,
+      "git_mode": "100644",
+      "lines": 105,
+      "sha256": "f4a36a4738d7ac3ac63a9e51c274af06cccacd476b101554ef5e0ddd0e3bbc3e"
+    },
+    "skills/_shared/documentation-standard.md": {
+      "blob": "ceab6a2fc81b29c2a7dfc61e664d5e9ff67869b2",
+      "bytes": 10441,
+      "git_mode": "100644",
+      "lines": 177,
+      "sha256": "0d5772849cc9166ea48db33898bf37fcc6fcff55c4712e22b480548770cdb70b"
+    },
+    "skills/_shared/infra-cli-contract.md": {
+      "blob": "91e0c603e4aae4e43142fe9e0ed6822276de8a3d",
+      "bytes": 6905,
+      "git_mode": "100644",
+      "lines": 53,
+      "sha256": "8454eb5d21cb7455f7e51ccd0381ec1944da8a5b116cc30f0fec38fe842f4728"
+    },
+    "skills/_shared/orchestration-guide.md": {
+      "blob": "fcbb3870d292556c39eaa99872c07adaa1183bf2",
+      "bytes": 36990,
+      "git_mode": "100644",
+      "lines": 539,
+      "sha256": "a6643657588aed32be7e94f6ee39ed8e11060f446820bc2c86ae27e484a8b065"
+    },
+    "skills/_shared/output-guide.md": {
+      "blob": "8a191e3555ad066228eb569bc30a450f667e328a",
+      "bytes": 19240,
+      "git_mode": "100644",
+      "lines": 298,
+      "sha256": "d3de4e2a87a18b3925b88599c48da98f970ae32fdb0a90909a1253547b0c04a1"
+    },
+    "skills/_shared/planning-standard.md": {
+      "blob": "501d4651afb725b750b8fc2305c7a0cfe5435028",
+      "bytes": 4710,
+      "git_mode": "100644",
+      "lines": 65,
+      "sha256": "5395d7ea89c94e05fbf34e252590d1cb49c4d7da4c5dd1a9cda1aeed67f044c0"
+    },
+    "skills/_shared/pre-handoff-checklist.md": {
+      "blob": "32a93fbbbb345eb992408176b21e8fb048c92c22",
+      "bytes": 4056,
+      "git_mode": "100644",
+      "lines": 75,
+      "sha256": "c4aec852762bf896b93bc99d45d87e0b480b438251195029dc53496317539a59"
+    },
+    "skills/_shared/reaper-rules.md": {
+      "blob": "74c6b58197fea1c4ff04aae76d3112acbe8f942b",
+      "bytes": 2995,
+      "git_mode": "100644",
+      "lines": 49,
+      "sha256": "0b3e2461eb67d1f49dc127a84b7aee468d732da313d319494330992e1203695f"
+    },
+    "skills/_shared/source-guide.md": {
+      "blob": "1e710d027cf35a43d3d164800765d5dd673cd6ac",
+      "bytes": 9403,
+      "git_mode": "100644",
+      "lines": 197,
+      "sha256": "b7eea59acdb7d852d6dceae1ac4f1625ac2737006f8a52ae35b2b03a77a383fe"
+    },
+    "skills/_shared/subagent-prompts/adversarial-chain.md": {
+      "blob": "a6284ccd3f97eff9a0551e5c8a2cf43f67a4051c",
+      "bytes": 4399,
+      "git_mode": "100644",
+      "lines": 101,
+      "sha256": "755b1b4ee0b6207adc82a5e6ffad7456939c88f8fb4e9b0361f88922a4a0ecd3"
+    },
+    "skills/_shared/subagent-prompts/simplify-chain.md": {
+      "blob": "96571c5f3a6bb2a7f5beeb6fb615f39884e1ec85",
+      "bytes": 2338,
+      "git_mode": "100644",
+      "lines": 57,
+      "sha256": "ec56ad74d599cfb23cfb33a54d7675dbf63648a337c9e1e4c3978af5680010ee"
+    },
+    "skills/_shared/trusted-input.md": {
+      "blob": "057c45fe02e375d1f30bd947293fcfbedd5fe669",
+      "bytes": 6060,
+      "git_mode": "100644",
+      "lines": 115,
+      "sha256": "2a0ac5aa74d66adbeb7bc6a17b2fbedd86718f402f712371e761e2275b4b2e66"
+    },
+    "skills/adversarial-review/SKILL.md": {
+      "blob": "7cc590607a077d9ac368ef0b0167d63c6d9dce7d",
+      "bytes": 20885,
+      "git_mode": "100644",
+      "lines": 353,
+      "sha256": "4222d1fcca3a8c26bab6ee3e7d506d7431b24cfb1cfc9d9f3ece7ef862e7f967"
+    },
+    "skills/audit/SKILL.md": {
+      "blob": "c305a279f4ddc508e0bf2bc7d9445d027841a723",
+      "bytes": 5195,
+      "git_mode": "100644",
+      "lines": 47,
+      "sha256": "c3338a49d26d61d3f123dded151f65c8ea55fd1cdf4c2da17e135600d92a03c1"
+    },
+    "skills/audit/access-path/access-path.md": {
+      "blob": "de26c664e9f6e0c1ec40351dce35dad75502f16a",
+      "bytes": 17547,
+      "git_mode": "100644",
+      "lines": 309,
+      "sha256": "2d228772679830dfa9cbcbb81ff872629b0c73ae3ac161a1b1497dd5853ddf65"
+    },
+    "skills/audit/access-path/scan-categories.md": {
+      "blob": "760ed5dfee7f1889bb3c14d31967bfba52bab5bd",
+      "bytes": 8672,
+      "git_mode": "100644",
+      "lines": 205,
+      "sha256": "1918a681e4730fa0ea36391b3be5562cc0c972b7db270450d4b529faf9ae5d53"
+    },
+    "skills/audit/access-path/subagent-prompts.md": {
+      "blob": "d6448c1b3cf190c2305e8437cd445dbcce9842b2",
+      "bytes": 7489,
+      "git_mode": "100644",
+      "lines": 185,
+      "sha256": "a3ce89c6c48e4b9c8e10388d98feb2dced16bff12b1f64f6537345816e341fb5"
+    },
+    "skills/audit/cache/cache-checks.md": {
+      "blob": "7b497041cae4eaaec0a9538aeec211c1f1eb6b40",
+      "bytes": 4730,
+      "git_mode": "100644",
+      "lines": 85,
+      "sha256": "119c1a17df62349e56fba86b1542e4c09b54e8d8bc08909067ba6e3688f9007d"
+    },
+    "skills/audit/cache/cache.md": {
+      "blob": "5b1c7f2a522050372fcc121ddf980555d3c87283",
+      "bytes": 3132,
+      "git_mode": "100644",
+      "lines": 44,
+      "sha256": "36f7bae6077a0f7e51029c2f298e535db8f1b7912aeb305d92262da9ac4c1f00"
+    },
+    "skills/audit/data-model-redesign/data-model-redesign.md": {
+      "blob": "5752c3508de94327604eacb3bc834f3b3a1203c2",
+      "bytes": 14263,
+      "git_mode": "100644",
+      "lines": 125,
+      "sha256": "f4828df41ed497f1104c08e333e327c82cb6c2cd82026705fb8ac28789ad088f"
+    },
+    "skills/audit/data-model-redesign/evaluation-prompt-template.md": {
+      "blob": "b828cdc31710043a9667859061841f98060342ca",
+      "bytes": 8511,
+      "git_mode": "100644",
+      "lines": 84,
+      "sha256": "3adfa59e320e35e7c0ca94d6ccd799dade526c851742b962a042ab3b8ebd1322"
+    },
+    "skills/audit/data-model-redesign/migration-playbook.md": {
+      "blob": "0c84a20968300a56f256af145f9cbe1726a5d72c",
+      "bytes": 6364,
+      "git_mode": "100644",
+      "lines": 79,
+      "sha256": "7abb82138a13e3e4b9eda4eb10513cdfa618d1ce82c38819c8eadc39eebdeb45"
+    },
+    "skills/audit/data-model-redesign/verification-checklist.md": {
+      "blob": "8241b34b9e07688dd6bed0b1c7cf4c2accbb4015",
+      "bytes": 4315,
+      "git_mode": "100644",
+      "lines": 53,
+      "sha256": "0cb04aad848b65114659740a5cce55e91c78b7c0bd8136dc6f84d508d831cb92"
+    },
+    "skills/audit/data-model/data-model.md": {
+      "blob": "6d490bbe52505f98aa751b9a08729eeafe40a39c",
+      "bytes": 6335,
+      "git_mode": "100644",
+      "lines": 95,
+      "sha256": "86550ef4c096f22f3a558fa4e1a0fa0fef4f63987990967b21ab8427d8575c4d"
+    },
+    "skills/audit/data-model/gap-analysis-categories.md": {
+      "blob": "9f8160ec095e3d3c3f8e5e35938af3d6ee4f7c53",
+      "bytes": 4128,
+      "git_mode": "100644",
+      "lines": 97,
+      "sha256": "d687e055fa23b6a705f540c7897c6a28ced19e09a211b75421dc672432236640"
+    },
+    "skills/audit/data-model/subagent-prompts.md": {
+      "blob": "a863641d11a5e429cb81f15da95b36023f4be7e6",
+      "bytes": 5268,
+      "git_mode": "100644",
+      "lines": 92,
+      "sha256": "ee63a531418c25ca8e7431eec0087f1e26dce5234d67a6c5417fd9bd17894003"
+    },
+    "skills/audit/design/ai-slop-blacklist.md": {
+      "blob": "01f464c3d5e8316fef6a4a252c345d11ca1ebdd5",
+      "bytes": 1384,
+      "git_mode": "100644",
+      "lines": 21,
+      "sha256": "62e97746e74396be9e14e653a46a42db91aa1bdff0f96efd8f1201c7e237b4f3"
+    },
+    "skills/audit/design/audit-checklist.md": {
+      "blob": "1228a90493c8ad6c056c10b94c99050373295f10",
+      "bytes": 6685,
+      "git_mode": "100644",
+      "lines": 123,
+      "sha256": "afb7cb1aef9638776f72adf2360727d8a4c9f05372ff776562acf4163175c35c"
+    },
+    "skills/audit/design/design-hard-rules.md": {
+      "blob": "f40f80d5b2ab5d2a8cf0950d40920ed7d25dcf2f",
+      "bytes": 2045,
+      "git_mode": "100644",
+      "lines": 48,
+      "sha256": "a793dbc2e112507b3de33476ab1903add97e8fad20c0468f9333dadcb9790930"
+    },
+    "skills/audit/design/design.md": {
+      "blob": "6fc1cb347e6c00a6a61b8ebee6ca2003e4bf09c1",
+      "bytes": 7066,
+      "git_mode": "100644",
+      "lines": 118,
+      "sha256": "dfea79eb9fab1644c8f08d376e27e5da3de69ccdd6ca850e9d05ff5b4f5f8230"
+    },
+    "skills/audit/design/font-knowledge.md": {
+      "blob": "9e1619e8333749afc19a7d4952f2ffa4ae810939",
+      "bytes": 1289,
+      "git_mode": "100644",
+      "lines": 21,
+      "sha256": "a4036e44a03a804b6c4cf421cc5f952802b2e816566cc6b4874b37c0acf2514f"
+    },
+    "skills/audit/docs/docs.md": {
+      "blob": "0e69e15193b750b355d142354e5a743acf6ca466",
+      "bytes": 11339,
+      "git_mode": "100644",
+      "lines": 217,
+      "sha256": "8d34e087445d4d0374437c0e7fc528ae8a453b6ac96454432ea4f507e54579ac"
+    },
+    "skills/audit/frontend-perf/cascade-diagram-template.md": {
+      "blob": "f511fe4258c60d9818df4df33592359f1160cec4",
+      "bytes": 3036,
+      "git_mode": "100644",
+      "lines": 46,
+      "sha256": "4e611ec3520288a4427de34e3e5cd339af204408eee045cba6aeb09539030da7"
+    },
+    "skills/audit/frontend-perf/frontend-perf.md": {
+      "blob": "0d52966b223c0d2e2da72806b9ce043b8d4d4d3b",
+      "bytes": 8510,
+      "git_mode": "100644",
+      "lines": 144,
+      "sha256": "fbfa830612078108cc4a0aae502af839e81b8ebea80020334be80fa11c49686a"
+    },
+    "skills/audit/frontend-perf/scan-categories.md": {
+      "blob": "c026e00f7d32cf76847eb1bdaf1d3e19920775c7",
+      "bytes": 4991,
+      "git_mode": "100644",
+      "lines": 90,
+      "sha256": "1374f5898eca0c50f89c856bd0dd06795980c399ecae106c9195a2bbab0fad47"
+    },
+    "skills/audit/repo-health/health-checks.md": {
+      "blob": "ba2369c603d0ee9bdbf48ab14ed5ceb4ad9c85d6",
+      "bytes": 6761,
+      "git_mode": "100644",
+      "lines": 137,
+      "sha256": "970536a4474a459b69849a337a514c6614342f3ccf19906459fd4d536acac3a8"
+    },
+    "skills/audit/repo-health/repo-health.md": {
+      "blob": "bd1ccd5822e85a0cdd6b7deb7d1a3b198ebb3107",
+      "bytes": 5252,
+      "git_mode": "100644",
+      "lines": 93,
+      "sha256": "723875cb201815d0fdce282a96892af36f90758bf827f0f475bd73b422be3393"
+    },
+    "skills/audit/scale/failure-windows.md": {
+      "blob": "596ddca9a6bd36def2cab462a838fc3ca2ad1974",
+      "bytes": 9608,
+      "git_mode": "100644",
+      "lines": 77,
+      "sha256": "c4a03334d3c1302efa6c707e086f439c1b6f75e0d473faf4dfd6ee1c11230762"
+    },
+    "skills/audit/scale/report-template.md": {
+      "blob": "a864e4c99d71501fbf02c4300b1003116665760b",
+      "bytes": 8496,
+      "git_mode": "100644",
+      "lines": 112,
+      "sha256": "565a720ddfa7c54113be72450d73e2b310450e72edf919def60e9481f2f8895a"
+    },
+    "skills/audit/scale/scale.md": {
+      "blob": "26999e71843da63a9272141e1af72297b2b6a1af",
+      "bytes": 20360,
+      "git_mode": "100644",
+      "lines": 221,
+      "sha256": "90b4240911b6661d96a8884758d885734065c30b3321657a1ba73650de6d259b"
+    },
+    "skills/audit/scale/scan-categories.md": {
+      "blob": "621615543815f23ab038da96f3c522a7a1e5e525",
+      "bytes": 14680,
+      "git_mode": "100644",
+      "lines": 133,
+      "sha256": "a4efee1bd0025c55fbb1271b5ba861a8020332a8370feb2b187a71cc383a73a0"
+    },
+    "skills/audit/scale/subagent-prompts.md": {
+      "blob": "757b147eba36e57c8c89a725c54f599fb1737b9a",
+      "bytes": 9092,
+      "git_mode": "100644",
+      "lines": 136,
+      "sha256": "0a78fb576c548d28ddff43804fc9d6aee5872255b168f3cfeb629b0ab2b1ccaa"
+    },
+    "skills/audit/security/scan-categories.md": {
+      "blob": "13a625aff9d1b00f9b5d1217859cd02e4b015af8",
+      "bytes": 4347,
+      "git_mode": "100644",
+      "lines": 121,
+      "sha256": "8df637d9b09e3106be72ac430ec23948d6572ef3b91b56a66a98f90c55a69afb"
+    },
+    "skills/audit/security/security.md": {
+      "blob": "f8218d6e17201e608666cfbba50314adc5c77c12",
+      "bytes": 11815,
+      "git_mode": "100644",
+      "lines": 201,
+      "sha256": "a0a44a6d90e5852ce2028d878c18becaf9fd6d6ff0d746459a9ca8cca148e02a"
+    },
+    "skills/audit/security/severity-definitions.md": {
+      "blob": "7231a711c628a31c30ad0c3cee501668972fd272",
+      "bytes": 1854,
+      "git_mode": "100644",
+      "lines": 27,
+      "sha256": "400a90cfc956445c13344794161901832c76de1e29d1fa79efc920eb20e665aa"
+    },
+    "skills/audit/system/issue-depth-standard.md": {
+      "blob": "98645931cd48c887e8d5e19970e38ab70e677a6b",
+      "bytes": 4042,
+      "git_mode": "100644",
+      "lines": 26,
+      "sha256": "423c69fdaa9b58fabbf485d90f4b1eefcebdfc62b5b268f2cac5f80556e871b2"
+    },
+    "skills/audit/system/subagent-prompts.md": {
+      "blob": "9b007452cf401c580c839de16f9ab5c627f481dc",
+      "bytes": 9486,
+      "git_mode": "100644",
+      "lines": 113,
+      "sha256": "5b3a1271e6b6bcb56cf4fbfcc1a17bfca36cd961113100c472c775d6a13425f2"
+    },
+    "skills/audit/system/system.md": {
+      "blob": "bc4bf9dd36bb4e8db89c46805bcc57ec76ebb3f9",
+      "bytes": 20142,
+      "git_mode": "100644",
+      "lines": 186,
+      "sha256": "23469ffe6c37e8786dfbd755e8c35ce5847cd940b59d14af55cddb2507920433"
+    },
+    "skills/audit/tech-debt/tech-debt.md": {
+      "blob": "7a6feffd3287fcfcd0404e8d55edfa725bcf13ef",
+      "bytes": 15581,
+      "git_mode": "100644",
+      "lines": 249,
+      "sha256": "e8f1d748ae64b81be1f75d4a5816dc72e6ce5f039a5b8d6a30d6b57932fe5384"
+    },
+    "skills/build-all/SKILL.md": {
+      "blob": "f4dfa92b0ecd697f32482db6d4838f1fa56046e3",
+      "bytes": 16748,
+      "git_mode": "100644",
+      "lines": 188,
+      "sha256": "65f0b8798951cfd6b58b7bfb023f582160a8ac5435da668b5b482d9525de1252"
+    },
+    "skills/build/SKILL.md": {
+      "blob": "d5fa6622af2a26fcb9b10bef31d96673c2c7a988",
+      "bytes": 45143,
+      "git_mode": "100644",
+      "lines": 884,
+      "sha256": "cce1bb080246b5f78eb4922b5cb484287949e48309221b438a48bd3af11f3efc"
+    },
+    "skills/build/challenge-round-questions.md": {
+      "blob": "aa59488ae3f251c59a906d8d3871c24e2733aff3",
+      "bytes": 3000,
+      "git_mode": "100644",
+      "lines": 46,
+      "sha256": "0932f0cfbc3d1d51f0719df29b8c20cc8564123d7e50a7bbb013bee048bdcaf5"
+    },
+    "skills/build/engineering-principles.md": {
+      "blob": "96994e8cee242184e5b9780416485073af405e08",
+      "bytes": 1659,
+      "git_mode": "100644",
+      "lines": 19,
+      "sha256": "14a95e4adf996ac91f59f69cbdec954b11745339c06c72ef3f1bda926a7b7867"
+    },
+    "skills/build/red-flags-and-rationalizations.md": {
+      "blob": "34c755833c86da09324c1f9dd4ac26f70c1b6a00",
+      "bytes": 2689,
+      "git_mode": "100644",
+      "lines": 28,
+      "sha256": "3597a8f35a8b88154522d4f89462100e4f2918f0fa53cfb3960f72e1715bf247"
+    },
+    "skills/capture/SKILL.md": {
+      "blob": "b1e4e4753f5356a64885955e1c53333c081c137e",
+      "bytes": 20611,
+      "git_mode": "100644",
+      "lines": 180,
+      "sha256": "9d41b8825a922386fa36bc6657148aeb30cdb92d1a3037c993b9d87a09527ce0"
+    },
+    "skills/claudron/SKILL.md": {
+      "blob": "f6b0cd230261f4edf67c2f31f9d0962e4b221772",
+      "bytes": 3830,
+      "git_mode": "100644",
+      "lines": 39,
+      "sha256": "9b1932f60ad6308036b63b9b476d0a08ad5bcab72551d28db22ddb4238bdc5e5"
+    },
+    "skills/claudron/doctor.md": {
+      "blob": "d4eb363deeb3de2f171f985b3986e18d515986f6",
+      "bytes": 8569,
+      "git_mode": "100644",
+      "lines": 137,
+      "sha256": "455635041c617da4d2002e4b4514f9d609b40f88cc890f14a8e47be34d997d14"
+    },
+    "skills/claudron/lookup.md": {
+      "blob": "ba800c8517d6d1efaddb07b6c12948d6df9f979a",
+      "bytes": 2479,
+      "git_mode": "100644",
+      "lines": 39,
+      "sha256": "8c23c54fec652b930680e69119807536bdece09a5bd72537723d367e866ea139"
+    },
+    "skills/claudron/status.md": {
+      "blob": "36b0ac5dd213ef284c6d9077cedc3eba3e17e6dd",
+      "bytes": 2753,
+      "git_mode": "100644",
+      "lines": 54,
+      "sha256": "8a2d9112cead5802cb5464a21894e8430b9b889203e9e20bbb282d4be11493dc"
+    },
+    "skills/cleanup-legacy-install/SKILL.md": {
+      "blob": "78abb45bc15a7d6ef5d3d66147e67bcf5cfad979",
+      "bytes": 10438,
+      "git_mode": "100644",
+      "lines": 245,
+      "sha256": "86d38ae45b2037e41088a45fa590763765dd1e57ceed773925867d8923f95242"
+    },
+    "skills/dbt/SKILL.md": {
+      "blob": "2b8a4d84c9229f2682fc8da4bd6c77cb28786dca",
+      "bytes": 1793,
+      "git_mode": "100644",
+      "lines": 57,
+      "sha256": "5ea6960fc7bbfb69e94767a883f5e1935aac1c02cb06a8fb0b58a1ab4d6ff267"
+    },
+    "skills/development-retro/SKILL.md": {
+      "blob": "21ee40ba4f3624a9dd3cdb3c84170a8d366d48e8",
+      "bytes": 7787,
+      "git_mode": "100644",
+      "lines": 165,
+      "sha256": "49bd3d95eabdf43723f19b5a62c14e5c6fe3b9a28641639ae6a0dc33c612570c"
+    },
+    "skills/extract-system-spec/SKILL.md": {
+      "blob": "8be5b8f0dbcf54a8749e52c3669337d891601e93",
+      "bytes": 8077,
+      "git_mode": "100644",
+      "lines": 100,
+      "sha256": "8d55d78a392d1c5eab27858d12f5d39d8cd241b947910c6dbe82ebf21ef30b27"
+    },
+    "skills/extract-system-spec/extraction-prompt.md": {
+      "blob": "af793d003401a0746c9f9ba67c44e3faead54daa",
+      "bytes": 35633,
+      "git_mode": "100644",
+      "lines": 502,
+      "sha256": "43d6f9f9b5cbb0dd011e4b1aa978cd747a2cab59e66438dab6a1b5fd6ba2171b"
+    },
+    "skills/file-github-issue/SKILL.md": {
+      "blob": "e7d61ed777041b44cc4c16c0242f6869a7f51941",
+      "bytes": 21010,
+      "git_mode": "100644",
+      "lines": 250,
+      "sha256": "8f0bcf1596b30e975ab9a60d23e0eeafff9e4f6d1addb58c57e48467e65b85a8"
+    },
+    "skills/file-github-issue/body-template.md": {
+      "blob": "e43520508e9cdc41a0a74cf6de14dd9f2974f7e3",
+      "bytes": 3183,
+      "git_mode": "100644",
+      "lines": 64,
+      "sha256": "fadd297c18c5a72635aeb396e5bac5f105296e22e5039d58d898fc3495bd3714"
+    },
+    "skills/find-skills/SKILL.md": {
+      "blob": "739c1f073c5d9d58951e0a0f83ed4af14104791c",
+      "bytes": 5505,
+      "git_mode": "100644",
+      "lines": 139,
+      "sha256": "dcb762ad6f0f5c23ccfc2652e07eb3e4d06f9fe5138286528e07b0c46bb4a608"
+    },
+    "skills/forge/SKILL.md": {
+      "blob": "9210fea3cc62f8cdf819ce1af7d66479d28ff04e",
+      "bytes": 18014,
+      "git_mode": "100644",
+      "lines": 254,
+      "sha256": "c023813ac7a8213f1b50fd399a3e6e63b5b650ef3e78f436897c908511854b7b"
+    },
+    "skills/github-activity-report/SKILL.md": {
+      "blob": "5262291f84549b4285269e02b33f9783714137a9",
+      "bytes": 9128,
+      "git_mode": "100644",
+      "lines": 208,
+      "sha256": "467d4be24ad8e1c9fe5da2a3cc3d3cb092eb430611e6b97a0599454ae7c084f7"
+    },
+    "skills/github-activity-report/crawl.sh": {
+      "blob": "c3a8147b1a456719ae174d806b85f4c2331eb530",
+      "bytes": 3258,
+      "git_mode": "100755",
+      "lines": 92,
+      "sha256": "d2df43de9ec90a7d86f46913a40f783fb6ac4cea4c2e3e37a34426e8bafa02a9"
+    },
+    "skills/heist/SKILL.md": {
+      "blob": "a83894a324cdb6074cb80cc4323e2f7027431c17",
+      "bytes": 4903,
+      "git_mode": "100644",
+      "lines": 100,
+      "sha256": "568787aaafd1315c7fee25a1b7f6069937d20c54bfae0c74dd40e447fd3dcac9"
+    },
+    "skills/heist/comparison-template.md": {
+      "blob": "2e278791f56a7ef7f09accea69be68af4c458aeb",
+      "bytes": 3982,
+      "git_mode": "100644",
+      "lines": 98,
+      "sha256": "cda232ed39d370be2a6534a6c975c22d49c216e796a4847bd07cf4f785b1e292"
+    },
+    "skills/heist/scout-prompts.md": {
+      "blob": "50ad4eb73b8c278758260b2f02a6ebe4e2e42582",
+      "bytes": 5847,
+      "git_mode": "100644",
+      "lines": 145,
+      "sha256": "a0a3ba711d46ef1949165fc3a51a867063866be3ced05f4174449aeda4128378"
+    },
+    "skills/index/SKILL.md": {
+      "blob": "2348ff8baf1b7e1fdbdd0aa21f5431294da96537",
+      "bytes": 6399,
+      "git_mode": "100644",
+      "lines": 129,
+      "sha256": "44851ee110f8eb704066d953c31dee50987e520e32edc5e864d728b858964ce8"
+    },
+    "skills/init-project/SKILL.md": {
+      "blob": "3c77bc701a27e6dbcf43858003cb7de4bc8d00eb",
+      "bytes": 14803,
+      "git_mode": "100644",
+      "lines": 253,
+      "sha256": "f05ff7e05d20d025f5cf18ff7033ec887a0e157d49b105bb59dfb231e264142c"
+    },
+    "skills/init-project/cache-checks.md": {
+      "blob": "339e0a286c92e21f4bf34efe8af741fbd4b7e5c0",
+      "bytes": 5504,
+      "git_mode": "100644",
+      "lines": 107,
+      "sha256": "c4cf865b772c27e29c04cd1467ff029eaa1f49e0c45648a8fb7928e98d10fd04"
+    },
+    "skills/init-project/references/CHANGELOG_TEMPLATE.md": {
+      "blob": "7502a81fe0d1061e0b7a377ba4a25aeb23c58992",
+      "bytes": 659,
+      "git_mode": "100644",
+      "lines": 28,
+      "sha256": "aca0763c2c50b4f8c4687a94c1761a081d95de07172972c8dd6ca498575989f4"
+    },
+    "skills/init-project/references/CLAUDE_MD_TEMPLATE.md": {
+      "blob": "d11c67770c566ac25c0412ae8faa67660ea66fba",
+      "bytes": 3772,
+      "git_mode": "100644",
+      "lines": 114,
+      "sha256": "963784ef78464a7d00edff610b0ba2cc36a10c6ab9de510c3515efbe6b8106e0"
+    },
+    "skills/investigate-app/SKILL.md": {
+      "blob": "125d1f51eb3558e68c366c09e2c1947d6ec767c7",
+      "bytes": 4875,
+      "git_mode": "100644",
+      "lines": 104,
+      "sha256": "efbb2685f21db3d4d6759059b1ba88e63a14563b94889aa327fac216d4bca225"
+    },
+    "skills/investigate-app/defense-in-depth.md": {
+      "blob": "58f1aa3fd56264a28bd7ad4e9b2af6a43f707cdb",
+      "bytes": 2868,
+      "git_mode": "100644",
+      "lines": 85,
+      "sha256": "8176ec60e2e2486763ac6f475de81ec6d4234ee0068a70e6b03bccef293378db"
+    },
+    "skills/investigate-app/evidence-gathering-checklist.md": {
+      "blob": "ad5a1d635de647a1905f811252f362bbd858572d",
+      "bytes": 6093,
+      "git_mode": "100644",
+      "lines": 80,
+      "sha256": "634370dab4c90417a3482fe9c4d72b306e7a97151c54f466ab30178282e1d5c7"
+    },
+    "skills/investigate-app/platform-detection-reference.md": {
+      "blob": "4ae81c4b3b556cbacbd5ee71613997ad46616a07",
+      "bytes": 3026,
+      "git_mode": "100644",
+      "lines": 66,
+      "sha256": "df098450b23fd332316648514b91451c960ccd4671cb4738af88bc2540462bff"
+    },
+    "skills/investigate-app/root-cause-tracing.md": {
+      "blob": "66b8e82d3d32e7ca4ed8290d710e45b3b087a9bf",
+      "bytes": 2487,
+      "git_mode": "100644",
+      "lines": 86,
+      "sha256": "740672e25ef480e907bd2599210877f3a91cbf00ee75f838dbdafa9e2411721e"
+    },
+    "skills/ironclad/SKILL.md": {
+      "blob": "faba1a34a2c73c482588a493996d510c5ca3797b",
+      "bytes": 17110,
+      "git_mode": "100644",
+      "lines": 204,
+      "sha256": "e5bbb6d419bca48b236d909fcebdaff7923f0860a39c01d2f50c5637b0dc41e1"
+    },
+    "skills/ironclad/lenses/align-to-mission.md": {
+      "blob": "74e0ea1adc71329fafaaa9678a0840c98a1886e2",
+      "bytes": 7860,
+      "git_mode": "100644",
+      "lines": 121,
+      "sha256": "ab62e9cf77c26338f3e89acfef52751d4093109a00388e32537f3423d2bfda04"
+    },
+    "skills/ironclad/lenses/cost-benefit.md": {
+      "blob": "5929f20f9c939282e1eeb48a27cab4b4b0b3a957",
+      "bytes": 11608,
+      "git_mode": "100644",
+      "lines": 195,
+      "sha256": "879fcc03b19c00b012d57c88f3f55351f306ae7e77ea544229a17f41a97367fc"
+    },
+    "skills/ironclad/lenses/extension-check.md": {
+      "blob": "ac6617efb712323f7f57913375b15ba6d03585ec",
+      "bytes": 9093,
+      "git_mode": "100644",
+      "lines": 153,
+      "sha256": "442b4a288c60f4a38b57073167504a581fb03b1442997213ec4229155d8132de"
+    },
+    "skills/ironclad/lenses/first-principles.md": {
+      "blob": "e30501d3f8cd55c4d53f6149cdb41cee94e40295",
+      "bytes": 8180,
+      "git_mode": "100644",
+      "lines": 130,
+      "sha256": "1ce409973b429cc03fe5bedcde00f0358ae624e435f8aa82c373986f07336592"
+    },
+    "skills/ironclad/lenses/plan-health-audit.md": {
+      "blob": "62606506b7712e928f81fa8f50f301b1761b41dd",
+      "bytes": 16250,
+      "git_mode": "100644",
+      "lines": 265,
+      "sha256": "450e55e6707e8c411cadf6702c69cf87863e3372e5f61a8c2a93031841ae6609"
+    },
+    "skills/ironclad/lenses/precedent-check.md": {
+      "blob": "1300090bc35744dfd3890b802779fe005d512f52",
+      "bytes": 12376,
+      "git_mode": "100644",
+      "lines": 156,
+      "sha256": "b1a78bb8286abe0bd13f9709d5b3fc65d0af087221f5aa118ee9393e49fbc843"
+    },
+    "skills/kindle/SKILL.md": {
+      "blob": "246222b794d0e207047f3da8b0bdbc0901728c1c",
+      "bytes": 10004,
+      "git_mode": "100644",
+      "lines": 108,
+      "sha256": "b64d33679dc20c975627142e51cd7fc64d3ed4f303a9e23ff4aead3e96063764"
+    },
+    "skills/modal/SKILL.md": {
+      "blob": "6c92f99a8a8b39f603749a03b3ed6f67eaed903d",
+      "bytes": 2667,
+      "git_mode": "100644",
+      "lines": 37,
+      "sha256": "1824d51df5943b20fee784330f31e5655299daed0ef7d3c9693e3fa286559068"
+    },
+    "skills/modal/deploy.md": {
+      "blob": "3dac48ca6a24b1eaa2b761efcfb0ec79e4148c97",
+      "bytes": 5239,
+      "git_mode": "100644",
+      "lines": 168,
+      "sha256": "ca592ed19df7fd329a2c6f4f2b7b6355ef68cff4617c2e4f34a81161c7a91fef"
+    },
+    "skills/modal/logs.md": {
+      "blob": "999ff53d086fc5910141296ae815eeba8d54edf2",
+      "bytes": 3778,
+      "git_mode": "100644",
+      "lines": 145,
+      "sha256": "f64f3e00a6d4e2fcb76d280e92f7d29b66ae0aa58c01deb38a112332c7d2f18b"
+    },
+    "skills/modal/status.md": {
+      "blob": "448f8fe7296ad56acf707c589b466f839c0298af",
+      "bytes": 3805,
+      "git_mode": "100644",
+      "lines": 89,
+      "sha256": "c977813cff0df4b114c2d24a4a50a1a299fa0d9e7b47c16033decce383dd409b"
+    },
+    "skills/neon/SKILL.md": {
+      "blob": "5845517ca185a38f8dfd9095c235815579b54830",
+      "bytes": 6394,
+      "git_mode": "100644",
+      "lines": 39,
+      "sha256": "fcb957a3a8b988b4f5777330189dc811310545e12bbd7028fe0dce5851a7195d"
+    },
+    "skills/neon/branch.md": {
+      "blob": "6b202a1d6316edd96afe6c4d04d8598739fd2826",
+      "bytes": 6364,
+      "git_mode": "100644",
+      "lines": 122,
+      "sha256": "768cac4e5185b6dc3501c7327df331d55dae73047adf65aa9fcf103ba115a28e"
+    },
+    "skills/neon/info.md": {
+      "blob": "8e98461a3d6e2e698fe449c299843d7c2bcc0d2e",
+      "bytes": 2345,
+      "git_mode": "100644",
+      "lines": 73,
+      "sha256": "da6ed920169a56109f414c3ac1506b941c91bb592a5410e191c7715bd4a1c793"
+    },
+    "skills/neon/query.md": {
+      "blob": "5bfae12c027ec2ff08fca906e4d9dd9d2c7747cd",
+      "bytes": 3964,
+      "git_mode": "100644",
+      "lines": 116,
+      "sha256": "fae9e39718d38377d5f57ecaea09e7491fd0bb4a271a18528368a17c59f70cc4"
+    },
+    "skills/product-enhance/SKILL.md": {
+      "blob": "2eee0d6788741e340ed49a06534d893c24a66628",
+      "bytes": 9054,
+      "git_mode": "100644",
+      "lines": 188,
+      "sha256": "e5334e180b2b4bf3907a9f665620728ce7df2154fbd6ca1983eb01cdc9dff4d7"
+    },
+    "skills/product-enhance/gap-categories.md": {
+      "blob": "ef1c97a85e7f0c10e41841b7ce0b0af2ec6e8be7",
+      "bytes": 1773,
+      "git_mode": "100644",
+      "lines": 29,
+      "sha256": "656ad5be231c1b62695ed0da8b1aa034d9e97fd37552c5475fa20940c6cf4093"
+    },
+    "skills/product-enhance/intent-interview-questions.md": {
+      "blob": "62b8186974d80911982930fa8d0dc168065c5747",
+      "bytes": 847,
+      "git_mode": "100644",
+      "lines": 25,
+      "sha256": "e36f4c89edaf9ba88946dace3c80aa9a2bee5636be083dcdb29f55ebdc482d04"
+    },
+    "skills/product-vision/SKILL.md": {
+      "blob": "1ac637f080213d9c657c639beaa49e52f822ea1d",
+      "bytes": 10369,
+      "git_mode": "100644",
+      "lines": 222,
+      "sha256": "8ce6a76eb0f174090d45e105aa055c5b8073d623a540b8a3695fcbcd5a378733"
+    },
+    "skills/promotion-intake/SKILL.md": {
+      "blob": "230531544024fc30bddaa9caeb8422580a655beb",
+      "bytes": 5765,
+      "git_mode": "100644",
+      "lines": 90,
+      "sha256": "1832cb7fd6b9adec0b059f41ff8adf205a8ba0a129b265cb7137d6f84f0cdb01"
+    },
+    "skills/publish/SKILL.md": {
+      "blob": "7a9fa41a3786a4c6397c0e3c321c5f42d6984fa2",
+      "bytes": 20230,
+      "git_mode": "100644",
+      "lines": 267,
+      "sha256": "eba33f6e87af101f2fff3dcf2da3c187911be5397c93a313998e033cd0f974f9"
+    },
+    "skills/qa/SKILL.md": {
+      "blob": "4caef9047dcfe08f63a9fae2f4382f016973e950",
+      "bytes": 14040,
+      "git_mode": "100644",
+      "lines": 263,
+      "sha256": "716fd709dc756776bf1e405cf3d201c238868af1ebffc0e6bb6d154c5dfc4830"
+    },
+    "skills/qa/crawl-checklist.md": {
+      "blob": "a5ce387f16aff0bd68ab5509e1b0025aa6c82369",
+      "bytes": 3212,
+      "git_mode": "100644",
+      "lines": 72,
+      "sha256": "9dd6771daa6c22b5e0a929d768f6e363d0bdf2dcef862f977667e85d935af3a1"
+    },
+    "skills/qa/deep-crawl.md": {
+      "blob": "7fe5b9f268ff9502473ac4ea6458002fb28b8a9b",
+      "bytes": 8703,
+      "git_mode": "100644",
+      "lines": 165,
+      "sha256": "2029baf1e9631d7ef1e0626c31778bba5179a7e902b2d8d1f0e707df92117b72"
+    },
+    "skills/qa/design-token-rules.md": {
+      "blob": "66d1be1e134efca80de2996fdc7765ef453bf2f0",
+      "bytes": 4187,
+      "git_mode": "100644",
+      "lines": 106,
+      "sha256": "0ae843b14083ecbab05524f105eec5271a0ddddd78be5dca329ebf281ecc9fd8"
+    },
+    "skills/railway/SKILL.md": {
+      "blob": "069ac4d58bc8dc2da83075a2a46b394eb8088c8d",
+      "bytes": 2378,
+      "git_mode": "100644",
+      "lines": 38,
+      "sha256": "bd344a862fa12e225634602d5b0e37facd344c2571b7da7521da1018b80a05dc"
+    },
+    "skills/railway/deploy.md": {
+      "blob": "f5a489a3fe8891dd5051185b8b38740793facc9d",
+      "bytes": 4503,
+      "git_mode": "100644",
+      "lines": 125,
+      "sha256": "bdccd10a3655c1e1151160bf8b196c64e2b3f126e0470e0be70989a8a458b1ed"
+    },
+    "skills/railway/logs.md": {
+      "blob": "5a7ba007c0e7fed27a882dc76871f79ba5472760",
+      "bytes": 2838,
+      "git_mode": "100644",
+      "lines": 100,
+      "sha256": "8e0f9295cea6c5a294a69ac6e99855e051adce93c529c625bd76deeb30c3a6e0"
+    },
+    "skills/railway/status.md": {
+      "blob": "70379c3ae0eb5f4f6e1bd2c6605761c4c36a2302",
+      "bytes": 3583,
+      "git_mode": "100644",
+      "lines": 86,
+      "sha256": "5e86bb8f3e5a490bd390c4047835927e8787333ea27b796bce60e74ac44c05ab"
+    },
+    "skills/recall/SKILL.md": {
+      "blob": "358e7b9a125c7c04424ce29fc7fd7b711c347f30",
+      "bytes": 12337,
+      "git_mode": "100644",
+      "lines": 139,
+      "sha256": "29447f3b292e23e6299cfc6672ab3efffde5a77904de499dcc239703de310524"
+    },
+    "skills/review-work/SKILL.md": {
+      "blob": "19367d55587175c1d1c5f041b7a7ff57c328aff9",
+      "bytes": 2485,
+      "git_mode": "100644",
+      "lines": 41,
+      "sha256": "06cd17a444d6570f1d75136d16a819332d689734d7c0d3ecbd6fb2df05d84670"
+    },
+    "skills/review-work/changes.md": {
+      "blob": "acc314aaad2ee499cbd8d140ce8f4caf76101ae8",
+      "bytes": 3559,
+      "git_mode": "100644",
+      "lines": 54,
+      "sha256": "9195d27b4bdbcd3227c31c4295364b5345d70a461251f3aee96e3b6480d78247"
+    },
+    "skills/review-work/multi-pr.md": {
+      "blob": "8d5fa7bd901dd207d6fd2ac4296f7c68abcdbbb7",
+      "bytes": 4978,
+      "git_mode": "100644",
+      "lines": 57,
+      "sha256": "ead0c7f91bb982648aedda47ca950771ef900718f441367715630269f39abdaa"
+    },
+    "skills/review-work/pr.md": {
+      "blob": "af6ffd5274600c8e06a11d07eec2eb3e7a58c9fe",
+      "bytes": 4659,
+      "git_mode": "100644",
+      "lines": 53,
+      "sha256": "b64f0130013efc1a400f688a415e5a7bb86d062eb2717bce56801372c99ca4f9"
+    },
+    "skills/review-work/red-flags-and-rationalizations.md": {
+      "blob": "bf6443bc04568946144c480e4d0e829d6b12e874",
+      "bytes": 3408,
+      "git_mode": "100644",
+      "lines": 30,
+      "sha256": "3e96dcfbca993c3a27dc8fe9bf28a1890f6500d990228ae68073392e13a8f55b"
+    },
+    "skills/review-work/review-dimensions.md": {
+      "blob": "783df91a2225766be091b86de5b952adeff89cbd",
+      "bytes": 1082,
+      "git_mode": "100644",
+      "lines": 16,
+      "sha256": "c3c17dc6fe0eb32014129b13651fe82ef5ccfa9d28b78141959847cc426add45"
+    },
+    "skills/review-work/severity-categories.md": {
+      "blob": "a7a9055d51224e138f1fc51537902168aa7b7784",
+      "bytes": 745,
+      "git_mode": "100644",
+      "lines": 16,
+      "sha256": "2046f9b7d311c6bf588502261b181fab31a1a977dafec76f5e5335e4064eb286"
+    },
+    "skills/session/SKILL.md": {
+      "blob": "b60b85b97b4cd638ea32b048e18a16e5772b4bee",
+      "bytes": 4264,
+      "git_mode": "100644",
+      "lines": 41,
+      "sha256": "f376a68d4e4144a2f934d8de1be4319e27693c605124df8c8bfb60b6b0b192d1"
+    },
+    "skills/session/checkpoint.md": {
+      "blob": "0c9a925b61686342b5a786585fa59767e2452451",
+      "bytes": 2975,
+      "git_mode": "100644",
+      "lines": 55,
+      "sha256": "88523a9a02f4fc5d45ddbc5e6886b103026a7bdbc92a94f1eac3d55cb408a3fd"
+    },
+    "skills/session/handoff.md": {
+      "blob": "3fe33ffbf369bc1c13f084789b537f79bbf2f23c",
+      "bytes": 5263,
+      "git_mode": "100644",
+      "lines": 113,
+      "sha256": "ade828dc726b54d1b45e3f90bef1771ac7105fa96479aa4f76bd88203337c999"
+    },
+    "skills/session/history.md": {
+      "blob": "ea438c04503ac8e868b7336f61eefe1545e493da",
+      "bytes": 2057,
+      "git_mode": "100644",
+      "lines": 23,
+      "sha256": "415dc3cb9859437eb9d77658d218c7c8b11f3af6e6f7fd710f50a9dd158b3f72"
+    },
+    "skills/session/name.md": {
+      "blob": "2bc8f628fc7e56cf15ba98daa701eae7ee2193a2",
+      "bytes": 4685,
+      "git_mode": "100644",
+      "lines": 96,
+      "sha256": "edcc36e4c9c1409a745aa21fb46e37296ba3c14a298bd645702420faa1e810b9"
+    },
+    "skills/session/resume.md": {
+      "blob": "088cb4fe85735629567046a2b09df00d61345c59",
+      "bytes": 5800,
+      "git_mode": "100644",
+      "lines": 125,
+      "sha256": "48bac0c65918ab4114d822bb71703d67617ca2c2ed88373f46225dd6a7429209"
+    },
+    "skills/session/templates.md": {
+      "blob": "b1a70ced440bf1f4ba59163eaeafb1cebf4b3788",
+      "bytes": 2759,
+      "git_mode": "100644",
+      "lines": 56,
+      "sha256": "cf1e4c2e59392dcdb74b6d837b1fd607b92487994adeeadeeec187f16eba862b"
+    },
+    "skills/ship/SKILL.md": {
+      "blob": "749e660db536169a7286091c274a7fb1bc780dfc",
+      "bytes": 5964,
+      "git_mode": "100644",
+      "lines": 89,
+      "sha256": "e4471c97a95440fb6b93bbcce441e4771127cc248f0d2f5908eba18a156b47e8"
+    },
+    "skills/skill-scaffold/SKILL.md": {
+      "blob": "ef39870b5450abcb2271205dd50ee37da075b737",
+      "bytes": 5248,
+      "git_mode": "100644",
+      "lines": 144,
+      "sha256": "202908b7c463c6eb7e85a9763a8b7c3139ac3bd37f23ddc7597962ae0c207e74"
+    },
+    "skills/sync-branches/SKILL.md": {
+      "blob": "6734252537ae66265963659cb4b39d65c65539bb",
+      "bytes": 2921,
+      "git_mode": "100644",
+      "lines": 99,
+      "sha256": "02f9ae36bfb400b4fc42872a58c094adf0fc3ceff778d9cecb49c09ab9e8435d"
+    },
+    "skills/using-claudna/SKILL.md": {
+      "blob": "0a5c3acae65b62cdf495ed19fb0d95e80c2056d6",
+      "bytes": 6697,
+      "git_mode": "100644",
+      "lines": 101,
+      "sha256": "1c15ec8cb0e5a2eae82de5a4b285c17f431835548e7af4964f6d8231522f3407"
+    },
+    "skills/vercel/SKILL.md": {
+      "blob": "9791fe29cb3950d2af92bf09bbd36b76a3fe0b5d",
+      "bytes": 2927,
+      "git_mode": "100644",
+      "lines": 37,
+      "sha256": "986179e785327423c52217ab4a26edd2810f4575b1f7e1a80db4af115dd5f843"
+    },
+    "skills/vercel/deploy.md": {
+      "blob": "a6668d174b8d09a652aaab25d00e6fec557281d8",
+      "bytes": 5541,
+      "git_mode": "100644",
+      "lines": 155,
+      "sha256": "55b4060b19c20896f1db9c79b72eb52d3f971404482434771453e2511ade4449"
+    },
+    "skills/vercel/logs.md": {
+      "blob": "26a4cf55b4036c5cce13444a2032044e2ef4a440",
+      "bytes": 4967,
+      "git_mode": "100644",
+      "lines": 187,
+      "sha256": "8834192c4517e874ecb5f167ddf98858a510e4c889a9acfb9795f0ec9f9ce869"
+    },
+    "skills/vercel/status.md": {
+      "blob": "2e2ed1cf5cc943eaa2edf46e3c3e8d8f26e90328",
+      "bytes": 4283,
+      "git_mode": "100644",
+      "lines": 97,
+      "sha256": "f8e68bd8240de7a26a888fccfb1e79f1a9a344db44e3a752ed31175e9d924c14"
+    },
+    "skills/verify-completion/SKILL.md": {
+      "blob": "f769616eefabbb983b01e57edcce2683dafe35eb",
+      "bytes": 5454,
+      "git_mode": "100644",
+      "lines": 118,
+      "sha256": "73b5ae71cb4e9db717c8d172db3dec8bd017174691322630281f35b16acd7c5d"
+    },
+    "skills/weigh-development-paths/SKILL.md": {
+      "blob": "c1662fe1ff1f3924efa5fadfd35e9c374223bdb8",
+      "bytes": 10858,
+      "git_mode": "100644",
+      "lines": 160,
+      "sha256": "729cf2932f3163303b1538e00ecb4e81b8ae5fab2ffee8a5d3bf1f7148f2be44"
+    },
+    "skills/worktree/SKILL.md": {
+      "blob": "d30ed143d4c879138b58fd83790e76198e7082e0",
+      "bytes": 5001,
+      "git_mode": "100644",
+      "lines": 77,
+      "sha256": "41bf573c033447ce24525ad10d7e1503c15ac844d063d08128a77898b4833ad9"
+    },
+    "skills/worktree/bootstrap-commands.md": {
+      "blob": "40cafce7a56102a2f1a457a60c0f2f7571a1283a",
+      "bytes": 974,
+      "git_mode": "100644",
+      "lines": 36,
+      "sha256": "0bb43b2a49fb014977b7ed4af77b01bcb8e5599225af27950eb5fc0184d7f3ae"
+    },
+    "skills/worktree/common-pitfalls.md": {
+      "blob": "1c32188c245e148dda731c5688b91ccad6044946",
+      "bytes": 1565,
+      "git_mode": "100644",
+      "lines": 18,
+      "sha256": "55d5e63a42a78463860eb21d3a56115da92a6f079b47b755d316b3fd47345441"
+    },
+    "skills/worktree/subagent-prompt-template.md": {
+      "blob": "d0fca54b36a2d2afa8d6204cd16f6abcc0f50bda",
+      "bytes": 1594,
+      "git_mode": "100644",
+      "lines": 37,
+      "sha256": "96e49a7a9fab711517a1f060c1a1845613ccb89e2df16394d7687d27bf03d319"
+    }
+  }
+}

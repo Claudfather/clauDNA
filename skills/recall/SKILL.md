@@ -10,6 +10,8 @@ requires:
 
 # Recall
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 Orientation briefing: surface what the fleet and this project already know before you start, so prior decisions and patterns inform the work instead of being rediscovered. Engine-preferred — renders `claudron recall`. Read-only.
 
 First verb in the knowledge lifecycle: **recall → work → capture** (next session recalls what you captured).
@@ -85,6 +87,8 @@ Skip a tier's header entirely when its split is empty — never print a heading 
 With `--full`, additionally read and summarize the top note in each tier from its `path` (vault-relative per §2 — resolve it against the vault `root` already in the Step 0 pre-flight envelope; no fresh `claudron status` call). Never read an Unverified note's body, `--full` or not: its title and provenance are all a briefing shows of it. If `data.notes` is empty, say **"No prior notes recalled"** (conventions may still have shown). Never fabricate notes.
 
 ## Harness memory — re-read on both paths
+
+**On Codex, skip this Claude-only facet entirely.** Use the declared project/vault retrieval above. Do not call the Claude auto-memory resolver or inspect Codex internal memory/configuration. The following steps apply only to Claude Code.
 
 Runs regardless of which retrieval path ran — the harness's per-project auto-memory is a **separate substrate** from the vault. The harness injects this project's `MEMORY.md` **once** at session start, a frozen snapshot: it can miss a topic that only turns relevant later, and it never re-fires if memory changes mid-session (a sibling session, or `/claudna:capture`'s fallback, can write to it while yours is open). So re-read it live on every recall.
 

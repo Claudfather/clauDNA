@@ -2,14 +2,14 @@
 
 ## Cursor Cloud specific instructions
 
-clauDNA is a plugin pack (markdown skills/agents + shell hooks) shipped to Claude Code via the `Claudfather` marketplace and to Cursor via `.cursor-plugin/`. There is **no long-running server or web app** to start — the "application" is the plugin, whose runtime pieces are the shell hooks in `plugin-hooks/`. The development gate is the Python validator/test toolchain.
+clauDNA is a plugin pack (markdown skills/agents + shell hooks) shipped to Claude Code via the `Claudfather` marketplace to Cursor via `.cursor-plugin/`, and to Codex via `.codex-plugin/` (36 curated skills, store hooks and startup briefing; no native agent registration). There is **no long-running server or web app** to start — the "application" is the plugin, whose runtime pieces are the shell hooks in `plugin-hooks/`. The development gate is the Python validator/test toolchain.
 
 `.cursor/environment.json` declares one `install` step, `./.cursor/install.sh`, which runs `make deps` to install the pinned toolchain from `requirements-dev.txt`. **A fresh agent should already be able to run `make check`** — no `start` command and no services, because there is nothing to serve. If `ruff` or `pytest` is missing, the install step did not run (check `/tmp/cursor/async-install/install-user.log`); run `make deps` yourself and carry on.
 
 ### Dev toolchain and the one check-set
 
 - `make check` is the single source of truth for lint/test/validation and is exactly what CI runs (see `.github/workflows/ci.yml` and the `Makefile`). A green `make check` locally == a green CI run. Add or change checks in the `Makefile`, never in the workflow.
-- The check-set runs: `validate-skills.py`, `integration-test.py`, `validate-agents.py`, `validate-manifest.py`, `check-changelog.sh`, `python3 -m ruff check scripts/ tests/`, and `python3 -m pytest tests/`.
+- The check-set runs the deterministic `routing-eval-codex` floor, then: `validate-skills.py`, `integration-test.py`, `validate-agents.py`, `validate-manifest.py`, `check-changelog.sh`, `python3 -m ruff check scripts/ tests/`, and `python3 -m pytest tests/`.
 - `integration-test.py` emits non-fatal warnings (e.g. "missing `## Procedure` heading"); these are expected and do not fail the run. It ends with `OK: N skills passed`.
 - Individual targets exist if you want to scope a run: `make lint`, `make test`, `make check-skills`, `make check-agents`, `make check-manifest`, `make check-changelog`.
 
@@ -22,3 +22,7 @@ clauDNA is a plugin pack (markdown skills/agents + shell hooks) shipped to Claud
   `echo '{"tool_name":"Bash","tool_input":{"command":"git status && ls -la"}}' | bash plugin-hooks/pretooluse-permissions.sh`
 - `pretooluse-permissions.sh` requires `jq` and silently no-ops (exit 0) if it is absent; it emits an `allow` decision, falls through, or emits a `deny` for the gh read-guard shapes (a granted `gh` read that would read the environment or reach a host other than github.com — `plugin-hooks/gh-guard-decide.py`).
 - This repo is the source of truth for the plugin. Do not edit the installed plugin cache under `~/.claude/plugins/cache/...`; make changes here and (for releases) bump `version` in **all three** `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json` and `.codex-plugin/plugin.json` — `scripts/release.sh` updates all three, and `make check-manifest` fails if they disagree.
+
+## Codex source work
+
+Read CLAUDE.md, applicable nested instructions and `skills/_shared/codex-tools.md`. Use actual exposed controls; bundled roles require complete filled prompts and real same-host spawn/wait. Global user settings/auth/plugins are not implementation targets. Claude 39 and Cursor 35 remain unchanged; Codex explicitly selects 36 and six hook handlers. Run fresh checks in isolated exports with private HOME/TMP; preserve baseline failures separately.

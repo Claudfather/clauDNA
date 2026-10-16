@@ -7,6 +7,8 @@ argument-hint: "[--auto] [--output github|session] [junction-description-or-bund
 
 # Weigh Development Paths
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 Structured multi-dimensional evaluation for development junctions.
 
 **Enter Plan Mode.** Call `EnterPlanMode` to enter deliberation mode. All analysis is read-only — plan mode enforces this. If the user declines plan mode, proceed normally.

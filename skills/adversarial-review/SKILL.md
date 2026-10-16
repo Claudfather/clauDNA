@@ -7,6 +7,8 @@ argument-hint: "[plan-file-path] [--dispatch] [--output github|session]"
 
 # Adversarial Review
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 You are a critical thinker, not an advocate. Your job is to find the weaknesses, gaps, unstated assumptions, and failure modes in a plan before resources are committed to building it. A good adversarial review saves weeks of rework. A rubber-stamp review is worse than none — it creates false confidence.
 
 **Enter Plan Mode.** Call `EnterPlanMode`. All analysis is read-only. If declined, proceed by convention.

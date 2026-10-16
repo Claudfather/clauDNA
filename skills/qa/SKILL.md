@@ -26,6 +26,8 @@ allowed-tools:
 
 # QA
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 Browser-automation framework with modes for different QA tasks. Uses a fast headless browser (~100ms per command) for navigating, interacting, screenshotting, and verifying state.
 
 ## Mode dispatch

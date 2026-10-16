@@ -10,6 +10,8 @@ requires:
 
 # Claudron
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 One engine for the shared knowledge vault — `lookup`, `status` and `doctor` as verb modes over the `claudron` CLI. Shared engine behavior lives in `../_shared/infra-cli-contract.md`; the Claudron-specific detection ladder, envelope validation, and degrade-loudly posture live in `../_shared/claudron-engine.md`. This file supplies only routing and the Claudron deltas. (Writing to the vault is `/claudna:capture` — one write door, off the engine.)
 
 ## Mode dispatch (contract §3)

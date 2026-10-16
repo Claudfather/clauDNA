@@ -7,6 +7,8 @@ description: "Use before any creative work — creating features, building compo
 
 # Kindle
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 Light the fire. Turn a raw, unformed idea into a spec a plan can be forged from — through collaborative discovery, not by jumping to implementation.
 
 kindle is the **ideation phase** of clauDNA's planning pipeline:

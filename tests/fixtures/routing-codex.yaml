@@ -1,0 +1,217 @@
+{
+  "method": "catalog_selection",
+  "positives": [
+    {
+      "id": "coverage-adversarial-review",
+      "utterance": "Challenge the assumptions in this design from several critical angles.",
+      "expect": "adversarial-review"
+    },
+    {
+      "id": "coverage-audit",
+      "utterance": "Audit this codebase for security vulnerabilities.",
+      "expect": "audit"
+    },
+    {
+      "id": "coverage-build",
+      "utterance": "Implement this one approved plan document.",
+      "expect": "build"
+    },
+    {
+      "id": "coverage-build-all",
+      "utterance": "Execute these ordered phase plans as one epic.",
+      "expect": "build-all"
+    },
+    {
+      "id": "coverage-capture",
+      "utterance": "Save the durable learning from this session to the vault.",
+      "expect": "capture"
+    },
+    {
+      "id": "coverage-claudron",
+      "utterance": "Look up vault knowledge about retry boundaries.",
+      "expect": "claudron"
+    },
+    {
+      "id": "coverage-dbt",
+      "utterance": "Run the dbt models against Snowflake.",
+      "expect": "dbt"
+    },
+    {
+      "id": "coverage-development-retro",
+      "utterance": "Review what we learned after merging this PR.",
+      "expect": "development-retro"
+    },
+    {
+      "id": "coverage-extract-system-spec",
+      "utterance": "Extract an anonymized system specification from the repository.",
+      "expect": "extract-system-spec"
+    },
+    {
+      "id": "coverage-file-github-issue",
+      "utterance": "File this analyst finding as a GitHub issue with its screenshot.",
+      "expect": "file-github-issue"
+    },
+    {
+      "id": "coverage-find-skills",
+      "utterance": "Find a public third-party skill for spreadsheet analysis.",
+      "expect": "find-skills"
+    },
+    {
+      "id": "coverage-forge",
+      "utterance": "Plan a workstream that spans several PRs and decision forks.",
+      "expect": "forge"
+    },
+    {
+      "id": "coverage-github-activity-report",
+      "utterance": "Report GitHub authors and commit activity for the organization.",
+      "expect": "github-activity-report"
+    },
+    {
+      "id": "coverage-heist",
+      "utterance": "Inspect that repository for reusable workflows we can adopt.",
+      "expect": "heist"
+    },
+    {
+      "id": "coverage-index",
+      "utterance": "Regenerate the documentation INDEX.md.",
+      "expect": "index"
+    },
+    {
+      "id": "coverage-init-project",
+      "utterance": "Initialize shared instructions and changelog for this new project.",
+      "expect": "init-project"
+    },
+    {
+      "id": "coverage-investigate-app",
+      "utterance": "Investigate the production application errors.",
+      "expect": "investigate-app"
+    },
+    {
+      "id": "coverage-ironclad",
+      "utterance": "Harden this implementation plan with independent review lenses.",
+      "expect": "ironclad"
+    },
+    {
+      "id": "coverage-kindle",
+      "utterance": "Explore requirements and intent before creating this feature.",
+      "expect": "kindle"
+    },
+    {
+      "id": "coverage-modal",
+      "utterance": "Deploy the Modal app.",
+      "expect": "modal"
+    },
+    {
+      "id": "coverage-neon",
+      "utterance": "Query the Neon database.",
+      "expect": "neon"
+    },
+    {
+      "id": "coverage-product-enhance",
+      "utterance": "Find product improvements through an architecture-aware gap analysis.",
+      "expect": "product-enhance"
+    },
+    {
+      "id": "coverage-product-vision",
+      "utterance": "Develop the product vision from this repository and mission.",
+      "expect": "product-vision"
+    },
+    {
+      "id": "coverage-publish",
+      "utterance": "Publish this finished review document as a GitHub issue.",
+      "expect": "publish"
+    },
+    {
+      "id": "coverage-qa",
+      "utterance": "Run browser QA against the application.",
+      "expect": "qa"
+    },
+    {
+      "id": "coverage-railway",
+      "utterance": "Show the Railway service logs.",
+      "expect": "railway"
+    },
+    {
+      "id": "coverage-recall",
+      "utterance": "Recall prior project decisions before we start work.",
+      "expect": "recall"
+    },
+    {
+      "id": "coverage-review-work",
+      "utterance": "Review the current uncommitted changes for bugs.",
+      "expect": "review-work"
+    },
+    {
+      "id": "coverage-session",
+      "utterance": "Write a session handoff for the next session.",
+      "expect": "session"
+    },
+    {
+      "id": "coverage-ship",
+      "utterance": "Commit, open a PR and ship the reviewed changes.",
+      "expect": "ship"
+    },
+    {
+      "id": "coverage-sync-branches",
+      "utterance": "Fetch latest main into all existing sibling worktrees.",
+      "expect": "sync-branches"
+    },
+    {
+      "id": "coverage-using-claudna",
+      "utterance": "Check the clauDNA installation health.",
+      "expect": "using-claudna"
+    },
+    {
+      "id": "coverage-vercel",
+      "utterance": "Deploy a Vercel preview.",
+      "expect": "vercel"
+    },
+    {
+      "id": "coverage-verify-completion",
+      "utterance": "Verify completion claims with fresh test evidence.",
+      "expect": "verify-completion"
+    },
+    {
+      "id": "coverage-weigh-development-paths",
+      "utterance": "Compare viable implementation approaches at this decision fork.",
+      "expect": "weigh-development-paths"
+    },
+    {
+      "id": "coverage-worktree",
+      "utterance": "Create an isolated worktree for this feature.",
+      "expect": "worktree"
+    }
+  ],
+  "pairs": [
+    {
+      "id": "pair-build",
+      "utterance": "Implement this one approved plan document end to end.",
+      "expect": "build"
+    },
+    {
+      "id": "pair-build-all",
+      "utterance": "Execute all ordered phase plans in this epic, preserving their dependencies.",
+      "expect": "build-all"
+    },
+    {
+      "id": "pair-capture",
+      "utterance": "Save what this session taught us as durable vault knowledge.",
+      "expect": "capture"
+    },
+    {
+      "id": "pair-recall",
+      "utterance": "Before starting, surface the prior project decisions relevant to this task.",
+      "expect": "recall"
+    },
+    {
+      "id": "pair-worktree",
+      "utterance": "Start feature work in a new isolated git worktree.",
+      "expect": "worktree"
+    },
+    {
+      "id": "pair-sync",
+      "utterance": "Fetch latest main into each existing worktree and branch across sibling repos.",
+      "expect": "sync-branches"
+    }
+  ]
+}

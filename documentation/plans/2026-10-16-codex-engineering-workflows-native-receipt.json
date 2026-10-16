@@ -1,0 +1,178 @@
+{
+  "acceptance": {
+    "mixed_fleet_week": "unperformed; #404 remains open pending #2149 live authority and actual elapsed observation",
+    "routing_contract": "17/18 actual result retained; remaining mode gate unresolved pending independent review",
+    "startup_original_wiring_exit": "not exposed; instrumented exact-package wait is a separate receipt"
+  },
+  "actions": {
+    "handoff": {
+      "completed_commands": 15,
+      "events_sha256": "635538ab10da79a22fae86b76136c298bd09d5e58f9fb81d92f88c8f6e4787f8",
+      "finding_file_line_present": false,
+      "installed_skill_read_observed": true,
+      "marker_received": false,
+      "no_model_tool_calls": false,
+      "skill": "session",
+      "skill_hash": "8d2509473e8697044f3a50197c63c01bc35c04a2eb7611ab6100d368e230a5e5"
+    },
+    "health": {
+      "completed_commands": 5,
+      "events_sha256": "0d72aaf83cb8454424570058ae1abb61defd3d924808e4da76ec812d0dc21c03",
+      "finding_file_line_present": false,
+      "installed_skill_read_observed": true,
+      "marker_received": false,
+      "no_model_tool_calls": false,
+      "skill": "using-claudna",
+      "skill_hash": "ee7c14088d275062f995cb8d782f6667ba3b298817e614cc780228b639128b06"
+    },
+    "native-unhinted": {
+      "completed_commands": 4,
+      "events_sha256": "7b7b05612654677a441b20bf2979862df6f43feebf1e1e7f8bf7235db9441eb4",
+      "finding_file_line_present": true,
+      "installed_skill_read_observed": true,
+      "marker_received": false,
+      "no_model_tool_calls": false,
+      "skill": "review-work",
+      "skill_hash": "04a528866edcaf820417a797723661ddde8993fe9b792e1b25d22c22f9c0a284"
+    },
+    "resume": {
+      "completed_commands": 14,
+      "events_sha256": "5707f5c5f2ddd6ad50fb68de8d392cabc3ef330f31687c1480e49aec9d8615ce",
+      "finding_file_line_present": false,
+      "installed_skill_read_observed": true,
+      "marker_received": false,
+      "no_model_tool_calls": false,
+      "skill": "session",
+      "skill_hash": "8d2509473e8697044f3a50197c63c01bc35c04a2eb7611ab6100d368e230a5e5"
+    },
+    "review": {
+      "completed_commands": 5,
+      "events_sha256": "2aebc703ad058a9f2781127045fb2d049a7d85fe764e07027eecd4514c4712b6",
+      "finding_file_line_present": true,
+      "installed_skill_read_observed": true,
+      "marker_received": false,
+      "no_model_tool_calls": false,
+      "skill": "review-work",
+      "skill_hash": "04a528866edcaf820417a797723661ddde8993fe9b792e1b25d22c22f9c0a284"
+    },
+    "verify": {
+      "completed_commands": 4,
+      "events_sha256": "225a9a7095965a2d9ce706541ec4786b9595514e27cc21a8c087d5ca7e131bad",
+      "finding_file_line_present": true,
+      "installed_skill_read_observed": true,
+      "marker_received": false,
+      "no_model_tool_calls": false,
+      "skill": "verify-completion",
+      "skill_hash": "2aaa73e1bd4dbca2e41ab2173605fb7d91e95b5f858f2adeb271c879c72912bd"
+    }
+  },
+  "execution_host": "native Codex CLI 0.162.0-alpha.17.2",
+  "historical_native_source_manifest_sha256": "68fd5bdb7c885a043b9b3af616aeccc13c86be6dbfa21ce8d129873a1b289b68",
+  "kind": "claudna-404-sanitized-native-receipt",
+  "native_discovery": {
+    "agent_component": "explicit inert directory; no native agent-list API claim",
+    "handlers": 6,
+    "installed_source_bytes_git_modes_equal": true,
+    "skills": 36,
+    "trust": "untrusted"
+  },
+  "native_dispatch": {
+    "actual_spawn_function": "spawn_agent",
+    "actual_wait_function": "wait_agent",
+    "child_file_line_finding": true,
+    "child_rollout_sha256": "3dc4dd42bc81eead9604223f734a597f34187e29ea79e5bbed6babc3730b23e0",
+    "distinct_child_rollout_present": true,
+    "execution_host": "native Codex CLI 0.162.0-alpha.17.2",
+    "filled_plaintext_prompt_sha256": "f953849f94f60d25be5abfd854a76209684b94982e29a2c5099a24824938f6c4",
+    "fork_turns": "none",
+    "installed_role_sha256": "260d1778677c62d58a74520cea6278f075e3fa4e7e3fdb0af4e6ecdef46639ed",
+    "limitation": "Native spawn payload is sealed encrypted_content. Plaintext prompt byte identity in the child cannot be asserted from rollout; fully filled expected role is in fresh parent input, and actual sealed delivery is linked.",
+    "observed_models": [
+      "gpt-6.1-sol"
+    ],
+    "parent_rollout_sha256": "a1671a92e9e68abbfa6363fc0bdee71caa3a9a411782ba097577192f7f186e5b",
+    "spawn_sealed_payload_equals_child_received_payload": true,
+    "wait_completed_without_timeout": true
+  },
+  "privacy": {
+    "global_auth_config_plugins_or_trust_written": false,
+    "original_auth_config_metadata_unchanged": true,
+    "private_auth_only_reuse": true,
+    "raw_auth_prompt_tool_content_exported": false
+  },
+  "selection_epochs": {
+    "description_only": {
+      "attempts": 18,
+      "exact_missed_modes": "unavailable; normalized null is not original mode",
+      "passed": 16,
+      "report_sha256": "4b7d2ca01f8f85e3482c77a10b59b6ab06d12b9262518be7db17192f15f0af30"
+    },
+    "installed_metadata_with_invocation_hints": {
+      "additional_inference": "held for independent contract review",
+      "attempts": 18,
+      "passed": 17,
+      "raw_responses_retained": true,
+      "remaining_actual_choice": {
+        "mode": "first-principles",
+        "skill": "ironclad"
+      },
+      "remaining_expected_mode": "--lens",
+      "report_sha256": "d3284d4a7298de296392d4417073425bfd4766f3abcfc28891c4de5c5f5cbfb8"
+    },
+    "invocation_suffix_contract": {
+      "attempts": 18,
+      "gate": "unresolved; no release or further inference from this result",
+      "passed": 17,
+      "raw_responses_retained": true,
+      "remaining_actual_choice": {
+        "mode": null,
+        "skill": "ironclad"
+      },
+      "remaining_expected_mode": "--lens",
+      "report_sha256": "5d17d4b3a4701fe6020c15451506f5a83f25ee814738c5f9851f6a655ff984c9",
+      "runner_sha256": "d2280cfe1e513879fc70088792f0f2fe8acba37462ac0102387c9ffb227e5e4c"
+    }
+  },
+  "selection_review_disposition": {
+    "independent_spec_review": "bounded exact-mode selection limitation; utterance does not uniquely require single-lens route",
+    "null_reason": "not present in raw events; not inferred",
+    "release_eligibility": "requires all actual hard gates and independent source/evidence review; not claimed from selection score",
+    "rescored_or_waived": false,
+    "unchanged_failed_oracle": true
+  },
+  "source_base": "3c56fb6c6b3e01546ee264e684a383d741a0a497",
+  "startup": {
+    "current_source_and_installed_script_equal": true,
+    "current_source_and_original_installed_hook_wiring_equal": true,
+    "instrumented_native_exec": {
+      "actual_packaged_stdout_contains_marker": true,
+      "exact_packaged_argv_recorded": true,
+      "model_received_same_marker": true,
+      "native_rc": 0,
+      "original_wiring_exit_claimed": false,
+      "package_bytes_before_after_equal": true,
+      "package_source_hash": "e9f2643e71fb4bc20e5c11b3d32ece354907019f403835a89bd6a2308f75b337",
+      "packaged_script_rc": 0,
+      "private_wiring_fixture_removed": true,
+      "report_sha256": "b8d655cd8a4a80848f42e03960d79c711f41cc650539de0e6fdca4411678a118"
+    },
+    "limitations": [
+      "Native appserver thread/start did not fire the startup hook; its absent marker is retained.",
+      "BASH_ENV observation produced no entry/exit receipt; retained, not treated as execution proof.",
+      "Original standalone native wiring delivered the marker without tools; its exit status was not exposed.",
+      "Exact packaged argv/owned wait rc came from separately instrumented private native wiring; do not transfer that rc to original wiring."
+    ],
+    "original_native_exec": {
+      "actual_marker_absent_from_prompt": true,
+      "completed_commands": 0,
+      "events_sha256": "11265529597e6aceef3d533f6baaffca775cdef2aba482d2c6fd947dfd4af5cd",
+      "finding_file_line_present": false,
+      "hook_exit_receipt_available": false,
+      "installed_skill_read_observed": false,
+      "marker_received": true,
+      "no_model_tool_calls": true,
+      "skill": null,
+      "skill_hash": null
+    }
+  }
+}

@@ -13,6 +13,6 @@
 | Import/runtime errors in worktree | Worktrees lack venvs, node_modules, .env — bootstrap first |
 | Main repo venv but imports fail | Package isn't installed in that venv — run `./venv/bin/pip install -e .` from worktree |
 | Orchestrator running commands in worktree dirs | Triggers permission prompts — delegate to subagents |
-| `gh pr merge --delete-branch` fails | Remove worktrees BEFORE merging — can't delete checked-out branches |
+| `gh pr merge --delete-branch` fails | Remove only authorized task-created scratch worktrees; otherwise omit branch deletion and preserve the checkout |
 | Second/third PR has merge conflicts | Rebase on updated main after each prior merge |
 | Running `/claudna:worktree` from inside a worktree | `--show-toplevel` returns worktree root — use `git worktree list` to find main repo |

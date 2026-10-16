@@ -10,6 +10,8 @@ requires:
 
 # Index
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 Scan, validate, and index shared documentation. INDEX.md is the discovery layer — other bots scan it to find relevant docs without reading every file.
 
 **This skill is the SOLE writer of INDEX.md files.** Other skills (/claudna:capture, /claudna:publish) create or update docs, then call /claudna:index to regenerate the index.

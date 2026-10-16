@@ -37,6 +37,8 @@ Then show only the branch's own fields (the file also holds its connection strin
 jq '(.branch // .) | {id, name, parent_id, created_at}' <scratch>/create.json
 ```
 
+Record the exact branch ID and name from each successful create response, its project/org and parent in the private task receipt. Cleanup uses that recorded branch ID only after ownership/identity readback; a prefix is never ownership evidence.
+
 Name conventions:
 - `claude/<purpose>` — for agent-created branches (e.g., `claude/debug-issue-123-2026-02-12`)
 - `dev/<feature>` — for development work
@@ -65,13 +67,13 @@ Working on more than one branch: one URL file per branch (`<scratch>/<name>.url`
 
 ### Delete branch — destructive, gated (contract §5)
 
-Present the §6 boxed summary (branch name, project, what is discarded) and ask "Ready to delete? (y/n)" — do not proceed without an explicit yes. No exceptions: `claude/*` cleanup branches gate too — "created this session" is unverifiable state (a compaction or a teammate's same-named branch makes it wrong), and contract §5 permits no ungated destructive operations. Batch the cleanup: one summary listing every `claude/*` branch to delete, one confirmation.
+Present the §6 boxed summary (branch name, project, what is discarded) and ask "Ready to delete? (y/n)" — do not proceed without an explicit yes. No exceptions: `claude/*` cleanup branches gate too — "created this session" alone is unverifiable state (a compaction or a teammate's same-named branch makes it wrong), and contract §5 permits no ungated destructive operations. Batch the cleanup: one summary listing only recorded task-created branch IDs whose ownership/identity readback matches the receipt, one confirmation. Never select cleanup targets by prefix or from every branch in a listing; preserve existing, foreign and ambiguous branches.
 
 ```bash
 <NEON> branches delete "<branch-name>" --project-id "<PROJECT_ID>" --org-id "<ORG_ID>"
 ```
 
-**Always clean up agent-created branches when done**, then remove the connection strings: `rm -r <scratch>`.
+Clean up only the recorded task-owned disposable branches after the gate, then remove only this task's private connection-string scratch directory: `rm -r <scratch>`.
 
 ### Reset branch — destructive, gated (contract §5)
 
@@ -110,8 +112,10 @@ python3 "<claudna-root>/scripts/env_from_file.py" --url-file <scratch>/branch.ur
 ```
 
 **Step 4: Clean up when done**
+
+Apply the destructive gate above to the recorded exact branch ID after ownership readback; do not use a same-named pre-existing branch.
 ```bash
-<NEON> branches delete "claude/experiment-..." --project-id "<PROJECT_ID>" --org-id "<ORG_ID>"
+<NEON> branches delete "<recorded-branch-id>" --project-id "<PROJECT_ID>" --org-id "<ORG_ID>"
 ```
 ```bash
 rm -r <scratch>
@@ -119,4 +123,4 @@ rm -r <scratch>
 
 ## Limits
 
-Neon free tier allows up to 10 branches. Check current branch count before creating new ones. Always delete `claude/*` branches when analysis is complete.
+Neon free tier allows up to 10 branches. Check current branch count before creating new ones. Capacity pressure does not authorize cleanup of existing/foreign branches. Delete only receipt-verified task-owned disposable branches after the destructive gate.

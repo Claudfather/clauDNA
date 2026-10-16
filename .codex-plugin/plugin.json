@@ -1,7 +1,7 @@
 {
   "name": "claudna",
   "version": "0.29.0",
-  "description": "Curated Claude Code skills, agents, and hooks \u2014 the canonical capability set of the Claudfather ecosystem.",
+  "description": "Curated engineering skills and session-store/startup hooks for Codex; specialist roles are read-and-dispatch prompts.",
   "author": {
     "name": "Chris Rogers",
     "url": "https://github.com/Claudfather"
@@ -22,6 +22,43 @@
     "neon",
     "dbt"
   ],
-  "skills": "./.codex-plugin/store-only",
+  "skills": [
+    "./skills/adversarial-review",
+    "./skills/audit",
+    "./skills/build",
+    "./skills/build-all",
+    "./skills/capture",
+    "./skills/claudron",
+    "./skills/dbt",
+    "./skills/development-retro",
+    "./skills/extract-system-spec",
+    "./skills/file-github-issue",
+    "./skills/find-skills",
+    "./skills/forge",
+    "./skills/github-activity-report",
+    "./skills/heist",
+    "./skills/index",
+    "./skills/init-project",
+    "./skills/investigate-app",
+    "./skills/ironclad",
+    "./skills/kindle",
+    "./skills/modal",
+    "./skills/neon",
+    "./skills/product-enhance",
+    "./skills/product-vision",
+    "./skills/publish",
+    "./skills/qa",
+    "./skills/railway",
+    "./skills/recall",
+    "./skills/review-work",
+    "./skills/session",
+    "./skills/ship",
+    "./skills/sync-branches",
+    "./skills/using-claudna",
+    "./skills/vercel",
+    "./skills/verify-completion",
+    "./skills/weigh-development-paths",
+    "./skills/worktree"
+  ],
   "agents": "./.codex-plugin/store-only"
 }

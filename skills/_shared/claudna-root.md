@@ -7,10 +7,10 @@ Shared reference for skills that run a bundled script, or that forward a `_share
 <!-- claudna-root:begin -->
 Use the first of these candidates that contains the file you need:
 
-1. **The path Claude Code filled in for `${CLAUDE_PLUGIN_ROOT}`.** Claude Code does this only in a `SKILL.md` body, fenced blocks included. In any other file the variable stays literal, and the shell never has it set.
-2. **`$CLAUDNA_ROOT`**, when your host or operator sets it.
-3. **`<skill-dir>/../..`**, two directories above the directory of the skill you are running. Claude Code prints that directory as "Base directory for this skill"; any other host knows where it loaded `SKILL.md` from.
-4. **The highest-versioned `~/.claude/plugins/cache/Claudfather/claudna/*/`**, Claude Code's plugin cache. Compare the version directories as version numbers, not as text: `0.19.0` is above `0.9.0` (`sort -V` orders them so). It comes last because it can hold a newer copy than the one that is loaded.
+1. **Claude Code only: the path filled in for `${CLAUDE_PLUGIN_ROOT}` in the loaded `SKILL.md` body.** This expansion is not an ordinary shell variable. Skip a literal, unfilled value; Codex must not use this Claude-only expansion candidate.
+2. **`$CLAUDNA_ROOT`**, when explicitly set by the operator, or a host-provided `PLUGIN_ROOT`/`CLAUDE_PLUGIN_ROOT` when actually set. Validate the needed bundled file before accepting this override. Ordinary skill shells must not assume a hook environment exists.
+3. **`<skill-dir>/../..`**, derived from the actual absolute path of the loaded skill. This is the default on Codex when no valid operator override exists. Keep spaces intact; never infer this path from cwd.
+4. **Claude Code only: the highest-versioned `~/.claude/plugins/cache/Claudfather/claudna/*/`.** Compare the version directories as version numbers, not as text: `0.19.0` is above `0.9.0`. Codex must not use the Claude cache fallback; it could select an unrelated or unloaded copy.
 
-If none of them contains the file, stop and say so. Never fall back to a path in the working directory, which is the user's project, not this plugin. Write the resolved absolute path into the command, and keep the command a bare one. In a prompt you forward to another agent, replace `<claudna-root>` with the absolute path before you send it, because the receiving agent has no skill directory to resolve against.
+If none of them contains the file, stop and say so. Never fall back to a path in the working directory, which is the user's project, not this plugin. Substitute the resolved absolute root and quote paths in commands. Before forwarding a prompt, replace every `<claudna-root>` with that root and fill all task placeholders; the receiving agent cannot resolve the caller's installation.
 <!-- claudna-root:end -->

@@ -1,5 +1,7 @@
 # Shared Orchestration Guide
 
+**Codex:** Read `../_shared/codex-tools.md` before dispatch. Required independent review cannot be replaced by an inline self-review.
+
 Shared reference for skills that use subagent orchestration to produce design documents. This file is not a skill — it has no `SKILL.md` and does not appear in skill listings. Skills reference it by telling subagents to read it from disk at `../_shared/orchestration-guide.md`.
 
 ---

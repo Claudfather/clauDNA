@@ -10,6 +10,8 @@ requires:
 
 # File an issue
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 Turn a screenshot + a short description into a well-structured GitHub issue on the target repo. Images are committed to a user-configured public attachments repo (set via the `CLAUDNA_ATTACHMENTS_REPO=<owner>/<repo>` env var) and embedded in the issue body via their raw URLs. If no attachments repo is configured, the skill prompts once and falls back to embedding the screenshot's local file path in the issue body.
 
 **Reference files:**

@@ -7,6 +7,8 @@ description: Use when executing multiple phase or plan docs as one ordered works
 
 # Build All
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout. For every simplify step, use `../_shared/subagent-prompts/simplify-codex.md` instead of the Claude native command or rollback instructions.
+
 Drive an epic's worth of phase docs as one governed run: ordered phases, each executed and shipped through the existing single-phase skills, with sprint-level state — invariants, merge topology, review convergence, deploy reachability — owned here, because no single-phase skill can see it.
 
 **Core principle:** a sprint is not N independent phases. Everything this skill adds is cross-phase state; everything per-phase is delegated.

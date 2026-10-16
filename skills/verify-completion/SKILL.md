@@ -6,6 +6,8 @@ description: "Use when about to claim work is complete, fixed, or passing -- req
 
 # Verify Completion
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 ## The Iron Law
 
 NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE

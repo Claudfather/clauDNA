@@ -850,15 +850,38 @@ The clauDNA project template (`project-template/CLAUDE.md`) embeds these princip
 **End of guide.** For day-to-day usage of skills, see the [README](./README.md). For the changelog, see [CHANGELOG.md](./CHANGELOG.md).
 
 
-## Codex session-store hooks
+## Codex workflows and continuity
 
-Codex's `Claudfather/claudna` plugin currently provides only session-store hooks. Skills and agents remain outside this adapter release. The native 0.162 canary verified local packaged hook execution; the release carries `.agents/plugins/marketplace.json` and `.codex-plugin/plugin.json` for the same marketplace identity.
+The `Claudfather/claudna` Codex plugin selects 36 engineering skills explicitly,
+plus five store handlers and a startup-only briefing. It excludes Claude-only
+`cleanup-legacy-install` and repo-clone `promotion-intake`/`skill-scaffold`.
+Bundled agent prompts map to a read-and-dispatch procedure. Support requires
+actual same-host controls and the required fixture proof on that execution host;
+unsupported routes remain explicit. No `.codex/agents` or global configuration is
+written.
 
-```bash
-codex plugin marketplace add Claudfather/clauDNA
-codex plugin add claudna@Claudfather
-```
+Use Codex's supported plugin marketplace interface to add `Claudfather/clauDNA`
+and install `claudna@Claudfather`; `.agents/plugins/marketplace.json` preserves
+that identity. Run `using-claudna health` through the host's skill interface for
+local scope, version and dependency checks. Read its linked Codex adapter before
+workflow actions. Native discovery must show precisely the declared skill set.
 
-Installation does not trust hook commands. Inspect the installed commands in Codex's `/hooks` interface and approve them there before expecting store events. The plugin never edits user settings or grants itself trust. Codex SessionEnd uses a 3-second handler timeout. Store commands use `PLUGIN_ROOT`, the native plugin-root environment variable, and explicitly select `--host codex`. Direct hooks default to Claude for compatibility; consumers must choose Codex explicitly rather than sniffing environment variables.
+Installation does not trust hook commands. Inspect commands in Codex's `/hooks`
+interface and approve the intended installed commands there as a separate operator
+action. Startup briefing matches only `startup` and uses timeout 5; SessionEnd
+retains timeout 3. The other store commands and their matchers are unchanged.
+Commands use quoted `PLUGIN_ROOT`; store handlers explicitly choose `--host codex`.
+Default direct store calls remain Claude-compatible. No permission, notification,
+formatting or compact capture prompt is ported by this change.
 
-The same session-store switches apply (`CLAUDNA_SESSION_STORE=0`, `CLAUDNA_SESSION_SUMMARY=0`, `CLAUDNA_HARVEST=0`). Detached summarization still requires the existing Claude runner; a Codex-only machine does not acquire a new model provider. See the [measured adapter plan](documentation/plans/2026-10-16-codex-session-store-adapter.md) and [phase-3 canary table](documentation/plans/2026-09-30-session-store-phase-3.md).
+The existing per-cwd `.claude/session.md` remains the cross-runtime handoff artifact.
+It is untrusted continuity data, never instructions overriding the current task.
+Set `CLAUDNA_SESSION_BRIEFING=0` to opt out of the startup briefing. Existing store
+switches remain `CLAUDNA_SESSION_STORE=0`, `CLAUDNA_SESSION_SUMMARY=0` and
+`CLAUDNA_HARVEST=0`. Detached summarization still uses the existing Claude runner;
+Codex installation does not add a summarizer provider.
+
+Declared/discovered hooks, trusted commands, actual firing and stdout context
+delivery are separate evidence. Local canaries do not establish a live mixed-fleet
+week; see the [workflow plan](documentation/plans/2026-10-16-codex-engineering-workflows.md)
+and [store adapter plan](documentation/plans/2026-10-16-codex-session-store-adapter.md).

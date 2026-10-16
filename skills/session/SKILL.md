@@ -8,6 +8,8 @@ allowed-tools: Bash(git status *), Bash(git branch *), Bash(git log *), Bash(git
 
 # Session
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 One engine for session continuity — `handoff`, `resume`, `name`, and `checkpoint` as verb modes over the per-cwd substrate: `<cwd>/.claude/session.md`, reaped by `../_shared/reaper-rules.md`. Session continuity only — durable knowledge capture is `/claudna:capture` territory.
 
 ## Mode dispatch

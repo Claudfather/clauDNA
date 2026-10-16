@@ -10,6 +10,8 @@ requires:
 
 # Capture
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 The write door to the vault. One domain, four input shapes — you save **what you wrote**, ingest **something external** (a URL, a file), or, on a **bare invocation**, distill **the current session's learnings**. Everything terminates in `claudron capture`; the engine dedups, ranks, and stamps maturity. Mutating.
 
 Second verb in the knowledge lifecycle: recall → work → **capture** (next session recalls what you captured).
@@ -76,7 +78,7 @@ What survives becomes the note body (Step 3); type is `knowledge`. Scope default
 
 ## Step 2: Boundary check
 
-If the content is **skill-shaped** — an imperative how-to, a reusable procedure, a list of steps meant to be executed — it does not belong in the vault (the type enum excludes `skill` by design). Stop and point at `/claudna:skill-scaffold`. The vault holds knowledge / decisions / runbooks / plans / audits / reviews, not executable skills.
+If the content is **skill-shaped** — an imperative how-to, a reusable procedure, a list of steps meant to be executed — it does not belong in the vault (the type enum excludes `skill` by design). On Codex, explain that executable procedures belong in a clauDNA source checkout and its contribution workflow; `skill-scaffold` requires that source checkout and is excluded from the installed Codex catalog. On Claude Code, stop and point at `/claudna:skill-scaffold`. The vault holds knowledge / decisions / runbooks / plans / audits / reviews, not executable skills.
 
 ## Step 3: Shape the note
 

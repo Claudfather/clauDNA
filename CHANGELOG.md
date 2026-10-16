@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Codex engineering workflows** explicitly select 36 existing skills, map real host tools and bundled role dispatch, provide a four-lens simplification procedure, and preserve project handoff compatibility. A startup-only briefing joins the unchanged store handlers. Deterministic catalog-choice checks are separate from live selection, native loading and independent reviewer evidence. Claude's 39 skills and Cursor's 35 remain unchanged; native agent registration and global configuration writes remain excluded (#404).
+
+
 ## [0.29.0] - 2026-10-16
 
 ### Added

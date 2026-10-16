@@ -7,6 +7,8 @@ argument-hint: "[workspace-root]"
 
 # Sync Branches
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 Fetch latest origin/main and merge into all active local branches and worktrees, across every sibling repo in the workspace. Designed to run manually or on a recurring interval via `/loop 2h /claudna:sync-branches`.
 
 **Important**: This assumes a multi-repo workspace — each sibling directory under the workspace root has its own `.git`. Iterate over all of them, not just the current repo.

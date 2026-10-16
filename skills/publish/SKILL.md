@@ -10,6 +10,8 @@ requires:
 
 # Publish
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 Markdown-first, output-last. Takes a doc with frontmatter and publishes it to the right destination. The doc is always the source of truth — /claudna:publish is just the adapter.
 
 **This skill is the single output sink.** Analysis/planning skills are *authors*: they produce a markdown doc with valid frontmatter and the house-style body skeleton, then hand it to /claudna:publish. /claudna:publish is the *publisher*: it enforces house style, dedups per-medium, and routes the one manuscript to whichever edition the caller asked for. Skills must never call `gh issue create` / `gh pr create` themselves — they delegate here. The canonical house-style spec (frontmatter schema, per-type body skeleton, label taxonomy) lives in `../_shared/output-guide.md`; this skill enforces it.

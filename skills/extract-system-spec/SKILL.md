@@ -7,6 +7,8 @@ argument-hint: "[full-system | wing <name> | targeted <scope>] [--budget <tokens
 
 # Extract System Spec
 
+> **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
+
 Produce a single, standalone, anonymized Markdown specification from which a capable team could rebuild a system from scratch — without the original repo. Orchestrator + subagents; coverage-gated; hard-anonymized; adversarially reviewed. The full 6-phase method lives in `extraction-prompt.md` in this skill directory; this file governs *when* to run it, at *what scope*, and at *what cost*.
 
 ## When to use this — and when NOT

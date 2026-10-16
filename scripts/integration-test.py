@@ -117,6 +117,7 @@ _SKIP_REF_PATTERNS = re.compile(
 # Common project files that skills reference but don't ship — they exist in
 # the user's target project, not in the skill directory.
 _EXTERNAL_PROJECT_FILES = {
+    "AGENTS.md",
     "CLAUDE.md",
     "README.md",
     "CHANGELOG.md",
