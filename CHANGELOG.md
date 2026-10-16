@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.28.1] - 2026-10-15
 ### Fixed
 - **Harvest refuses malformed Claudron responses before trusting them.** A present capability declaration must be a list of strings; only an absent declaration takes the legacy path. A failed or mismatched status envelope is not cached, and malformed resolve candidates no longer look like an empty subject search. Every response requires a boolean `ok`; capture and amend still accept a deliberate `rejected` answer with `ok: false`. These failures leave the harvest cursor for a valid retry.
 
