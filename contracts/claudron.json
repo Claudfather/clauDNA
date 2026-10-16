@@ -3,6 +3,7 @@
   "capabilities": [
     "navigation",
     "doctor",
+    "codex-session-loop",
     "doctor-settings",
     "trust-aware-reads",
     "subjects",
