@@ -859,6 +859,6 @@ codex plugin marketplace add Claudfather/clauDNA
 codex plugin add claudna@Claudfather
 ```
 
-Installation does not trust hook commands. Inspect the installed commands in Codex's `/hooks` interface and approve them there before expecting store events. The plugin never edits user settings or grants itself trust. Store commands use `PLUGIN_ROOT`, the native plugin-root environment variable, and explicitly select `--host codex`. Direct hooks default to Claude for compatibility; consumers must choose Codex explicitly rather than sniffing environment variables.
+Installation does not trust hook commands. Inspect the installed commands in Codex's `/hooks` interface and approve them there before expecting store events. The plugin never edits user settings or grants itself trust. Codex SessionEnd uses a 3-second handler timeout. Store commands use `PLUGIN_ROOT`, the native plugin-root environment variable, and explicitly select `--host codex`. Direct hooks default to Claude for compatibility; consumers must choose Codex explicitly rather than sniffing environment variables.
 
 The same session-store switches apply (`CLAUDNA_SESSION_STORE=0`, `CLAUDNA_SESSION_SUMMARY=0`, `CLAUDNA_HARVEST=0`). Detached summarization still requires the existing Claude runner; a Codex-only machine does not acquire a new model provider. See the [measured adapter plan](documentation/plans/2026-10-16-codex-session-store-adapter.md) and [phase-3 canary table](documentation/plans/2026-09-30-session-store-phase-3.md).

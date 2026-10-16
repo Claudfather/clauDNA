@@ -6,9 +6,12 @@
     1,
     2,
     3,
+    4,
+    5,
     6,
     7,
     8,
+    9,
     10,
     12,
     13,
@@ -21,9 +24,9 @@
     29,
     44
   ],
-  "selected_count": 17,
+  "selected_count": 20,
   "sanitized_filename": "codex-rollout-golden.jsonl",
-  "sanitized_sha256": "85dc581b6c525be0412dff6713f3cc8e9b45e7ec09cdc7108fa07a08b245164c",
-  "recipe_script_sha256": "d7b67dc52f2a617cd7b5de37312949bd576ea9da915874bc2bf50a8b49ff2931",
-  "recipe": "First actual record per(type,payload.type,role,phase), in original source order. Preserve keys/list order/types and numeric counts; allowlist protocol enums; replace all other strings with explicit placeholders; stable fake UUID map; ISO dates fake; path keys redacted. Raw source remains private."
+  "sanitized_sha256": "589998008aad8966709fa19914c93a3b649789695025679b9a5ee9260811e31d",
+  "recipe_script_sha256": "52ad3abc7f2f21f95984653dc2f1f7cabbe941a8506335a92da1bb431b035df2",
+  "recipe": "First actual record per(type,payload.type,role,phase,nested content_item_kinds), retaining both injected-environment and genuine-user shapes. Retain only user.text/environments.environment_context content-kind enum strings; assistant phase is retained, assistant unknown content-kind strings remain redacted; in original source order. Preserve keys/list order/types and numeric counts; allowlist protocol enums; replace all other strings with explicit placeholders; stable fake UUID map; ISO dates fake; path keys redacted. Raw source remains private."
 }

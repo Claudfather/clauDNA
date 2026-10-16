@@ -15,9 +15,16 @@
     "userpromptsubmit-default-845f0797.json": "845f07979c2808389c8e698360bd0f90cc933143d85c666784ef0182f27631b3"
   },
   "golden_rollout": "codex-rollout-golden.jsonl",
-  "golden_rollout_sha256": "85dc581b6c525be0412dff6713f3cc8e9b45e7ec09cdc7108fa07a08b245164c",
+  "golden_rollout_sha256": "589998008aad8966709fa19914c93a3b649789695025679b9a5ee9260811e31d",
   "shape_instrument_sha256": "a0fbe97daf8ed6002f915930e13ebe5889fdfc89435b18e32dace58dd93e618a",
   "fixture_transform_sha256": "a0a09c36772d777ca150d4ea152ae52e9005624f2960ab88070291b912ee7a87",
   "original_harness_sha256": "d84982af190ce84292456744a678cb0d007671500d1fccd03bb291c0008afbec",
-  "recipe": "fixture_hook.py and export_rollout_golden.py are the exact transformations; provenance.jsonl hashes each actual native stdin object and maps it to sanitized file/hash; rollout-provenance.json maps actual record line numbers and source hash"
+  "recipe": "fixture_hook.py and export_rollout_golden.py are the exact transformations; provenance.jsonl hashes each actual native stdin object and maps it to sanitized file/hash; rollout-provenance.json maps actual record line numbers and source hash",
+  "golden_refinement": {
+    "original_p0_manifest_sha256": "8ca604533fe6d6f509d75a832938f422fac3aa8c2512db95592f97b07eae8c2a",
+    "original_p0_golden_sha256": "85dc581b6c525be0412dff6713f3cc8e9b45e7ec09cdc7108fa07a08b245164c",
+    "reason": "Retain actual nested user content-kind enums and both injected-environment/genuine-user shapes; no producer-source fixture synthesis",
+    "source_sha256": "97a96d73d5898942359bd517632f9642270bcac81098f1b8fa1f285e6b71254f",
+    "recipe_script_sha256": "52ad3abc7f2f21f95984653dc2f1f7cabbe941a8506335a92da1bb431b035df2"
+  }
 }

@@ -124,10 +124,10 @@ def test_codex_reader_drops_tools_reasoning_context_and_partial_ranges(tmp_path)
     records = [
         {"type": "event_msg", "payload": {"type": "user_message", "message": "duplicate"}},
         {"type": "response_item", "payload": {"type": "message", "role": "developer", "content": [{"type": "input_text", "text": "system context"}]}},
-        {"type": "response_item", "payload": {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "question"}]}},
+        {"type": "response_item", "payload": {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "question"}], "internal_chat_message_metadata_passthrough": {"content_item_kinds": ["user.text"]}}},
         {"type": "response_item", "payload": {"type": "custom_tool_call_output", "output": "secret tool output"}},
         {"type": "response_item", "payload": {"type": "reasoning", "content": [{"type": "output_text", "text": "private thinking"}]}},
-        {"type": "response_item", "payload": {"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": "answer"}]}},
+        {"type": "response_item", "payload": {"type": "message", "role": "assistant", "phase": "commentary", "content": [{"type": "output_text", "text": "answer"}]}},
     ]
     path = tmp_path / "rollout.jsonl"
     lines = [json.dumps(r).encode() + b"\n" for r in records]
@@ -145,3 +145,36 @@ def test_wrapper_explicit_codex_host_is_silent_and_records_runtime(tmp_path):
     assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
     facts = session_facts(load_lifecycle(SessionStore(tmp_path / "state").session(SID).paths).events)
     assert facts.agent_cli == "codex"
+
+
+@pytest.mark.parametrize("metadata", [
+    {"content_item_kinds": ["environments.environment_context"]},
+    {"content_item_kinds": ["unknown"]}, {},
+    {"content_item_kinds": []}, {"content_item_kinds": ["user.text", "user.text"]},
+])
+def test_codex_user_context_or_unclassified_items_never_become_dialogue(metadata):
+    record = {"type": "response_item", "payload": {"type": "message", "role": "user",
+              "content": [{"type": "input_text", "text": "private injected context"}],
+              "internal_chat_message_metadata_passthrough": metadata}}
+    assert transcript.codex_turn_of(record) is None
+
+
+@pytest.mark.parametrize("phase", ["analysis", "unknown", None])
+def test_codex_unmeasured_assistant_phases_never_become_dialogue(phase):
+    record = {"type": "response_item", "payload": {"type": "message", "role": "assistant", "phase": phase,
+              "content": [{"type": "output_text", "text": "not conversation prose"}]}}
+    assert transcript.codex_turn_of(record) is None
+
+
+def test_codex_mixed_content_keeps_only_aligned_user_text():
+    record = {"type": "response_item", "payload": {"type": "message", "role": "user",
+              "content": [{"type": "input_text", "text": "injected"}, {"type": "input_text", "text": "question"}],
+              "internal_chat_message_metadata_passthrough": {
+                  "content_item_kinds": ["environments.environment_context", "user.text"]}}}
+    assert transcript.codex_turn_of(record).text == "question"
+
+
+def test_codex_host_reader_uses_the_same_classified_golden_prose():
+    from claudna.session_store.host_codex import HOST
+    turns = HOST.read_range(FIXTURES / "codex-rollout-golden.jsonl", 0, None)
+    assert [(t.role, t.text) for t in turns] == [("user", "<redacted-text>"), ("assistant", "<redacted-text>")]

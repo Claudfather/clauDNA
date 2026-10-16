@@ -80,8 +80,21 @@ def codex_turn_of(record: object) -> Turn | None:
     content = payload.get("content")
     if not isinstance(content, list):
         return None
-    wanted = "input_text" if role == "user" else "output_text"
-    text = "\n".join(b["text"] for b in content if isinstance(b, dict) and
+    if role == "user":
+        # Native user-role records also carry injected environment/agent context.
+        # Positive per-item classification is required; absent or torn metadata
+        # must never turn that context into apparent user prose.
+        metadata = payload.get("internal_chat_message_metadata_passthrough")
+        kinds = metadata.get("content_item_kinds") if isinstance(metadata, dict) else None
+        if not isinstance(kinds, list) or len(kinds) != len(content):
+            return None
+        blocks = [block for block, kind in zip(content, kinds) if kind == "user.text"]
+        wanted = "input_text"
+    else:
+        if payload.get("phase") not in ("commentary", "final_answer"):
+            return None
+        blocks, wanted = content, "output_text"
+    text = "\n".join(b["text"] for b in blocks if isinstance(b, dict) and
                      b.get("type") == wanted and isinstance(b.get("text"), str)).strip()
     if role == "user":
         text = _INJECTED.sub("", text).strip()

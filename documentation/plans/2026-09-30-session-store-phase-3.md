@@ -75,3 +75,6 @@ The owner kept the defaults as built on 2026-09-30: a 24 h idle threshold and a 
 
 
 The 2026-10-16 P0 report SHA256 is `4d13c914c1227807d736293573b24e10ac9f055a504f298c6955288369bc9cb7`; the hook fixture manifest is `8ca604533fe6d6f509d75a832938f422fac3aa8c2512db95592f97b07eae8c2a`, and the actual-rollout golden excerpt is `85dc581b6c525be0412dff6713f3cc8e9b45e7ec09cdc7108fa07a08b245164c`. Claudlobby's canonical runtime-neutral run log records the full evidence and limitations before the [P4 plan](2026-10-16-codex-session-store-adapter.md). These are fixture/owner boundaries, not fleet activation or long-duration acceptance.
+
+
+Independent P4 source review refined C4's prose boundary: native user-role records included six genuine `user.text` messages and one injected `environments.environment_context`, distinguished by aligned nested `internal_chat_message_metadata_passthrough.content_item_kinds`. No event_msg.user_message was present. Only the genuine user items and assistant commentary/final_answer phases enter summaries. The revised actual-source 20-record golden (`589998008aad8966709fa19914c93a3b649789695025679b9a5ee9260811e31d`) retains both user shapes with those noncontent enums preserved; an independent byte-for-byte reproduction passed. This corrects the earlier P0 golden's overly broad enum redaction without rewriting the original P0 capture.
