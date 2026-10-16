@@ -85,7 +85,8 @@ def capture(finding: dict, cwd: str | None, env: Mapping[str, str], vault: str |
                           stdin=json.dumps(_with_run(finding, run_id)), cwd=cwd, error=CaptureError)
     data = _data(envelope)
     action = data.get("action")
-    if envelope.get("command") != "capture" or action not in CAPTURE_ACTIONS or \
+    if not isinstance(envelope.get("ok"), bool) or envelope.get("command") != "capture" or \
+            action not in CAPTURE_ACTIONS or \
             ((code != 0 or not envelope.get("ok")) and action != "rejected"):
         raise CaptureError(f"claudron capture exited {code}: {str(envelope.get('errors') or data)[:150]}")
     return {"action": action, **_located(data.get("path"), cwd, vault, env)}
@@ -128,9 +129,18 @@ def resolve(names: list[str], *, project: str | None, cwd: str | None, env: Mapp
         args.append(f"--project={project}")
     code, envelope = _run(args, env, vault=vault, cwd=cwd, error=CaptureError)
     candidates = _data(envelope).get("candidates")
-    if code != 0 or not envelope.get("ok") or envelope.get("command") != "resolve" or not isinstance(candidates, list):
+    if code != 0 or envelope.get("ok") is not True or envelope.get("command") != "resolve" or \
+            not isinstance(candidates, list) or not all(_usable_subject(c) for c in candidates):
         raise CaptureError(f"claudron resolve exited {code}: {str(envelope.get('errors') or candidates)[:150]}")
-    return [c for c in candidates if isinstance(c, dict)]
+    return candidates
+
+
+def _usable_subject(candidate: object) -> bool:
+    """Validate the fields filing reads, without dropping malformed entries or additive fields."""
+    return (isinstance(candidate, dict) and isinstance(candidate.get("exact"), bool)
+            and all(isinstance(candidate.get(k), str) for k in ("path", "title", "type", "trust", "source_type"))
+            and bool(candidate["path"]) and isinstance(candidate.get("tags"), list)
+            and all(isinstance(tag, str) for tag in candidate["tags"]))
 
 
 def amend(request: dict, cwd: str | None, env: Mapping[str, str], vault: str | None = None, *,
@@ -148,7 +158,8 @@ def amend(request: dict, cwd: str | None, env: Mapping[str, str], vault: str | N
                           stdin=json.dumps(_with_run(request, run_id)), cwd=cwd, error=CaptureError)
     data = _data(envelope)
     action = data.get("action")
-    if envelope.get("command") != "amend" or action not in AMEND_ACTIONS or \
+    if not isinstance(envelope.get("ok"), bool) or envelope.get("command") != "amend" or \
+            action not in AMEND_ACTIONS or \
             (action != "rejected" and (code != 0 or not envelope.get("ok"))):
         raise CaptureError(f"claudron amend exited {code}: {str(envelope.get('errors') or data)[:150]}")
     return {"action": action, "reason": str(data.get("reason") or "")[:200],
@@ -172,8 +183,9 @@ def status(cwd: str | None, vault: str | None, env: Mapping[str, str]) -> Status
     Vault resolution is Claudron's contract: ask it, with the same
     ``--vault``/``cwd`` the capture used. Only a success is cached: one failed
     call (a timeout, a busy index) mustn't decide the rest of the run. An
-    engine older than the capability list reports none, which is the right
-    answer for every capability in it (claudron-engine.md §2).
+    engine older than the capability list omits it, which is the right
+    answer for every capability in it (claudron-engine.md §2). A present but
+    malformed list is a failure, never a legacy engine's empty declaration.
     """
     key = (cwd, vault)
     if key in _STATUS:
@@ -182,12 +194,14 @@ def status(cwd: str | None, vault: str | None, env: Mapping[str, str]) -> Status
         code, envelope = _run(["status", "--json"], env, vault=vault, cwd=cwd)
     except ClaudronError:
         return None
-    data = _data(envelope) if code == 0 else {}
-    root, caps = data.get("root"), data.get("capabilities")
-    if not (isinstance(root, str) and root):
+    if code != 0 or envelope.get("ok") is not True or envelope.get("command") != "status":
         return None
-    _STATUS[key] = Status(Path(os.path.realpath(root)),
-                          frozenset(c for c in caps if isinstance(c, str)) if isinstance(caps, list) else frozenset())
+    data = _data(envelope)
+    root, caps = data.get("root"), data.get("capabilities", [])
+    if not (isinstance(root, str) and root) or not isinstance(caps, list) or \
+            not all(isinstance(c, str) for c in caps):
+        return None
+    _STATUS[key] = Status(Path(os.path.realpath(root)), frozenset(caps))
     return _STATUS[key]
 
 
@@ -213,7 +227,7 @@ def promote(item: str, vault: str | None, env: Mapping[str, str]) -> dict:
     code, envelope = _run(["promote", item, "--to", "verified", "--by", "user", "--json"], env, vault=vault,
                           error=PromoteError)
     data = _data(envelope)
-    if code != 0 or not envelope.get("ok") or envelope.get("command") != "promote" or \
+    if code != 0 or envelope.get("ok") is not True or envelope.get("command") != "promote" or \
             data.get("action") not in PROMOTE_ACTIONS:
         raise PromoteError(f"claudron promote exited {code}: {str(envelope.get('errors') or data)[:200]}")
     return data
