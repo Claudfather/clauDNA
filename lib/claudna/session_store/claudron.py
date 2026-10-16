@@ -85,7 +85,8 @@ def capture(finding: dict, cwd: str | None, env: Mapping[str, str], vault: str |
                           stdin=json.dumps(_with_run(finding, run_id)), cwd=cwd, error=CaptureError)
     data = _data(envelope)
     action = data.get("action")
-    if envelope.get("command") != "capture" or action not in CAPTURE_ACTIONS or \
+    if not isinstance(envelope.get("ok"), bool) or envelope.get("command") != "capture" or \
+            action not in CAPTURE_ACTIONS or \
             ((code != 0 or not envelope.get("ok")) and action != "rejected"):
         raise CaptureError(f"claudron capture exited {code}: {str(envelope.get('errors') or data)[:150]}")
     return {"action": action, **_located(data.get("path"), cwd, vault, env)}
@@ -128,7 +129,7 @@ def resolve(names: list[str], *, project: str | None, cwd: str | None, env: Mapp
         args.append(f"--project={project}")
     code, envelope = _run(args, env, vault=vault, cwd=cwd, error=CaptureError)
     candidates = _data(envelope).get("candidates")
-    if code != 0 or not envelope.get("ok") or envelope.get("command") != "resolve" or \
+    if code != 0 or envelope.get("ok") is not True or envelope.get("command") != "resolve" or \
             not isinstance(candidates, list) or not all(_usable_subject(c) for c in candidates):
         raise CaptureError(f"claudron resolve exited {code}: {str(envelope.get('errors') or candidates)[:150]}")
     return candidates
@@ -157,7 +158,8 @@ def amend(request: dict, cwd: str | None, env: Mapping[str, str], vault: str | N
                           stdin=json.dumps(_with_run(request, run_id)), cwd=cwd, error=CaptureError)
     data = _data(envelope)
     action = data.get("action")
-    if envelope.get("command") != "amend" or action not in AMEND_ACTIONS or \
+    if not isinstance(envelope.get("ok"), bool) or envelope.get("command") != "amend" or \
+            action not in AMEND_ACTIONS or \
             (action != "rejected" and (code != 0 or not envelope.get("ok"))):
         raise CaptureError(f"claudron amend exited {code}: {str(envelope.get('errors') or data)[:150]}")
     return {"action": action, "reason": str(data.get("reason") or "")[:200],
@@ -225,7 +227,7 @@ def promote(item: str, vault: str | None, env: Mapping[str, str]) -> dict:
     code, envelope = _run(["promote", item, "--to", "verified", "--by", "user", "--json"], env, vault=vault,
                           error=PromoteError)
     data = _data(envelope)
-    if code != 0 or not envelope.get("ok") or envelope.get("command") != "promote" or \
+    if code != 0 or envelope.get("ok") is not True or envelope.get("command") != "promote" or \
             data.get("action") not in PROMOTE_ACTIONS:
         raise PromoteError(f"claudron promote exited {code}: {str(envelope.get('errors') or data)[:200]}")
     return data

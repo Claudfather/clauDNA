@@ -287,29 +287,30 @@ class TestHarvestGate:
 FAKE = """#!/usr/bin/env python3
 import json, os, sys
 argv = sys.argv[1:]
-verb = next(a for a in argv if a in ("status", "resolve", "amend", "capture"))
+verb = next(a for a in argv if a in ("status", "resolve", "amend", "capture", "promote"))
 stdin = sys.stdin.read() if verb in ("amend", "capture") else ""
 with open(os.environ["FAKE_LOG"], "a") as fh:
     fh.write(json.dumps({"argv": argv, "stdin": stdin}) + "\\n")
 amend = os.environ.get("FAKE_AMEND", "updated")
+capture = os.environ.get("FAKE_CAPTURE", "created")
 replies = {
     "status": {"root": os.environ["FAKE_ROOT"], "capabilities": ["subjects", "amend", "runs"]},
     "resolve": {"name": "x", "candidates": [{"path": "k/a.md", "title": "(unverified) staging DB",
                   "type": "knowledge", "exact": True, "trust": "external", "source_type": "session",
                   "tags": ["harvest:subject"]}]},
     "amend": {"action": amend, "path": os.environ["FAKE_ROOT"] + "/k/a.md", "reason": "refused" * (amend == "rejected")},
-    "capture": {"action": "created", "path": "k/n.md"},
+    "capture": {"action": capture, "path": "k/n.md"},
+    "promote": {"action": "promoted", "path": "k/a.md", "from": "draft", "to": "verified"},
 }
 if verb == "status" and "FAKE_STATUS" in os.environ:
     replies[verb] = json.loads(os.environ["FAKE_STATUS"])
 if verb == "resolve" and "FAKE_CANDIDATES" in os.environ:
     replies[verb]["candidates"] = json.loads(os.environ["FAKE_CANDIDATES"])
-envelope = {"ok": amend != "rejected" or verb != "amend", "command": verb, "errors": [], "warnings": [],
+envelope = {"ok": replies[verb].get("action") != "rejected", "command": verb, "errors": [], "warnings": [],
             "data": replies[verb]}
-if verb == "status":
-    envelope.update(json.loads(os.environ.get("FAKE_STATUS_ENVELOPE", "{}")))
+envelope.update(json.loads(os.environ.get("FAKE_ENVELOPES", "{}")).get(verb, {}))
 print(json.dumps(envelope))
-sys.exit(2 if verb == "amend" and amend == "rejected" else 0)
+sys.exit(2 if verb == "amend" and amend == "rejected" else 1 if verb == "capture" and capture == "rejected" else 0)
 """
 
 
@@ -369,7 +370,7 @@ class TestDoor:
     @pytest.mark.parametrize("patch", [{"ok": False}, {"ok": "true"}, {"ok": 1},
                                        {"command": "capture"}, {"command": None}])
     def test_a_malformed_status_envelope_is_not_cached(self, env, patch):
-        assert claudron.status("/w", "/v", {**env, "FAKE_STATUS_ENVELOPE": json.dumps(patch)}) is None
+        assert claudron.status("/w", "/v", {**env, "FAKE_ENVELOPES": json.dumps({"status": patch})}) is None
         assert claudron._STATUS == {}
         assert claudron.status("/w", "/v", env) is not None
         assert len(self.calls(env)) == 2
@@ -384,17 +385,19 @@ class TestDoor:
         assert call["argv"] == ["--vault", "/v", "resolve", "--name=-rf staging", "--alias=a, b", "--alias=c",
                                 "--limit=10", "--json", "--project=webapp"]
 
-    @pytest.mark.parametrize("candidates", [None, 7, {}, ["existing"], [CANDIDATE, "junk"], [{}],
-                                            [{**CANDIDATE, "exact": "true"}],
-                                            [{k: v for k, v in CANDIDATE.items() if k != "exact"}],
-                                            [{**CANDIDATE, "path": None}],
-                                            [{**CANDIDATE, "tags": "harvest:subject"}]])
-    def test_malformed_candidates_stop_harvest_and_allow_a_valid_retry(self, store, env, candidates):
+    @pytest.mark.parametrize("candidates, envelope", [(c, {}) for c in [
+        None, 7, {}, ["existing"], [CANDIDATE, "junk"], [{}], [{**CANDIDATE, "exact": "true"}],
+        [{k: v for k, v in CANDIDATE.items() if k != "exact"}], [{**CANDIDATE, "path": None}],
+        [{**CANDIDATE, "tags": "harvest:subject"}],
+    ]] + [([], {"ok": 1}), ([], {"ok": "false"})])
+    def test_malformed_resolve_response_stops_harvest_and_allows_a_valid_retry(self, store, env, candidates, envelope):
         handle = summarized_session(store, "s1", [[], [BLOCK]], vault=env["FAKE_ROOT"])
         handle.ack(harvest.CONSUMER, 1)
         before = handle.paths.consumers.read_bytes()
         env = {**env, **ON, "FAKE_STATUS": json.dumps({"root": env["FAKE_ROOT"], "capabilities": sorted(ALL_CAPS)})}
-        report = harvest.harvest(store, env={**env, "FAKE_CANDIDATES": json.dumps(candidates)},
+        invalid = {**env, "FAKE_CANDIDATES": json.dumps(candidates),
+                   "FAKE_ENVELOPES": json.dumps({"resolve": envelope})}
+        report = harvest.harvest(store, env=invalid,
                                  capture=claudron.capture, force=True)
         assert report.status == "error" and "claudron resolve" in report.errors[0]
         assert handle.paths.consumers.read_bytes() == before and handle.cursor(harvest.CONSUMER) == 1
@@ -423,6 +426,22 @@ class TestDoor:
     def test_a_refused_amend_is_an_answer_not_a_failure(self, env):
         answer = claudron.amend({"note": "k/a.md", "op": "append_fact"}, "/w", {**env, "FAKE_AMEND": "rejected"}, "/v")
         assert (answer["action"], answer["reason"]) == ("rejected", "refused")
+
+    def test_a_refused_capture_is_an_answer_not_a_failure(self, env):
+        answer = claudron.capture({"type": "knowledge", "title": "t"}, "/w",
+                                 {**env, "FAKE_CAPTURE": "rejected"}, "/v")
+        assert answer["action"] == "rejected"
+
+    @pytest.mark.parametrize("verb, action", [("capture", "created"), ("capture", "rejected"),
+                                             ("amend", "updated"), ("amend", "rejected"), ("promote", "promoted")])
+    @pytest.mark.parametrize("ok", [1, "false"])
+    def test_a_write_response_requires_boolean_ok_even_when_rejected(self, env, verb, action, ok):
+        env = {**env, "FAKE_ENVELOPES": json.dumps({verb: {"ok": ok, "data": {"action": action}}})}
+        with pytest.raises(claudron.ClaudronError, match=f"claudron {verb}"):
+            if verb == "promote":
+                claudron.promote("k/a.md", "/v", env)
+            else:
+                getattr(claudron, verb)({"type": "knowledge", "title": "t", "note": "k/a.md"}, "/w", env, "/v")
 
     def test_capture_carries_the_run_id_only_when_given(self, env):
         claudron.capture({"type": "knowledge", "title": "t"}, "/w", env, "/v", run_id="harvest-1")
