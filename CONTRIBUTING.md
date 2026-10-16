@@ -122,7 +122,7 @@ CI runs the same `make check` target, so local green means CI green. If CI fails
 - **One concern per PR.** A skill fix and an unrelated hook change should be separate PRs.
 - **Descriptive title.** Use conventional commits: `feat:`, `fix:`, `docs:`, `chore:`.
 - **Fill out the PR template.** The checkboxes are there for a reason.
-- **Version bumps.** If your change affects what users get (new skill, changed behavior, hook change), bump `version` in **both** `.claude-plugin/plugin.json` and `.cursor-plugin/plugin.json`. Marketplace users only receive updates on version bumps, and `make check-manifest` fails if the two manifests disagree — bumping only one is worse than bumping neither. Bug fixes to docs or tests don't need a bump.
+- **Version bumps.** If your change affects what users get (new skill, changed behavior, hook change), bump `version` in **all three** `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json` and `.codex-plugin/plugin.json`. Marketplace users only receive updates on version bumps, and `make check-manifest` fails if these versions disagree. Bug fixes to docs or tests don't need a bump.
 - **CI must pass.** CI runs `make check` — the same command you run locally, so there are no CI-only surprises. Run it before pushing.
 
 ## Release Process
@@ -135,7 +135,7 @@ Maintainers use `scripts/release.sh` to cut releases:
 ./scripts/release.sh major   # 0.3.0 → 1.0.0
 ```
 
-The script bumps both `plugin.json` manifests together, rewrites the CHANGELOG's `[Unreleased]` section under the new version, commits, and tags. It refuses to start if the two manifests already disagree on the version, so reconcile them first.
+The script bumps all three `plugin.json` manifests together, rewrites the CHANGELOG's `[Unreleased]` section under the new version, commits, and tags. It refuses to start if the three manifests already disagree on the version, so reconcile them first.
 
 **What a marketplace user receives.** The Claude Code marketplace entry (`.claude-plugin/marketplace.json`) names `{"source": "github", "repo": "Claudfather/clauDNA"}` with no `ref` or `sha`, so it **tracks the default branch**: on a version bump a user fetches the head of the default branch at fetch time, not necessarily the exact commit that bumped the version. Nothing binds a release to the reviewed commit. To bind them, set `sha` (a full commit) or a release-tag `ref` on the entry as part of the release change, and protect that tag separately — a pin is only a gate when the ref it names cannot be rewritten by whoever can write the default branch.
 
@@ -143,18 +143,19 @@ Contributors don't need to run this — just add your CHANGELOG entry and bump t
 
 ## Distribution
 
-clauDNA ships to two hosts from one tree, and the manifests are not interchangeable:
+clauDNA ships to three hosts from one tree, and the manifests are not interchangeable:
 
-| | Claude Code | Cursor |
-|---|---|---|
-| Manifest | `.claude-plugin/plugin.json` | `.cursor-plugin/plugin.json` |
-| Marketplace manifest | `.claude-plugin/marketplace.json` (name `Claudfather`) | `.cursor-plugin/marketplace.json` (name `claudfather`) |
-| Components | `skills/`, `agents/`, `plugin-hooks/` | `skills/`, `agents/` — no hooks |
+| | Claude Code | Cursor | Codex |
+|---|---|---|---|
+| Manifest | `.claude-plugin/plugin.json` | `.cursor-plugin/plugin.json` | `.codex-plugin/plugin.json` |
+| Marketplace manifest | `.claude-plugin/marketplace.json` (name `Claudfather`) | `.cursor-plugin/marketplace.json` (name `claudfather`) | `.agents/plugins/marketplace.json` (name `Claudfather`) |
+| Components | `skills/`, `agents/`, `plugin-hooks/` | `skills/`, `agents/` — no hooks | `plugin-hooks/codex-hooks.json` — session-store hooks only; inert skill/agent paths |
 
-Two asymmetries are deliberate and gated by `scripts/validate-manifest.py`:
+These asymmetries are deliberate and gated by `scripts/validate-manifest.py`:
 
 - **The marketplace names differ in case.** Claude Code's stays `Claudfather` because the documented install command is `/plugin install claudna@Claudfather`. Cursor's must be `claudfather` because Cursor's marketplace identifier grammar allows only lowercase alphanumerics and hyphens.
 - **The Cursor manifest declares no hooks**, so the Claude Code shell hooks never fire in a Cursor-based environment. This is enforced two ways: the validator rejects a `hooks` field in the Cursor manifest, and it rejects a `hooks/hooks.json` at the repo root, which is where Cursor's folder discovery would find hooks with no manifest change to notice.
+- **The Codex manifest carries only session-store hooks.** Its explicit inert skill/agent paths prevent default discovery. Workflow skills and agents belong to the execution companion; installing the plugin does not grant hook trust.
 
 ### Submitting to the Cursor marketplace
 

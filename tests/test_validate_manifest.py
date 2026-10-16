@@ -1,9 +1,10 @@
 """Tests for the manifest gate (scripts/validate-manifest.py).
 
-The gate guards two manifests that are *not* interchangeable. Claude Code
+The gate guards three manifests that are *not* interchangeable. Claude Code
 reads .claude-plugin/ and wires the shell hooks; Cursor reads .cursor-plugin/
-and deliberately wires none. Several rules therefore apply to one host and
-must not apply to the other — most visibly the marketplace name, which stays
+and deliberately wires none; Codex reads .codex-plugin/ and wires only the
+session-store hooks, with inert skill/agent paths. Several rules therefore
+apply to one host only — most visibly the marketplace name, which stays
 `Claudfather` for Claude Code (the documented install command depends on that
 casing) and must be `claudfather` for Cursor (whose identifier grammar admits
 only lowercase alphanumerics and hyphens).
