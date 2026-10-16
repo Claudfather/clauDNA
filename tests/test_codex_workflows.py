@@ -66,3 +66,9 @@ def test_project_agents_artifact_is_not_a_bundled_skill_reference(monkeypatch):
     spec.loader.exec_module(module)
     assert module.extract_file_references('Create `AGENTS.md` from `references/AGENTS_MD_TEMPLATE.md`.') == [
         'references/AGENTS_MD_TEMPLATE.md']
+
+
+def test_ironclad_checks_actual_dispatch_before_claiming_availability():
+    text = read('skills/ironclad/SKILL.md')
+    assert 'Subagents are always available' not in text
+    assert '§14.1' in text and 'required independent review' in text

@@ -256,3 +256,19 @@ further inference or acceptance normalization follows. The selection mode gate
 is unresolved pending independent review of the residual. Source checks and
 other native observations proceed independently; this phase is not releasable
 from that result alone.
+
+Independent spec review classified the retained 17/18 as a bounded exact-mode
+selection limitation: the utterance does not uniquely require the single-lens
+route. The original expectation and failed result remain unchanged, with no
+rescore, waiver or assumed reason for null. No 18/18 threshold was specified as
+a separate acceptance hard gate; release eligibility still requires every actual
+hard gate and independent source/evidence review.
+
+The first frozen full run exposed stale resolver/scoping assertions and a real
+explicit-override precedence concern. The correction preserves Claude's expanded
+SKILL-body candidate first, then validated operator roots before the loaded-path
+default; Codex skips Claude-only expansion/cache candidates. Existing runnable
+script cases remain, with added Codex/no-cache, paths-with-spaces, poisoned-cwd
+and unknown-instruction refusal coverage. Orientation proves Codex inclusion and
+Cursor exclusion. The ironclad availability claim now follows actual tool
+detection, with required independent review left unsatisfied on an inline path.

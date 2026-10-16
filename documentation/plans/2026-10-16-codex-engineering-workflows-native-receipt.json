@@ -133,6 +133,13 @@
       "runner_sha256": "d2280cfe1e513879fc70088792f0f2fe8acba37462ac0102387c9ffb227e5e4c"
     }
   },
+  "selection_review_disposition": {
+    "independent_spec_review": "bounded exact-mode selection limitation; utterance does not uniquely require single-lens route",
+    "null_reason": "not present in raw events; not inferred",
+    "release_eligibility": "requires all actual hard gates and independent source/evidence review; not claimed from selection score",
+    "rescored_or_waived": false,
+    "unchanged_failed_oracle": true
+  },
   "source_base": "3c56fb6c6b3e01546ee264e684a383d741a0a497",
   "startup": {
     "current_source_and_installed_script_equal": true,

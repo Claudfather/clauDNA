@@ -58,7 +58,7 @@ Create a scratch directory with `mktemp -d "${TMPDIR:-/tmp}/ironclad.XXXXXX"` (r
 
 ### Phase 3: Select lenses
 
-Subagents are always available — there is no executor-availability step. Pick the lenses that apply from the target type:
+Before dispatch, inspect actual execution-host controls per `../_shared/orchestration-guide.md` §14.1. Use independent subagents when supported; if dispatch is unavailable, use only the explicitly permitted sequential fallback and label its reduced independence. A required independent review remains unsatisfied on that route. Codex desktop and native CLI availability need separate evidence per `../_shared/codex-tools.md`. Pick the lenses that apply from the target type:
 
 | Lens | Source | Applies to |
 |------|--------|-----------|

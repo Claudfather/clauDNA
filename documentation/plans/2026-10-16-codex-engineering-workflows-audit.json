@@ -13,7 +13,7 @@
   "document": {
     "label": "claudna-404-codex-workflows-plan",
     "path": "documentation/plans/2026-10-16-codex-engineering-workflows.md",
-    "sha256": "64cc67c2d2cb6da279c9a356c4c6dfeedf4b541fef3105d7cc84bdb770dc8db1",
+    "sha256": "b2131ecb21e718bebc8a04f354b6e28e2560810dd49fbba8c29281887af355cf",
     "status": "active; implementation and native acceptance pending"
   },
   "evidence": [
@@ -40,6 +40,7 @@
     "correction": "Retain private schema responses and perform one fresh bounded complete epoch",
     "final_epoch": "17/18 actual result retained; selection mode gate unresolved and inference stopped",
     "first_complete_epoch": "16/18 normalized choices; exact two missed modes unavailable",
+    "independent_residual_disposition": "Bounded exact-mode limitation; failed unchanged oracle, no rescore or mandatory18/18 threshold",
     "second_contract_correction": "Independent review: generic mode was ambiguous; prompt/schema now share invocation-suffix rule without changing judge or expectations",
     "source_metadata_scope": "Codex description accurately identifies engineering skills and read-and-dispatch roles"
   },

@@ -5,12 +5,12 @@ Shared reference for skills that run a bundled script, or that forward a `_share
 `<claudna-root>` stands for the directory that holds this plugin's `skills/`, `scripts/` and `lib/`. A bundled script is written `<claudna-root>/scripts/<name>`, and a `lib/` entry point `<claudna-root>/lib/<path>`. A `_shared` doc named in text that leaves its file before anyone reads it is written `<claudna-root>/skills/_shared/<path>`. Resolve it before you run or forward anything:
 
 <!-- claudna-root:begin -->
-Use the first candidate that contains the bundled file you actually need:
+Use the first of these candidates that contains the file you need:
 
-1. **The actual absolute root derived from the loaded skill path**: two directories above its containing directory. Use the path the host supplied, including spaces; never infer it from cwd.
-2. **An explicitly set operator root** (`CLAUDNA_ROOT`, or a host-provided `PLUGIN_ROOT`/`CLAUDE_PLUGIN_ROOT`), after checking the needed file exists there. Ordinary skill shells must not assume hook environment variables exist.
-3. **The path Claude Code filled in for `${CLAUDE_PLUGIN_ROOT}`**, only in a `SKILL.md` body. In other files it stays literal; never pass an unfilled variable to the shell.
-4. **Claude Code only:** the highest-versioned `~/.claude/plugins/cache/Claudfather/claudna/*/`, comparing semantic versions. Codex must not use the Claude cache fallback; it could select an unrelated or unloaded copy.
+1. **Claude Code only: the path filled in for `${CLAUDE_PLUGIN_ROOT}` in the loaded `SKILL.md` body.** This expansion is not an ordinary shell variable. Skip a literal, unfilled value; Codex must not use this Claude-only expansion candidate.
+2. **`$CLAUDNA_ROOT`**, when explicitly set by the operator, or a host-provided `PLUGIN_ROOT`/`CLAUDE_PLUGIN_ROOT` when actually set. Validate the needed bundled file before accepting this override. Ordinary skill shells must not assume a hook environment exists.
+3. **`<skill-dir>/../..`**, derived from the actual absolute path of the loaded skill. This is the default on Codex when no valid operator override exists. Keep spaces intact; never infer this path from cwd.
+4. **Claude Code only: the highest-versioned `~/.claude/plugins/cache/Claudfather/claudna/*/`.** Compare the version directories as version numbers, not as text: `0.19.0` is above `0.9.0`. Codex must not use the Claude cache fallback; it could select an unrelated or unloaded copy.
 
-If no valid candidate contains the file, stop and report that missing file. Never run a same-named helper from the project working directory. Substitute the resolved absolute root and quote paths in commands. Before forwarding a prompt, replace every `<claudna-root>` with that root and fill all task placeholders; the receiving agent cannot resolve the caller's installation.
+If none of them contains the file, stop and say so. Never fall back to a path in the working directory, which is the user's project, not this plugin. Substitute the resolved absolute root and quote paths in commands. Before forwarding a prompt, replace every `<claudna-root>` with that root and fill all task placeholders; the receiving agent cannot resolve the caller's installation.
 <!-- claudna-root:end -->

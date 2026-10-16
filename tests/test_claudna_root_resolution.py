@@ -59,18 +59,22 @@ def _version_key(path: Path) -> tuple:
     return tuple(int(part) if part.isdigit() else part for part in re.split(r"[.+-]", path.name))
 
 
-def _resolve(script: str, *, filled_in: Path | None, env: Path | None, skill_dir: Path, cache: Path) -> Path | None:
+def _resolve(script: str, *, filled_in: Path | None, env: Path | None, skill_dir: Path, cache: Path, host: str = "claude-code") -> Path | None:
     """The procedure the definition describes, taken in the order it lists."""
     for kind in _candidate_kinds():
         if kind == "filled-in":
-            roots = [filled_in] if filled_in else []
+            roots = [filled_in] if filled_in and host == "claude-code" else []
         elif kind == "env":
             roots = [env] if env else []
         elif kind == "skill-dir":
             roots = [skill_dir / ".." / ".."]
-        else:
+        elif kind == "cache":
+            if host != "claude-code":
+                continue
             versions = sorted((p for p in cache.iterdir() if p.is_dir()), key=_version_key) if cache.is_dir() else []
             roots = versions[-1:]
+        else:
+            raise AssertionError(f"unrecognized resolver candidate: {kind}")
         for root in roots:
             if (root / "scripts" / script).is_file():
                 return root.resolve()
@@ -102,7 +106,7 @@ def layout(tmp_path: Path) -> dict[str, Path]:
     empty_root = tmp_path / "empty-root"
     empty_root.mkdir()
     return {
-        "plugin": _plugin(tmp_path / "plugin"),
+        "plugin": _plugin(tmp_path / "plugin with spaces"),
         "env": _plugin(tmp_path / "env-root"),
         "empty": empty_root,
         "cache": cache,
@@ -177,3 +181,41 @@ def test_every_bundled_script_resolves_and_runs_without_claude_plugin_root(
                 text=True,
             )
             assert run.returncode in (0, 1) and "Traceback" not in run.stderr, run.stderr
+
+
+def test_codex_cannot_use_a_claude_filled_variable_or_cache(layout):
+    text = DEFINITION.read_text()
+    assert text.count("**Claude Code only:") == 2
+    assert "Codex must not use the Claude cache fallback" in text
+    assert _resolve("redact.py", filled_in=layout["plugin"], env=None,
+                    skill_dir=layout["skills-only"] / "skills/recall",
+                    cache=layout["cache"], host="codex") is None
+
+
+def test_codex_validated_operator_override_precedes_loaded_default(layout):
+    assert _resolve("redact.py", filled_in=None, env=layout["env"],
+                    skill_dir=layout["plugin"] / "skills/recall",
+                    cache=layout["cache"], host="codex") == layout["env"].resolve()
+
+
+def test_codex_missing_override_uses_loaded_path_with_spaces(layout):
+    assert _resolve("redact.py", filled_in=None, env=layout["empty"],
+                    skill_dir=layout["plugin"] / "skills/recall",
+                    cache=layout["cache"], host="codex") == layout["plugin"].resolve()
+
+
+def test_poisoned_working_directory_never_becomes_a_root(layout, monkeypatch):
+    layout["work"].mkdir(exist_ok=True)
+    (layout["work"] / "scripts").mkdir()
+    (layout["work"] / "scripts/redact.py").write_text("raise AssertionError('cwd poison')\n")
+    monkeypatch.chdir(layout["work"])
+    assert _resolve("redact.py", filled_in=None, env=None,
+                    skill_dir=layout["skills-only"] / "skills/recall",
+                    cache=layout["cache"], host="codex") is None
+
+
+def test_unknown_instruction_candidate_refuses_instead_of_becoming_cache(layout, monkeypatch):
+    monkeypatch.setattr(sys.modules[__name__], "_candidate_kinds", lambda: ["unknown"])
+    with pytest.raises(AssertionError, match="unrecognized resolver candidate"):
+        _resolve("redact.py", filled_in=None, env=None,
+                 skill_dir=layout["skills-only"] / "skills/recall", cache=layout["cache"])
