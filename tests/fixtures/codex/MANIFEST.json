@@ -1,0 +1,23 @@
+{
+  "native_cli_version": "codex-cli0.162.0-alpha.17.2",
+  "capture": "Actual native hook stdin transformed before write; raw payload never persisted",
+  "native_hook_fixtures": {
+    "interrupt-default-b57a8b15.json": "b57a8b15536a7642d8003e1381e2f5e3e327f74f8b6f3847b4c41fc788693720",
+    "postcompact-manual-0a2cfbc6.json": "0a2cfbc62924678a6ca925d8cdcdc74f3a81e6581c207bcc80551f82ee9a25c3",
+    "posttooluse-bash-ae6be304.json": "ae6be304bcfeb8d4dffee39e27d4b6f1ecfb40c5d6e472012a7f12e1e3a0577a",
+    "precompact-manual-2d623ede.json": "2d623edef3841f17fa30524f166b3fd41ba43e0331c03da84b57fc45c40afa09",
+    "pretooluse-bash-602ce279.json": "602ce279901f7866c9c8b0075780ec50332e2fd9b1c6c9187645cec78fe12de2",
+    "sessionend-other-270455e7.json": "270455e711ff30bc27f84f66ac7f6906baa071b1efbeb91b57a521a4bef523bf",
+    "sessionstart-compact-e97e2d45.json": "e97e2d45f549775fe9ed8957a48652780c1fde8f0ef4b8ff06e921283418a8b8",
+    "sessionstart-resume-998ca396.json": "998ca3967d2e3f6d5ebf12f476b7b177b189df70767512b6472414b3c15b380c",
+    "sessionstart-startup-34d84987.json": "34d849879ff8f5f04513b80e54a05af91de3aa00690af0dc1c89e0f06d746c55",
+    "stop-default-22ab6800.json": "22ab6800c0496a735304bd104c59403dd524715bde0cfa4dafa66b9cb76c8b80",
+    "userpromptsubmit-default-845f0797.json": "845f07979c2808389c8e698360bd0f90cc933143d85c666784ef0182f27631b3"
+  },
+  "golden_rollout": "codex-rollout-golden.jsonl",
+  "golden_rollout_sha256": "85dc581b6c525be0412dff6713f3cc8e9b45e7ec09cdc7108fa07a08b245164c",
+  "shape_instrument_sha256": "a0fbe97daf8ed6002f915930e13ebe5889fdfc89435b18e32dace58dd93e618a",
+  "fixture_transform_sha256": "a0a09c36772d777ca150d4ea152ae52e9005624f2960ab88070291b912ee7a87",
+  "original_harness_sha256": "d84982af190ce84292456744a678cb0d007671500d1fccd03bb291c0008afbec",
+  "recipe": "fixture_hook.py and export_rollout_golden.py are the exact transformations; provenance.jsonl hashes each actual native stdin object and maps it to sanitized file/hash; rollout-provenance.json maps actual record line numbers and source hash"
+}

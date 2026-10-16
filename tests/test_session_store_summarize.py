@@ -486,3 +486,16 @@ class TestInstructionScreen:
         assert len(joined) <= 400 and rest.startswith("+") and int(rest[1:]) + len(kept.split(",")) == 90
         assert all(len(fp) == 12 for fp in kept.split(","))
 
+
+
+def test_detached_summary_selects_reader_from_recorded_agent_cli(store):
+    path = Path(__file__).resolve().parent / "fixtures/codex/codex-rollout-golden.jsonl"
+    h = store.session("codex-summary")
+    h.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path=str(path),
+                   harvest=OPTED_IN, agent_cli="codex")
+    h.open_segment("session_open", 0)
+    h.seal_segment(path.stat().st_size, "session_end")
+    runner = FakeRunner()
+    assert summarize.summarize(h, 1, env={}, runner=runner) == "summarized: 1 block(s)"
+    assert runner.calls[0]["dialogue"] == "[user]\n<redacted-text>\n\n[assistant]\n<redacted-text>"
+    assert runner.calls[0]["model"] == "haiku"  # F10: no second summarizer provider

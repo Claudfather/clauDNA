@@ -1,0 +1,29 @@
+{
+  "capture_source": "Actual native private Codex0.162.0-alpha.17.2 append-only JSONL; parsed in memory; no raw records exported",
+  "source_sha256": "97a96d73d5898942359bd517632f9642270bcac81098f1b8fa1f285e6b71254f",
+  "source_bytes": 181134,
+  "selected_original_line_numbers": [
+    1,
+    2,
+    3,
+    6,
+    7,
+    8,
+    10,
+    12,
+    13,
+    14,
+    16,
+    17,
+    19,
+    22,
+    23,
+    29,
+    44
+  ],
+  "selected_count": 17,
+  "sanitized_filename": "codex-rollout-golden.jsonl",
+  "sanitized_sha256": "85dc581b6c525be0412dff6713f3cc8e9b45e7ec09cdc7108fa07a08b245164c",
+  "recipe_script_sha256": "d7b67dc52f2a617cd7b5de37312949bd576ea9da915874bc2bf50a8b49ff2931",
+  "recipe": "First actual record per(type,payload.type,role,phase), in original source order. Preserve keys/list order/types and numeric counts; allowlist protocol enums; replace all other strings with explicit placeholders; stable fake UUID map; ISO dates fake; path keys redacted. Raw source remains private."
+}

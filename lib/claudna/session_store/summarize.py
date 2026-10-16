@@ -169,7 +169,8 @@ def _summarize_once(handle: SessionHandle, index: int, *, env: Mapping[str, str]
     boundary = handle.boundary(index, lifecycle)
     if not boundary.sealed:
         return f"ignored: segment {index} is not sealed", None
-    reason = summary_gate(session_facts(lifecycle), env)
+    facts = session_facts(lifecycle)
+    reason = summary_gate(facts, env)
     if reason:
         return _skip(handle, index, reason), None
     path = segment_transcript_paths(lifecycle)[index]
@@ -184,7 +185,7 @@ def _summarize_once(handle: SessionHandle, index: int, *, env: Mapping[str, str]
     if not path:
         return _skip(handle, index, "no_transcript"), end
     try:
-        turns = read_range(Path(path), start, end)
+        turns = read_range(Path(path), start, end, agent_cli=facts.agent_cli)
     except OSError:
         return _skip(handle, index, "no_transcript"), end
     if not any(t.role == "user" for t in turns):

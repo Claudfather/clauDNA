@@ -14,12 +14,13 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CHANGELOG="$REPO_ROOT/CHANGELOG.md"
 
-# Both manifests carry the version and validate-manifest.py enforces that they
+# All three manifests carry the version and validate-manifest.py enforces that they
 # match, so a release has to move them together. The Claude manifest is the
 # one the version is read from.
 PLUGIN_JSON="$REPO_ROOT/.claude-plugin/plugin.json"
 CURSOR_PLUGIN_JSON="$REPO_ROOT/.cursor-plugin/plugin.json"
-VERSIONED_MANIFESTS=("$PLUGIN_JSON" "$CURSOR_PLUGIN_JSON")
+CODEX_PLUGIN_JSON="$REPO_ROOT/.codex-plugin/plugin.json"
+VERSIONED_MANIFESTS=("$PLUGIN_JSON" "$CURSOR_PLUGIN_JSON" "$CODEX_PLUGIN_JSON")
 
 # --- Arg parsing ---
 
@@ -84,14 +85,14 @@ fi
 
 # Refuse to release from a state the gate already rejects — otherwise the
 # release commit inherits a mismatch it did not cause.
-CURSOR_VERSION="$(jq -r '.version' "$CURSOR_PLUGIN_JSON")"
-if [[ "$CURSOR_VERSION" != "$CURRENT_VERSION" ]]; then
-    echo "error: manifest versions disagree before the bump" >&2
-    echo "  $PLUGIN_JSON: $CURRENT_VERSION" >&2
-    echo "  $CURSOR_PLUGIN_JSON: $CURSOR_VERSION" >&2
-    echo "hint: reconcile them, then re-run — run 'make check-manifest' to verify" >&2
-    exit 1
-fi
+for manifest in "${VERSIONED_MANIFESTS[@]}"; do
+    manifest_version="$(jq -r '.version' "$manifest")"
+    if [[ "$manifest_version" != "$CURRENT_VERSION" ]]; then
+        echo "error: manifest versions disagree before the bump" >&2
+        echo "hint: reconcile them, then re-run — run 'make check-manifest' to verify" >&2
+        exit 1
+    fi
+done
 
 # Parse semver components
 IFS='.' read -r V_MAJOR V_MINOR V_PATCH <<< "$CURRENT_VERSION"
@@ -147,12 +148,12 @@ fi
 echo ""
 
 if [[ "$DRY_RUN" == "true" ]]; then
-    echo "[dry-run] would update both plugin.json manifests (.claude-plugin/," \
-         ".cursor-plugin/), CHANGELOG.md, commit, and tag $TAG"
+    echo "[dry-run] would update all three plugin.json manifests (.claude-plugin/," \
+         ".cursor-plugin/, .codex-plugin/), CHANGELOG.md, commit, and tag $TAG"
     exit 0
 fi
 
-# --- Update both plugin.json manifests ---
+# --- Update all three plugin.json manifests ---
 
 for manifest in "${VERSIONED_MANIFESTS[@]}"; do
     TMP_PLUGIN="$(mktemp)"

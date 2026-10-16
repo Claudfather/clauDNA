@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Codex session-store hooks** use explicitly selected runtime adapters, record the owning native process and `agent_cli`, and read captured append-only rollout prose for detached summaries. The Codex plugin/marketplace exposes store hooks only, with skill/agent discovery disabled and hook trust separate from installation. Claude activity and summarizer behavior are preserved; Cursor remains hook-free. Manifest validation and releases synchronize all three front-end versions (Claudlobby#2145 P4).
+
 ## [0.28.1] - 2026-10-15
 ### Fixed
 - **Harvest refuses malformed Claudron responses before trusting them.** A present capability declaration must be a list of strings; only an absent declaration takes the legacy path. A failed or mismatched status envelope is not cached, and malformed resolve candidates no longer look like an empty subject search. Every response requires a boolean `ok`; capture and amend still accept a deliberate `rejected` answer with `ok: false`. These failures leave the harvest cursor for a valid retry.

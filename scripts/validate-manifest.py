@@ -44,6 +44,7 @@ from check_cursor_scope import run_check as run_cursor_scope_check
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CLAUDE_PLUGIN_DIR = REPO_ROOT / ".claude-plugin"
 CURSOR_PLUGIN_DIR = REPO_ROOT / ".cursor-plugin"
+CODEX_PLUGIN_DIR = REPO_ROOT / ".codex-plugin"
 
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
@@ -316,22 +317,53 @@ def validate_all_json_files(plugin_dir: Path) -> None:
 
 
 def validate_version_sync() -> None:
-    """Claude and Cursor plugin manifests must share the same version."""
-    claude_path = CLAUDE_PLUGIN_DIR / "plugin.json"
-    cursor_path = CURSOR_PLUGIN_DIR / "plugin.json"
-    claude_data = load_json(claude_path)
-    cursor_data = load_json(cursor_path)
-    if not claude_data or not cursor_data:
-        return
+    """Every shipped front-end manifest carries the same release version."""
+    versions = {}
+    for directory in (CLAUDE_PLUGIN_DIR, CURSOR_PLUGIN_DIR, CODEX_PLUGIN_DIR):
+        data = load_json(directory / "plugin.json")
+        if isinstance(data, dict):
+            versions[directory.name] = data.get("version")
+    if len(set(versions.values())) > 1:
+        error("plugin.json version mismatch: " + ", ".join(f"{k} has {v!r}" for k, v in versions.items()))
 
-    claude_version = claude_data.get("version")
-    cursor_version = cursor_data.get("version")
-    if claude_version != cursor_version:
-        error(
-            "plugin.json version mismatch: "
-            f".claude-plugin has {claude_version!r}, "
-            f".cursor-plugin has {cursor_version!r}"
-        )
+
+def validate_codex_store_hooks() -> None:
+    """P4 exposes the measured store hook surface, with no skill/agent discovery."""
+    data = load_json(CODEX_PLUGIN_DIR / "plugin.json")
+    if not isinstance(data, dict):
+        return
+    empty = "./.codex-plugin/store-only"
+    if data.get("skills") != empty or data.get("agents") != empty:
+        error("Codex ships store hooks only: skills and agents must select the inert store-only directory")
+    empty_path = REPO_ROOT / empty
+    if not empty_path.is_dir() or any(p.name != ".gitkeep" for p in empty_path.iterdir()):
+        error("Codex store hooks only directory must contain only its inert .gitkeep")
+    path = data.get("hooks")
+    if not isinstance(path, str) or not is_safe_relative(path):
+        return  # the generic path validator reports this
+    hooks = load_json(resolve_component_path(path))
+    mapping = hooks.get("hooks") if isinstance(hooks, dict) else None
+    allowed = {"SessionStart", "PreCompact", "SessionEnd", "UserPromptSubmit", "PostToolUse"}
+    if not isinstance(mapping, dict) or set(mapping) != allowed:
+        error("Codex hooks must match the measured store events; missing or unmeasured event")
+        return
+    for event, entries in mapping.items():
+        expected = {"type": "command", "command":
+                    '\"${PLUGIN_ROOT}/plugin-hooks/session-store.sh\" --host codex ' + event}
+        if event == "SessionEnd":
+            expected["timeout"] = 3
+        entry = {"hooks": [expected]}
+        if event == "PostToolUse":
+            entry["matcher"] = "Skill"
+        if entries != [entry]:
+            error(f"Codex {event} must run only its explicitly selected store command")
+    market = load_json(REPO_ROOT / ".agents/plugins/marketplace.json")
+    plugins = market.get("plugins") if isinstance(market, dict) else None
+    if not isinstance(plugins, list) or len(plugins) != 1 or not isinstance(plugins[0], dict) or \
+            plugins[0].get("name") != data.get("name") or market.get("name") != "Claudfather":
+        error("Codex marketplace must expose the existing Claudfather/claudna identity")
+    elif plugins[0].get("source") != {"source": "local", "path": "."}:
+        error("Codex marketplace must select its own plugin root through the measured local source grammar")
 
 
 def validate_cursor_hook_free() -> None:
@@ -368,6 +400,9 @@ def main() -> int:
         require_logo=True,
     )
     validate_marketplace_json(CURSOR_PLUGIN_DIR, cursor=True)
+    validate_all_json_files(CODEX_PLUGIN_DIR)
+    validate_plugin_json(CODEX_PLUGIN_DIR, require_hooks=True)
+    validate_codex_store_hooks()
     validate_cursor_hook_free()
     validate_version_sync()
 

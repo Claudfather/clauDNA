@@ -40,5 +40,5 @@ fi
 
 # -S: the store is stdlib-only, so skip site-packages setup (a few ms per call).
 PKG="${BASH_SOURCE[0]%/*}/../lib/claudna/session_store"
-python3 -S "$PKG" hook "${1:-}" > /dev/null 2>> "$ERR"
+python3 -S "$PKG" hook "$@" > /dev/null 2>> "$ERR"
 exit 0

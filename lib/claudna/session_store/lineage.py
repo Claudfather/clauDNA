@@ -20,6 +20,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import Callable
 
 from .fsio import atomic_write_json, ensure_dir, read_json
 
@@ -49,20 +50,21 @@ def _parent(pid: int) -> tuple[int, str] | None:
         return None
 
 
-def claude_pid(start: int | None = None) -> int | None:
+def claude_pid(start: int | None = None, *, matches: Callable[[str], bool] | None = None) -> int | None:
     """The pid of the ``claude`` process this hook runs under, or ``None``.
 
     Walks up from ``start`` (default: this process's parent) through at most a
     few ancestors — the hook wrapper, then Claude Code's per-hook shell — to
     the first one whose name contains ``claude``.
     """
+    matches = matches or (lambda name: "claude" in name)
     pid = os.getppid() if start is None else start
     for _ in range(_MAX_HOPS):
         found = _parent(pid)
         if found is None:
             return None
         ppid, name = found
-        if "claude" in name:
+        if matches(name):
             return pid
         if ppid <= 1:
             return None
