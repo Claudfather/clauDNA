@@ -95,14 +95,17 @@ python3 "<claudna-root>/scripts/env_from_file.py" --url-file <scratch>/branch.ur
 ```
 
 ### Clean up when done
+
+Retain the exact branch ID and name from each successful creation response in this task's private scratch receipt, with its project/org and parent. Before cleanup, read back that recorded branch ID and verify ownership and identity still match the receipt. Delete only that task-created disposable branch within existing destructive-action authorization; follow the branch workflow's confirmation gate when authorization is missing. Never select cleanup targets by `claude/*`, `codex/*`, a name pattern or the full branch list. Preserve pre-existing, foreign or ownership-ambiguous branches and report them instead. Use the recorded exact ID in the deletion command below.
+
 ```bash
-<NEON> branches delete "claude/analyst-..." --project-id "<PROJECT_ID>" --org-id "<ORG_ID>"
+<NEON> branches delete "<recorded-branch-id>" --project-id "<PROJECT_ID>" --org-id "<ORG_ID>"
 ```
 ```bash
 rm -r <scratch>
 ```
 
-**Always clean up `claude/*` branches when your analysis is complete.** Neon free tier has a 10-branch limit.
+Clean up only the recorded branches this task created after ownership checks and required authorization; a capacity limit never authorizes deleting another task's branch.
 
 ## Schema Inspection
 
@@ -164,7 +167,7 @@ COMMIT;
    - Include relevant numbers
    - Suggest follow-up questions
 
-7. **Clean up** — Delete any branches created during analysis, then `rm -r <scratch>`
+7. **Clean up** — Verify each recorded branch ID and delete only this task's owned disposable branches with required authorization, then remove only this task's exact private scratch directory
 
 ## Discovering the schema
 
@@ -177,7 +180,7 @@ This agent is schema-agnostic. Before answering questions, run a list-tables / d
 - Use appropriate aggregations (don't pull raw data unnecessarily)
 - Explain your reasoning as you go
 - For JSON fields, use PostgreSQL JSON operators: `->`, `->>`, `jsonb_each()`
-- Clean up branches after use — don't leave orphaned branches
+- Clean up only receipt-verified task-owned branches after use; preserve existing or foreign branches
 - First query after Neon idle timeout (~5 min) may take 2-3s to wake the compute
 
 ## Output Formats

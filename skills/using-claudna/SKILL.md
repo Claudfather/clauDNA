@@ -50,23 +50,46 @@ On Codex, inspect `plugin-hooks/codex-hooks.json`:
 
 Verify the quoted PLUGIN_ROOT command paths and all referenced files. There are five events and six handlers. Distinguish **declared**, **installed/discovered**, **trusted/enabled**, and **observed executing**. If the current host exposes hook listing, read its trust state; otherwise say trust is unknown. A manifest or file existing does not prove firing or stdout delivery. Never enable hooks as part of health. Compact capture policy belongs to Claudron, not this startup briefing.
 
-On Claude Code, inspect `plugin-hooks/hooks.json` and each referenced script: SessionStart briefing; PreToolUse permissions; PostToolUse formatting; PreCompact reflection; Notification; store lifecycle/tool handlers; and Skill telemetry. These Claude-specific hooks are not inferred to exist on Codex. Cursor remains hook-free.
+On Claude Code, inspect `plugin-hooks/hooks.json` and each referenced script. Preserve all wired event/matcher checks:
+
+| Hook | Event | Matcher |
+|---|---|---|
+| session-start | SessionStart | startup\|clear |
+| pretooluse-permissions | PreToolUse | Bash |
+| auto-format | PostToolUse | Write\|Edit |
+| precompact-reflect | PreCompact | any |
+| notify | Notification | any |
+| session-store | SessionStart, PreCompact, SessionEnd | any |
+| session-store (async) | UserPromptSubmit, PostToolUseFailure; PostToolUse | any; Skill |
+| telemetry-emit (async) | PostToolUse, PostToolUseFailure | Skill |
+
+PASS when every wired entry and referenced script exists; WARN for missing entries/scripts, listing each; FAIL for missing/unparseable hooks.json. The opt-in statusline is informational. These Claude-specific hooks are not inferred to exist on Codex. Cursor remains hook-free.
 
 ### 4. Catalog
 
 On Codex, validate each of the 36 declared paths exists, has a matching `name` and a nonempty description. No folder discovery or empty list is acceptable. Exclude `cleanup-legacy-install` (Claude-only), `promotion-intake` and `skill-scaffold` (source-checkout context). If native skill listing is exposed, compare the discovered plugin names against the declared set and report missing/extra names. Local parsing is only static health; do not claim native discovery from it. Agents remain inert prompt files: use the read-and-dispatch mapping only when actual same-host controls exist.
 
-On Claude Code scan all 39 canonical skills. Report parsed, failed and discovered counts separately where available.
+On Claude Code scan all 39 canonical skills: parse frontmatter, match `name` to directory and require a nonempty description. PASS when all parse; WARN for 1–2 failures, listing them; FAIL for 3+ failures or a missing/empty skill directory. Report parsed, failed and discovered counts separately where available.
 
 ### 5. Dependencies
 
-Read `requires` for the skill the user needs, and use `command -v` for its CLIs; report missing environment variables by presence only, never values. Codex needs `git` and a supported Python 3.9+ for the packaged store/briefing. Claude-only formatters and Node tooling are not universal Codex prerequisites. A missing optional service CLI limits only that workflow. No automatic installation or outbound service action.
+On Codex, read `requires` for the skill the user needs, and use `command -v` for its CLIs; report missing environment variables by presence only, never values. Codex needs `git` and a supported Python 3.9+ for the packaged store/briefing. Claude-only formatters and Node tooling are not universal Codex prerequisites. A missing optional service CLI limits only that workflow. No automatic installation or outbound service action.
+
+On Claude Code, retain all baseline dependency diagnostics:
+
+```bash
+for cmd in jq gh git node npx; do
+  command -v "$cmd" >/dev/null 2>&1 && printf '%s: found\n' "$cmd" || printf '%s: MISSING\n' "$cmd"
+done
+```
+
+PASS when all baseline commands exist; WARN with the missing command names and manual install guidance otherwise. In particular, missing `jq` silently disables the Claude permission hook, so report that consequence. Optional formatters (`prettier`, `ruff`, `sqlfluff`) are informational; auto-format degrades when absent. Skills' own `requires` still apply. Do not install anything during health.
 
 ### 6. Telemetry and continuity
 
 On Codex, report Claude Skill telemetry as unsupported by this hook set. Do not read a Claude telemetry file as Codex activity proof. Inspect only the authorized project's `.claude/session.md` when continuity is relevant; it is shared per-cwd compatibility state. Actual packaged startup execution and stdout delivery require a separate native canary; health does not assert them.
 
-On Claude Code, report telemetry opt-in from `CLAUDNA_TELEMETRY` presence and its explicitly configured local output when authorized. Do not print raw events or personal paths in a public receipt.
+On Claude Code, report opt-in from `CLAUDNA_TELEMETRY` (unset/disabled → INFO). When enabled, resolve `CLAUDNA_TELEMETRY_PATH` if set, else `~/.claude/telemetry/skill-events.jsonl`. Read-only: check the file exists, check writability with `test -w` without writing a probe, and report its size, line count and latest timestamp (parse the last event's timestamp only; never print its full body). PASS when enabled with a writable output file; WARN when the enabled file/directory is missing, unreadable or not writable. Do not create or repair it during health. Do not print raw events or personal paths in a public receipt.
 
 ### Results
 

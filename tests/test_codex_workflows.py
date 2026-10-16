@@ -72,3 +72,41 @@ def test_ironclad_checks_actual_dispatch_before_claiming_availability():
     text = read('skills/ironclad/SKILL.md')
     assert 'Subagents are always available' not in text
     assert '§14.1' in text and 'required independent review' in text
+
+
+def test_health_retains_claude_dependencies_without_assigning_them_to_codex():
+    health = read('skills/using-claudna/SKILL.md')
+    dependencies = health.split('### 5. Dependencies', 1)[1].split('### 6.', 1)[0]
+    assert 'On Claude Code' in dependencies and 'jq gh git node npx' in dependencies
+    assert 'command -v' in dependencies
+    assert 'On Codex' in dependencies and 'not universal Codex prerequisites' in dependencies
+
+
+def test_health_retains_claude_telemetry_diagnostics_separate_from_codex():
+    health = read('skills/using-claudna/SKILL.md')
+    telemetry = health.split('### 6. Telemetry and continuity', 1)[1].split('### Results', 1)[0]
+    for requirement in ('CLAUDNA_TELEMETRY_PATH', 'writability', 'size', 'line count', 'latest timestamp'):
+        assert requirement in telemetry
+    assert 'On Codex' in telemetry and 'unsupported' in telemetry
+    assert 'Do not print raw events' in telemetry
+
+
+def test_health_retains_claude_wired_matchers_and_scan_severity():
+    text = read('skills/using-claudna/SKILL.md')
+    claude_hooks = text.split('On Claude Code, inspect', 1)[1].split('### 4.', 1)[0]
+    assert 'PostToolUseFailure' in claude_hooks and 'Write\\|Edit' in claude_hooks
+    assert 'telemetry-emit' in claude_hooks and 'Skill' in claude_hooks
+    assert '1–2' in text and '3+' in text
+
+
+def test_resource_cleanup_selects_recorded_task_ownership_not_prefixes():
+    for path in ('agents/neon-analyst.md', 'skills/neon/branch.md'):
+        text = read(path)
+        assert 'recorded branch ID' in text
+        assert 'ownership' in text
+        assert 'Never select' in text
+        assert 'Always delete `claude/*`' not in text
+        assert 'Always clean up `claude/*`' not in text
+    worktree = read('skills/worktree/SKILL.md')
+    assert 'only the exact worktrees this task created' in worktree
+    assert 'omit branch deletion' in worktree

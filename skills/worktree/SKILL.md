@@ -62,13 +62,14 @@ Use TaskOutput with `block=false` for non-blocking checks. Wait for all agents t
 
 ### Step 6: Merge and cleanup
 
-**CRITICAL — remove worktrees BEFORE merging.** `gh pr merge --delete-branch` fails on branches still checked out in a worktree.
+Before merging, inspect `git worktree list` and the retained creation receipts. Remove only the exact worktrees this task created, after all assigned work has completed, ownership is verified and uncommitted work is preserved. Keep pre-existing, foreign and app-managed checkouts; use app owner controls for managed scratch checkouts when removal is authorized. Never select cleanup by a branch prefix or remove every listed worktree.
 
-Required order (each as a separate Bash call):
-1. `git worktree remove <path>` for every worktree, then `git worktree prune`
-2. Confirm with user, then `gh pr merge <pr> --merge --delete-branch` sequentially
-3. If remaining PRs conflict, rebase on updated main: `git fetch origin`, `git checkout <branch>`, `git rebase origin/main`, `git push --force-with-lease`, then merge
-4. Return to main: `git checkout main`, `git pull`
+If a branch remains checked out in a preserved worktree, omit branch deletion instead of removing that checkout to make `--delete-branch` succeed. Use existing merge authorization, asking only when it is missing.
+
+1. For each authorized, clean, task-created scratch checkout, remove its recorded absolute path with `git worktree remove <path>`; prune only stale metadata afterward.
+2. Merge eligible reviewed PRs sequentially using the authorized method; use `--delete-branch` only when that branch is owned and no preserved checkout needs it.
+3. Rebase or update remaining branches only within their assigned ownership and merge topology; verify the resulting diff before any authorized push.
+4. Return to the intended owned checkout. Preserve others' branches and working changes.
 
 ## Reference files
 
