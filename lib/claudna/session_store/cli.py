@@ -177,7 +177,7 @@ def _unparseable_lines(log: Path) -> tuple[int, int]:
     return torn, corrupt
 
 
-def run_hook(event: str, raw: str | bytes, env: dict[str, str] | None = None) -> str:
+def run_hook(event: str, raw: str | bytes, env: dict[str, str] | None = None, *, host: str = "claude") -> str:
     """Apply one hook event; never raise. Returns the outcome (``"error: …"`` on failure).
 
     ``raw`` may be the undecoded stdin bytes: decoding happens inside the guard,
@@ -187,10 +187,14 @@ def run_hook(event: str, raw: str | bytes, env: dict[str, str] | None = None) ->
     root = None
     try:
         root = state_root(env)
+        selected = boundaries.HOSTS.get(host)
+        if selected is None:
+            _log_hook_error(root, event, ValueError(f"unknown host {host!r}"))
+            return f"ignored: unknown host {host!r}"
         if isinstance(raw, bytes):
             raw = raw.decode("utf-8")
         payload = json.loads(raw) if raw.strip() else None
-        return boundaries.handle(event, payload, store=SessionStore(root), env=env)
+        return boundaries.handle(event, payload, store=SessionStore(root), env=env, host=selected)
     except Exception as exc:  # noqa: BLE001 — a hook must fail open, and say so
         _log_hook_error(root, event, exc)
         return f"error: {type(exc).__name__}: {exc}"
@@ -317,8 +321,11 @@ def _read(args) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
-    if argv[:1] == ["hook"] and len(argv) == 2:  # the hot path: no argparse
-        run_hook(argv[1], sys.stdin.buffer.read())
+    if argv[:1] == ["hook"] and len(argv) in (2, 4):  # the hot path: no argparse
+        if len(argv) == 2:
+            run_hook(argv[1], sys.stdin.buffer.read())
+        elif argv[1] == "--host":
+            run_hook(argv[3], sys.stdin.buffer.read(), host=argv[2])
         return 0
     if argv == ["telemetry"]:  # telemetry-emit.sh: its own entry, so it works with the store off
         from . import telemetry
@@ -394,11 +401,12 @@ def main(argv: list[str] | None = None) -> int:
     harv = sub.add_parser("harvest", help="write summarized blocks to the vault as drafts (via claudron)",
                           parents=[rooted])
     harv.add_argument("--force", action="store_true", help="run even if the last run is recent")
-    hook = sub.add_parser("hook", help="apply one Claude Code hook event (payload on stdin); always exits 0")
+    hook = sub.add_parser("hook", help="apply one host hook event (payload on stdin); always exits 0")
+    hook.add_argument("--host", default="claude")
     hook.add_argument("event")
     args = parser.parse_args(argv)
     if args.verb == "hook":
-        run_hook(args.event, sys.stdin.buffer.read())
+        run_hook(args.event, sys.stdin.buffer.read(), host=args.host)
         return 0
 
     if args.verb == "harvest":

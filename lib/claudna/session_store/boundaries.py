@@ -1,6 +1,6 @@
-"""Hook adapter: Claude Code hook payloads → store actions (spec §4.2).
+"""Neutral hook orchestration: explicit host adapters → store actions (spec §4.2).
 
-The one Claude Code-specific module. A hook wrapper pipes the hook's JSON
+A hook wrapper selects a host and pipes the hook's JSON
 payload to ``session_store hook <event>``; :func:`handle` maps it onto the
 store's lifecycle verbs:
 
@@ -37,48 +37,26 @@ from typing import Callable, Mapping
 
 from . import events as ev
 from . import activity
+from . import host_claude, host_codex
+from .host_claude import actor_from_env as actor_from_env, claude_pid_of as claude_pid_of, inherited as inherited
 from .paths import CHILD_ENV, InvalidSessionId
 from .fsio import atomic_write_json, cap_log, ensure_dir, file_size, read_json
 from .project import SessionFacts, load_lifecycle, session_facts, summary_gate
 from .store import NotAppendable, SessionHandle, SessionStore
 
+HOSTS = {"claude": host_claude.HOST, "codex": host_codex.HOST}
+
 _SOURCES = ev.REGISTRY["session.opened"].choices["source"]
 _CLOSE_REASONS = ev.HOOK_CLOSE_REASONS
 _TRIGGERS = ev.REGISTRY["segment.sealed"].choices["trigger"]
 #: Entrypoints a person drives. Anything else (``sdk-*``, CI actions, chat bots) is headless (#373, M5).
-INTERACTIVE_ENTRYPOINTS = ("cli", "claude-vscode", "claude-desktop")
+INTERACTIVE_ENTRYPOINTS = host_claude.INTERACTIVE_ENTRYPOINTS
 #: The directory entrypoint used by workers and published for external consumers (spec §8).
 ENTRYPOINT = Path(__file__).resolve().parent
 ENTRYPOINT_SCHEMA = "claudna.entrypoint/1"
 #: The agent CLI this adapter serves, recorded at open as ``session.opened.agent_cli`` (Claudlobby#2145 P1).
 #: P4's host split replaces the literal with the selected host's name.
-AGENT_CLI = "claude"
-
-
-def actor_from_env(env: Mapping[str, str]) -> dict:
-    """Who is running this session, from the environment Claude Code and Claudlobby set.
-
-    A Claudlobby bot exports ``BOT_ID`` (and ``BOT_NAME``, ``FLEET_NAME``) in
-    its ``bot.conf``. Interactive means an entrypoint a person drives
-    (:data:`INTERACTIVE_ENTRYPOINTS`); every other entrypoint — ``sdk-cli``
-    for ``claude -p``, a CI action, a chat integration — is headless. No
-    entrypoint at all (a direct call) counts as interactive.
-    """
-    entrypoint = env.get("CLAUDE_CODE_ENTRYPOINT") or None
-    if env.get("BOT_ID"):
-        kind = "bot"
-    elif entrypoint is None or entrypoint in INTERACTIVE_ENTRYPOINTS:
-        kind = "interactive"
-    else:
-        kind = "headless"
-    return {
-        "kind": kind,
-        "fleet": env.get("FLEET_NAME") or env.get("CLAUDLOBBY_FLEET") or None,
-        "bot_id": env.get("BOT_ID") or None,
-        "bot_name": env.get("BOT_NAME") or None,
-        "model": None,
-        "entrypoint": entrypoint,
-    }
+AGENT_CLI = "claude"  # compatibility constant; writes use the explicitly selected host
 
 
 def origin_from_cwd(cwd: str) -> dict:
@@ -114,15 +92,6 @@ def origin_from_cwd(cwd: str) -> dict:
 # ── actions ──────────────────────────────────────────────────────────────────
 
 
-def claude_pid_of(env: Mapping[str, str]) -> int | None:
-    """The owning Claude Code process: ``$CLAUDE_PID``, which Claude Code exports to the commands it runs."""
-    try:
-        pid = int(env.get("CLAUDE_PID") or 0)
-    except ValueError:
-        return None
-    return pid if pid > 0 else None
-
-
 def harvest_choice(env: Mapping[str, str]) -> dict:
     """This session's own harvest choice, recorded at open: opted in, and the vault it would pick."""
     return {"enabled": env.get("CLAUDNA_HARVEST") == "1", "vault": env.get("CLAUDRON_VAULT_PATH") or None}
@@ -137,7 +106,8 @@ def write_entrypoint(root: Path, *, agent_cli: str) -> Path:
     """
     plugin_root = ENTRYPOINT.parents[2]
     try:
-        manifest = read_json(plugin_root / ".claude-plugin" / "plugin.json")
+        manifest_dir = ".codex-plugin" if agent_cli == "codex" else ".claude-plugin"
+        manifest = read_json(plugin_root / manifest_dir / "plugin.json")
     except OSError:
         manifest = None
     version = manifest.get("version") if isinstance(manifest, dict) else None
@@ -151,7 +121,7 @@ def write_entrypoint(root: Path, *, agent_cli: str) -> Path:
 
 
 def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str], *,
-                   spawn: Callable[..., None], find_pid: Callable[[], int | None]) -> str:
+                   spawn: Callable[..., None], find_pid: Callable[[], int | None], host=host_claude.HOST) -> str:
     source = payload.get("source")
     transcript = payload.get("transcript_path") or None
     previous = handle.current_segment()
@@ -169,10 +139,10 @@ def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str],
     if source == "clear":  # spec §4.3: the SessionEnd(clear) before us left a link under our claude's pid
         pid = find_pid()
         parent = lineage.take_link(root, pid, sid=handle.sid) if pid else None
-    handle.open_session(source, actor=actor_from_env(env),
+    handle.open_session(source, actor=host.actor(env),
                         origin=origin_from_cwd(payload.get("cwd") or os.getcwd()),
-                        transcript_path=transcript, claude_pid=claude_pid_of(env), harvest=harvest_choice(env),
-                        agent_cli=AGENT_CLI,
+                        transcript_path=transcript, claude_pid=host.owner_pid(env), harvest=harvest_choice(env),
+                        agent_cli=host.name,
                         parent_sid=parent["sid"] if parent else None,
                         chain_id=parent["chain_id"] if parent else None)
     handle.open_segment("session_open", file_size(transcript))  # before the parent's write, which can fail
@@ -188,7 +158,7 @@ def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str],
     if unclosed.sweep_due(root):  # one stat; the walk over the store runs detached
         unclosed.mark_swept(root)
         spawn_sweep(root, env)
-    write_entrypoint(root, agent_cli=AGENT_CLI)
+    write_entrypoint(root, agent_cli=host.name)
     return f"session opened ({source})"
 
 
@@ -313,40 +283,9 @@ def _facts(handle: SessionHandle) -> SessionFacts:
     return session_facts(load_lifecycle(handle.paths).events if handle.exists() else [])
 
 
-def inherited(event: str, payload: dict, facts: SessionFacts, env: Mapping[str, str]) -> bool:
-    """Is this hook a nested ``claude`` reusing an existing session's id? (spec §11.5)
-
-    A nested child inherits ``CLAUDE_CODE_SESSION_ID`` — and its entrypoint,
-    except that a ``cli`` parent's child reports ``sdk-cli`` — so its hooks can
-    look like the parent's. Three checks, any one enough, whether the parent is
-    still open or already closed (a child can outlive its parent's SessionEnd):
-
-    * **Another Claude Code process.** Claude Code exports ``CLAUDE_PID`` to
-      what it runs; a hook whose ``CLAUDE_PID`` differs from the one the
-      session recorded belongs to someone else.
-    * **A fresh start of an existing session.** ``startup``, ``clear`` and
-      ``fork`` each begin a new session id, so one naming a session the store
-      already has can only be a child.
-    * **Another entrypoint** (the phase 2 check; kept for sessions opened
-      before ``claude_pid`` was recorded).
-
-    A ``resume`` is always let through: ``claude --resume`` must reopen the
-    session, from whatever process, whether a crash left it open or it closed.
-    Claude Code's ``CLAUDE_CODE_CHILD_SESSION=1`` is on every hook and tool
-    process, a top-level session's included (Claudlobby#2145 C11), so it is not read.
-    """
-    if facts.status == "unknown" or (event == "SessionStart" and payload.get("source") == "resume"):
-        return False
-    pid = claude_pid_of(env)
-    if facts.claude_pid and pid and pid != facts.claude_pid:
-        return True
-    if event == "SessionStart" and payload.get("source") in ("startup", "clear", "fork"):
-        return True
-    return facts.actor is not None and facts.actor["entrypoint"] != (env.get("CLAUDE_CODE_ENTRYPOINT") or None)
-
-
 def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str, str],
-           spawn: Callable[..., None] | None = None, find_pid: Callable[[], int | None] | None = None) -> str:
+           spawn: Callable[..., None] | None = None, find_pid: Callable[[], int | None] | None = None,
+           host=host_claude.HOST) -> str:
     """Apply one hook event to the store; return what happened, for tests and the error log.
 
     Raises only on a store failure (the caller logs it); every guard returns.
@@ -355,31 +294,34 @@ def handle(event: str, payload: object, *, store: SessionStore, env: Mapping[str
     """
     if env.get(CHILD_ENV) == "1":
         return "ignored: clauDNA child"
-    if event not in ("SessionStart", "PreCompact", "SessionEnd", *activity.EVENTS):
+    mapped = host.events.get(event)
+    if mapped is None:
         return f"ignored: event {event!r}"
+    event = mapped
     if not isinstance(payload, dict):
         return "ignored: payload is not an object"
+    payload = host.normalize(event, payload).as_payload()
     try:
         session = store.session(payload.get("session_id"))
     except InvalidSessionId:
         return "ignored: no valid session id"
     facts = _facts(session)
-    if inherited(event, payload, facts, env):
+    if host.inherited(event, payload, facts, env):
         return "ignored: nested child with an inherited session id"
     if event in activity.EVENTS:
         return _record_activity(session, event, payload, facts, env)
     from . import lineage
 
     spawn = spawn or spawn_summarizer
-    find_pid = find_pid or (lambda: claude_pid_of(env) or lineage.claude_pid())  # $CLAUDE_PID, else the walk
+    find_pid = find_pid or (lambda: host.owner_pid(env))
     if event == "SessionStart" and payload.get("source") != "compact":
-        return _session_start(session, payload, env, spawn=spawn, find_pid=find_pid)
+        return _session_start(session, payload, env, spawn=spawn, find_pid=find_pid, host=host)
     # A closed session's segments are final: never re-sealed, re-closed or extended by a compaction.
     # A session the store never opened (enabled mid-session) gets no phantom segment either.
     if facts.status != "open":
         return "ignored: no open session"
     if event == "SessionStart":
-        return _session_start(session, payload, env, spawn=spawn, find_pid=find_pid)
+        return _session_start(session, payload, env, spawn=spawn, find_pid=find_pid, host=host)
     if event == "PreCompact":  # seal only: the summary waits for SessionStart(compact) or SessionEnd
         trigger = payload.get("trigger") if payload.get("trigger") in _TRIGGERS else None
         return "segment sealed" if _seal(session, payload, sealed_by="precompact", trigger=trigger) is not None \

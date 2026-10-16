@@ -848,3 +848,17 @@ The clauDNA project template (`project-template/CLAUDE.md`) embeds these princip
 ---
 
 **End of guide.** For day-to-day usage of skills, see the [README](./README.md). For the changelog, see [CHANGELOG.md](./CHANGELOG.md).
+
+
+## Codex session-store hooks
+
+Codex's `Claudfather/claudna` plugin currently provides only session-store hooks. Skills and agents remain outside this adapter release. The native 0.162 canary verified local packaged hook execution; the release carries `.agents/plugins/marketplace.json` and `.codex-plugin/plugin.json` for the same marketplace identity.
+
+```bash
+codex plugin marketplace add Claudfather/clauDNA
+codex plugin add claudna@Claudfather
+```
+
+Installation does not trust hook commands. Inspect the installed commands in Codex's `/hooks` interface and approve them there before expecting store events. The plugin never edits user settings or grants itself trust. Codex SessionEnd uses a 3-second handler timeout. Store commands use `PLUGIN_ROOT`, the native plugin-root environment variable, and explicitly select `--host codex`. Direct hooks default to Claude for compatibility; consumers must choose Codex explicitly rather than sniffing environment variables.
+
+The same session-store switches apply (`CLAUDNA_SESSION_STORE=0`, `CLAUDNA_SESSION_SUMMARY=0`, `CLAUDNA_HARVEST=0`). Detached summarization still requires the existing Claude runner; a Codex-only machine does not acquire a new model provider. See the [measured adapter plan](documentation/plans/2026-10-16-codex-session-store-adapter.md) and [phase-3 canary table](documentation/plans/2026-09-30-session-store-phase-3.md).

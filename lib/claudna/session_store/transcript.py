@@ -63,7 +63,45 @@ def turn_of(record: object) -> Turn | None:
     return Turn(record["type"], text) if text else None
 
 
-def read_range(path: Path, start: int, end: int | None) -> list[Turn]:
+def codex_turn_of(record: object) -> Turn | None:
+    """Only response_item message prose; event_msg is a duplicate view, not dialogue.
+
+    Developer/system messages, world state, compacted context, reasoning, tool
+    calls and tool output are never sent to the summarizer.
+    """
+    if not isinstance(record, dict) or record.get("type") != "response_item":
+        return None
+    payload = record.get("payload")
+    if not isinstance(payload, dict) or payload.get("type") != "message":
+        return None
+    role = payload.get("role")
+    if role not in ("user", "assistant"):
+        return None
+    content = payload.get("content")
+    if not isinstance(content, list):
+        return None
+    if role == "user":
+        # Native user-role records also carry injected environment/agent context.
+        # Positive per-item classification is required; absent or torn metadata
+        # must never turn that context into apparent user prose.
+        metadata = payload.get("internal_chat_message_metadata_passthrough")
+        kinds = metadata.get("content_item_kinds") if isinstance(metadata, dict) else None
+        if not isinstance(kinds, list) or len(kinds) != len(content):
+            return None
+        blocks = [block for block, kind in zip(content, kinds) if kind == "user.text"]
+        wanted = "input_text"
+    else:
+        if payload.get("phase") not in ("commentary", "final_answer"):
+            return None
+        blocks, wanted = content, "output_text"
+    text = "\n".join(b["text"] for b in blocks if isinstance(b, dict) and
+                     b.get("type") == wanted and isinstance(b.get("text"), str)).strip()
+    if role == "user":
+        text = _INJECTED.sub("", text).strip()
+    return Turn(role, text) if text else None
+
+
+def read_range(path: Path, start: int, end: int | None, *, agent_cli: str = "claude") -> list[Turn]:
     """The prose turns whose lines lie wholly inside ``[start, end)`` of ``path``.
 
     Streams line by line up to ``end`` (a segment can be many MB), and only
@@ -71,6 +109,9 @@ def read_range(path: Path, start: int, end: int | None) -> list[Turn]:
     ``FileNotFoundError`` when the transcript is gone (Claude Code deletes old
     ones); the caller records that as a skip.
     """
+    if agent_cli not in ("claude", "codex"):
+        raise ValueError(f"unknown transcript agent_cli {agent_cli!r}")
+    decode = codex_turn_of if agent_cli == "codex" else turn_of
     turns = []
     with open(path, "rb") as fh:
         pos = start
@@ -83,11 +124,13 @@ def read_range(path: Path, start: int, end: int | None) -> list[Turn]:
             pos += len(line)
             if (end is not None and pos > end) or not line.endswith(b"\n"):
                 break  # a line the range cuts, or one still being written
-            if b'"type":"user"' not in line and b'"type":"assistant"' not in line and \
+            if agent_cli == "claude" and b'"type":"user"' not in line and b'"type":"assistant"' not in line and \
                     b'"type": "user"' not in line and b'"type": "assistant"' not in line:
                 continue
+            if agent_cli == "codex" and b'"response_item"' not in line:
+                continue
             try:
-                turn = turn_of(json.loads(line))
+                turn = decode(json.loads(line))
             except (ValueError, UnicodeDecodeError):
                 continue
             if turn is not None:

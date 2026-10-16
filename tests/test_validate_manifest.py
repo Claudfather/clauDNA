@@ -48,6 +48,11 @@ def build_repo(tmp_path: Path) -> Path:
         for name in ("plugin.json", "marketplace.json"):
             shutil.copy2(REPO_ROOT / manifest_dir / name, root / manifest_dir / name)
 
+    (root / ".codex-plugin/store-only").mkdir(parents=True)
+    (root / ".codex-plugin/store-only/.gitkeep").write_text("")
+    shutil.copy2(REPO_ROOT / ".codex-plugin/plugin.json", root / ".codex-plugin/plugin.json")
+    (root / ".agents/plugins").mkdir(parents=True)
+    shutil.copy2(REPO_ROOT / ".agents/plugins/marketplace.json", root / ".agents/plugins/marketplace.json")
     (root / "skills").mkdir()
     # A cursor manifest may declare skills as an explicit list of individual
     # directories rather than one directory string (#340); each entry then
@@ -67,6 +72,7 @@ def build_repo(tmp_path: Path) -> Path:
     (root / "assets" / "logo.svg").write_text("<svg />\n")
     (root / "plugin-hooks").mkdir()
     (root / "plugin-hooks" / "hooks.json").write_text("{}\n")
+    shutil.copy2(REPO_ROOT / "plugin-hooks/codex-hooks.json", root / "plugin-hooks/codex-hooks.json")
     return root
 
 
@@ -371,3 +377,73 @@ def test_cursor_manifest_shipping_a_restricted_skill_is_rejected(tmp_path):
     assert code != 0
     assert marked in output
     assert "#340" in output
+
+
+def test_codex_version_mismatch_is_rejected(tmp_path):
+    root = build_repo(tmp_path)
+    patch(root, ".codex-plugin/plugin.json", "version", "0.99.0")
+    code, output = run_gate(root)
+    assert code != 0
+    assert "version mismatch" in output
+
+
+def test_codex_skill_discovery_is_explicitly_disabled(tmp_path):
+    root = build_repo(tmp_path)
+    patch(root, ".codex-plugin/plugin.json", "skills", "./skills")
+    code, output = run_gate(root)
+    assert code != 0
+    assert "store hooks only" in output
+
+
+def test_codex_unsupported_hook_is_rejected(tmp_path):
+    root = build_repo(tmp_path)
+    hooks = root / "plugin-hooks/codex-hooks.json"
+    doc = json.loads(hooks.read_text())
+    doc["hooks"]["PostToolUseFailure"] = doc["hooks"]["PostToolUse"]
+    hooks.write_text(json.dumps(doc))
+    code, output = run_gate(root)
+    assert code != 0
+    assert "unmeasured" in output
+
+
+def test_codex_empty_arrays_do_not_accidentally_allow_default_discovery(tmp_path):
+    root = build_repo(tmp_path)
+    for component in ("skills", "agents"):
+        patch(root, ".codex-plugin/plugin.json", component, [])
+    code, output = run_gate(root)
+    assert code != 0
+    assert "store hooks only" in output
+
+
+def test_codex_inert_component_directory_cannot_grow_content(tmp_path):
+    root = build_repo(tmp_path)
+    (root / ".codex-plugin/store-only/SKILL.md").write_text("unexpected skill")
+    code, output = run_gate(root)
+    assert code != 0
+    assert "inert .gitkeep" in output
+
+
+def test_release_bumps_all_three_manifests_together(tmp_path):
+    root = build_repo(tmp_path)
+    shutil.copy2(REPO_ROOT / "scripts/release.sh", root / "scripts/release.sh")
+    (root / "CHANGELOG.md").write_text("# Changelog\n\n## [Unreleased]\n\n### Added\n- Fixture release.\n")
+    for args in (["init", "-q"], ["config", "user.name", "Fixture"],
+                 ["config", "user.email", "fixture@example.invalid"], ["add", "."],
+                 ["commit", "-qm", "fixture"]):
+        subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
+    result = subprocess.run(["bash", "scripts/release.sh", "patch"], cwd=root, text=True, capture_output=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    versions = [json.loads((root / component / "plugin.json").read_text())["version"]
+                for component in (".claude-plugin", ".cursor-plugin", ".codex-plugin")]
+    assert len(set(versions)) == 1 and versions[0] != json.loads((REPO_ROOT / CLAUDE).read_text())["version"]
+
+
+def test_codex_marketplace_uses_native_source_grammar(tmp_path):
+    root = build_repo(tmp_path)
+    path = root / ".agents/plugins/marketplace.json"
+    doc = json.loads(path.read_text())
+    doc["plugins"][0]["source"] = {"source": "github", "repo": "Claudfather/clauDNA"}
+    path.write_text(json.dumps(doc))
+    code, output = run_gate(root)
+    assert code != 0
+    assert "measured local source grammar" in output
