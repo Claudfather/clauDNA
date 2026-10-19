@@ -2,7 +2,7 @@
 
 ## What this project is
 
-clauDNA is the canonical set of skills, hooks, and agents for Claude Code, distributed as a marketplace plugin; another agent host receives the surfaces its plugin model can carry, each by an approval-gated decision — Cursor: skills and agents, no hooks (#315); Codex: the session store's hooks only (Claudlobby#2145 F7/F12; skills on Codex are clauDNA#404's). Install it and any Claude Code instance gains a curated set of well-tested capabilities.
+clauDNA is the canonical set of skills, hooks, and agents for Claude Code, distributed as a marketplace plugin; another agent host receives the surfaces its plugin model can carry, each by an approval-gated decision — Cursor: skills and agents, no hooks (#315); Codex: 36 selected engineering skills, session-store and startup hooks, and bundled role prompts dispatched only through supported same-host controls (#404; no native agent registration). Install it and any Claude Code instance gains a curated set of well-tested capabilities.
 
 It's the "genome" of the Claudfather ecosystem — what every bot inherits at startup. Skills here are procedural (how to do X), not referential (what we know about X). Reference knowledge lives in Claudron, evaluation happens in Claudosseum, runtime is Claudlobby. clauDNA's job is just: ship the canonical capabilities, predictably, with version discipline.
 
@@ -29,7 +29,7 @@ Materially smarter Claude Code with one install.
 
 **Consumes:** promotions from Claudosseum (champions ready to ship); manual additions during the early phase.
 
-**Produces:** a marketplace plugin that Claudlobby bots install and any Claude Code (or Cursor) user can install — the "what skills exist" answer for the entire ecosystem.
+**Produces:** a marketplace plugin that Claudlobby bots install and Claude Code, Cursor or Codex users can install, each with its declared host scope ([Codex workflow scope and evidence](documentation/plans/2026-10-16-codex-engineering-workflows.md)) — the "what skills exist" answer for the entire ecosystem.
 
 **Sibling boundaries:**
 - clauDNA writes only to the user's disk — the session store (spec `documentation/specs/2026-09-28-session-store-design.md`) and, with `CLAUDNA_TELEMETRY=1`, the `skill_invocation` lines Claudosseum ingests (`plugin-hooks/telemetry-emit.sh`, `lib/claudna/session_store/telemetry.py`); it never transmits. Scoring and any hosted telemetry are Claudosseum's.
