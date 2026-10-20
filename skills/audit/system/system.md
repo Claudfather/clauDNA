@@ -84,13 +84,36 @@ Breadth lanes (surface obvious risk; **defer depth** — do not reproduce the de
 
 ---
 
-## Phase 5: Triage & tracker reconciliation — THE GATE
+## Phase 5: Refutation, triage & tracker reconciliation — THE GATE
 
 <HARD-GATE>
 No finding proceeds to drafting until it has been reconciled against the live issue tracker. This gate runs in **every** output mode (`session` and `github`) — reconciliation is a triage step, not a filing courtesy. Skipping it produces duplicate work against a tracker the maintainer is actively grooming, which is worse than filing nothing.
+
+Before reconciliation, every `CRITICAL` or `HIGH` candidate needs an attempted
+refutation by a fresh reviewer. `MEDIUM`/`LOW` candidates skip this extra pass.
 </HARD-GATE>
 
-To reconcile, the orchestrator now reads the `system/findings-<lane>.md` files from scratch (still read-only — this is why the findings are on disk: retrievable at the gate without having flowed through the fan-out returns). For any lane whose subagent returned `SCRATCH-WRITE-BLOCKED` (write-blocked fallback, `subagent-prompts.md`), reconcile from its compact inline table instead — the file is absent by design, not by error. Assemble the deduplicated candidate list, then:
+The orchestrator now reads the `system/findings-<lane>.md` files from scratch (still read-only — this is why the findings are on disk: retrievable at the gate without having flowed through the fan-out returns). For any lane whose subagent returned `SCRATCH-WRITE-BLOCKED` (write-blocked fallback, `subagent-prompts.md`), use its compact inline table instead — the file is absent by design, not by error. Assemble the deduplicated candidate list, then:
+
+**Refute severe candidates.** If any are `CRITICAL`/`HIGH`, dispatch one fresh
+`general-purpose` reviewer per finding or shared failure-mechanism cluster using
+`subagent-prompts.md` Part C. Give it the intake, concrete plugin/project/scratch
+paths, candidate claims and source references, without the prior reviewer's
+reasoning history. Reuse native dispatch and its existing parent/child logging;
+the reviewer amends the existing lane findings, with only one writer per file at
+a time. No extra run record or artifact family is needed.
+
+Wait for actual completion and read the amendments (or compact write-blocked
+verdicts). Drop refuted claims, narrow corrected ones to the surviving branches,
+and carry those amendments through reconciliation and Phase 6 authoring. Keep
+impact and certainty separate: unavailable runtime evidence stays unverified,
+not automatically refuted or lower severity. With no severe candidates, skip
+dispatch. If fresh dispatch/wait is unavailable or fails, report the refutation
+as incomplete and stop before drafting; an inline pass cannot satisfy independent
+review. All exits retain the shared scratch owner's automatic finalizer under
+the audit-lens contract §5.
+
+Reconcile the surviving candidates:
 
 1. **Fetch the tracker.** `gh issue list --repo <owner/repo> --state open --limit 300` plus the recently-closed set (`--state closed --limit 60`). **A bulk fetch can miss issues outside that window**, so for each candidate also write its key terms to `<terms-file>` in `<scratch>` with the Write tool and run a targeted `gh issue list --repo <owner/repo> --search="$(cat <terms-file>)" --state all --limit 50` — `--state all` is mandatory here: `gh issue list` defaults to open-only, and the `regressed` bucket depends on the search returning *closed* matches. Bucket from the returned state: open exact match → `duplicate of #N`; open related → `extends #N`; closed exact/near recurrence → `regressed #N`; no match → `net-new`. If the repo has no GitHub remote or `gh` is unavailable, say so and reconcile against whatever tracker exists (`documentation/`, a TODO file) — never silently skip.
 2. **Reconcile every candidate** into exactly one bucket:
