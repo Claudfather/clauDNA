@@ -263,14 +263,14 @@ If you enable sandbox, you may also want these filesystem extensions. The skills
 These ship with the plugin (`plugin-hooks/hooks.json`) and auto-wire on enable:
 
 - `pretooluse-permissions.sh` — PreToolUse, `Bash` (permission expansion)
-- `auto-format.sh` — PostToolUse, `Write|Edit`
+- `auto-format.sh` — PostToolUse, `Write|Edit` (Python: layout only, and only where the committed file is already in ruff's default style; every formatter change is reported to the session)
 - `notify.sh` — Notification
 - `precompact-reflect.sh` — PreCompact (the capture prompt, §3.5)
 - `session-start.sh` — SessionStart, `startup|clear` (the briefing, §3.6)
 - `session-store.sh` (§3.7) — SessionStart, PreCompact and SessionEnd (5 s timeout); async on UserPromptSubmit, PostToolUse (`Skill`) and PostToolUseFailure
 - `telemetry-emit.sh` (§8) — async on PostToolUse and PostToolUseFailure, both `Skill`
 
-You don't need to add anything to `settings.json` for them. To verify they're firing, run `/plugin list` and confirm `claudna` is enabled, then trigger a `Write` to a `.py` file and watch `ruff` run.
+You don't need to add anything to `settings.json` for them. To verify they're firing, run `/plugin list` and confirm `claudna` is enabled, then edit a committed `.py` file that is already in ruff's default style so that one line is not (for example `x = {'a':1}`): `ruff format` reformats that line, and the session is told which line changed. A `.py` file that is not in that style, or has no committed version, is left as written.
 
 ### 3.5 PreCompact capture hook
 

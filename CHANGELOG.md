@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **For Python, the auto-format hook changes layout, never code, and no formatter changes a file silently** (#419). It runs no lint fix on Python: ruff's default `--fix` deletes imports that look unused, such as a pytest fixture imported from another module, and every test that requests the fixture then errors at setup. Python is formatted only when the file's committed version has content and `ruff format --isolated` would leave it unchanged, so a one-line edit in a repo whose Python is not in ruff's default style no longer rewrites the whole file. A file with no committed version, such as a new one, is left as written. Each change any formatter makes, prettier's and `sqlfluff fix`'s included, comes back to the session as PostToolUse `additionalContext` naming the formatter, the lines it touched and how many. `--isolated` stays, so the repo's ruff configuration is still not read.
+
 ## [0.30.0] - 2026-10-16
 
 ### Added
