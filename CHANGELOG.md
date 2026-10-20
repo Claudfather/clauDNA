@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-10-20
 ### Added
 - **Bounded delegation between Claude Code and Codex** reuses a clean owned workspace, records provider-qualified child links and separate completion/acceptance/cleanup in session history, and automatically releases its small operational record. SessionStart retries only known-terminal cleanup; unknown workers are never reaped or replaced heuristically. No per-job directories, copied transcripts, worktree creation, resume manager, account switching or direct vault writes. Native Codex 0.162.1 and Claude 2.1.304 helper probes passed, including a Claude Manual-mode diagnostic denial that remained enforced while independently permitted commands completed the task. Claude uses native `--permission-prompts none`; denial metadata stays separate from completion and requires parent review. No permission widening, launcher retries or permission broker. The skill ships to Claude Code and Codex; Cursor's catalog is unchanged. Deterministic CI uses controlled subprocesses, not model calls.
 
