@@ -27,7 +27,7 @@
   "document": {
     "label": "claudna-404-codex-workflows-plan",
     "path": "documentation/plans/2026-10-16-codex-engineering-workflows.md",
-    "sha256": "7925be1f5458962c28f4f3bb26a4ba2a53fa54cd6dd818d900110b38d23d9201",
+    "sha256": "cdcd9296d5e5712100a446ae85bc3b4546acba84728630f42d35b61d50a5d9c4",
     "status": "active; implementation and native acceptance pending"
   },
   "evidence": [
@@ -40,7 +40,7 @@
       "sha256": "fed1310c41723d33cdf050bccf8d4394be4754f090705d21a9ad70294a3c029f"
     },
     {
-      "label": "installed-artemis-codex-tool-adapter",
+      "label": "installed-codex-tool-adapter",
       "sha256": "02554cb4a08168bfd78fac22c184d97444351db08c9f4fbecd8633eb0266675b"
     },
     {

@@ -35,7 +35,7 @@ The original private P0 final report has SHA256 `4d13c914c1227807d736293573b24e1
 
 Keep one canonical skill tree. `.codex-plugin/plugin.json` declares the selected existing skill directories explicitly; its `agents` component remains the tracked inert directory. Agent prompt files remain ordinary bundled reference content, read and filled by a workflow before it dispatches a Codex subagent.
 
-Add `skills/_shared/codex-tools.md` as clauDNA-owned procedure, adapted from the installed Artemis Codex adapter's mapping. Selected skill bodies point to this mapping before host-specific actions. Native names are translated into available Codex controls; absent controls cause a documented inline/read-only fallback or an explicit capability limitation. Tool grants, background mode, agent memory and Claude model aliases are never invented.
+Add `skills/_shared/codex-tools.md` as clauDNA-owned procedure for mapping host tools. Selected skill bodies point to this mapping before host-specific actions. Native names are translated into available Codex controls; absent controls cause a documented inline/read-only fallback or an explicit capability limitation. Tool grants, background mode, agent memory and Claude model aliases are never invented.
 
 Codex continues to use P4's store hooks. A separately named SessionStart `startup` entry runs the existing continuity briefing through a quoted `PLUGIN_ROOT` command with an explicit five-second native timeout. It neither claims the knowledge-recall role nor runs at compact. The complete Claudron owner pack supplies recall/capture instructions when composed by #2149; no second frontend compact prompt is added here.
 
