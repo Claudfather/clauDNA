@@ -712,6 +712,13 @@ Apply `engineering-principles.md` ("Applying During Implementation" checklist). 
 
 **A. Deliverable Audit** — Every deliverable in the phase doc must be marked `COMPLETE` or skipped with justification. Present audit table. Fix gaps.
 
+For visual/user-facing deliverables, read `../_shared/visual-evidence.md`: audit
+actual-app capture, source freshness and behavioral checks, then carry the packet
+through PR publication and authenticated rendering/playback verification. These
+states stay separate until the PR exists. The outer build retains ownership of
+borrowed scratch and finalizes it before its terminal result. Backend-only work
+uses command/request evidence without media.
+
 **B. Verification Checklist** — Run the plan's checklist: tests, lint, types, docs, manual checks. Present results. Fix failures.
 
 If verification exposes a lapsed exemption, silent safeguard or a CI failure apparently unrelated to the change, use `/claudna:audit booby-traps`'s focused spot check before suppressing the check or renewing an exception. Return to this checklist afterward; do not add a full audit to every build.

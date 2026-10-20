@@ -68,6 +68,14 @@ Not all evidence is equal -- the command must prove *this* claim:
 
 A behavioral claim backed only by "tests pass" is unverified.
 
+For visual or user-facing PR claims, read `../_shared/visual-evidence.md`. Require
+current-source capture, local media validation, native attachment publication and
+authenticated verification on the saved PR before claiming evidence delivered.
+Keep those states separate; a URL or composer preview is insufficient. Verify PNG
+rendering directly and video playback in the native player, without round-trip
+downloads. The packet owner finalizes owned scratch and handles before the terminal
+result. Backend/data-only claims continue to use command/request evidence.
+
 ## Red Flags — STOP
 
 If you catch yourself doing any of these, STOP and run verification:

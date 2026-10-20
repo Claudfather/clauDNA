@@ -30,6 +30,12 @@ allowed-tools:
 
 Browser-automation framework with modes for different QA tasks. Uses a fast headless browser (~100ms per command) for navigating, interacting, screenshotting, and verifying state.
 
+For PR visual evidence in test, report or browse mode, read
+`../_shared/visual-evidence.md`. Capture the actual app with proportionate
+screenshots/video and source provenance, carry the packet to shipping, and reuse
+its native publication, rendered-media verification and automatic finalizer.
+Backend-only work needs command/request evidence, without compulsory media.
+
 ## Mode dispatch
 
 Arguments to dispatch (first token = mode, the rest belong to the mode): $ARGUMENTS

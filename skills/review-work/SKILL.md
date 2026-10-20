@@ -14,6 +14,13 @@ requires:
 
 One engine for code review — `changes`, `pr`, and `multi-pr` as modes over the same verification discipline: evidence before approval, findings ranked by severity, never a rubber stamp.
 
+For visual or user-facing changes, read `../_shared/visual-evidence.md` and assess
+the packet's source freshness, behavioral proof and actual published rendering/
+playback. Follow the selected mode's provenance gate before executing app code.
+Local changes may have capture/validation ready while PR verification is pending;
+report those states separately. Reuse the packet and its owner for cleanup rather
+than recapturing by default. Backend-only changes need no media.
+
 ## Mode dispatch
 
 Arguments to dispatch (first token = mode, the rest belong to the mode): $ARGUMENTS

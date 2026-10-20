@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Shared PR visual evidence workflow** connects QA, review, verification, shipping and the build deliverable audit. Actual-app screenshots and native Playwright video carry source provenance through local validation, GitHub user attachments and authenticated rendering/playback checks. PNGs are verified directly without download copies; the owning workflow finalizes its scratch and browser/server handles before returning. Backend-only work keeps command/request evidence. No new skill, runtime dependency, uploader service, retry loop or cleanup daemon (#409).
+
 ## [0.32.0] - 2026-10-20
 ### Added
 - **`audit booby-traps`** examines decaying safeguards, person dependence, dead-end outputs, duplicated registries and hidden blast radius. A focused spot check connects relevant build/review failures to the existing audit engine without another mandatory sweep. The thin router, publish path and session relationships stay shared.
