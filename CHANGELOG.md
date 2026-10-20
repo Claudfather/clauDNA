@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Shared PR visual evidence workflow** connects QA, review, verification, shipping and the build deliverable audit. Actual-app screenshots and native Playwright video carry source provenance through local validation, GitHub user attachments and authenticated rendering/playback checks. PNGs are verified directly without download copies; the owning workflow finalizes its scratch and browser/server handles before returning. Backend-only work keeps command/request evidence. No new skill, runtime dependency, uploader service, retry loop or cleanup daemon (#409).
+- **Shared PR visual evidence workflow** connects QA, review, verification, shipping and the build deliverable audit. One risk/claim-based decision selects no media for mechanical changes, targeted screenshots for meaningful appearance changes, or short video where screenshots cannot demonstrate behavior. All callers honor that choice; only selected media gets capture, validation, native GitHub publication and authenticated rendering/playback checks. PNGs are verified directly without download copies; the owning workflow automatically finalizes any scratch and browser/server handles before returning. No new skill, runtime dependency, uploader service, retry loop or cleanup daemon (#409).
 
 ## [0.32.0] - 2026-10-20
 ### Added

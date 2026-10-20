@@ -14,12 +14,14 @@ requires:
 
 One engine for code review — `changes`, `pr`, and `multi-pr` as modes over the same verification discipline: evidence before approval, findings ranked by severity, never a rubber stamp.
 
-For visual or user-facing changes, read `../_shared/visual-evidence.md` and assess
-the packet's source freshness, behavioral proof and actual published rendering/
-playback. Follow the selected mode's provenance gate before executing app code.
-Local changes may have capture/validation ready while PR verification is pending;
-report those states separately. Reuse the packet and its owner for cleanup rather
-than recapturing by default. Backend-only changes need no media.
+Read `../_shared/visual-evidence.md` §1 and assess the existing evidence decision
+against the change's risk and claims; change it only for a concrete gap or changed
+scope/requirements. `none` needs no media packet; screenshots need no video.
+For selected media, assess source freshness, behavioral proof and published
+rendering/playback as applicable. Follow the mode's provenance gate before executing
+app code. Local capture/validation may be ready while PR verification is pending;
+report those states separately. Carry the same decision and reuse the packet and
+its owner for automatic cleanup, without recapturing by default.
 
 ## Mode dispatch
 

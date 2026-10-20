@@ -17,12 +17,14 @@ Two-mode pipeline for landing work. Use whichever scope you want.
 - **Commit mode** — stage and commit locally, push if tracked. No PR. (`/claudna:ship commit`, or say "commit"/"quick commit")
 - **PR mode** (default) — rebase onto the base branch, verify, review the diff, commit, push, open a PR. (`/claudna:ship`, `/claudna:ship pr`, or say "ship")
 
-For visual or user-facing PRs, read `../_shared/visual-evidence.md`. Reuse the
-caller's evidence packet and owner, or become its owner if creating it here.
-Prepare/validate missing evidence before publication; after updating the base,
-recapture affected evidence unless exact runtime inputs still match. Check both
-the diff and feature history for generated media before pushing. Keep the packet
-outside Git and carry it through PR creation. Backend-only PRs need no media.
+Read `../_shared/visual-evidence.md` §1 before preparing PR media. Reuse the caller's
+evidence decision and reason; choose them here only if absent, and revise only for
+changed scope, risk, claims or requirements. `none` needs no packet or media gates;
+screenshots need no recording or playback. For selected media, reuse the packet
+and owner or become its owner if creating it here. Prepare/validate missing selected
+evidence; after updating the base, recapture affected evidence unless exact runtime
+inputs still match. Check both the diff and feature history for generated media
+before pushing. Keep the packet outside Git and carry the decision into the PR.
 
 ---
 
@@ -64,13 +66,14 @@ Example: `feat: add product search functionality`
       - `## Summary` — what changed and why
       - `## Test plan` — testing done
       - `## Notes for reviewers` — anything reviewers should look at closely (risky areas, deliberate omissions, follow-ups); omit only when there's genuinely nothing to call out
-11. For visual/user-facing changes, embed the native attachment links with their
-    provenance/results in the PR evidence section and verify the saved PR's actual
-    rendering/playback per `../_shared/visual-evidence.md`. Do not claim delivered
-    evidence from upload links alone. Complete the packet owner's automatic
-    finalizer on this path and on blocked/failed exits; a nested caller remains
-    responsible for its borrowed root. Return the PR URL and actual evidence and
-    cleanup states to the user.
+11. Include the shared evidence decision and reason in the PR verification note.
+    For selected media only, embed native attachment links and provenance/results,
+    then verify the saved PR's rendering and, for video, playback per
+    `../_shared/visual-evidence.md`. Do not claim delivered media from links alone
+    or block a `none` decision on absent media. Complete the owner's automatic
+    finalizer for any owned resources on success and blocked/failed exits; a nested
+    caller remains responsible for its borrowed root. Return the PR URL and actual
+    evidence and cleanup states to the user.
 
 Does NOT merge — that's the user's call. If there are any issues at any step,
 finalize owned resources, then stop and report them.

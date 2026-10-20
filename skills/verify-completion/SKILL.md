@@ -68,13 +68,15 @@ Not all evidence is equal -- the command must prove *this* claim:
 
 A behavioral claim backed only by "tests pass" is unverified.
 
-For visual or user-facing PR claims, read `../_shared/visual-evidence.md`. Require
-current-source capture, local media validation, native attachment publication and
-authenticated verification on the saved PR before claiming evidence delivered.
-Keep those states separate; a URL or composer preview is insufficient. Verify PNG
-rendering directly and video playback in the native player, without round-trip
-downloads. The packet owner finalizes owned scratch and handles before the terminal
-result. Backend/data-only claims continue to use command/request evidence.
+Read `../_shared/visual-evidence.md` §1 and honor the shared evidence decision and
+reason. `none` uses relevant checks and behavioral evidence without media gates;
+screenshots require no video. For selected media, require current-source capture,
+local validation, native publication and authenticated verification on the saved
+PR before claiming that media delivered. Keep those states separate; a URL or
+composer preview is insufficient. Verify PNG rendering directly; verify native
+playback only for selected video. No round-trip downloads. The owner finalizes
+owned scratch and handles before the terminal result, including after a decision
+changes to `none`.
 
 ## Red Flags — STOP
 
