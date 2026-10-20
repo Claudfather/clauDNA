@@ -16,6 +16,7 @@ Do NOT approve or express satisfaction with changes until verification commands 
    - Does it follow project conventions?
    - Are there any security concerns?
    - Is error handling adequate?
+   - If a lapsed exemption, silent safeguard or unexplained gate failure appears, use `/claudna:audit booby-traps`'s focused spot check, then resume this review; no full sweep is required.
 4. **Verify claims with evidence** — before expressing any positive assessment:
    - If tests exist: run them and confirm output
    - If linting is configured: run the linter and confirm clean
@@ -38,7 +39,7 @@ If you catch yourself thinking any of these during review, STOP — you are abou
 - "I already reviewed this mentally" — Mental review is not review. Show your work — the summary in Step 4 proves you actually analyzed each file.
 - "The diff is clean" — Clean diffs can contain logic errors, missing error handling, security vulnerabilities, and broken edge cases. "Clean" means well-formatted, not correct.
 - Providing a summary without mentioning a single specific file or line — Generic feedback ("looks good overall") means you didn't actually review the changes. Name files. Cite lines.
-- Recommending "commit" without checking for test coverage — Untested changes are incomplete changes. If there are no tests, that IS a concern to flag.
+- Recommending "commit" without adequate verification — identify the changed behavior and required project checks. Flag a concrete uncovered failure; missing matching test files alone do not justify new tests.
 
 ## Common Rationalizations
 

@@ -96,6 +96,8 @@ Logic that contradicts documented behavior; unhandled edge cases; wrong assumpti
 
 Non-idempotent jobs; missing or unsafe retries; missing timeouts; missing circuit breakers; incomplete failure recovery; poor logging; missing metrics; no alerting for critical failures; no health checks; incomplete cleanup after partial failure; deployment assumptions not reflected in code; local↔production behavior divergence.
 
+For decaying safeguards, person-dependent controls or hidden blast radius, record the concrete candidate and note `/claudna:audit booby-traps` as the focused follow-up. Do not automatically launch another full sweep.
+
 ### Lane 3 — Backend performance & scalability *(primary)*
 
 N+1 queries; full table scans where an index/partition filter belongs; inefficient loops; unbounded memory; loading whole datasets unnecessarily; poor server-side pagination; missing/invalid server-side caching; hot paths doing unnecessary serialization; over- or under-materialized data jobs; inefficient joins. (Anything client-side — rendering, scroll/layout, fetch waterfalls, state/memoization, bundle & loading — belongs to `/claudna:audit frontend-perf`; do not cover it here.)

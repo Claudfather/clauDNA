@@ -5,6 +5,7 @@ Invoked by /claudna:audit in tech-debt mode — find, report, and plan remediati
 ## When NOT to use
 
 - For security-specific vulnerabilities → use `/claudna:audit security`
+- For decaying safeguards, person dependence or hidden operational blast radius → use `/claudna:audit booby-traps`
 - For frontend performance issues → use `/claudna:audit frontend-perf`
 - For a portfolio view across many repos → use `/claudna:audit repo-health`
 - For product feature gaps → use `/claudna:product-enhance`
@@ -104,9 +105,9 @@ Use the Grep tool with pattern `TODO|FIXME|HACK|XXX`, glob `*.{py,js,ts}`, `outp
 
 Use the Glob tool with the detected language patterns to find source files, then run `wc -l` on the results to identify large files. Files over 300 lines may need splitting (see SRP at #4 above for the reasoning).
 
-#### 8. Missing tests
+#### 8. Verification gaps
 
-Compare source files to test files — flag untested modules.
+Identify meaningful behavior or contracts with no adequate verification, naming the concrete failure that missing coverage would catch. A source file without a corresponding test file is not itself a finding. Reuse existing checks, static tracing, focused reproductions or manual evidence when sufficient; recommend new tests only for a specific uncovered behavior or regression, while keeping required project checks.
 
 #### 9. Outdated dependencies
 
