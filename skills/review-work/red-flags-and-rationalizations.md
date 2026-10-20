@@ -5,7 +5,7 @@
 If you catch yourself thinking any of these during PR review, STOP -- you are about to approve without adequate scrutiny:
 
 - "The PR is well-structured" -- Structure is not correctness. A beautifully organized PR can contain logic errors, missing edge cases, and security holes. Structure is Step 1 of review, not the whole review.
-- "Tests pass" -- Tests passing means the *existing* tests pass. It does NOT mean the change is tested. Check: are there NEW tests for the NEW behavior? Do the existing tests actually cover the changed code paths?
+- "Tests pass" -- Check whether existing evidence covers the changed behavior. Add tests only for a concrete uncovered risk or regression; a new test file is not required for every change.
 - "The author is experienced" -- Experience does not prevent bugs. Experienced engineers ship security vulnerabilities, off-by-one errors, and race conditions. Review the code, not the resume.
 - "This is a refactor, low risk" -- Refactors are among the highest-risk changes. They touch many files, change behavior boundaries, and break assumptions. A "safe refactor" still needs line-by-line review.
 - "I've seen this pattern before" -- Familiarity is not review. The specific instance may have a bug even if the pattern is sound.
@@ -19,7 +19,7 @@ If you catch yourself thinking any of these during PR review, STOP -- you are ab
 | Excuse | Reality |
 |--------|---------|
 | "The PR is well-structured" | Structure != correctness. Review the logic, not the formatting. |
-| "Tests pass" | Passing tests may not cover the change. Check for NEW tests on NEW behavior. |
+| "Tests pass" | Check coverage of the changed behavior; require new tests only for a concrete verification gap. |
 | "The author is experienced" | Experience != infallibility. Review code, not credentials. |
 | "This is a refactor, low risk" | Refactors break things. They touch many files and shift assumptions. |
 | "It's a small PR" | Small PRs get proportional review -- not no review. Check correctness, edge cases, security. |

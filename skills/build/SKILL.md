@@ -714,6 +714,8 @@ Apply `engineering-principles.md` ("Applying During Implementation" checklist). 
 
 **B. Verification Checklist** — Run the plan's checklist: tests, lint, types, docs, manual checks. Present results. Fix failures.
 
+If verification exposes a lapsed exemption, silent safeguard or a CI failure apparently unrelated to the change, use `/claudna:audit booby-traps`'s focused spot check before suppressing the check or renewing an exception. Return to this checklist afterward; do not add a full audit to every build.
+
 ---
 
 ### Step 6.5: Simplification Pass

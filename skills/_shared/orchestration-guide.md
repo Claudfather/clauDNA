@@ -12,7 +12,7 @@ Shared reference for skills that use subagent orchestration to produce design do
 
 ## 1. Scratch Directory
 
-At orchestration start, make a private scratch directory for this session, once:
+When the workflow first needs scratch files, make one private scratch directory for this run. A short inline check that writes nothing needs none:
 
 ```bash
 mktemp -d "${TMPDIR:-/tmp}/<skill-name>.XXXXXX"
@@ -27,9 +27,29 @@ Never name a scratch path yourself under `/tmp` or `$TMPDIR` (a fixed name, or o
 
 **Every file a skill writes for its own use goes in `<scratch>`, orchestrated or not:** a file a command takes its text from (a title, a body, search terms, a message, a JSON payload), a draft of a doc to publish, fetched content, a working ledger. A skill that has not made `<scratch>` yet makes it as above before it writes the first such file. Never write one at a name you chose under `/tmp` or `$TMPDIR`, however unlikely the name.
 
-**Permissions note:** this is the one Bash call the pattern needs. If `mktemp -d` is refused, stop and say so; never fall back to a name of your own. After it, subagents write with the Write tool, which creates the subdirectories (`research/`, `docs/`) inside `<scratch>` as it writes, so the rest of the workflow uses only Read and Write.
+**Permissions note:** If `mktemp -d` is refused, stop and say so; never fall back to a name of your own. Subagents write with the Write tool, which creates subdirectories (`research/`, `docs/`) inside `<scratch>`. The owner also needs the foreground finalization calls below.
 
 **Subagent type note:** Explore agents (`subagent_type: "Explore"`) do NOT have the Write tool — they are read-only. For the disk-write pattern, use `general-purpose` subagents (`subagent_type: "general-purpose"`) which have access to all tools including Write. Use Explore agents only when you need fast, read-only codebase searches that don't need to persist results to disk.
+
+### 1.1. Finalize owned scratch before the terminal result
+
+The workflow that created `<scratch>` owns finalization. A nested skill or subagent borrowing that root returns to its owner without deleting it. Reuse the existing run/session identity and result; do not create a cleanup ledger or copy transcripts.
+
+On completion, no findings, all-duplicate output, blocked work or handled cancellation:
+
+1. Wait for this run's writers to finish, or stop them through their actual owned handles and observe exit. Never delete beneath a live writer or infer ownership from a process name.
+2. Preserve the deliverable outside scratch and verify publication. For session output, present the sanitized findings or carry them in the final result. If publication fails, return those findings in the session result and report the requested publication as blocked before deleting its drafts. A deliberate active handoff may retain the one root, with its exact path and next owner recorded in the existing handoff; it is not a terminal cleanup success.
+3. Substitute the **exact absolute path returned by this run's `mktemp -d`**, quote it, and run these as separate foreground calls. Never reconstruct a path, expand a glob or delete a caller's directory:
+
+   ```bash
+   rm -rf -- "<scratch>"
+   test ! -e "<scratch>"
+   test ! -L "<scratch>"
+   ```
+
+4. Observe every exit. Report cleanup in the existing result/receipt before its final emission. A denied or failed removal blocks a cleanup-complete claim; name the remaining owned path and failure. Do not defer an authorized deletion to a reminder for the user.
+
+This finalizer applies to observed exits. An uncatchable process termination does not prove cleanup; do not add age-based scans, guessed recovery paths or background reapers to conceal that limit.
 
 ---
 
@@ -410,6 +430,7 @@ Every `--auto` run emits a single fenced JSON block as its final output (the las
 |---|---|---|
 | `/claudna:audit tech-debt` | ✅ Yes | Scan + issue creation, no user input needed |
 | `/claudna:audit security` | ✅ Yes | Scan + issue creation, no user input needed |
+| `/claudna:audit booby-traps` | ✅ Yes | Read-only sweep or focused spot check; finalizes owned scratch before its result |
 | `/claudna:product-enhance` | ✅ Yes | Uses triage path (skip discovery/interview) |
 | `/claudna:audit frontend-perf` | ✅ Yes | Requires page/flow in arguments |
 | `/claudna:audit docs` | ✅ Yes | Global review mode, auto-fix stale docs |
@@ -429,7 +450,7 @@ The following rules apply to ALL orchestration skills. Skills should reference t
 
 - **One PR per doc.** Each phase/remediation/fix doc maps to exactly one PR when implemented via `/claudna:build`.
 - **This skill produces plans, not code.** Implementation is always handled by `/claudna:build`, which provides its own challenge round, verification, and PR workflow. Do NOT build, branch, or create PRs from planning skills.
-- **Testing is non-negotiable.** Every phase doc must include a test plan. Implementations without tests are incomplete.
+- **Verification follows risk.** Every phase doc specifies proportionate verification and required project checks. Add or update tests when they protect a concrete behavior or regression; existing checks, static tracing, focused reproductions or manual evidence may suffice. Name the failure that additional coverage would catch. A missing corresponding test file is not itself a defect; state any remaining verification limits.
 - **Documentation is non-negotiable.** Every phase doc must specify documentation updates. Code without docs is incomplete.
 - **Respect existing architecture.** Enhancements and fixes should work *with* the system's existing patterns, not introduce alien abstractions.
 

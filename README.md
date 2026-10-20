@@ -99,7 +99,7 @@ On a host without Claude Code's namespaced commands (Cursor, or an agent that re
 
 | Skill | Description |
 |-------|-------------|
-| `/audit` | Codebase-audit engine — `security` / `tech-debt` / `docs` / `design` / `access-path` / `data-model` / `data-model-redesign` / `frontend-perf` / `repo-health` / `system` / `cache` / `scale` lenses (replaces the eight standalone audit skills) |
+| `/audit` | Codebase-audit engine — `security` / `tech-debt` / `booby-traps` / `docs` / `design` / `access-path` / `data-model` / `data-model-redesign` / `frontend-perf` / `repo-health` / `system` / `cache` / `scale` lenses (replaces the eight standalone audit skills) |
 | `/review-work` | Review engine — `changes` (uncommitted work) / `pr` (one PR) / `multi-pr` (parallel subagent reviews + synthesis) modes (replaces the two review skills) |
 | `/verify-completion` | Verify work is actually complete before claiming success |
 | `/qa` | Headless-browser QA — test-and-fix, report-only, canary, benchmark, browse, cookie-setup, or autonomous visual crawl |
