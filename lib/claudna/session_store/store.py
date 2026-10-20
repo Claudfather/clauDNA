@@ -399,8 +399,47 @@ class SessionHandle:
                 return None
             return self._seal_open_locked(lifecycle)
 
-    def link_child(self, child_sid: str) -> dict:
-        return self.append("session.child_linked", {"child_sid": child_sid})
+    def _append_once(self, kind: str, data: dict, key: tuple[str, ...]) -> dict:
+        """Replay a delegation transition under the same lock as its durable append."""
+        data = ev.cap_text(kind, data)
+        ev.check_data(kind, data)
+        if not self.exists():
+            raise StoreError("delegation requires an existing parent session")
+        with exclusive_lock(self.paths.lock, blocking=False) as taken:
+            if not taken:
+                raise StoreError("parent session history is busy; retry bookkeeping later")
+            events = load_lifecycle(self.paths).events
+            decision = kind == "delegation.updated" and data["phase"] in ("accepted", "rejected")
+            if decision:
+                job_events = [e for e in events if e["kind"] == kind
+                              and e["data"]["job_id"] == data["job_id"]]
+                if not any(e["data"]["phase"] == "finished" for e in job_events):
+                    raise StoreError("job has no observed finish")
+                for event in job_events:
+                    prior = event["data"]
+                    if prior["phase"] in ("accepted", "rejected"):
+                        if prior["phase"] != data["phase"] or prior["summary"] != data["summary"]:
+                            raise StoreError("conflicting delegation decision")
+                        return event  # Cleanup is independent of a parent's decision.
+            for event in events:
+                if event["kind"] == kind and all(event["data"].get(k) == data.get(k) for k in key):
+                    if event["data"] != data:
+                        raise StoreError("conflicting delegation replay")
+                    return event
+            return self._append_locked(kind, data, seg=None)
+
+    def link_child(self, child_sid: str, *, relation: str = "continuation",
+                   child_agent_cli: str | None = None, job_id: str | None = None) -> dict:
+        if relation == "continuation":
+            return self.append("session.child_linked", {"child_sid": child_sid})
+        if relation != "delegation" or child_agent_cli not in ev.AGENT_CLIS or not job_id or not child_sid:
+            raise StoreError("delegation edge requires provider, native child ID and job ID")
+        from .paths import validate_sid
+
+        validate_sid(child_sid)
+        return self._append_once("session.child_linked", {
+            "child_sid": child_sid, "relation": relation, "child_agent_cli": child_agent_cli, "job_id": job_id,
+        }, ("job_id", "relation"))
 
     def set_private(self, private: bool, *, by: str = "user") -> dict:
         return self.append("session.privacy_set", {"private": private, "by": by})
@@ -433,6 +472,15 @@ class SessionHandle:
         """Regenerate projections from the logs (read-only with respect to logs)."""
         with self._locked():
             return rebuild(self.paths)
+
+
+def record_delegation(parent: SessionHandle, job_id: str, phase: str, data: dict) -> dict:
+    """One parent-observed transition; no transcript, phantom child or vault write."""
+    from claudna.redact import redact_strings
+
+    return parent._append_once("delegation.updated", {
+        **redact_strings(data), "job_id": job_id, "phase": phase,
+    }, ("job_id", "phase"))
 
 
 class SessionStore:

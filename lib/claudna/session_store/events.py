@@ -110,7 +110,19 @@ REGISTRY: dict[str, KindSpec] = {
                                  "properties": {"enabled": {"type": "boolean"},
                                                 "vault": {"type": ["string", "null"], "minLength": 1}}}},
     ),
-    "session.child_linked": KindSpec(log=LIFECYCLE, seg=False, fields={"child_sid": _STR}, opens=True),
+    "session.child_linked": KindSpec(
+        log=LIFECYCLE, seg=False, fields={"child_sid": _STR}, opens=True,
+        optional={"relation": _STR, "child_agent_cli": _STR, "job_id": _STR},
+        choices={"relation": ("continuation", "delegation"), "child_agent_cli": AGENT_CLIS},
+    ),
+    "delegation.updated": KindSpec(
+        log=LIFECYCLE, seg=False,
+        fields={"job_id": _STR, "phase": _STR, "provider": _STR, "child_sid": _OPT_STR,
+                "exit_code": _OPT_INT, "outcome": _STR, "cleanup": _STR, "summary": _STR},
+        choices={"phase": ("started", "finished", "accepted", "rejected", "cleanup_pending", "cleaned"),
+                 "provider": AGENT_CLIS, "cleanup": ("pending", "complete")},
+        caps={"summary": 1000, "outcome": 100},
+    ),
     "session.privacy_set": KindSpec(
         log=LIFECYCLE,
         opens=True,

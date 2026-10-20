@@ -1,5 +1,7 @@
 # Session history — `list`, `show`, `timeline`, `failures`
 
+`show` also derives delegation links/results from the lifecycle: provider/native ID, parent decision and cleanup. Native-only children have no invented transcript. `timeline` includes transitions after the parent closes without reopening it. These links are distinct from `/clear` continuity; completion is not acceptance. `/claudna:delegate status` reports the single operational slot.
+
 Read-only views over the session store (`~/.claudna/sessions/`, SETUP_GUIDE §3.7): what past sessions recorded, not the per-cwd handoff. Nothing here writes.
 
 Run the store's reader for the verb, with `<claudna-root>` resolved per [`../_shared/claudna-root.md`](../_shared/claudna-root.md):

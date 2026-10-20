@@ -1,5 +1,13 @@
 # clauDNA Setup Guide
 
+## Cross-provider delegation
+
+`/claudna:delegate run` supports Claude-to-Codex only in v1. It requires Python 3.9+, an installed/authenticated native `codex` CLI, and the actual Claude parent session recorded by clauDNA. It reuses native account/model policy; no API key is required to install the plugin. Unsupported credentials or permission requirements block delegation without changing configuration. The reverse direction failed the live helper's policy gate and is disabled.
+
+Hand off a clean, task-owned workspace exclusively during execution. Provider-qualified child links and separate worker/acceptance/cleanup events appear through `/claudna:session show`/`timeline`, distinct from `/clear` continuity. No extra checkout or dependency copy. Code and native provider history remain; only `<state>/delegation/active.json` is temporary, with one stable empty lock retained.
+
+Normal completion cleans bookkeeping automatically. SessionStart and the next invocation retry known-terminal cleanup even with capture/harvest off. Unknown execution stays protected and may need an ownership decision after a crash; it is never age-deleted or automatically replaced. No cleanup runs while the host is absent. V1 excludes native resume, concurrent workers, Git integration, recovery archives and direct Claudron publishing. Parent verification remains required.
+
 **Last Updated:** 2026-05-11
 
 This guide is the deep-dive companion to [README.md](./README.md). The README covers the marketplace install (`/plugin install claudna@Claudfather`); this guide covers everything beyond that — recommended `settings.json` tweaks, headless provisioning for bots and CI, Snowflake key-pair auth, shell aliases, the Claude Code configuration hierarchy, and troubleshooting.

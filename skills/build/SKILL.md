@@ -32,6 +32,10 @@ allowed-tools:
 
 # Build
 
+## Optional cross-provider task
+
+For an explicitly authorized bounded task on the other provider, use `/claudna:delegate` in a clean owned workspace and pause parent writes until observed exit. Inspect the full diff/check evidence and settle the parent decision before continuing. Reuse current evidence where valid; retain build's review/verification/shipping once. Workspace setup, dirty prerequisites and concurrency remain with the caller. No automatic account/model switching or extra reviewer per task.
+
 > **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout. For every simplify step, use `../_shared/subagent-prompts/simplify-codex.md` instead of the Claude native command or rollback instructions.
 
 Execute a design or development plan against the codebase. Challenge first, refine through dialogue, then build — updating the plan as the single source of truth throughout. Works with any structured development document (downstream of `/claudna:audit tech-debt`, `/claudna:product-enhance`, or standalone) or a GitHub Issue created by `--output github`.

@@ -49,7 +49,7 @@ test:
 # The runtime floor: hooks and the session store run under the user's own
 # python3, which is 3.9 on stock macOS. CI runs these suites on 3.9 too; they
 # also pass on any newer Python, so this target works locally as-is.
-RUNTIME_TESTS = tests/test_session_store.py tests/test_session_store_hook.py tests/test_session_store_codex.py \
+RUNTIME_TESTS = tests/test_delegation.py tests/test_session_store.py tests/test_session_store_hook.py tests/test_session_store_codex.py \
 	tests/test_session_store_summarize.py tests/test_session_store_harvest.py tests/test_session_store_filing.py \
 	tests/test_session_store_lineage.py tests/test_session_store_unclosed.py \
 	tests/test_session_store_activity.py tests/test_session_store_readers.py \

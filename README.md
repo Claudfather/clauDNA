@@ -61,7 +61,7 @@ For bots, CI runners, and Docker images, drop a `settings.json` with `enabledPlu
 
 | Directory | Count | Contents |
 |-----------|-------|----------|
-| `skills/` | 39 | User-invocable slash commands |
+| `skills/` | 40 | User-invocable slash commands |
 | `agents/` | 8 | `snowflake-analyst`, `dbt-engineer`, `neon-analyst`, `modal-ops`, `railway-ops`, `vercel-ops`, `code-reviewer`, `spec-reviewer` |
 | `plugin-hooks/` | 6 wired + 1 opt-in | SessionStart briefing (opt-out `CLAUDNA_SESSION_BRIEFING=0`), auto-format on Write/Edit, PreToolUse permission expansion, PreCompact capture gate, macOS notifications, and the session store (boundaries, activity, and opt-in skill telemetry; SETUP_GUIDE §3.7). (`statusline.sh` is opt-in — see [SETUP_GUIDE §3.2](./SETUP_GUIDE.md#32-statusline-optional).) Named `plugin-hooks/` to avoid a Claude Code bug that deletes any project-root `hooks/` directory between tool calls. |
 
@@ -87,6 +87,7 @@ On a host without Claude Code's namespaced commands (Cursor, or an agent that re
 | `/build` | Execute a design doc or GitHub Issue — browse, pick, challenge, build, test, PR |
 | `/build-all` | Drive an epic's worth of ordered phase docs as one governed multi-PR run |
 | `/worktree` | Manage git worktrees for parallel Claude sessions |
+| `/delegate` | Bounded Claude-to-Codex task in an owned workspace; existing parent/child history and automatic bookkeeping cleanup (Claude Code only) |
 | `/sync-branches` | Fetch and merge origin/main into every branch and worktree across sibling repos |
 | `/development-retro` | Post-merge retrospective — systemic patterns, friction, breadcrumb trails |
 | `/weigh-development-paths` | Compare multiple viable approaches at a development junction |

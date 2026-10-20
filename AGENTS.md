@@ -25,4 +25,4 @@ clauDNA is a plugin pack (markdown skills/agents + shell hooks) shipped to Claud
 
 ## Codex source work
 
-Read CLAUDE.md, applicable nested instructions and `skills/_shared/codex-tools.md`. Use actual exposed controls; bundled roles require complete filled prompts and real same-host spawn/wait. Global user settings/auth/plugins are not implementation targets. Claude 39 and Cursor 35 remain unchanged; Codex explicitly selects 36 and six hook handlers. Run fresh checks in isolated exports with private HOME/TMP; preserve baseline failures separately.
+Read CLAUDE.md, applicable nested instructions and `skills/_shared/codex-tools.md`. Use actual exposed controls; bundled roles require complete filled prompts and real same-host spawn/wait. Global user settings/auth/plugins are not implementation targets. Claude selects 40 and Cursor 35 skills; Codex explicitly selects 36 and six hook handlers. Run fresh checks in isolated exports with private HOME/TMP; preserve baseline failures separately.
