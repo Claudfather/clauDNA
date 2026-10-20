@@ -58,8 +58,11 @@ def test_run_records_child_cleans_bookkeeping_and_settles(store, job, monkeypatc
     shown = readers.show(store, "parent")
     assert shown["session"]["children"] == []
     assert shown["delegations"][0]["decision"] == "accepted"
-    with pytest.raises(d.DelegationError):
+    with pytest.raises(d.StoreError):
         d.settle(store, "parent", result.job_id, "rejected", "changed my mind")
+    payload["evidence"] = 5
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(json.dumps(payload).encode())))
+    assert d.main(["settle", "--root", str(store.root), "--request", "-"]) == 1
 
 
 def test_nonzero_exit_keeps_all_worker_edits(store, job, monkeypatch):
@@ -106,7 +109,8 @@ def test_busy_and_unknown_slots_never_launch(store, job, monkeypatch):
     assert (root / "active.json").exists()
 
 
-def test_terminal_cleanup_retry_is_idempotent(store, job, monkeypatch):
+@pytest.mark.parametrize("entry", ["reconcile", "disabled_run"])
+def test_terminal_cleanup_retry_is_idempotent(store, job, monkeypatch, entry):
     from pathlib import Path
 
     worker(monkeypatch)
@@ -121,7 +125,14 @@ def test_terminal_cleanup_retry_is_idempotent(store, job, monkeypatch):
     assert result.cleanup == "pending"
     assert readers.show(store, "parent")["delegations"][0]["cleanup"] == "pending"
     d.settle(store, "parent", result.job_id, "accepted", "behavior check passed")
-    assert d.reconcile(store)["outcome"] == "cleaned"
+    if entry == "disabled_run":
+        with monkeypatch.context() as patch:
+            patch.setenv("CLAUDNA_SESSION_STORE", "0")
+            patch.setattr(d, "native_command", lambda req: pytest.fail("blocked request must not launch"))
+            with pytest.raises(d.DelegationError, match="logging"):
+                d.run_job(job[0], store)
+    else:
+        assert d.reconcile(store)["outcome"] == "cleaned"
     d.settle(store, "parent", result.job_id, "accepted", "behavior check passed")
     shown = readers.show(store, "parent")["delegations"][0]
     assert (shown["decision"], shown["evidence"], shown["cleanup"]) == (
@@ -303,3 +314,15 @@ raise SystemExit(d.main())
     output = json.loads(result.stdout)
     assert result.returncode == 1 and output["outcome"] == "cancelled" and output["cleanup"] == "complete"
     assert not (store.root / "delegation/active.json").exists()
+
+
+@pytest.mark.parametrize("stage", ["argv", "prompt"])
+def test_prelaunch_encoding_failure_does_not_protect_a_nonexistent_worker(store, job, monkeypatch, stage):
+    from dataclasses import replace
+
+    command = [sys.executable, "-c", "pass"] + (["\0"] if stage == "argv" else [])
+    monkeypatch.setattr(d, "native_command", lambda request: command)
+    req = replace(job[0], owned_paths=["\ud800"]) if stage == "prompt" else job[0]
+    result = d.run_job(req, store)
+    assert result.outcome == "failed" and result.cleanup == "complete" and result.exit_code is None
+    assert d.reconcile(store)["outcome"] == "idle"

@@ -18,7 +18,7 @@ from claudna.session_store.events import AGENT_CLIS
 from claudna.session_store.fsio import atomic_write_json, ensure_dir, exclusive_lock, read_json
 from claudna.session_store.paths import CHILD_ENV, validate_sid
 from claudna.session_store.project import load_lifecycle, session_facts
-from claudna.session_store.store import SessionStore, StoreError, record_delegation
+from claudna.session_store.store import SessionHandle, SessionStore, StoreError, record_delegation
 
 RECORD_LIMIT, RESPONSE_LIMIT, TAIL_LIMIT = 1048576, 65536, 16384
 
@@ -135,14 +135,14 @@ def _parent(store: SessionStore, sid: str, provider: str):
     return parent
 
 
-def _validate(request: Request, store: SessionStore) -> str:
+def _validate(request: Request, store: SessionStore) -> tuple[SessionHandle, str]:
     if os.environ.get("CLAUDNA_SESSION_STORE") == "0":
         raise DelegationError("session logging is disabled")
     if request.provider not in AGENT_CLIS or request.parent_provider not in AGENT_CLIS:
         raise DelegationError("unsupported provider")
     if request.provider == request.parent_provider:
         raise DelegationError("use native subagents for same-provider work")
-    _parent(store, request.parent_sid, request.parent_provider)
+    parent = _parent(store, request.parent_sid, request.parent_provider)
     if (request.workspace_owned is not True or not isinstance(request.read_only, bool)
             or not isinstance(request.cwd, str) or not Path(request.cwd).is_absolute()
             or not Path(request.cwd).is_dir()):
@@ -160,7 +160,7 @@ def _validate(request: Request, store: SessionStore) -> str:
         raise DelegationError("explicit workspace-relative owned paths are required")
     if not request.read_only and _git(request.cwd, "status", "--porcelain", "--untracked-files=all"):
         raise DelegationError("editing requires a clean owned workspace")
-    return _git(request.cwd, "rev-parse", "HEAD")
+    return parent, _git(request.cwd, "rev-parse", "HEAD")
 
 
 def _data(state: dict, *, cleanup: str = "pending", summary: str = "") -> dict:
@@ -214,17 +214,21 @@ def reconcile(store: SessionStore) -> dict:
         return _reconcile_locked(store, root / "active.json") if taken else {"outcome": "busy"}
 
 
-def _observe(command: list[str], request: Request) -> tuple[int, NativeObservation, bool, str]:
+def _observe(command: list[str], request: Request) -> tuple[int | None, NativeObservation, bool, str]:
     observation = NativeObservation(request.provider)
-    prompt = (f"Bounded task. Own only: {', '.join(request.owned_paths)}. No subagents, commits, pushes, "
-              "deployments, external messages, detached processes or dependency installs. Preserve project "
-              "policy and others' work. Report actual results; do not self-certify acceptance.\n"
-              + request.task).encode()
     timed_out, tail, buffer, dropping = False, b"", b"", False
     deadline = time.monotonic() + request.deadline_seconds
-    with subprocess.Popen(command, cwd=request.cwd, env={**os.environ, CHILD_ENV: "1"},
-                          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                          start_new_session=True) as process:
+    try:
+        prompt = (f"Bounded task. Own only: {', '.join(request.owned_paths)}. No subagents, commits, pushes, "
+                  "deployments, external messages, detached processes or dependency installs. Preserve project "
+                  "policy and others' work. Report actual results; do not self-certify acceptance.\n"
+                  + request.task).encode()
+        process = subprocess.Popen(command, cwd=request.cwd, env={**os.environ, CHILD_ENV: "1"},
+                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   start_new_session=True)
+    except (OSError, ValueError) as exc:
+        return None, observation, False, redact_text(str(exc))
+    with process:
         try:
             with selectors.DefaultSelector() as selector:
                 for stream, events in ((process.stdin, selectors.EVENT_WRITE),
@@ -290,7 +294,6 @@ def _observe(command: list[str], request: Request) -> tuple[int, NativeObservati
 
 
 def run_job(request: Request, store: SessionStore) -> Result:
-    base = _validate(request, store)
     root = ensure_dir(store.root / "delegation")
     path = root / "active.json"
     with exclusive_lock(root / ".lock", blocking=False) as taken:
@@ -299,21 +302,15 @@ def run_job(request: Request, store: SessionStore) -> Result:
         prior = _reconcile_locked(store, path)
         if prior["outcome"] not in ("idle", "cleaned"):
             return Result(outcome=prior["outcome"], summary=prior.get("reason", ""))
+        parent, base = _validate(request, store)
         command = native_command(request)
         job_id = str(uuid.uuid4())
         state = {"job_id": job_id, "parent_sid": request.parent_sid, "parent_provider": request.parent_provider,
                  "provider": request.provider, "cwd": request.cwd, "base": base,
                  "phase": "running", "outcome": "incomplete", "child_sid": None, "exit_code": None}
-        parent = _parent(store, request.parent_sid, request.parent_provider)
         record_delegation(parent, job_id, "started", _data(state))
         _save(path, state)
-        try:
-            exit_code, observed, timed_out, diagnostic = _observe(command, request)
-        except OSError as exc:
-            # A spawn failure has no child. Other observation exceptions preserve the running slot.
-            if exc.filename != command[0]:
-                raise
-            exit_code, observed, timed_out, diagnostic = None, NativeObservation(request.provider), False, str(exc)
+        exit_code, observed, timed_out, diagnostic = _observe(command, request)
         state.update(exit_code=exit_code, child_sid=observed.sid, phase="finished",
                      permission_denials=len(observed.permission_denials))
         state["outcome"] = ("cancelled" if observed.cancelled else "timeout" if timed_out else
@@ -340,14 +337,14 @@ def run_job(request: Request, store: SessionStore) -> Result:
 
 
 def settle(store: SessionStore, parent_sid: str, job_id: str, decision: str, evidence: str) -> dict:
-    if decision not in ("accepted", "rejected") or not evidence.strip():
+    if decision not in ("accepted", "rejected") or not isinstance(evidence, str) or not evidence.strip():
         raise DelegationError("settlement requires an explicit decision and check evidence")
     parent = store.session(parent_sid)
     events = [e["data"] for e in load_lifecycle(parent.paths).events
               if e["kind"] == "delegation.updated" and e["data"]["job_id"] == job_id]
     finished = next((e for e in events if e["phase"] == "finished"), None)
-    if not finished or any(e["phase"] in ("accepted", "rejected") and e["phase"] != decision for e in events):
-        raise DelegationError("job has no observed finish or already has another decision")
+    if not finished:
+        raise DelegationError("job has no observed finish")
     return record_delegation(parent, job_id, decision, {
         **{k: v for k, v in finished.items() if k not in ("job_id", "phase")},
         "cleanup": "complete" if any(e["phase"] == "cleaned" for e in events) else "pending",
@@ -364,9 +361,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root")
     parser.add_argument("--request", choices=("-",))
     parser.add_argument("--parent")
-    parser.add_argument("--job")
-    parser.add_argument("--decision", choices=("accepted", "rejected"))
-    parser.add_argument("--evidence-stdin", action="store_true")
     args = parser.parse_args(argv)
     import sys
 
@@ -390,12 +384,9 @@ def main(argv: list[str] | None = None) -> int:
                 for sig, handler in handlers.items():
                     signal.signal(sig, handler)
         elif args.verb == "settle":
-            if args.request == "-":
-                output = settle(store, **payload)
-            else:
-                if not args.parent or not args.job or not args.decision or not args.evidence_stdin:
-                    raise DelegationError("settle requires JSON input or parent, job, decision and evidence stdin")
-                output = settle(store, args.parent, args.job, args.decision, sys.stdin.read(1000))
+            if args.request != "-":
+                raise DelegationError("settle requires --request -")
+            output = settle(store, **payload)
         elif args.verb == "status":
             if not args.parent:
                 raise DelegationError("status requires --parent")
