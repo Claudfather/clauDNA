@@ -2,7 +2,7 @@
 
 ## Cross-provider delegation
 
-`/claudna:delegate run` supports Claude-to-Codex only in v1. It requires Python 3.9+, an installed/authenticated native `codex` CLI, and the actual Claude parent session recorded by clauDNA. It reuses native account/model policy; no API key is required to install the plugin. Unsupported credentials or permission requirements block delegation without changing configuration. The reverse direction failed the live helper's policy gate and is disabled.
+`/claudna:delegate run` supports Claude-to-Codex and Codex-to-Claude. It requires Python 3.9+, the destination's installed/authenticated native CLI (measured with Codex 0.162.1 and Claude 2.1.304), and the actual parent session recorded by clauDNA. It reuses native account/model/permission policy; no API key is required to install the plugin. Claude uses its native `--permission-prompts none` flag: unanswered permission requests are denied without a permission broker or launcher retry. Denied calls remain visible separately from native completion; parent checks must establish the required result before acceptance. No permission is broadened.
 
 Hand off a clean, task-owned workspace exclusively during execution. Provider-qualified child links and separate worker/acceptance/cleanup events appear through `/claudna:session show`/`timeline`, distinct from `/clear` continuity. No extra checkout or dependency copy. Code and native provider history remain; only `<state>/delegation/active.json` is temporary, with one stable empty lock retained.
 
@@ -860,7 +860,7 @@ The clauDNA project template (`project-template/CLAUDE.md`) embeds these princip
 
 ## Codex workflows and continuity
 
-The `Claudfather/claudna` Codex plugin selects 36 engineering skills explicitly,
+The `Claudfather/claudna` Codex plugin selects 37 engineering skills explicitly,
 plus five store handlers and a startup-only briefing. It excludes Claude-only
 `cleanup-legacy-install` and repo-clone `promotion-intake`/`skill-scaffold`.
 Bundled agent prompts map to a read-and-dispatch procedure. Support requires

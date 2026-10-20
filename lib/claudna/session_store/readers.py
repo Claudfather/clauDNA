@@ -275,7 +275,8 @@ def render(verb: str, data, *, group: bool = False) -> list[str]:
         for job in data.get("delegations", []):
             lines.append(f"  delegate {job['job_id']} {job['provider']}:{job.get('child_sid') or '-'} "
                          f"{job.get('outcome', '-')} decision={job.get('decision', '-')} "
-                         f"cleanup={job.get('cleanup', '-')} evidence={job.get('evidence', '-')}"
+                         f"cleanup={job.get('cleanup', '-')} denials={job.get('permission_denials', 0)} "
+                         f"evidence={job.get('evidence', '-')}"
                          + (" [native only]" if job["native_only"] else ""))
         if roll:
             f = roll["fields"]

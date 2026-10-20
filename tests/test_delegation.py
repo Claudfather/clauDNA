@@ -163,18 +163,51 @@ def test_dirty_workspace_and_logging_opt_out_do_not_launch(store, job, monkeypat
         d.run_job(req, store)
 
 
-def test_native_fixture_and_unsupported_direction(store, job, monkeypatch):
+@pytest.mark.parametrize("provider", ["codex", "claude"])
+def test_native_fixture_and_same_provider_block(store, job, monkeypatch, provider):
     from dataclasses import replace
     from pathlib import Path
 
-    fixture = json.loads((Path(__file__).parent / "fixtures/delegation/codex.json").read_text())
-    observed = d.NativeObservation("codex")
+    fixture = json.loads((Path(__file__).parent / "fixtures/delegation" / (provider + ".json")).read_text())
+    observed = d.NativeObservation(provider)
     for record in fixture["records"]:
         observed.read(json.dumps(record).encode())
     assert observed.sid and observed.completed and not observed.invalid
     monkeypatch.setattr(d, "native_command", lambda req: pytest.fail("unsupported direction must not launch"))
-    with pytest.raises(d.DelegationError, match="only Claude-to-Codex"):
-        d.run_job(replace(job[0], parent_provider="codex", provider="claude"), store)
+    with pytest.raises(d.DelegationError, match="same-provider"):
+        d.run_job(replace(job[0], provider="claude"), store)
+
+
+@pytest.mark.parametrize("subtype,is_error,exit_code,outcome", [
+    ("success", False, 0, "completed"),
+    ("error_max_turns", True, 0, "failed"),
+    ("success", False, 2, "failed"),
+])
+def test_claude_denials_are_reported_separately_from_native_completion(
+        store, job, monkeypatch, subtype, is_error, exit_code, outcome):
+    from dataclasses import replace
+
+    parent = store.session("codex-parent")
+    parent.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path=None, agent_cli="codex")
+    denial = {"tool_name": "Bash", "tool_use_id": "denied-diagnostic",
+              "tool_input": {"command": 'echo "exit=$?"'}}
+    worker(monkeypatch, final=[{"type": "result", "subtype": subtype, "is_error": is_error,
+                               "session_id": "native-claude-child", "result": "observed",
+                               "permission_denials": [denial]}], exit_code=exit_code)
+    result = d.run_job(replace(job[0], parent_sid="codex-parent", parent_provider="codex", provider="claude"), store)
+    assert result.outcome == outcome and result.cleanup == "complete"
+    assert result.permission_denials == [denial]
+    shown = readers.show(store, "codex-parent")["delegations"][0]
+    assert shown["permission_denials"] == 1 and not shown.get("decision")
+
+
+def test_claude_command_leaves_permission_policy_to_native_settings(job, monkeypatch):
+    from dataclasses import replace
+
+    monkeypatch.setattr(d.shutil, "which", lambda name: "/native/" + name)
+    req = replace(job[0], parent_provider="codex", provider="claude")
+    assert d.native_command(req) == ["/native/claude", "--print", "--output-format", "json",
+                                     "--permission-prompts", "none"]
 
 
 def test_opposite_settlements_are_atomic(store, job, monkeypatch):

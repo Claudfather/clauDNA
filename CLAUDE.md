@@ -1,6 +1,6 @@
 # clauDNA
 
-Plugin pack shipping skills, agents, and hooks as a single plugin (`claudna`) to three hosts: Claude Code via the `Claudfather` marketplace, Cursor via `.cursor-plugin/`, and Codex via `.codex-plugin/` (36 curated skills, store hooks and startup briefing). Marketplace install is the only supported channel — for headless / CI use, see [SETUP_GUIDE §4](./SETUP_GUIDE.md#4-headless--ci--docker-provisioning) for the declarative-settings + env-var pattern.
+Plugin pack shipping skills, agents, and hooks as a single plugin (`claudna`) to three hosts: Claude Code via the `Claudfather` marketplace, Cursor via `.cursor-plugin/`, and Codex via `.codex-plugin/` (37 curated skills, store hooks and startup briefing). Marketplace install is the only supported channel — for headless / CI use, see [SETUP_GUIDE §4](./SETUP_GUIDE.md#4-headless--ci--docker-provisioning) for the declarative-settings + env-var pattern.
 
 ## Repo Structure
 
@@ -8,7 +8,7 @@ Plugin pack shipping skills, agents, and hooks as a single plugin (`claudna`) to
 .claude-plugin/                 → Claude Code manifests
   plugin.json                   → Plugin manifest (name: claudna, version, hooks)
   marketplace.json              → Marketplace manifest (name: Claudfather, lists claudna)
-.codex-plugin/                  → Codex manifest — 36 explicit skills, store hooks + startup, inert agents
+.codex-plugin/                  → Codex manifest — 37 explicit skills, store hooks + startup, inert agents
   plugin.json                   → Same identity/version, explicit curated skills and inert agent path
 .agents/plugins/marketplace.json → Codex marketplace entry (Claudfather/claudna)
 .cursor-plugin/                 → Cursor manifests — skills + agents only, NO hooks (see Rules)
@@ -69,7 +69,7 @@ clauDNA is the stack's **behavior system**: procedural content — skills, agent
 - **Never write to `~/.claude/settings.json`** — that's user-managed. Recommended settings tweaks are documented in SETUP_GUIDE for the user to apply manually; the plugin never modifies user settings.
 - **Never touch `~/.claude/notes/`** — personal data (decisions, patterns).
 - **Never touch `~/.claude/plugins/cache/Claudfather/claudna/<ver>/`** directly — Claude Code manages that directory. Make changes in this repo and bump `version` in `plugin.json` to ship them.
-- **Keep Codex's measured scope explicit.** Its nonempty list selects 36 workflow skills; agents stay at the inert `.codex-plugin/store-only/` path and are ordinary read-and-dispatch prompts, never native registrations. Preserve all five store handlers and append only the startup briefing. Native install/discovery, hook trust, execution and context delivery are separate evidence. No policy/edit/notification hooks or global config changes. `skills/_shared/codex-tools.md` maps actual execution-host controls; unsupported independent review remains unsatisfied.
+- **Keep Codex's measured scope explicit.** Its nonempty list selects 37 workflow skills; agents stay at the inert `.codex-plugin/store-only/` path and are ordinary read-and-dispatch prompts, never native registrations. Preserve all five store handlers and append only the startup briefing. Native install/discovery, hook trust, execution and context delivery are separate evidence. No policy/edit/notification hooks or global config changes. `skills/_shared/codex-tools.md` maps actual execution-host controls; unsupported independent review remains unsatisfied.
 - **Never give the Cursor manifest hooks.** `.cursor-plugin/plugin.json` ships `skills/` (minus a few host-/context-restricted skills, #340) and `agents/` only, so the Claude Code shell hooks never fire in a Cursor-based environment. Two things are load-bearing: no `hooks` field in that manifest, and no `hooks/hooks.json` at the repo root, which is where Cursor's folder discovery looks. `make check-manifest` rejects both.
 - **Use Read/Write tools for file operations** — Not shell `cp`. This gives visibility into what changes and avoids permission issues.
 

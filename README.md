@@ -1,6 +1,6 @@
 # clauDNA
 
-Curated skills, agents, and hooks for shipping software — codebase audits, plan review, build workflows, and infrastructure operations. Packaged for **Claude Code** (via the `Claudfather` marketplace) for **Cursor** (as a Cursor plugin), and for **Codex** (36 curated skills plus measured store/startup hooks).
+Curated skills, agents, and hooks for shipping software — codebase audits, plan review, build workflows, and infrastructure operations. Packaged for **Claude Code** (via the `Claudfather` marketplace) for **Cursor** (as a Cursor plugin), and for **Codex** (37 curated skills plus measured store/startup hooks).
 
 ## Quick Start
 
@@ -30,7 +30,7 @@ Three install paths, depending on what you have:
 ### Codex
 
 Use the supported Codex plugin marketplace interface to add `Claudfather/clauDNA`
-and install `claudna@Claudfather`. The manifest explicitly selects 36 skills:
+and install `claudna@Claudfather`. The manifest explicitly selects 37 skills:
 Claude-only cleanup and the two source-checkout contribution skills are excluded.
 Use skill mentions or read the installed skill file; all selected entrypoints link
 the [Codex tool mapping](skills/_shared/codex-tools.md). All eight role prompts map to a read-and-dispatch procedure, with no native agent
@@ -65,7 +65,7 @@ For bots, CI runners, and Docker images, drop a `settings.json` with `enabledPlu
 | `agents/` | 8 | `snowflake-analyst`, `dbt-engineer`, `neon-analyst`, `modal-ops`, `railway-ops`, `vercel-ops`, `code-reviewer`, `spec-reviewer` |
 | `plugin-hooks/` | 6 wired + 1 opt-in | SessionStart briefing (opt-out `CLAUDNA_SESSION_BRIEFING=0`), auto-format on Write/Edit, PreToolUse permission expansion, PreCompact capture gate, macOS notifications, and the session store (boundaries, activity, and opt-in skill telemetry; SETUP_GUIDE §3.7). (`statusline.sh` is opt-in — see [SETUP_GUIDE §3.2](./SETUP_GUIDE.md#32-statusline-optional).) Named `plugin-hooks/` to avoid a Claude Code bug that deletes any project-root `hooks/` directory between tool calls. |
 
-Codex receives the curated 36-skill set and six store/startup handlers; role prompts are read-and-dispatch only. Claude Code gets all three. Cursor gets `skills/` (minus a few host-/context-restricted skills, #340) and `agents/` only — see [Cursor](#cursor) above. The `plugin-hooks/` name does double duty: besides dodging the Claude Code bug, it keeps the hooks out of `hooks/`, which is where Cursor's folder discovery would otherwise find and wire them.
+Codex receives the curated 37-skill set and six store/startup handlers; role prompts are read-and-dispatch only. Claude Code gets all three. Cursor gets `skills/` (minus a few host-/context-restricted skills, #340) and `agents/` only — see [Cursor](#cursor) above. The `plugin-hooks/` name does double duty: besides dodging the Claude Code bug, it keeps the hooks out of `hooks/`, which is where Cursor's folder discovery would otherwise find and wire them.
 
 ## Design Philosophy
 
@@ -87,7 +87,7 @@ On a host without Claude Code's namespaced commands (Cursor, or an agent that re
 | `/build` | Execute a design doc or GitHub Issue — browse, pick, challenge, build, test, PR |
 | `/build-all` | Drive an epic's worth of ordered phase docs as one governed multi-PR run |
 | `/worktree` | Manage git worktrees for parallel Claude sessions |
-| `/delegate` | Bounded Claude-to-Codex task in an owned workspace; existing parent/child history and automatic bookkeeping cleanup (Claude Code only) |
+| `/delegate` | Bounded task between Claude Code and Codex in an owned workspace; existing parent/child history and automatic bookkeeping cleanup |
 | `/sync-branches` | Fetch and merge origin/main into every branch and worktree across sibling repos |
 | `/development-retro` | Post-merge retrospective — systemic patterns, friction, breadcrumb trails |
 | `/weigh-development-paths` | Compare multiple viable approaches at a development junction |

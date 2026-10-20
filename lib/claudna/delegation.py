@@ -10,10 +10,10 @@ import signal
 import subprocess
 import time
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from claudna.redact import redact_text
+from claudna.redact import redact_strings, redact_text
 from claudna.session_store.events import AGENT_CLIS
 from claudna.session_store.fsio import atomic_write_json, ensure_dir, exclusive_lock, read_json
 from claudna.session_store.paths import CHILD_ENV, validate_sid
@@ -49,18 +49,24 @@ class Result:
     exit_code: int | None = None
     summary: str = ""
     cleanup: str = "pending"
+    permission_denials: list[dict] = field(default_factory=list)
 
 
 def native_command(request: Request) -> list[str]:
-    if request.provider != "codex":
-        raise DelegationError("only the measured Claude-to-Codex direction is supported")
+    if request.provider not in ("codex", "claude"):
+        raise DelegationError("unsupported native provider")
     binary = shutil.which(request.provider)
     if not binary:
         raise DelegationError(f"{request.provider} CLI is not installed")
-    command = [binary, "exec", "--sandbox", "read-only" if request.read_only else "workspace-write", "--json"]
+    if request.provider == "codex":
+        command = [binary, "exec", "--sandbox", "read-only" if request.read_only else "workspace-write", "--json"]
+    else:
+        command = [binary, "--print", "--output-format", "json", "--permission-prompts", "none"]
+        if request.read_only:
+            command += ["--tools", "Read,Glob,Grep"]
     if request.model:
         command += ["--model", request.model]
-    return command + ["-"]
+    return command + (["-"] if request.provider == "codex" else [])
 
 
 class NativeObservation:
@@ -70,6 +76,7 @@ class NativeObservation:
         self.provider, self.sid, self.response = provider, None, ""
         self.completed = self.failed = self.invalid = False
         self.cancelled = False
+        self.permission_denials = []
 
     def read(self, line: bytes) -> None:
         try:
@@ -78,6 +85,16 @@ class NativeObservation:
                 raise ValueError("protocol record must be an object")
             kind = record.get("type")
             sid = record.get("thread_id") if kind == "thread.started" else None
+            if self.provider == "claude" and kind == "result":
+                sid = record.get("session_id")
+                self.completed = record.get("subtype") == "success" and record.get("is_error") is False
+                self.failed = not self.completed
+                self.response = record.get("result", "")
+                denials = record.get("permission_denials")
+                if (not isinstance(denials, list) or any(not isinstance(d, dict) for d in denials)
+                        or len(json.dumps(denials).encode()) > RESPONSE_LIMIT):
+                    raise ValueError("invalid or oversized permission-denial metadata")
+                self.permission_denials = redact_strings(denials)
             if self.provider == "codex":
                 if kind == "turn.completed":
                     self.completed = True
@@ -123,8 +140,6 @@ def _validate(request: Request, store: SessionStore) -> str:
         raise DelegationError("session logging is disabled")
     if request.provider not in AGENT_CLIS or request.parent_provider not in AGENT_CLIS:
         raise DelegationError("unsupported provider")
-    if request.provider != "codex" or request.parent_provider != "claude":
-        raise DelegationError("only Claude-to-Codex is supported; Claude worker compatibility is unproven")
     if request.provider == request.parent_provider:
         raise DelegationError("use native subagents for same-provider work")
     _parent(store, request.parent_sid, request.parent_provider)
@@ -151,7 +166,8 @@ def _validate(request: Request, store: SessionStore) -> str:
 def _data(state: dict, *, cleanup: str = "pending", summary: str = "") -> dict:
     return {"provider": state["provider"], "child_sid": state.get("child_sid"),
             "exit_code": state.get("exit_code"), "outcome": state["outcome"],
-            "cleanup": cleanup, "summary": summary}
+            "cleanup": cleanup, "summary": summary,
+            **({"permission_denials": state["permission_denials"]} if "permission_denials" in state else {})}
 
 
 def _save(path: Path, state: dict) -> None:
@@ -290,14 +306,16 @@ def run_job(request: Request, store: SessionStore) -> Result:
             if exc.filename != command[0]:
                 raise
             exit_code, observed, timed_out, diagnostic = None, NativeObservation(request.provider), False, str(exc)
-        state.update(exit_code=exit_code, child_sid=observed.sid, phase="finished")
+        state.update(exit_code=exit_code, child_sid=observed.sid, phase="finished",
+                     permission_denials=len(observed.permission_denials))
         state["outcome"] = ("cancelled" if observed.cancelled else "timeout" if timed_out else
                             "protocol_error" if observed.invalid else
                             "completed" if exit_code == 0 and observed.sid and observed.completed
                             and not observed.failed else "failed")
         _save(path, state)
         result = Result(job_id, state["outcome"], observed.sid, exit_code,
-                        redact_text(observed.response or diagnostic)[:RESPONSE_LIMIT])
+                        redact_text(observed.response or diagnostic)[:RESPONSE_LIMIT],
+                        permission_denials=observed.permission_denials)
         try:
             _finalize(store, path, state)
             result.cleanup = "complete"

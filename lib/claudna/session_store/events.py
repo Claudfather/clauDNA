@@ -119,6 +119,7 @@ REGISTRY: dict[str, KindSpec] = {
         log=LIFECYCLE, seg=False,
         fields={"job_id": _STR, "phase": _STR, "provider": _STR, "child_sid": _OPT_STR,
                 "exit_code": _OPT_INT, "outcome": _STR, "cleanup": _STR, "summary": _STR},
+        optional={"permission_denials": _INT},
         choices={"phase": ("started", "finished", "accepted", "rejected", "cleanup_pending", "cleaned"),
                  "provider": AGENT_CLIS, "cleanup": ("pending", "complete")},
         caps={"summary": 1000, "outcome": 100},
