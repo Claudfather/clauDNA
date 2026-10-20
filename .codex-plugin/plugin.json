@@ -1,6 +1,6 @@
 {
   "name": "claudna",
-  "version": "0.32.0",
+  "version": "0.33.0",
   "description": "Curated engineering skills and session-store/startup hooks for Codex; specialist roles are read-and-dispatch prompts.",
   "author": {
     "name": "Chris Rogers",
