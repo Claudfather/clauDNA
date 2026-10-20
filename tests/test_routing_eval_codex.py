@@ -13,10 +13,10 @@ import routing_eval_codex as evaluator
 def test_floor_covers_every_selected_skill_and_preserves_source_rows():
     report = evaluator.floor()
     assert report['method'] == 'catalog_selection'
-    assert report['selected'] == 36
+    assert report['selected'] == 37
     assert report['source_rows'] == 41
     assert report['controls'] == 2
-    assert report['positive_coverage'] == 36
+    assert report['positive_coverage'] == 37
     assert report['unsupported'] == [{'skill': 'promotion-intake', 'reason': 'requires repo-clone context'}]
     assert report['live_cases'] == 18
     assert report['errors'] == []

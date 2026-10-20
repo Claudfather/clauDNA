@@ -93,6 +93,35 @@ class TestClearLineage:
         assert session(store, "s2")["parent_sid"] == "gone" and not store.session("gone").exists()
 
 
+def test_delegation_edges_preserve_continuation_and_replay(store):
+    from conftest import ACTOR, ORIGIN
+    from claudna.session_store import readers
+    from claudna.session_store.store import StoreError, record_delegation
+
+    parent = store.session("parent")
+    parent.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path=None)
+    parent.link_child("continuation")
+    for provider in ("claude", "codex"):
+        first = parent.link_child("same-native-id", relation="delegation", child_agent_cli=provider,
+                                  job_id=provider)
+        assert parent.link_child("same-native-id", relation="delegation", child_agent_cli=provider,
+                                 job_id=provider) == first
+    parent.close_session("other")
+    data = {"provider": "codex", "child_sid": "same-native-id", "exit_code": 0,
+            "outcome": "completed", "cleanup": "pending", "summary": "checked"}
+    first = record_delegation(parent, "codex", "finished", data)
+    assert record_delegation(parent, "codex", "finished", data) == first
+    with pytest.raises(StoreError):
+        record_delegation(parent, "codex", "finished", {**data, "outcome": "failed"})
+    result = readers.show(store, "parent")
+    assert result["session"]["status"] == "closed"
+    assert result["session"]["children"] == ["continuation"]
+    assert {(d["provider"], d["child_sid"]) for d in result["delegations"]} == {
+        ("claude", "same-native-id"), ("codex", "same-native-id")}
+    assert all(d["native_only"] for d in result["delegations"])
+    assert sum(e["kind"] == "delegation.updated" for e in readers.timeline(store, "parent")) == 1
+
+
 class TestLinks:
     def test_a_stale_link_is_ignored_and_consumed(self, tmp_path):
         lineage.write_link(tmp_path, PID, sid="s1", chain_id="s1")

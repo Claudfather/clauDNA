@@ -59,9 +59,9 @@ def test_excluded_unknown_external_and_duplicate_entries_fail(tmp_path, entry):
     assert check(root)
 
 
-def test_real_catalog_has_36_codex_35_cursor_39_canonical():
+def test_real_catalog_has_37_codex_35_cursor_40_canonical():
     from check_codex_scope import selected_names
     from check_cursor_scope import _declared_cursor_skills
-    assert len(selected_names(ROOT)) == 36
+    assert len(selected_names(ROOT)) == 37
     assert len(_declared_cursor_skills(ROOT / ".cursor-plugin")[0]) == 35
-    assert len(list((ROOT / "skills").glob("*/SKILL.md"))) == 39
+    assert len(list((ROOT / "skills").glob("*/SKILL.md"))) == 40

@@ -30,6 +30,7 @@
     "./skills/capture",
     "./skills/claudron",
     "./skills/dbt",
+    "./skills/delegate",
     "./skills/development-retro",
     "./skills/extract-system-spec",
     "./skills/file-github-issue",

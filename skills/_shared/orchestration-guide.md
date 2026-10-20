@@ -1,5 +1,9 @@
 # Shared Orchestration Guide
 
+## Cross-provider bounded work
+
+`/claudna:delegate` uses the other provider's native CLI under existing provider/account/billing authorization. Require actual recorded parent identity, a clean owned workspace and a meaningful check; parent writes pause until observed exit. Parent acceptance is separate from worker completion and is recorded in the existing lifecycle. The launcher owns its small bookkeeping and automatic cleanup; the caller owns the workspace and its existing pipeline. No handoff directories/transcript copies, guessed process reaping or replacement workers. Same-host subagents remain a different surface.
+
 **Codex:** Read `../_shared/codex-tools.md` before dispatch. Required independent review cannot be replaced by an inline self-review.
 
 Shared reference for skills that use subagent orchestration to produce design documents. This file is not a skill — it has no `SKILL.md` and does not appear in skill listings. Skills reference it by telling subagents to read it from disk at `../_shared/orchestration-guide.md`.

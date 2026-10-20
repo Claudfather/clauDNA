@@ -1,5 +1,13 @@
 # clauDNA Setup Guide
 
+## Cross-provider delegation
+
+`/claudna:delegate run` supports Claude-to-Codex and Codex-to-Claude. It requires Python 3.9+, the destination's installed/authenticated native CLI (measured with Codex 0.162.1 and Claude 2.1.304), and the actual parent session recorded by clauDNA. It reuses native account/model/permission policy; no API key is required to install the plugin. Claude uses its native `--permission-prompts none` flag: unanswered permission requests are denied without a permission broker or launcher retry. Denied calls remain visible separately from native completion; parent checks must establish the required result before acceptance. No permission is broadened.
+
+Hand off a clean, task-owned workspace exclusively during execution. Provider-qualified child links and separate worker/acceptance/cleanup events appear through `/claudna:session show`/`timeline`, distinct from `/clear` continuity. No extra checkout or dependency copy. Code and native provider history remain; only `<state>/delegation/active.json` is temporary, with one stable empty lock retained.
+
+Normal completion cleans bookkeeping automatically. SessionStart and the next invocation retry known-terminal cleanup even with capture/harvest off. Unknown execution stays protected and may need an ownership decision after a crash; it is never age-deleted or automatically replaced. No cleanup runs while the host is absent. V1 excludes native resume, concurrent workers, Git integration, recovery archives and direct Claudron publishing. Parent verification remains required.
+
 **Last Updated:** 2026-05-11
 
 This guide is the deep-dive companion to [README.md](./README.md). The README covers the marketplace install (`/plugin install claudna@Claudfather`); this guide covers everything beyond that — recommended `settings.json` tweaks, headless provisioning for bots and CI, Snowflake key-pair auth, shell aliases, the Claude Code configuration hierarchy, and troubleshooting.
@@ -852,7 +860,7 @@ The clauDNA project template (`project-template/CLAUDE.md`) embeds these princip
 
 ## Codex workflows and continuity
 
-The `Claudfather/claudna` Codex plugin selects 36 engineering skills explicitly,
+The `Claudfather/claudna` Codex plugin selects 37 engineering skills explicitly,
 plus five store handlers and a startup-only briefing. It excludes Claude-only
 `cleanup-legacy-install` and repo-clone `promotion-intake`/`skill-scaffold`.
 Bundled agent prompts map to a read-and-dispatch procedure. Support requires

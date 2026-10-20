@@ -384,9 +384,11 @@ gh_option_expansion() {
 # devices are not writable files a rule needs to cover, and stay auto-approvable.
 has_write_redirection() {
     local s
+    # POSIX token boundary: BSD sed does not recognize GNU's \>. Requiring
+    # whitespace/end also keeps /dev/null.backup and other suffixes guarded.
     s="$(printf '%s' "$1" | sed -E '
-        s/[0-9]*[<>]&[0-9-]+//g
-        s/[0-9]*>>?[[:space:]]*\/dev\/(null|stdout|stderr)\>//g
+        s/[0-9]*[<>]&([0-9]+-?|-)([[:space:]]|$)/\2/g
+        s/[0-9]*>>?[[:space:]]*\/dev\/(null|stdout|stderr)([[:space:]]|$)/\2/g
     ')"
     [[ "$s" == *'>'* ]]
 }

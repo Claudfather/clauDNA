@@ -102,7 +102,24 @@ def show(store: SessionStore, sid: str) -> dict:
         raise LookupError(f"no session {sid}")
     paths = handle.paths
     lifecycle = load_lifecycle(paths)
+    delegations = {}
+    for event in lifecycle.events:
+        data = event["data"]
+        if event["kind"] == "delegation.updated":
+            job = delegations.setdefault(data["job_id"], {})
+            if data["phase"] in ("accepted", "rejected"):
+                job.update(decision=data["phase"], evidence=data["summary"])
+            else:
+                job.update(data)
+        elif event["kind"] == "session.child_linked" and data.get("relation") == "delegation":
+            delegations.setdefault(data["job_id"], {}).update(
+                job_id=data["job_id"], provider=data["child_agent_cli"], child_sid=data["child_sid"])
+    for job in delegations.values():
+        child = store.session(job["child_sid"]) if job.get("child_sid") else None
+        job["native_only"] = not (child and child.exists() and
+                                  session_doc(child.paths).get("agent_cli") == job["provider"])
     return {"session": session_doc(paths, lifecycle), "segments": segment_docs(paths, lifecycle),
+            "delegations": list(delegations.values()),
             "rollup": _rollup(paths) or current(paths, lifecycle.events)}  # missing or foreign: computed
 
 
@@ -255,6 +272,12 @@ def render(verb: str, data, *, group: bool = False) -> list[str]:
             lines.append(f"  seg-{seg['index']:03d} {seg['status']:6} summary={seg['summary']['status']:7} "
                          f"prompts={c['prompts']} skills={c['skills']} failures={c['failures']} "
                          f"interrupts={c['interrupts']}")
+        for job in data.get("delegations", []):
+            lines.append(f"  delegate {job['job_id']} {job['provider']}:{job.get('child_sid') or '-'} "
+                         f"{job.get('outcome', '-')} decision={job.get('decision', '-')} "
+                         f"cleanup={job.get('cleanup', '-')} denials={job.get('permission_denials', 0)} "
+                         f"evidence={job.get('evidence', '-')}"
+                         + (" [native only]" if job["native_only"] else ""))
         if roll:
             f = roll["fields"]
             lines += [f"  {f.get('title') or ''}".rstrip(), f"  outcome: {f.get('outcome') or '-'}"]

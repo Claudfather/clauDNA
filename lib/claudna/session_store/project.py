@@ -356,7 +356,8 @@ def project_session(sid: str, lifecycle: Log, segments: list[dict], *, transcrip
     status, closed_at, close_reason = session_status(lifecycle.events)
     children: list[str] = []
     for e in lifecycle.events:
-        if e["kind"] == "session.child_linked" and e["data"]["child_sid"] not in children:
+        if (e["kind"] == "session.child_linked" and e["data"].get("relation", "continuation") == "continuation"
+                and e["data"]["child_sid"] not in children):
             children.append(e["data"]["child_sid"])
     facts = session_facts(lifecycle.events)
 

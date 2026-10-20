@@ -44,6 +44,10 @@ If none of them contains the file, stop and say so. Never fall back to a path in
 
 ---
 
+### 1.2. Command text transport
+
+Free text for commands arrives by file, enforced by `tests/test_command_text_by_file.py`. Structured JSON stdin has one file-free exception: a here-document with a quoted alphabetic delimiter and exactly one physical body line that parses as a JSON object. Serialize all embedded line breaks and control characters inside JSON strings. The object cannot equal its delimiter and the quoted delimiter disables shell expansion. Plain-text, unquoted and multiline payloads still use files. Runtime consumers must parse the JSON as data, never evaluate it. This permits bounded native delegation without creating handoff input files.
+
 ## 2. `SKILL.md` frontmatter
 
 `SKILL.md` begins with YAML frontmatter delimited by `---` lines, followed by markdown body.
