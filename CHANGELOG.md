@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-10-20
 ### Added
 - **`audit booby-traps`** examines decaying safeguards, person dependence, dead-end outputs, duplicated registries and hidden blast radius. A focused spot check connects relevant build/review failures to the existing audit engine without another mandatory sweep. The thin router, publish path and session relationships stay shared.
 
