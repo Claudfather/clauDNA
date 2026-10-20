@@ -99,9 +99,6 @@ fi
 
 # --- Session store liveness: the last harvest run's one line (written by
 # `session_store harvest`), so a harvest that stopped working is seen, not guessed.
-# shellcheck source=lib/state-dir.sh
-. "${BASH_SOURCE[0]%/*}/lib/state-dir.sh"
-STATE_DIR="$(claudna_state_dir)"
 HARVEST=""
 if [ -n "$STATE_DIR" ] && [ -f "$STATE_DIR/harvest/liveness.txt" ]; then
     IFS= read -r HARVEST < "$STATE_DIR/harvest/liveness.txt" 2>/dev/null || true

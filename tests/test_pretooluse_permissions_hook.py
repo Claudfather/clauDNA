@@ -166,6 +166,10 @@ class TestWriteRedirectionKeepsThePrompt:
     def test_device_name_prefix_is_still_a_file_write(self, tmp_path, target):
         assert not approves(tmp_path, "git status 2>" + target)
 
+    @pytest.mark.parametrize("target", ["1x", "-x"])
+    def test_fd_word_is_still_a_file_write(self, tmp_path, target):
+        assert not approves(tmp_path, "git log >&" + target)
+
     def test_plain_allowed_command_still_approves(self, tmp_path):
         assert approves(tmp_path, "git status")
 

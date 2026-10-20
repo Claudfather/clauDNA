@@ -176,7 +176,10 @@ def _save(path: Path, state: dict) -> None:
     atomic_write_json(path, state, durable=True)
 
 
-def _finalize(store: SessionStore, path: Path, state: dict) -> None:
+def _finalize(store: SessionStore, path: Path, state: dict) -> str:
+    if not store.session(state["parent_sid"]).exists():
+        path.unlink(missing_ok=True)
+        return "Parent history is absent; removed known-terminal bookkeeping without recreating it."
     parent = _parent(store, state["parent_sid"], state["parent_provider"])
     if state.get("child_sid"):
         parent.link_child(state["child_sid"], relation="delegation", child_agent_cli=state["provider"],
@@ -184,6 +187,7 @@ def _finalize(store: SessionStore, path: Path, state: dict) -> None:
     record_delegation(parent, state["job_id"], "finished", _data(state))
     path.unlink(missing_ok=True)
     record_delegation(parent, state["job_id"], "cleaned", _data(state, cleanup="complete"))
+    return ""
 
 
 def _reconcile_locked(store: SessionStore, path: Path) -> dict:
@@ -195,11 +199,11 @@ def _reconcile_locked(store: SessionStore, path: Path) -> dict:
     if not isinstance(state, dict) or state.get("phase") != "finished":
         return {"outcome": "needs_attention", "reason": "worker exit was not observed; do not relaunch"}
     try:
-        _finalize(store, path, state)
+        warning = _finalize(store, path, state)
     except (OSError, ValueError, KeyError, StoreError) as exc:
         _save(path, state)
         return {"outcome": "cleanup_pending", "reason": redact_text(str(exc))[:1000]}
-    return {"outcome": "cleaned", "job_id": state["job_id"]}
+    return {"outcome": "cleaned", "job_id": state["job_id"], **({"warning": warning} if warning else {})}
 
 
 def reconcile(store: SessionStore) -> dict:
@@ -275,9 +279,13 @@ def _observe(command: list[str], request: Request) -> tuple[int, NativeObservati
             if process.poll() is None:
                 os.killpg(process.pid, signal.SIGKILL)
             exit_code = process.wait()
-            if not isinstance(exc, KeyboardInterrupt):
+            if isinstance(exc, KeyboardInterrupt):
+                observation.cancelled = True
+            elif isinstance(exc, Exception):
+                observation.failed, observation.response = True, ""
+                tail = ("Observation failed: " + str(exc)).encode()[-TAIL_LIMIT:]
+            else:
                 raise
-            observation.cancelled = True
     return exit_code, observation, timed_out, redact_text(tail.decode(errors="replace"))
 
 
@@ -317,8 +325,10 @@ def run_job(request: Request, store: SessionStore) -> Result:
                         redact_text(observed.response or diagnostic)[:RESPONSE_LIMIT],
                         permission_denials=observed.permission_denials)
         try:
-            _finalize(store, path, state)
+            warning = _finalize(store, path, state)
             result.cleanup = "complete"
+            if warning:
+                result.summary = (warning + "\n" + result.summary)[:RESPONSE_LIMIT]
         except (OSError, ValueError, StoreError):
             _save(path, state)
             try:
@@ -362,17 +372,30 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         store = SessionStore(Path(args.root)) if args.root else SessionStore()
-        if args.verb == "run":
-            if args.request != "-":
-                raise DelegationError("run requires --request -")
+        payload = None
+        if args.request == "-":
+            if args.verb not in ("run", "settle"):
+                raise DelegationError("JSON input is supported only by run and settle")
             raw = sys.stdin.buffer.read(RECORD_LIMIT + 1)
             if len(raw) > RECORD_LIMIT:
                 raise DelegationError("request exceeds 1 MiB")
-            output = asdict(run_job(Request(**json.loads(raw)), store))
+            payload = json.loads(raw)
+        if args.verb == "run":
+            if args.request != "-":
+                raise DelegationError("run requires --request -")
+            handlers = {sig: signal.signal(sig, signal.default_int_handler) for sig in (signal.SIGTERM, signal.SIGHUP)}
+            try:
+                output = asdict(run_job(Request(**payload), store))
+            finally:
+                for sig, handler in handlers.items():
+                    signal.signal(sig, handler)
         elif args.verb == "settle":
-            if not args.parent or not args.job or not args.decision or not args.evidence_stdin:
-                raise DelegationError("settle requires parent, job, decision and evidence stdin")
-            output = settle(store, args.parent, args.job, args.decision, sys.stdin.read(1000))
+            if args.request == "-":
+                output = settle(store, **payload)
+            else:
+                if not args.parent or not args.job or not args.decision or not args.evidence_stdin:
+                    raise DelegationError("settle requires JSON input or parent, job, decision and evidence stdin")
+                output = settle(store, args.parent, args.job, args.decision, sys.stdin.read(1000))
         elif args.verb == "status":
             if not args.parent:
                 raise DelegationError("status requires --parent")

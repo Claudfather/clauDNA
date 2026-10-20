@@ -405,9 +405,7 @@ class SessionHandle:
         ev.check_data(kind, data)
         if not self.exists():
             raise StoreError("delegation requires an existing parent session")
-        with exclusive_lock(self.paths.lock, blocking=False) as taken:
-            if not taken:
-                raise StoreError("parent session history is busy; retry bookkeeping later")
+        with self._locked():
             events = load_lifecycle(self.paths).events
             decision = kind == "delegation.updated" and data["phase"] in ("accepted", "rejected")
             if decision:

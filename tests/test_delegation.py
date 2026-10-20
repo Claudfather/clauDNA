@@ -42,13 +42,18 @@ def worker(monkeypatch, code="", *, final=None, exit_code=0):
 
 
 def test_run_records_child_cleans_bookkeeping_and_settles(store, job, monkeypatch):
+    import io
+
     req, work = job
     worker(monkeypatch, "from pathlib import Path\nPath('code.txt').write_text('after')")
     result = d.run_job(req, store)
     assert (result.outcome, result.cleanup, result.child_sid) == ("completed", "complete", "native-child")
     assert (work / "code.txt").read_text() == "after"
     assert {p.name for p in (store.root / "delegation").iterdir()} == {".lock"}
-    d.settle(store, "parent", result.job_id, "accepted", "behavior check passed")
+    payload = {"parent_sid": "parent", "job_id": result.job_id,
+               "decision": "accepted", "evidence": "behavior check passed"}
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(json.dumps(payload).encode())))
+    assert d.main(["settle", "--root", str(store.root), "--request", "-"]) == 0
     d.settle(store, "parent", result.job_id, "accepted", "behavior check passed")
     shown = readers.show(store, "parent")
     assert shown["session"]["children"] == []
@@ -127,7 +132,10 @@ def test_terminal_cleanup_retry_is_idempotent(store, job, monkeypatch):
     assert sum(e["data"].get("phase") == "cleaned" for e in timeline) == 1
 
 
-def test_terminal_history_failure_preserves_retry_without_rerun(store, job, monkeypatch):
+@pytest.mark.parametrize("retired_parent", [False, True])
+def test_terminal_history_failure_preserves_retry_without_rerun(store, job, monkeypatch, retired_parent):
+    import shutil
+
     from claudna.session_store.store import SessionHandle
 
     worker(monkeypatch)
@@ -140,8 +148,14 @@ def test_terminal_history_failure_preserves_retry_without_rerun(store, job, monk
         patch.setattr(SessionHandle, "_append_once", fail_finished)
         result = d.run_job(job[0], store)
     assert result.cleanup == "pending"
+    if retired_parent:
+        shutil.rmtree(store.session("parent").paths.dir)
     monkeypatch.setattr(d, "native_command", lambda req: pytest.fail("must not relaunch"))
-    assert d.reconcile(store)["outcome"] == "cleaned"
+    recovery = d.reconcile(store)
+    assert recovery["outcome"] == "cleaned"
+    if retired_parent:
+        assert recovery["warning"] and not store.session("parent").exists()
+    assert not (store.root / "delegation/active.json").exists()
 
 
 def test_deadline_is_failure_and_child_cannot_inherit_parent_logging(store, job, monkeypatch):
@@ -248,7 +262,8 @@ def test_opposite_settlements_are_atomic(store, job, monkeypatch):
     assert len(decisions) == 1
 
 
-def test_handled_cancellation_reaps_and_cleans(store, job, monkeypatch):
+@pytest.mark.parametrize("error,outcome", [(KeyboardInterrupt, "cancelled"), (OSError, "failed")])
+def test_handled_observation_failure_reaps_and_cleans(store, job, monkeypatch, error, outcome):
     worker(monkeypatch, "import time\ntime.sleep(60)")
     original = d.subprocess.Popen
     processes = []
@@ -259,11 +274,32 @@ def test_handled_cancellation_reaps_and_cleans(store, job, monkeypatch):
         return process
 
     def interrupt(selector, timeout):
-        raise KeyboardInterrupt
+        raise error("controlled interruption")
 
     monkeypatch.setattr(d.subprocess, "Popen", launch)
     monkeypatch.setattr(d.selectors.DefaultSelector, "select", interrupt)
     result = d.run_job(job[0], store)
-    assert result.outcome == "cancelled" and result.cleanup == "complete"
+    assert result.outcome == outcome and result.cleanup == "complete"
     assert processes and all(p.poll() is not None for p in processes)
     assert d.reconcile(store)["outcome"] == "idle"
+
+
+@pytest.mark.parametrize("sig", ["SIGTERM", "SIGHUP"])
+def test_cli_signals_use_the_owned_worker_cancellation_path(store, job, sig):
+    import dataclasses
+    from pathlib import Path
+
+    script = f"""
+import os, signal, sys
+sys.path.insert(0, {str(Path(d.__file__).resolve().parents[1])!r})
+from claudna import delegation as d
+d.native_command = lambda request: [sys.executable, '-c', 'import time; time.sleep(20)']
+d.selectors.DefaultSelector.select = lambda selector, timeout: os.kill(os.getpid(), signal.{sig})
+raise SystemExit(d.main())
+"""
+    result = subprocess.run([sys.executable, "-c", script, "run", "--root", str(store.root), "--request", "-"],
+                            input=json.dumps(dataclasses.asdict(job[0])), text=True,
+                            capture_output=True, timeout=30)
+    output = json.loads(result.stdout)
+    assert result.returncode == 1 and output["outcome"] == "cancelled" and output["cleanup"] == "complete"
+    assert not (store.root / "delegation/active.json").exists()
