@@ -30,6 +30,14 @@ allowed-tools:
 
 Browser-automation framework with modes for different QA tasks. Uses a fast headless browser (~100ms per command) for navigating, interacting, screenshotting, and verifying state.
 
+For PR visual evidence in test, report or browse mode, read
+`../_shared/visual-evidence.md` §1 before capture. Reuse the shared evidence decision
+and reason, or choose them from the change's risk and claims. `none` creates no
+media packet or capture/upload obligation; explicitly requested browser QA still
+runs. For selected media, capture the actual app with source provenance, carry the
+decision and packet to shipping, and reuse its publication, media-specific
+verification and automatic finalizer. Screenshots do not require recording.
+
 ## Mode dispatch
 
 Arguments to dispatch (first token = mode, the rest belong to the mode): $ARGUMENTS
@@ -58,8 +66,8 @@ Only **Crawl mode** supports `--auto` (see "Autonomous Mode" below) — the othe
 
 1. **Health baseline.** Snapshot the current state: tests pass/fail, lint clean, type-check clean, build succeeds. Record a score 0-10.
 2. **Discover.** Either walk the app's key flows (golden path + top edge cases) OR if a URL is provided, navigate and interact.
-3. **Find bugs.** Each bug gets severity (Critical / High / Medium / Cosmetic), repro steps, screenshot, and expected vs. actual.
-4. **Fix iteratively.** For each bug, write a failing test → fix → verify pass → commit atomically. One bug → one commit.
+3. **Find bugs.** Each bug gets severity (Critical / High / Medium / Cosmetic), repro steps and expected vs. actual. Attach media only as selected by the shared evidence gate.
+4. **Fix iteratively.** Reproduce → fix → verify with relevant checks → commit atomically. Add a regression test only for a concrete failure existing checks do not adequately cover. One bug → one commit.
 5. **Re-verify.** Re-run the QA flow. Did fixes introduce regressions? Repeat.
 6. **Report.** Before/after health score, fix evidence, ship-readiness summary.
 
@@ -74,7 +82,7 @@ Three tiers based on user's appetite:
 
 **When:** user says "qa report only", "just check for bugs", "don't fix anything."
 
-Same as test-and-fix but stops at step 3. Deliverable is a structured report (bug list + screenshots + repro). No code changes.
+Same as test-and-fix but stops at step 3. Deliverable is a structured report (bug list + selected evidence + repro). No code changes.
 
 ---
 
