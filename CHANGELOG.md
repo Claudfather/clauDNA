@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.2] - 2026-10-21
 ### Changed
 - **Automatic booby-traps issue filing follows confidence:** with `--auto` and explicit `--output github`, only Confirmed/Likely findings enter issue docs. Hypotheses remain visible at their assessed severity with missing evidence and the confirming check. A batch with no eligible findings can complete after the existing automatic finalizer succeeds; no new tests, helpers or workflow stages are added.
 
