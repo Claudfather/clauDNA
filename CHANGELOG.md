@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Booby-traps audits name clock-dependent test traps:** live-clock assertions against fixed cutoffs and expiring fixtures. Trace the first failing boundary and intended protection before recommending a change; preserve valid expiry gates and boundary behavior. The existing spot-check/sweep and automatic cleanup remain shared, with no new tests, scanner or workflow stage.
+
 ## [0.34.0] - 2026-10-20
 ### Changed
 - **System audits refute critical/high candidates before tracker reconciliation.** A fresh reviewer challenges each finding or shared failure-mechanism cluster against its claimed branches; refuted claims drop, corrected claims narrow, and unresolved evidence stays explicit. Medium/low candidates skip the extra pass. Existing dispatch, parent/child logging, finding evidence and automatic scratch cleanup are reused; no new tests, helper, schema or review panel is required.
