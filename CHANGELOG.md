@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **System data maps name grain and constraint enforcement**, including version-write/flush ordering against actual enforcement timing. Existing data-lane scope, severe-finding refutation, logging and cleanup remain shared.
+- **Product discovery adds optional positioning questions** for feature dilution and evidenced advantage over a real alternative, reuses settled answers and consolidates proposals only around an evidenced cause. Concrete bug triage skips the strategy interview. Kindle adds optional visual-direction prompts within its existing spec and approval path.
+
+### Fixed
+- **Workflow guidance agrees on failure, evidence and tracker access:** persistent autonomous build verification failures preserve/push work without opening a PR; design audits select scope- and claim-based evidence instead of a fixed viewport matrix; required tracker reads remain direct while output mutations use publish. Existing concern writers prepare search inputs so system-audit orchestration stays read-only. Shared evidence/resource finalization keeps cleanup automatic; no new skills, helpers or test files.
+
 ## [0.34.2] - 2026-10-21
 ### Changed
 - **Automatic booby-traps issue filing follows confidence:** with `--auto` and explicit `--output github`, only Confirmed/Likely findings enter issue docs. Hypotheses remain visible at their assessed severity with missing evidence and the confirming check. A batch with no eligible findings can complete after the existing automatic finalizer succeeds; no new tests, helpers or workflow stages are added.

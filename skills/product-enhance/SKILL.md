@@ -122,7 +122,7 @@ Compare Step 2 answers against Step 1B findings via **Explore subagents** (disk-
 
 ### Step 4: Enhancement Proposals
 
-**Both paths converge here.** Rank enhancements by impact-to-effort ratio (H/M/L for Impact, Effort, Risk). Each gets a 2-3 sentence description. Ask user to select by number; do NOT proceed until confirmed. Call `ExitPlanMode`.
+**Both paths converge here.** Where findings share an evidenced cause, name it and consolidate overlapping proposals before ranking; keep unrelated findings separate rather than forcing a theme. Rank enhancements by impact-to-effort ratio (H/M/L for Impact, Effort, Risk). Each gets a 2-3 sentence description. Ask user to select by number; do NOT proceed until confirmed. Call `ExitPlanMode`.
 
 ---
 

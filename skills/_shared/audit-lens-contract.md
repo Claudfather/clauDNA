@@ -13,7 +13,7 @@ The shared skeleton for the `/audit` engine and its lenses. The engine (`skills/
 Every lens accepts, via the engine:
 
 - `[focus]` — free-text scope narrowing (an area, path, page, or repo set, per the lens's Focus note in the table).
-- `--output github|session` — `github` files findings as issues per `../_shared/output-guide.md` (routing through `/claudna:publish`; lenses never call `gh` directly); `session` (default) presents the analysis in chat.
+- `--output github|session` — `github` files findings as issues per `../_shared/output-guide.md` (output mutations route through `/claudna:publish`; required read-only tracker/repo-health queries may use `gh` directly under existing permissions); `session` (default) presents the analysis in chat.
 - `--auto` — non-interactive run, only for lenses whose table row says **auto: yes**. See §4.
 
 ## 3. Shared output conventions
