@@ -4,13 +4,13 @@ A safeguard's own explanation is a claim to check. Read its consumers and enforc
 
 ## 1. Safeguards that fail toward silence
 
-**Look for:** exemptions and expiry dates; skipped or warn-only CI checks; empty selections returning success; missing configuration logging and returning; paused schedules disappearing from monitoring.
+**Look for:** exemptions and expiry dates; skipped or warn-only CI checks; empty selections returning success; missing configuration logging and returning; paused schedules disappearing from monitoring; tests comparing live clocks (`date.today()`, `datetime.now()`) with fixed cutoffs, or using fixtures that expire without a code change.
 
-**Verify:** trace what reads the exception and what the gate actually prevents. Turn event-based exits (such as "after its first successful run") into a history check. Compare workflow events, branch/path filters and deployed state with the claimed behavior. Establish who detects a silent monitor or missing token. Check whether coupled config must be removed together to avoid reactivating one half.
+**Verify:** trace what reads the exception and what the gate actually prevents. Turn event-based exits (such as "after its first successful run") into a history check. Compare workflow events, branch/path filters and deployed state with the claimed behavior. Establish who detects a silent monitor or missing token. Check whether coupled config must be removed together to avoid reactivating one half. For clock-dependent tests, trace the clock source/timezone, first failing boundary and who discovers it: does time alone make otherwise healthy behavior fail, or is the check enforcing intended expiry?
 
 **Counterexamples:** an intentional CI expiry can be a valid merge gate; a dateless manual exemption with an owner and compensating control is not automatically decay. Verify the control where possible; otherwise report it as unverified. A fixed date alone does not establish a defect.
 
-**Remediation:** make the intended transition observable and route it to the responsible owner. Prefer a condition the system can evaluate over repeated manual renewal when the condition is measurable. Keep existing sound gates. Replay proposed alert enrollment against representative history when available so healthy runs do not become new pages.
+**Remediation:** make the intended transition observable and route it to the responsible owner. Prefer a condition the system can evaluate over repeated manual renewal when the condition is measurable. Keep existing sound gates. Replay proposed alert enrollment against representative history when available so healthy runs do not become new pages. For accidental clock coupling, remove irrelevant calendar assertions or use an explicit clock/as-of date or suitable relative fixture; preserve before/at/after expiry behavior and intentional real-clock enforcement.
 
 ## 2. Person dependence
 
