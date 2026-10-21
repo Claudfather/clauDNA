@@ -59,6 +59,8 @@ Present findings as a table: `#`, `Category`, `Finding`, `Confidence`, `Evidence
 
 For each root cause, propose a fix scored by **Impact**, **Effort**, **Risk** (each H/M/L). Present as a table: `#`, `Fix`, `Impact`, `Effort`, `Risk`.
 
+Use `defense-in-depth.md` to select prevention and verification for the concrete failure; carry that choice and any evidence limits into the fix plan.
+
 Ask the user: **"Which fixes would you like me to plan? Pick by number, or tell me to adjust."** Do NOT proceed until the user selects fixes.
 
 **Exit Plan Mode.** Call `ExitPlanMode` -- doc generation requires the Write tool.
