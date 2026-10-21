@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.1] - 2026-10-20
 ### Changed
 - **Booby-traps audits name clock-dependent test traps:** live-clock assertions against fixed cutoffs and expiring fixtures. Trace the first failing boundary and intended protection before recommending a change; preserve valid expiry gates and boundary behavior. The existing spot-check/sweep and automatic cleanup remain shared, with no new tests, scanner or workflow stage.
 
