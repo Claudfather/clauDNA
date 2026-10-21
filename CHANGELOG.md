@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Reviewer wording and skill-discovery fallback stay proportional:** evidence-backed clean reviews need no finding quota or repeat pass, and adequate existing verification is reused while concrete gaps and failed/unrun checks remain explicit. `find-skills` routes recurring clauDNA workflows through the existing source-checkout contribution process instead of generic personal scaffolding. Existing automatic cleanup is unchanged; no tests, helpers or workflow stages are added.
+
 ## [0.34.4] - 2026-10-21
 ### Fixed
 - **Investigation and dbt-agent verification follow concrete risk:** prevention layers and additional tests address an uncovered failure or invariant, with sufficient existing evidence reused. Required project checks and valid safeguards remain intact; failed/unrun checks stay explicit. Removes blanket layer/end-to-end/schema-test requirements, reuses existing automatic cleanup and adds no tests, helpers or workflow stages.
