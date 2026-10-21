@@ -1,6 +1,6 @@
 # System-lens subagent briefs
 
-Full briefs for the fan-out lanes in `system.md` Phases 2 (mapping) and 4 (concern sweep). The orchestrator inlines the relevant brief into each `general-purpose` subagent's prompt, **prepended with the intake brief it assembled in Phase 1** (subagents don't inherit the parent context, and — because Phases 1–5 run in plan mode — the intake is not yet on disk to read). Every subagent:
+Full briefs for `system.md` Phases 2 (mapping), 4 (concern sweep) and 5 (severe-finding refutation). The orchestrator inlines the relevant brief into each `general-purpose` subagent's prompt, **prepended with the intake brief it assembled in Phase 1** (subagents don't inherit the parent context, and — because Phases 1–5 run in plan mode — the intake is not yet on disk to read). Every subagent:
 
 - Takes the inlined intake brief as its shared context (what the system does, entrypoints, data-surface flag, out-of-scope paths).
 - Scopes to `[focus]` if the orchestrator passed one.
@@ -113,3 +113,34 @@ Secrets committed or likely to leak; unsafe logging of credentials/user data; ov
 ### Lane 6 — Maintainability *(breadth — defer depth)*
 
 Overly coupled modules; unclear boundaries; duplicate logic; unused or premature abstractions; missing domain concepts; config scattered through code; business logic in scripts/notebooks without tests; tests asserting implementation details instead of behavior. Breadth pass; for the full quality-axis scan (DRY, naming, SRP, dead code, magic literals), note "deep-scan candidate for `/claudna:audit tech-debt`." For *stale or inaccurate project documentation* specifically, the right deep lens is `/claudna:audit docs`, not tech-debt — route doc-quality findings there.
+
+---
+
+## Part C — Refute severe findings (Phase 5; CRITICAL/HIGH only)
+
+Act as a fresh reviewer of the supplied finding or shared failure-mechanism
+cluster. The claim is a hypothesis to challenge, even when labelled `Confirmed`.
+Review only its affected scope; this is not another concern sweep.
+
+1. Enumerate the branches the claim covers: entrypoints, modes, callers and
+   relevant configuration. Trace each against source, actively seeking evidence
+   that contradicts the claimed failure or limits its reach.
+2. Use code tracing and existing evidence first. Reproduce only when it resolves
+   a concrete uncertainty and is cheap, safe and already authorized. A new test
+   is not a prerequisite; follow the existing risk-based verification discipline.
+3. For each claimed branch, record `upheld`, `refuted`, `corrected` or `unverified`
+   with decisive `file:line` evidence and any observation still needed. One safe
+   branch does not disprove an unsafe sibling. Missing runtime access does not
+   prove safety or reduce impact; preserve `Likely`/`Hypothesis` where appropriate.
+4. Amend the supplied entries in the existing `system/findings-<lane>.md` files:
+   put the verdicts in `Evidence`, narrow the title/impact/fix to supported branches,
+   and retain the reason for any refuted claim so the orchestrator can drop it.
+   Keep severity proportional to surviving impact and `Status` proportional to
+   certainty. Do not edit application code or other findings. Scrub the amended
+   file using the shared redactor instructions above before returning.
+
+Return the usual 2-4 line summary: finding/cluster, verdict, surviving scope and
+unresolved checks. If writing is blocked, use `SCRATCH-WRITE-BLOCKED:` with compact
+per-branch verdicts, evidence and corrected scope/status; these amendments must
+reach Phase 6 even when the original findings file still exists. Borrowed scratch
+stays with its existing owner for automatic finalization.

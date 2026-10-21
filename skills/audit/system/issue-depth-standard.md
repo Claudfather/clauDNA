@@ -9,7 +9,7 @@ The depth this standard requires — ordered implementation steps, acceptance cr
 | §4.1 section | System-review depth bar |
 |---|---|
 | `## Summary` | 2-3 sentences: the problem, why it matters, the intended fix. Name the failure mode, not just the area. |
-| `## Evidence` | `file:line` for every claim. Current behavior quoted from source. A `Confirmed \| Likely \| Hypothesis` label carried over from the sweep. If Hypothesis: what would confirm or falsify it. |
+| `## Evidence` | `file:line` for every claim. Current behavior quoted from source. A `Confirmed \| Likely \| Hypothesis` label carried over from triage. For CRITICAL/HIGH candidates, carry the refutation verdicts and decisive branch evidence, including unresolved checks. If Hypothesis: what would confirm or falsify it. |
 | `## Implementation Plan → Dependencies / Blocks` | Real issue/phase numbers from the Phase 5 partition (`extends #N`, `regressed #N`), or "None". Sequencing constraints stated (e.g., "backfill column X before enforcing the scope filter, or the pool reads empty"). |
 | `## Implementation Plan → Steps` | Ordered, file-by-file, with function/symbol names and before/after sketches. Zero ambiguity — the implementer never has to reverse-engineer intent. New files: give the skeleton. |
 | `## Test Plan` | **Exact commands** (`./venv/bin/python -m pytest tests/x -k y`), not "run the tests". New tests named with what they assert. Manual checks where automation can't reach. |
