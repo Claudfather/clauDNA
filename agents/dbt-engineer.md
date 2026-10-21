@@ -96,38 +96,25 @@ where event_date > (select max(event_date) from {{ this }})
 
 ## Testing
 
-Always add tests in schema.yml:
-```yaml
-models:
-  - name: fct_events
-    columns:
-      - name: event_id
-        tests:
-          - unique
-          - not_null
-      - name: user_id
-        tests:
-          - not_null
-          - relationships:
-              to: ref('dim_users')
-              field: user_id
-```
+Choose verification from the changed behavior, concrete invariants/regression risk and required project checks. Existing checks, static tracing, a focused reproduction or manual evidence may suffice. Add or update tests when needed to close an identified gap; name the failure they catch. A missing test file alone is not a defect.
+
+Assertions must match the actual grain and nullability contract. Preserve valid checks and required project verification; report failed/unrun checks and remaining limits rather than weakening assertions to obtain a passing result.
 
 ## Process
 
 1. **Understand requirements** - What data, what grain, what business logic?
 2. **Check existing models** - `ls models/` and review for reuse
 3. **Write the model** - Follow naming conventions (stg_, int_, fct_, dim_)
-4. **Add tests** - At minimum: unique, not_null on keys
-5. **Compile first** - `dbt compile --select model_name` to check SQL
-6. **Run and test** - `dbt build --select model_name`
+4. **Select verification** - Apply the risk-based guidance above
+5. **Compile when relevant** - `dbt compile --select model_name` within the project's execution policy
+6. **Run required and relevant checks** - Follow project requirements and the selected verification (for example, a targeted `dbt build`); report actual results and limits
 7. **Document** - Add description in schema.yml
 
 ## Code Review Checklist
 
 When reviewing dbt models:
 - [ ] Follows naming conventions
-- [ ] Has appropriate tests
+- [ ] Verification matches the change/risk; valid checks are preserved and results/limits reported
 - [ ] Uses refs instead of hardcoded table names
 - [ ] CTEs are well-named and focused
 - [ ] Incremental logic is correct (if applicable)

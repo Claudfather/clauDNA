@@ -1,6 +1,6 @@
 # Defense in Depth
 
-After finding a root cause, add validation at multiple layers so the same class of bug can't recur undetected.
+After finding a root cause, identify unprotected failure boundaries and choose prevention and verification proportionate to the risk. The four layers below are options; each proposed layer needs a concrete failure it would prevent.
 
 ## The 4-Layer Pattern
 
@@ -71,15 +71,15 @@ def process_request(request):
 
 ## Application Process
 
-1. **Map data flow** — trace the path from input to where the bug appeared
-2. **Validate each layer** — add appropriate checks at each boundary
-3. **Test layers independently** — each validation should have its own test
-4. **Verify together** — end-to-end test that exercises the full chain
+1. **Map data flow and existing controls** — trace the path from input to the failure and identify what already protects it.
+2. **Choose prevention** — add a check where a concrete failure remains unprotected; reuse adequate controls. Preserve valid safeguards and required project checks.
+3. **Choose verification** — name what needs proving. Existing checks, static tracing, a focused reproduction or manual evidence may suffice. Add or update tests when needed to protect an uncovered behavior or regression; name the failure they catch.
+4. **Verify relevant interactions** — use a focused integration or end-to-end check when the risk crosses boundaries that narrower evidence cannot establish. Report failed/unrun checks and remaining verification limits before handoff.
 
 ## When to Use
 
-After fixing a root cause, ask: "What layers could have caught this before it reached the failure point?" Add validation at each layer that was missing it.
+After finding a root cause, ask: "Which boundary could prevent this failure, and what evidence proves the fix?" If existing controls and verification are sufficient, no additional layer or test is needed.
 
 ## Key Principle
 
-**One check is never enough.** Entry validation catches malformed input. Business logic catches invalid state. Environment guards catch dangerous contexts. Instrumentation catches what you didn't predict. Each layer is independent — if one fails, the others still protect.
+**Evidence and risk determine sufficient protection.** Add independent layers where they cover distinct failures. Keep valid checks intact; a layer count or a missing test file is not itself a reason to add work or weaken protection.

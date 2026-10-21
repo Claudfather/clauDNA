@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Investigation and dbt-agent verification follow concrete risk:** prevention layers and additional tests address an uncovered failure or invariant, with sufficient existing evidence reused. Required project checks and valid safeguards remain intact; failed/unrun checks stay explicit. Removes blanket layer/end-to-end/schema-test requirements, reuses existing automatic cleanup and adds no tests, helpers or workflow stages.
+
 ## [0.34.3] - 2026-10-21
 ### Changed
 - **System data maps name grain and constraint enforcement**, including version-write/flush ordering against actual enforcement timing. Existing data-lane scope, severe-finding refutation, logging and cleanup remain shared.
