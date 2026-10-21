@@ -95,7 +95,7 @@ Adopt `/claudna:product-vision`'s own question pattern and scoring mechanics dir
 
 - Ask about the audience, primary tasks and desired feeling, one question at a time; reuse answers already given.
 - When direction is still open, offer 2–3 meaningfully distinct typography/color/layout directions tied to those needs, with motion only where relevant. Get the user's choice in the existing design approval.
-- The existing spec remains required: record the chosen direction and token constraints there. Previews are optional; if used, apply `../_shared/visual-evidence.md` §1's evidence selection and §6's ownership/finalizer. This lens adds no separate visual-direction document, preview quota or capture stage. Implementation and app verification stay with build/QA.
+- Record the chosen direction and token constraints in the existing design/spec, following the checklist's right-sizing rule: inline for a trivial change, a written spec for substantial work. Previews are optional; if used, apply `../_shared/visual-evidence.md` §1's evidence selection and §6's ownership/finalizer. This lens adds no separate visual-direction document, preview quota or capture stage. Implementation and app verification stay with build/QA.
 
 ## After the design → forge
 

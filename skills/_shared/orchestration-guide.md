@@ -406,7 +406,7 @@ Every `--auto` run emits a single fenced JSON block as its final output (the las
 - `summary` (required): 2-4 lines of plain text. No markdown. For Telegram report-back.
 - `next` (optional, may be null): a one-sentence hint for the orchestrator.
 - `errors` (required, may be empty): array of strings describing non-fatal issues encountered during the run.
-- `blocker_description` (required when outcome is `blocked` or `needs-input`, null otherwise): one or two sentences explaining what blocks the work and what would unblock it.
+- `blocker_description` (required when outcome is `blocked` or `needs-input`; other non-completed outcomes may include it per the skill's contract; null on `completed`): one or two sentences explaining what blocks the work and what would unblock it.
 
 #### Outcome semantics
 
