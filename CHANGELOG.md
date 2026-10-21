@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.3] - 2026-10-21
 ### Changed
 - **System data maps name grain and constraint enforcement**, including version-write/flush ordering against actual enforcement timing. Existing data-lane scope, severe-finding refutation, logging and cleanup remain shared.
 - **Product discovery adds optional positioning questions** for feature dilution and evidenced advantage over a real alternative, reuses settled answers and consolidates proposals only around an evidenced cause. Concrete bug triage skips the strategy interview. Kindle adds optional visual-direction prompts within its existing spec and approval path.
