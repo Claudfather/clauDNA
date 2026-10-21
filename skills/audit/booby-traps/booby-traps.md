@@ -48,7 +48,9 @@ Each finding names the broken protection, file:line evidence, affected party, la
 
 For `session` (default), present a compact scope/count summary, severity-ordered findings and cleared candidates. A clean scope is a valid result; do not manufacture findings.
 
-For explicit `--output github`, prepare finding-cluster docs in `<scratch>` with the output-guide's §4.1 skeleton and route through `/claudna:publish` for validation, deduplication, labels and redaction. Follow `../../_shared/output-guide.md`; never call `gh` directly from this lens. Audit selection alone does not authorize filing, remediation or another logging stack.
+**Automatic GitHub filing (`--auto` with explicit `--output github`):** select only **Confirmed** or **Likely** findings for issue docs. Retain every **Hypothesis** in the final findings/result at its assessed severity, with the missing evidence and exact confirming check. Confidence limits automatic filing, not impact severity. This gate applies only to this lens's automatic GitHub output; session output retains all findings. With no eligible findings, return `completed` with no issues only after Step 5 succeeds.
+
+For explicit `--output github`, prepare the selected finding-cluster docs in `<scratch>` with the output-guide's §4.1 skeleton and route through `/claudna:publish` for validation, deduplication, labels and redaction. Follow `../../_shared/output-guide.md`; never call `gh` directly from this lens. Audit selection alone does not authorize filing, remediation or another logging stack.
 
 ### 5. Finalize before returning
 
