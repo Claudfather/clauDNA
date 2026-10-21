@@ -2,7 +2,7 @@
 
 Shared reference for planning skills that support `--output <target>`. Skills reference this file at `../_shared/output-guide.md`.
 
-**Author writes content → `/claudna:publish` enforces + routes.** Skills are *authors*: they run their analysis and produce a markdown doc with valid frontmatter and the house-style body skeleton (defined below). They never call `gh` themselves. `/claudna:publish` is the *publisher*: it validates the doc against this spec, dedups per-medium, and routes it to the chosen edition. This guide is the canonical spec for **body structure and publish routing**; the **frontmatter vocabulary** (types, per-type status values, optional fields) is ratified in [Claudron `SCHEMA.md`](https://github.com/Claudfather/Claudron/blob/main/SCHEMA.md) — Section 3 summarizes it, changes to it PR Claudron first.
+**Author writes content → `/claudna:publish` enforces + routes.** Skills are *authors*: they run their analysis and produce a markdown doc with valid frontmatter and the house-style body skeleton (defined below). Direct `gh` use here is limited to required read-only tracker/repo-health queries under existing permissions; authored output uses `/claudna:publish`'s existing adapters. `/claudna:publish` is the *publisher*: it validates the doc against this spec, dedups per-medium, and routes it to the chosen edition. This guide is the canonical spec for **body structure and publish routing**; the **frontmatter vocabulary** (types, per-type status values, optional fields) is ratified in [Claudron `SCHEMA.md`](https://github.com/Claudfather/Claudron/blob/main/SCHEMA.md) — Section 3 summarizes it, changes to it PR Claudron first.
 
 ---
 
@@ -41,7 +41,7 @@ Regardless of output target, every skill must:
 1. **Run the full analysis pipeline.** No phases are skipped based on output target. The scan, analysis, and plan generation phases all execute identically.
 2. **Produce a publishable doc.** Each unit of output is a markdown file with the frontmatter (Section 3) and the body skeleton (Section 4) below. Every finding includes before/after code examples, step-by-step instructions, a verification checklist, and "What NOT To Do" guidance.
 3. **Delegate ALL output to `/claudna:publish`.** Never run `gh issue create` / `gh pr create` directly, and never write into `documentation/` directly. For `--output github` or `--output session`, invoke `/claudna:publish <file> --to <edition>` (mapping in Section 1). For the default `docs` target, write the doc(s) to `<scratch>` (`../_shared/orchestration-guide.md` §1) and invoke `/claudna:publish <scratch-file-or-dir> --to docs --dir <category-dir>` — publish handles validation (family mode for `00_*` + `NN_*` directories), dedup, and placement.
-4. **Use Plan Mode for deliberation.** Enter Plan Mode before analysis begins. Exit Plan Mode when transitioning to writing the doc + publishing.
+4. **Use Plan Mode for deliberation.** Enter Plan Mode before analysis begins. Exit before the orchestrator writes or publishes a persisted output. Session-only printing may remain in Plan Mode when subagents authored the scratch docs (Section 5); honor the skill's mode-specific transition.
 
 The output target is a persistence decision, not a quality decision.
 
@@ -239,7 +239,7 @@ When using subagents to generate plans:
 
 1. **Research agents** write research to `<scratch>/research/` (`../_shared/orchestration-guide.md` §1) and return summaries.
 2. **Plan agents** write each doc (frontmatter + skeleton) to `<scratch>/docs/`.
-3. **The orchestrator** invokes `/claudna:publish <scratch-file> --to github-issue --repo <repo>` per doc — it never reads the full doc or calls `gh` itself.
+3. **The orchestrator** invokes `/claudna:publish <scratch-file> --to github-issue --repo <repo>` per doc — it never reads the full doc or performs output mutations itself. Required read-only tracker/repo-health queries remain direct under existing permissions.
 
 This preserves context-window management (the orchestrator works from metadata summaries) while routing output through the single publisher.
 
@@ -292,7 +292,7 @@ Produce each unit of output as a markdown doc with frontmatter + the body skelet
 - `--output session` → `/claudna:publish <file> --to session` (Section 5)
 - `docs` (default) → `/claudna:publish <scratch-file-or-dir> --to docs --dir documentation/planning/<skill-category>/<session>_<date>/` (family mode for 00_ + NN_ directories; Section 1)
 
-Never call `gh` directly and never write into `documentation/` directly — `/claudna:publish` owns validation, dedup, labels, and routing on every plane.
+Route output mutations through `/claudna:publish` and never write into `documentation/` directly — publish owns validation, dedup, labels, and routing on every plane. Required read-only tracker/repo-health queries may use `gh` directly under existing permissions.
 
 [Skill-specific output notes, if any]
 ```

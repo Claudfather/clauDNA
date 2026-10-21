@@ -27,6 +27,8 @@ Do NOT write code, scaffold a project, or take any implementation action until y
 
 Create a task per item and complete them in order.
 
+For substantial work, complete the written-spec steps below. A trivial change uses the approved inline design from the right-sized gate above and implements directly, without a separate spec file or publish/review cycle.
+
 1. **Explore project context** — files, docs, recent commits.
 2. **Pick a lens if one fits** (see Lenses) — adopt its question pattern for the discovery.
 3. **Ask clarifying questions — one at a time.** Purpose, constraints, success criteria. Prefer multiple-choice.
@@ -85,7 +87,15 @@ Adopt `/claudna:product-vision`'s own question pattern and scoring mechanics dir
 4. Group related gaps into coherent enhancement themes.
 5. Present the top 3-5 themes; user picks; proceed to the regular discovery flow.
 
-> Lightweight, in-ideation gap analysis. For a full ranked punch-list across five enhancement lenses (wedge / friction / coverage / differentiation / cost-of-change), use `/claudna:product-enhance`.
+> Lightweight, in-ideation gap analysis. For full discovery or triage with ranked proposals and phased plans, use `/claudna:product-enhance`.
+
+### Lens: Visual Direction
+
+**When:** choosing a visual direction for a new UI or an explicit redesign. Reuse settled brand rules/tokens and approved direction; skip this lens for mechanical changes within an established system.
+
+- Ask about the audience, primary tasks and desired feeling, one question at a time; reuse answers already given.
+- When direction is still open, offer 2–3 meaningfully distinct typography/color/layout directions tied to those needs, with motion only where relevant. Get the user's choice in the existing design approval.
+- Record the chosen direction and token constraints in the existing design/spec, following the checklist's right-sizing rule: inline for a trivial change, a written spec for substantial work. Previews are optional; if used, apply `../_shared/visual-evidence.md` §1's evidence selection and §6's ownership/finalizer. This lens adds no separate visual-direction document, preview quota or capture stage. Implementation and app verification stay with build/QA.
 
 ## After the design → forge
 

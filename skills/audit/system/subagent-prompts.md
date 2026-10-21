@@ -61,8 +61,8 @@ Run **only** if a data surface exists (DB, ORM, migrations, dbt, pipelines, even
 
 - Source systems; raw → staging → intermediate → final models (if a pipeline).
 - ORM entities & relationships; tables, views, materializations, migrations, indexes.
-- Primary/foreign keys, unique constraints, nullability, defaults.
-- Incremental logic, deduplication logic, timezone/timestamp semantics, SCD/snapshot logic.
+- Grain (what one row represents); primary/foreign keys, unique constraints, nullability and defaults; where each is enforced (model, migration or DB-only), citing source and marking deployed state unverified when unavailable.
+- Incremental/deduplication logic and timezone/timestamp semantics. For SCD/snapshots, trace how `current` flips and the transaction, write and flush order against the actual constraints and their enforcement timing; do not assume one universal expire/insert order.
 - Data-freshness assumptions, data-quality checks/tests.
 - API request/response schemas; ownership and downstream consumers.
 
@@ -85,6 +85,8 @@ What is happening: <plain English>
 Why it matters: <impact — correctness/reliability/data/perf/security/maintainability>
 How to fix: <high-level remediation>
 ```
+
+For GitHub tracker reconciliation, the same concern subagent writes each candidate's concise, non-secret search terms to `<scratch>/system/terms-<lane>-<finding-slug>.txt` and references that absolute path in the finding. This is the existing file-based command input, prepared alongside findings so the Phase 5 orchestrator stays read-only; no extra agent or helper. Keep these inputs under the same scratch owner's automatic finalizer. A write-blocked return reports missing search input explicitly.
 
 **Do not force findings.** If a lane is clean, write "No material findings" and say what you checked. Severity guide (matches output-guide §4.4, so the orchestrator maps it straight to `priority:*`): CRITICAL = data loss / security exposure / outage risk / broken critical path; HIGH = high-impact bug, major data-quality issue, serious reliability problem; MEDIUM = medium correctness/maintainability/observability/test gap; LOW = cleanup/docs/naming. The `Status` label (Confirmed/Likely/Hypothesis) is the one axis carried downstream — a Hypothesis states what would confirm or falsify it.
 
@@ -136,7 +138,8 @@ Review only its affected scope; this is not another concern sweep.
    put the verdicts in `Evidence`, narrow the title/impact/fix to supported branches,
    and retain the reason for any refuted claim so the orchestrator can drop it.
    Keep severity proportional to surviving impact and `Status` proportional to
-   certainty. Do not edit application code or other findings. Scrub the amended
+   certainty. Update that candidate's existing search input if narrowing changes
+   its tracker keywords. Do not edit application code or other findings. Scrub the amended
    file using the shared redactor instructions above before returning.
 
 Return the usual 2-4 line summary: finding/cluster, verdict, surviving scope and
