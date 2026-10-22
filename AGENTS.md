@@ -2,7 +2,7 @@
 
 ## Cursor Cloud specific instructions
 
-clauDNA is a plugin pack (markdown skills/agents + shell hooks) shipped to Claude Code via the `Claudfather` marketplace to Cursor via `.cursor-plugin/`, and to Codex via `.codex-plugin/` (36 curated skills, store hooks and startup briefing; no native agent registration). There is **no long-running server or web app** to start — the "application" is the plugin, whose runtime pieces are the shell hooks in `plugin-hooks/`. The development gate is the Python validator/test toolchain.
+clauDNA is a plugin pack (markdown skills/agents + shell hooks) shipped to Claude Code via the `Claudfather` marketplace to Cursor via `.cursor-plugin/`, and to Codex via `.codex-plugin/` (37 curated skills, store hooks and startup briefing; no native agent registration). There is **no long-running server or web app** to start — the "application" is the plugin, whose runtime pieces are the shell hooks in `plugin-hooks/`. The development gate is the Python validator/test toolchain.
 
 `.cursor/environment.json` declares one `install` step, `./.cursor/install.sh`, which runs `make deps` to install the pinned toolchain from `requirements-dev.txt`. **A fresh agent should already be able to run `make check`** — no `start` command and no services, because there is nothing to serve. If `ruff` or `pytest` is missing, the install step did not run (check `/tmp/cursor/async-install/install-user.log`); run `make deps` yourself and carry on.
 
@@ -25,4 +25,4 @@ clauDNA is a plugin pack (markdown skills/agents + shell hooks) shipped to Claud
 
 ## Codex source work
 
-Read CLAUDE.md, applicable nested instructions and `skills/_shared/codex-tools.md`. Use actual exposed controls; bundled roles require complete filled prompts and real same-host spawn/wait. Global user settings/auth/plugins are not implementation targets. Claude 39 and Cursor 35 remain unchanged; Codex explicitly selects 36 and six hook handlers. Run fresh checks in isolated exports with private HOME/TMP; preserve baseline failures separately.
+Read CLAUDE.md, applicable nested instructions and `skills/_shared/codex-tools.md`. Use actual exposed controls; bundled roles require complete filled prompts and real same-host spawn/wait. Global user settings/auth/plugins are not implementation targets. Claude selects 40 and Cursor 35 skills; Codex explicitly selects 37 and six hook handlers. Run fresh checks in isolated exports with private HOME/TMP; preserve baseline failures separately.

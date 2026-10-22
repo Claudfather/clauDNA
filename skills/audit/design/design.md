@@ -18,7 +18,7 @@ Tool note: the standalone predecessor pre-approved its browser-automation comman
 
 ### Step 1: Scope & Context Gathering
 
-Ask: (1) deployed URL, (2) focus area, (3) anything to skip, (4) front-end stack. If a deployed URL or focus area was provided as the focus argument, use it and skip asking for it. Scratch dir: `<scratch>/research/`, with `<scratch>` a private directory made by `mktemp -d "${TMPDIR:-/tmp}/audit-design.XXXXXX"`.
+Ask: (1) deployed URL, (2) focus area, (3) anything to skip, (4) front-end stack. If a deployed URL or focus area was provided as the focus argument, use it and skip asking for it. Reuse the caller's `<scratch>` when nested; otherwise make one private root with `mktemp -d "${TMPDIR:-/tmp}/audit-design.XXXXXX"`. Research lives in `<scratch>/research/`.
 
 Parallel: **A.** Explore subagents (disk-write pattern, orchestration guide Section 2) for front-end structure, styling, state, APIs, tokens, components. **B.** Begin Step 2.
 
@@ -26,11 +26,15 @@ Present codebase context summary. Confirm with user.
 
 ---
 
-### Step 2: Visual Audit — Screenshot Capture
+### Step 2: Visual Audit — Targeted Evidence
 
-Detect Chrome (`which google-chrome`, `which chromium`, `test -x "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"` in parallel). Prefer local dev server -- check `package.json` for port, `lsof` if running, `curl` to verify; fall back to deployed URL.
+Use the available browser/capture controls and the app's documented startup/authentication flow. Prefer a verified local dev server when available; otherwise use the deployed URL agreed in Step 1.
 
-Capture each page at `1440,900` / `768,1024` / `375,812`. **One screenshot per Bash call. No shell operators.**
+Choose pages, states and responsive boundaries from the agreed scope and claims, using `../../_shared/visual-evidence.md` §1's least-sufficient-evidence principles. Observe the running app even when there is no code change. `1440,900` / `768,1024` / `375,812` are starting points, not a mandatory matrix; honor explicitly requested whole-app responsive coverage.
+
+Use screenshots for appearance/layout claims, DOM/code/request evidence for claims they establish, and short video only when motion or transitions cannot be adequately shown statically. Record evidence and coverage limits in the existing findings. A standalone audit needs no PR base/head packet or GitHub upload/playback gate; use that protocol only when PR evidence is requested.
+
+Reuse `../../_shared/visual-evidence.md` §6 and `../../_shared/orchestration-guide.md` §1.1 for automatic finalization: track actual owned tab/context/recorder/server handles, observe their closure before returning, and preserve cited media as verified durable deliverables before deleting scratch. Borrowed roots/resources return to their existing owner; leave pre-existing user browsers/servers alone.
 
 Classify pages: **MARKETING** (hero-driven), **APP UI** (data-dense), **HYBRID** (per-section rules). See `design-hard-rules.md`.
 
@@ -62,7 +66,7 @@ Ask these one group at a time, waiting for answers:
 
 Compare intent (Step 3) vs. observations (Step 2) vs. code (Step 1). Explore subagents for targeted digs.
 
-Subagents read from this directory: `audit-checklist.md`, `ai-slop-blacklist.md`, `font-knowledge.md`, `design-hard-rules.md`. Calibrate by page-type. Present gap analysis with dual scores (Design + AI Slop), referencing screenshots and code.
+Subagents read from this directory: `audit-checklist.md`, `ai-slop-blacklist.md`, `font-knowledge.md`, `design-hard-rules.md`. Calibrate by page-type. Present gap analysis with scoped scores (Design + AI Slop where assessed), referencing collected evidence and code.
 
 Ask: **"Does this match your experience? Anything I missed or got wrong?"**
 
@@ -72,7 +76,7 @@ Ask: **"Does this match your experience? Anything I missed or got wrong?"**
 
 <!-- Enhanced with ideas from https://github.com/garrytan/gstack -->
 
-Propose enhancements scored on Impact, Effort, Risk. Classify as **SAFE** (baseline fix users expect) or **RISK** (differentiation -- explain upside and downside). SAFE first, ranked by impact-to-effort. Reference screenshots, Step 3 intent, code.
+Propose enhancements scored on Impact, Effort, Risk. Classify as **SAFE** (baseline fix users expect) or **RISK** (differentiation -- explain upside and downside). SAFE first, ranked by impact-to-effort. Reference supporting evidence, Step 3 intent, code.
 
 Ask: **"Which would you like me to design? Pick by number or adjust."** Wait for selection. Call `ExitPlanMode`.
 
@@ -82,7 +86,7 @@ Ask: **"Which would you like me to design? Pick by number or adjust."** Wait for
 
 Output lands in `documentation/planning/phases/<session_name>_<YYYY-MM-DD>/` — Plan agents write the family to the session's scratch docs directory and the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/phases/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide Section 3). Overview + numbered docs (1 PR each). Orchestration guide Section 9.
 
-Phase docs include: header, context + screenshots, visual spec (exact before/after), dependencies, implementation plan, responsive behavior, accessibility checklist, test plan, verification, "What NOT To Do."
+Phase docs include: header, context + supporting evidence, change spec (observable before/after), dependencies, implementation plan, responsive behavior, accessibility checklist, test plan, verification, "What NOT To Do."
 
 Tell user: **"Run `/claudna:build` on the phase directory to start building."** This lens produces plans, not code.
 
@@ -97,7 +101,7 @@ Before presenting output (all modes), run the adversarial review gate per `../..
 ## Notes
 
 - **User gates** at every step -- never auto-proceed.
-- **Screenshots are evidence** -- every observation references one.
+- **Evidence proves the claim** -- cite the relevant screenshot, observation, DOM measurement, code or request result; use video only where static evidence is insufficient.
 - **Subagents:** Steps 1/4 Explore, Step 6 Plan. Disk-write pattern per orchestration guide.
 - **Critique format:** "I notice..." / "I wonder..." / "What if..." / "I think... because..."
 - **Respect existing design system.** Accessibility non-negotiable. Orchestration guide Section 10.

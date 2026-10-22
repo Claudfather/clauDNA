@@ -2,7 +2,7 @@
 
 Ask the user a focused set of questions about the **purpose** of the system. These are not code questions — they're product questions.
 
-Ask these one group at a time, waiting for answers:
+Ask these one group at a time, waiting for answers. Reuse settled answers; ask only what is missing and relevant to the discovery scope.
 
 ## Group A: Core Purpose
 
@@ -15,6 +15,13 @@ Ask these one group at a time, waiting for answers:
 - What's working well today?
 - What frustrates you or your users most?
 - Are there things the system *should* do but doesn't?
+
+If positioning or product scope is under review, also ask:
+
+- Have accumulated features diluted the primary job? What usage or user observations support that?
+- Which real alternative do users choose, and what advantage here is hard to reproduce? What evidence supports it?
+
+Skip these positioning questions for concrete bug triage or already-settled positioning. Missing market/usage evidence stays unknown; do not infer an advantage or recommend feature cuts from absence of evidence.
 
 ## Group C: Aspirations
 

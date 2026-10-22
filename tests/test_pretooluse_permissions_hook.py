@@ -22,6 +22,8 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 HOOK = REPO_ROOT / "plugin-hooks" / "pretooluse-permissions.sh"
 
@@ -149,8 +151,24 @@ class TestWriteRedirectionKeepsThePrompt:
         # 2>&1 is fd-duplication, not a file write — must stay auto-approvable.
         assert approves(tmp_path, "git status 2>&1")
 
-    def test_dev_null_still_approves(self, tmp_path):
-        assert approves(tmp_path, "git status 2>/dev/null")
+    @pytest.mark.parametrize("command", [
+        "git status 2>/dev/null",
+        "git status >/dev/null --short",
+        "git status 1>/dev/stdout",
+        "git status 2>/dev/stderr",
+    ])
+    def test_standard_device_still_approves(self, tmp_path, command):
+        assert approves(tmp_path, command)
+
+    @pytest.mark.parametrize("target", [
+        "/dev/null.backup", "/dev/null/sink", "/dev/stderr-extra", '/dev/null"suffix"',
+    ])
+    def test_device_name_prefix_is_still_a_file_write(self, tmp_path, target):
+        assert not approves(tmp_path, "git status 2>" + target)
+
+    @pytest.mark.parametrize("target", ["1x", "-x"])
+    def test_fd_word_is_still_a_file_write(self, tmp_path, target):
+        assert not approves(tmp_path, "git log >&" + target)
 
     def test_plain_allowed_command_still_approves(self, tmp_path):
         assert approves(tmp_path, "git status")

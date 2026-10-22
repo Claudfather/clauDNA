@@ -50,6 +50,25 @@ def run_hook(cwd: Path, env_overrides: dict | None = None) -> tuple[int, str, fl
 
 
 class TestSessionStartHook:
+    def test_terminal_delegation_cleanup_runs_even_with_briefing_and_capture_off(self, tmp_path):
+        from conftest import ACTOR, ORIGIN
+        from claudna.session_store.fsio import atomic_write_json
+        from claudna.session_store.store import SessionStore
+
+        state = tmp_path / "claudna-state"
+        store = SessionStore(state)
+        store.session("parent").open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path=None)
+        directory = state / "delegation"
+        directory.mkdir()
+        active = directory / "active.json"
+        atomic_write_json(active, {"job_id": "job", "parent_sid": "parent", "parent_provider": "claude",
+                                  "provider": "codex", "child_sid": "child", "exit_code": 0,
+                                  "outcome": "completed", "phase": "finished"})
+        code, out, _ = run_hook(tmp_path, {"CLAUDNA_SESSION_BRIEFING": "0", "CLAUDNA_SESSION_STORE": "0",
+                                         "CLAUDNA_HARVEST": "0"})
+        assert code == 0 and out == ""
+        assert not active.exists()
+
     def test_opt_out_is_silent_and_zero(self, tmp_path):
         code, out, _ = run_hook(tmp_path, {"CLAUDNA_SESSION_BRIEFING": "0"})
         assert code == 0

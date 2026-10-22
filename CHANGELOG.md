@@ -7,10 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.4] - 2026-10-21
+### Fixed
+- **Investigation and dbt-agent verification follow concrete risk:** prevention layers and additional tests address an uncovered failure or invariant, with sufficient existing evidence reused. Required project checks and valid safeguards remain intact; failed/unrun checks stay explicit. Removes blanket layer/end-to-end/schema-test requirements, reuses existing automatic cleanup and adds no tests, helpers or workflow stages.
+
+## [0.34.3] - 2026-10-21
+### Changed
+- **System data maps name grain and constraint enforcement**, including version-write/flush ordering against actual enforcement timing. Existing data-lane scope, severe-finding refutation, logging and cleanup remain shared.
+- **Product discovery adds optional positioning questions** for feature dilution and evidenced advantage over a real alternative, reuses settled answers and consolidates proposals only around an evidenced cause. Concrete bug triage skips the strategy interview. Kindle adds optional visual-direction prompts within its existing spec and approval path.
+
+### Fixed
+- **Workflow guidance agrees on failure, evidence and tracker access:** persistent autonomous build verification failures preserve/push work without opening a PR; design audits select scope- and claim-based evidence instead of a fixed viewport matrix; required tracker reads remain direct while output mutations use publish. Existing concern writers prepare search inputs so system-audit orchestration stays read-only. Shared evidence/resource finalization keeps cleanup automatic; no new skills, helpers or test files.
+
+## [0.34.2] - 2026-10-21
+### Changed
+- **Automatic booby-traps issue filing follows confidence:** with `--auto` and explicit `--output github`, only Confirmed/Likely findings enter issue docs. Hypotheses remain visible at their assessed severity with missing evidence and the confirming check. A batch with no eligible findings can complete after the existing automatic finalizer succeeds; no new tests, helpers or workflow stages are added.
+
+## [0.34.1] - 2026-10-20
+### Changed
+- **Booby-traps audits name clock-dependent test traps:** live-clock assertions against fixed cutoffs and expiring fixtures. Trace the first failing boundary and intended protection before recommending a change; preserve valid expiry gates and boundary behavior. The existing spot-check/sweep and automatic cleanup remain shared, with no new tests, scanner or workflow stage.
+
+## [0.34.0] - 2026-10-20
+### Changed
+- **System audits refute critical/high candidates before tracker reconciliation.** A fresh reviewer challenges each finding or shared failure-mechanism cluster against its claimed branches; refuted claims drop, corrected claims narrow, and unresolved evidence stays explicit. Medium/low candidates skip the extra pass. Existing dispatch, parent/child logging, finding evidence and automatic scratch cleanup are reused; no new tests, helper, schema or review panel is required.
+
+## [0.33.0] - 2026-10-20
+### Added
+- **Shared PR visual evidence workflow** connects QA, review, verification, shipping and the build deliverable audit. One risk/claim-based decision selects no media for mechanical changes, targeted screenshots for meaningful appearance changes, or short video where screenshots cannot demonstrate behavior. All callers honor that choice; only selected media gets capture, validation, native GitHub publication and authenticated rendering/playback checks. PNGs are verified directly without download copies; the owning workflow automatically finalizes any scratch and browser/server handles before returning. No new skill, runtime dependency, uploader service, retry loop or cleanup daemon (#409).
+
+## [0.32.0] - 2026-10-20
+### Added
+- **`audit booby-traps`** examines decaying safeguards, person dependence, dead-end outputs, duplicated registries and hidden blast radius. A focused spot check connects relevant build/review failures to the existing audit engine without another mandatory sweep. The thin router, publish path and session relationships stay shared.
+
+### Changed
+- **Verification follows concrete risk**, replacing missing-test-file findings and blanket new-test requirements in tech-debt, shared orchestration and change review. Required project checks remain; existing evidence can suffice.
+- **Owned scratch is finalized before terminal workflow results**, including clean, duplicate and blocked audit outcomes. The owner preserves sanitized findings, waits for writers, removes the exact run-created directory and verifies removal; nested callers do not delete shared scratch. No cleanup reminder, new ledger or heuristic reaper.
+
+## [0.31.0] - 2026-10-20
+### Added
+- **Bounded delegation between Claude Code and Codex** reuses a clean owned workspace, records provider-qualified child links and separate completion/acceptance/cleanup in session history, and automatically releases its small operational record. SessionStart retries only known-terminal cleanup; unknown workers are never reaped or replaced heuristically. No per-job directories, copied transcripts, worktree creation, resume manager, account switching or direct vault writes. Native Codex 0.162.1 and Claude 2.1.304 helper probes passed, including a Claude Manual-mode diagnostic denial that remained enforced while independently permitted commands completed the task. Claude uses native `--permission-prompts none`; denial metadata stays separate from completion and requires parent review. No permission widening, launcher retries or permission broker. The skill ships to Claude Code and Codex; Cursor's catalog is unchanged. Deterministic CI uses controlled subprocesses, not model calls.
+
+### Fixed
+- **Delegation lifecycle edges found by a delegated audit**: handled SIGTERM/SIGHUP and reaped observation failures reach terminal cleanup; lifecycle appends share the existing blocking session lock; known-terminal bookkeeping cleans up after parent retention without recreating history. Descriptor-like file targets such as `>&1x` keep the write prompt. Claude Code stdin transport and the local-only scope of read-only restrictions are now explicit; MCP/connector policy remains native.
+- **Delegation simplification**: one bounded JSON input interface for run/settle, one authoritative locked decision check, and one parent validation per launch. Pre-spawn failures finalize without inventing an unknown worker, and entry reconciliation runs even when the next request is blocked by disabled logging.
+- **Standard-device redirections on macOS**: the permission hook uses a portable whitespace/end boundary instead of GNU sed's `\>` extension. Allowed commands redirecting to `/dev/null`, `/dev/stdout`, or `/dev/stderr` work under BSD sed; similarly prefixed file paths still require approval.
+- **For Python, the auto-format hook changes layout, never code, and no formatter changes a file silently** (#419). It runs no lint fix on Python: ruff's default `--fix` deletes imports that look unused, such as a pytest fixture imported from another module, and every test that requests the fixture then errors at setup. Python is formatted only when the file's committed version has content and `ruff format --isolated` would leave it unchanged, so a one-line edit in a repo whose Python is not in ruff's default style no longer rewrites the whole file. A file with no committed version, such as a new one, is left as written. Each change any formatter makes, prettier's and `sqlfluff fix`'s included, comes back to the session as PostToolUse `additionalContext` naming the formatter, the lines it touched and how many. `--isolated` stays, so the repo's ruff configuration is still not read.
+
+## [0.30.0] - 2026-10-16
+
 ### Added
 - **Codex engineering workflows** explicitly select 36 existing skills, map real host tools and bundled role dispatch, provide a four-lens simplification procedure, and preserve project handoff compatibility. A startup-only briefing joins the unchanged store handlers. Deterministic catalog-choice checks are separate from live selection, native loading and independent reviewer evidence. Claude's 39 skills and Cursor's 35 remain unchanged; native agent registration and global configuration writes remain excluded (#404).
-### Changed
-- **Moves to Claudron v0.10.0.** `contracts/claudron.json` and `contracts/claudron.ref` now come from v0.10.0, and output-guide §3's status table is re-rendered from it. Opened by the `claudron-release` workflow.
+
 
 ## [0.29.0] - 2026-10-16
 

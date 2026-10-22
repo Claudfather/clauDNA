@@ -37,6 +37,11 @@
       "expect": "dbt"
     },
     {
+      "id": "coverage-delegate",
+      "utterance": "Delegate this bounded task from Codex to native Claude Code.",
+      "expect": "delegate"
+    },
+    {
       "id": "coverage-development-retro",
       "utterance": "Review what we learned after merging this PR.",
       "expect": "development-retro"

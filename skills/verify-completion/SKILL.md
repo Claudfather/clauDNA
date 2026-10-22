@@ -68,6 +68,16 @@ Not all evidence is equal -- the command must prove *this* claim:
 
 A behavioral claim backed only by "tests pass" is unverified.
 
+Read `../_shared/visual-evidence.md` §1 and honor the shared evidence decision and
+reason. `none` uses relevant checks and behavioral evidence without media gates;
+screenshots require no video. For selected media, require current-source capture,
+local validation, native publication and authenticated verification on the saved
+PR before claiming that media delivered. Keep those states separate; a URL or
+composer preview is insufficient. Verify PNG rendering directly; verify native
+playback only for selected video. No round-trip downloads. The owner finalizes
+owned scratch and handles before the terminal result, including after a decision
+changes to `none`.
+
 ## Red Flags — STOP
 
 If you catch yourself doing any of these, STOP and run verification:

@@ -1,5 +1,9 @@
 # Shared Orchestration Guide
 
+## Cross-provider bounded work
+
+`/claudna:delegate` uses the other provider's native CLI under existing provider/account/billing authorization. Require actual recorded parent identity, a clean owned workspace and a meaningful check; parent writes pause until observed exit. Parent acceptance is separate from worker completion and is recorded in the existing lifecycle. The launcher owns its small bookkeeping and automatic cleanup; the caller owns the workspace and its existing pipeline. No handoff directories/transcript copies, guessed process reaping or replacement workers. Same-host subagents remain a different surface.
+
 **Codex:** Read `../_shared/codex-tools.md` before dispatch. Required independent review cannot be replaced by an inline self-review.
 
 Shared reference for skills that use subagent orchestration to produce design documents. This file is not a skill — it has no `SKILL.md` and does not appear in skill listings. Skills reference it by telling subagents to read it from disk at `../_shared/orchestration-guide.md`.
@@ -8,7 +12,7 @@ Shared reference for skills that use subagent orchestration to produce design do
 
 ## 1. Scratch Directory
 
-At orchestration start, make a private scratch directory for this session, once:
+When the workflow first needs scratch files, make one private scratch directory for this run. A short inline check that writes nothing needs none:
 
 ```bash
 mktemp -d "${TMPDIR:-/tmp}/<skill-name>.XXXXXX"
@@ -23,9 +27,29 @@ Never name a scratch path yourself under `/tmp` or `$TMPDIR` (a fixed name, or o
 
 **Every file a skill writes for its own use goes in `<scratch>`, orchestrated or not:** a file a command takes its text from (a title, a body, search terms, a message, a JSON payload), a draft of a doc to publish, fetched content, a working ledger. A skill that has not made `<scratch>` yet makes it as above before it writes the first such file. Never write one at a name you chose under `/tmp` or `$TMPDIR`, however unlikely the name.
 
-**Permissions note:** this is the one Bash call the pattern needs. If `mktemp -d` is refused, stop and say so; never fall back to a name of your own. After it, subagents write with the Write tool, which creates the subdirectories (`research/`, `docs/`) inside `<scratch>` as it writes, so the rest of the workflow uses only Read and Write.
+**Permissions note:** If `mktemp -d` is refused, stop and say so; never fall back to a name of your own. Subagents write with the Write tool, which creates subdirectories (`research/`, `docs/`) inside `<scratch>`. The owner also needs the foreground finalization calls below.
 
 **Subagent type note:** Explore agents (`subagent_type: "Explore"`) do NOT have the Write tool — they are read-only. For the disk-write pattern, use `general-purpose` subagents (`subagent_type: "general-purpose"`) which have access to all tools including Write. Use Explore agents only when you need fast, read-only codebase searches that don't need to persist results to disk.
+
+### 1.1. Finalize owned scratch before the terminal result
+
+The workflow that created `<scratch>` owns finalization. A nested skill or subagent borrowing that root returns to its owner without deleting it. Reuse the existing run/session identity and result; do not create a cleanup ledger or copy transcripts.
+
+On completion, no findings, all-duplicate output, blocked work or handled cancellation:
+
+1. Wait for this run's writers to finish, or stop them through their actual owned handles and observe exit. Never delete beneath a live writer or infer ownership from a process name.
+2. Preserve the deliverable outside scratch and verify publication. For session output, present the sanitized findings or carry them in the final result. If publication fails, return those findings in the session result and report the requested publication as blocked before deleting its drafts. A deliberate active handoff may retain the one root, with its exact path and next owner recorded in the existing handoff; it is not a terminal cleanup success.
+3. Substitute the **exact absolute path returned by this run's `mktemp -d`**, quote it, and run these as separate foreground calls. Never reconstruct a path, expand a glob or delete a caller's directory:
+
+   ```bash
+   rm -rf -- "<scratch>"
+   test ! -e "<scratch>"
+   test ! -L "<scratch>"
+   ```
+
+4. Observe every exit. Report cleanup in the existing result/receipt before its final emission. A denied or failed removal blocks a cleanup-complete claim; name the remaining owned path and failure. Do not defer an authorized deletion to a reminder for the user.
+
+This finalizer applies to observed exits. An uncatchable process termination does not prove cleanup; do not add age-based scans, guessed recovery paths or background reapers to conceal that limit.
 
 ---
 
@@ -183,6 +207,7 @@ The disk-write workflow is designed to use **only Read and Write tools** for all
 - **No `mkdir` calls** — Write tool creates parent directories automatically
 - **No `cp` or `mv` calls** — all file creation goes through the Write tool
 - **No `cat` or `head`/`tail` calls** — all file reading goes through the Read tool (use `limit` and `offset` parameters for partial reads)
+- **Command input transport stays file-based** per `SKILL_CONTRACT.md` §1.2: documented adapters such as `--body-file` or `"$(cat <terms-file>)"` supply text to a command, rather than inspecting it in chat. Keep the latter as one quoted argument; it does not evaluate the file's contents as shell code.
 - **No `find` calls** — use the Glob tool for file discovery by pattern
 - **No `grep` calls** — use the Grep tool for content search (supports regex, glob filters, output modes, and `head_limit`)
 
@@ -335,7 +360,7 @@ When `--auto` is set (see orchestration guide Section 10):
 
 The rules above describe planning skills that produce GitHub Issues. Implementation skills (Tier 3 per §13: `/claudna:build`, and any future skill that produces PRs from existing plans) follow a parallel `--auto` contract with these differences:
 
-- **Implies producing a PR, not an issue.** Does NOT imply `--output github`. The terminal artifact is an open PR on the work item's source branch.
+- **A completed run produces a PR, not an issue.** Does NOT imply `--output github`. The successful terminal artifact is an open PR on the work item's source branch; non-completed exits follow the skill's outcome contract (for example, build's failed verification preserves work without a PR).
 - **Never merges.** The merge gate is unconditionally skipped in `--auto`. A human ratifies the PR.
 - **Requires a target work item.** `--auto` MUST be invoked with `--source github <#>` or an explicit plan path. Picker / browse modes are disallowed.
 - **Trusts a *collaborator-authored* plan the caller has vetted.** Interactive challenge rounds are replaced by either (a) trust (the upstream planning skill ran adversarial-review at creation time per §5.3 of the design) or (b) machine synthesis via `/claudna:weigh-development-paths --auto` per design §5.5.2. The skill does not stop to ask the user. **This trust presumption holds only when the work item's author is trusted** (`authorAssociation` OWNER/MEMBER/COLLABORATOR — [`./trusted-input.md`](./trusted-input.md)); a work item authored by an untrusted account carries no vetting to presume, so `--auto` refuses it (exit `blocked`) rather than implementing outsider text unattended.
@@ -381,7 +406,7 @@ Every `--auto` run emits a single fenced JSON block as its final output (the las
 - `summary` (required): 2-4 lines of plain text. No markdown. For Telegram report-back.
 - `next` (optional, may be null): a one-sentence hint for the orchestrator.
 - `errors` (required, may be empty): array of strings describing non-fatal issues encountered during the run.
-- `blocker_description` (required when outcome is `blocked` or `needs-input`, null otherwise): one or two sentences explaining what blocks the work and what would unblock it.
+- `blocker_description` (required when outcome is `blocked` or `needs-input`; other non-completed outcomes may include it per the skill's contract; null on `completed`): one or two sentences explaining what blocks the work and what would unblock it.
 
 #### Outcome semantics
 
@@ -406,6 +431,7 @@ Every `--auto` run emits a single fenced JSON block as its final output (the las
 |---|---|---|
 | `/claudna:audit tech-debt` | ✅ Yes | Scan + issue creation, no user input needed |
 | `/claudna:audit security` | ✅ Yes | Scan + issue creation, no user input needed |
+| `/claudna:audit booby-traps` | ✅ Yes | Read-only sweep or focused spot check; finalizes owned scratch before its result |
 | `/claudna:product-enhance` | ✅ Yes | Uses triage path (skip discovery/interview) |
 | `/claudna:audit frontend-perf` | ✅ Yes | Requires page/flow in arguments |
 | `/claudna:audit docs` | ✅ Yes | Global review mode, auto-fix stale docs |
@@ -425,7 +451,7 @@ The following rules apply to ALL orchestration skills. Skills should reference t
 
 - **One PR per doc.** Each phase/remediation/fix doc maps to exactly one PR when implemented via `/claudna:build`.
 - **This skill produces plans, not code.** Implementation is always handled by `/claudna:build`, which provides its own challenge round, verification, and PR workflow. Do NOT build, branch, or create PRs from planning skills.
-- **Testing is non-negotiable.** Every phase doc must include a test plan. Implementations without tests are incomplete.
+- **Verification follows risk.** Every phase doc specifies proportionate verification and required project checks. Add or update tests when they protect a concrete behavior or regression; existing checks, static tracing, focused reproductions or manual evidence may suffice. Name the failure that additional coverage would catch. A missing corresponding test file is not itself a defect; state any remaining verification limits.
 - **Documentation is non-negotiable.** Every phase doc must specify documentation updates. Code without docs is incomplete.
 - **Respect existing architecture.** Enhancements and fixes should work *with* the system's existing patterns, not introduce alien abstractions.
 

@@ -32,6 +32,10 @@ allowed-tools:
 
 # Build
 
+## Optional cross-provider task
+
+For an explicitly authorized bounded task on the other provider, use `/claudna:delegate` in a clean owned workspace and pause parent writes until observed exit. Inspect the full diff/check evidence and settle the parent decision before continuing. Reuse current evidence where valid; retain build's review/verification/shipping once. Workspace setup, dirty prerequisites and concurrency remain with the caller. No automatic account/model switching or extra reviewer per task.
+
 > **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout. For every simplify step, use `../_shared/subagent-prompts/simplify-codex.md` instead of the Claude native command or rollback instructions.
 
 Execute a design or development plan against the codebase. Challenge first, refine through dialogue, then build — updating the plan as the single source of truth throughout. Works with any structured development document (downstream of `/claudna:audit tech-debt`, `/claudna:product-enhance`, or standalone) or a GitHub Issue created by `--output github`.
@@ -73,7 +77,7 @@ If invoked with `--auto` and any ambiguous source, exit immediately with the str
 | 3: Challenge Round | Replaced by §5.5.2 synthesis pass (see "Synthesis pass" below) |
 | 4: Mark In Progress | No change |
 | 5: Branch & Implement | "Feels wrong" exits with `outcome: "blocked"` instead of stopping for user discussion |
-| 6: Verify | Persistent verification failure (after fix-and-retry attempts) exits with `outcome: "partial"` |
+| 6: Verify | Still failing after one focused fix pass and re-verification → `outcome: "partial"`; push the preserved branch, no PR |
 | 6.5: Simplify | On regression, automatically reverts the simplify commit (no user prompt) and proceeds with a note in the PR body |
 | 7: PR | Opens PR. Suppresses any post-PR user messages. |
 | 8: Merge Gate | Skipped entirely. Never offers merge. |
@@ -116,7 +120,7 @@ After Step 9, emit a single fenced JSON block as the FINAL output (full schema i
 - `bypassed` — Step 2.5 scope-expansion tripwire fired
 - `blocked` — Step 1.5 sparse issue, Step 5 "feels wrong"
 - `needs-input` — synthesis pass returned unresolved decisions, or could not run (a synthesis failure remaps here rather than to `blocked` — never silently fall back to implementing unresolved decisions)
-- `partial` — verification ultimately failed after multiple fix attempts; PR opened with failing checks noted in body
+- `partial` — required verification still fails after fix attempts (including after a simplify revert); preserve and push the implementation branch, report the failures, and open no PR
 
 When `outcome != "completed"`, populate `blocker_description` with 1-2 sentences explaining what blocked the work and what would unblock it.
 
@@ -205,6 +209,7 @@ digraph build {
     step6b [label="Step 6B: Verification\nChecklist" shape=box];
     verify_pass [label="All\npass?" shape=diamond];
     fix_check [label="Fix failing\ncheck" shape=box];
+    verification_partial [label="EXIT outcome:\npartial (--auto)\npush branch, no PR" shape=doublecircle style=filled fillcolor=lightcoral];
 
     step6_5 [label="Step 6.5: Simplify\nif diff > threshold" shape=box];
     simplify_pass [label="Verify\npasses?" shape=diamond];
@@ -299,7 +304,8 @@ digraph build {
     step6b -> verify_pass;
     verify_pass -> step6_5 [label="yes"];
     verify_pass -> fix_check [label="no"];
-    fix_check -> step6b;
+    fix_check -> step6b [label="once in --auto"];
+    verify_pass -> verification_partial [label="still fails after fix (--auto)"];
 
     step6_5 -> simplify_pass;
     simplify_pass -> step7 [label="yes"];
@@ -658,7 +664,7 @@ Read `challenge-round-questions.md` for the question matrix and `red-flags-and-r
 ---
 
 <HARD-GATE>
-Do NOT write any code, create any branch, or make any changes until Step 3 (Challenge Round) is complete and the user has confirmed "Ready to build."
+Do NOT write any code, create any branch, or make any changes until Step 3 is complete: interactive mode requires the user's "Ready to build" confirmation; `--auto` requires the successful Step 3-AUTO synthesis gate instead.
 </HARD-GATE>
 
 ### Step 5: Branch & Implement
@@ -708,7 +714,19 @@ Apply `engineering-principles.md` ("Applying During Implementation" checklist). 
 
 **A. Deliverable Audit** — Every deliverable in the phase doc must be marked `COMPLETE` or skipped with justification. Present audit table. Fix gaps.
 
+Apply `../_shared/visual-evidence.md` §1's shared evidence decision and reason before
+capture. `none` uses relevant checks without media gates; screenshots need no video.
+For selected media, audit actual-app capture, source freshness and behavioral checks,
+then carry the same decision and packet through publication and authenticated
+rendering/playback as applicable. These states stay separate until the PR exists.
+The outer build retains ownership of borrowed scratch and finalizes owned resources
+before its terminal result, including after a decision changes to `none`.
+
 **B. Verification Checklist** — Run the plan's checklist: tests, lint, types, docs, manual checks. Present results. Fix failures.
+
+**Persistent failure in `--auto`:** make one focused fix pass for observed failures and re-run the affected required checks. If verification still fails, stop before Steps 6.5–7. Preserve and push the implementation branch without opening a PR or marking the source complete. Finalize owned resources, then emit the existing structured result with `outcome: "partial"`, branch/source artifacts, failed commands/results in `errors`, and a concrete `blocker_description`/`next`. Report a failed push separately; never imply the branch is remote if it was not pushed. Do not add a retry loop or emit Step 9's success result.
+
+If verification exposes a lapsed exemption, silent safeguard or a CI failure apparently unrelated to the change, use `/claudna:audit booby-traps`'s focused spot check before suppressing the check or renewing an exception. Return to this checklist afterward; do not add a full audit to every build.
 
 ---
 
@@ -868,7 +886,7 @@ The structured-result for a successful `--auto` run:
 }
 ```
 
-For non-`completed` outcomes (`bypassed`, `blocked`, `needs-input`, `partial`), the structured-result block is emitted from the failing step (see Steps 1.5, 2.5, 3-AUTO, 5, 6.5) — Step 9 is only reached on `completed` runs. If a non-completed outcome was emitted earlier, Step 9 must NOT emit another block.
+For non-`completed` outcomes (`bypassed`, `blocked`, `needs-input`, `partial`), the structured-result block is emitted from the failing step (see Steps 1.5, 2.5, 3-AUTO, 5, 6, 6.5) — Step 9 is only reached on `completed` runs. If a non-completed outcome was emitted earlier, Step 9 must NOT emit another block.
 
 **JSON validity:** Before emitting the block, verify it is parseable JSON (no trailing commas, all strings quoted). The orchestrator's parser is strict.
 

@@ -17,7 +17,7 @@ Interactive-only lens: there is no `--auto` variant. The engine owns the `--auto
 
 Follow the phases in order. Call `EnterPlanMode` first — every phase through the gate (1–5) is read-only for the orchestrator. After the Phase 5 gate, follow the **mode-specific** Plan-mode transition defined there: `--output github` exits before publishing issues; `--output session` stays in Plan Mode unless the user opts into map promotion (Phase 7). Do not exit unconditionally.
 
-**Who writes what.** The orchestrator itself writes nothing to disk before the gate — it runs read-only discovery (Read/Grep/Glob, read-only Bash), launches subagents, and reads what they write. All pre-gate scratch files are written by **subagents** (Task = separate sessions, not bound by the orchestrator's plan mode): maps in Phase 2, findings in Phase 4. This is the house pattern (orchestration guide §2–§3, §6) and it is what makes plan mode viable for a lens that ultimately writes.
+**Who writes what.** The orchestrator itself writes nothing to disk before the gate — it runs read-only discovery (Read/Grep/Glob, read-only Bash), launches subagents, and reads what they write. All pre-gate scratch files are written by **subagents** (Task = separate sessions, not bound by the orchestrator's plan mode): maps in Phase 2, findings and their tracker-search input files in Phase 4. This is the house pattern (orchestration guide §2–§3, §6) and it is what makes plan mode viable for a lens that ultimately writes.
 
 Do not spend scan budget re-reading CLAUDE.md or MEMORY.md if they are already loaded into context — use them for project understanding and spend scan effort on the code. If project instructions appear missing or contradictory (this lens ships to arbitrary marketplace repos where they may not have loaded as expected), read them once for routing and safety context before scanning.
 
@@ -84,15 +84,38 @@ Breadth lanes (surface obvious risk; **defer depth** — do not reproduce the de
 
 ---
 
-## Phase 5: Triage & tracker reconciliation — THE GATE
+## Phase 5: Refutation, triage & tracker reconciliation — THE GATE
 
 <HARD-GATE>
 No finding proceeds to drafting until it has been reconciled against the live issue tracker. This gate runs in **every** output mode (`session` and `github`) — reconciliation is a triage step, not a filing courtesy. Skipping it produces duplicate work against a tracker the maintainer is actively grooming, which is worse than filing nothing.
+
+Before reconciliation, every `CRITICAL` or `HIGH` candidate needs an attempted
+refutation by a fresh reviewer. `MEDIUM`/`LOW` candidates skip this extra pass.
 </HARD-GATE>
 
-To reconcile, the orchestrator now reads the `system/findings-<lane>.md` files from scratch (still read-only — this is why the findings are on disk: retrievable at the gate without having flowed through the fan-out returns). For any lane whose subagent returned `SCRATCH-WRITE-BLOCKED` (write-blocked fallback, `subagent-prompts.md`), reconcile from its compact inline table instead — the file is absent by design, not by error. Assemble the deduplicated candidate list, then:
+The orchestrator now reads the `system/findings-<lane>.md` files from scratch (still read-only — this is why the findings are on disk: retrievable at the gate without having flowed through the fan-out returns). For any lane whose subagent returned `SCRATCH-WRITE-BLOCKED` (write-blocked fallback, `subagent-prompts.md`), use its compact inline table instead — the file is absent by design, not by error. Assemble the deduplicated candidate list, then:
 
-1. **Fetch the tracker.** `gh issue list --repo <owner/repo> --state open --limit 300` plus the recently-closed set (`--state closed --limit 60`). **A bulk fetch can miss issues outside that window**, so for each candidate also write its key terms to `<terms-file>` in `<scratch>` with the Write tool and run a targeted `gh issue list --repo <owner/repo> --search="$(cat <terms-file>)" --state all --limit 50` — `--state all` is mandatory here: `gh issue list` defaults to open-only, and the `regressed` bucket depends on the search returning *closed* matches. Bucket from the returned state: open exact match → `duplicate of #N`; open related → `extends #N`; closed exact/near recurrence → `regressed #N`; no match → `net-new`. If the repo has no GitHub remote or `gh` is unavailable, say so and reconcile against whatever tracker exists (`documentation/`, a TODO file) — never silently skip.
+**Refute severe candidates.** If any are `CRITICAL`/`HIGH`, dispatch one fresh
+`general-purpose` reviewer per finding or shared failure-mechanism cluster using
+`subagent-prompts.md` Part C. Give it the intake, concrete plugin/project/scratch
+paths, candidate claims and source references, without the prior reviewer's
+reasoning history. Reuse native dispatch and its existing parent/child logging;
+the reviewer amends the existing lane findings, with only one writer per file at
+a time. No extra run record or artifact family is needed.
+
+Wait for actual completion and read the amendments (or compact write-blocked
+verdicts). Drop refuted claims, narrow corrected ones to the surviving branches,
+and carry those amendments through reconciliation and Phase 6 authoring. Keep
+impact and certainty separate: unavailable runtime evidence stays unverified,
+not automatically refuted or lower severity. With no severe candidates, skip
+dispatch. If fresh dispatch/wait is unavailable or fails, report the refutation
+as incomplete and stop before drafting; an inline pass cannot satisfy independent
+review. All exits retain the shared scratch owner's automatic finalizer under
+the audit-lens contract §5.
+
+Reconcile the surviving candidates:
+
+1. **Fetch the tracker.** `gh issue list --repo <owner/repo> --state open --limit 300` plus the recently-closed set (`--state closed --limit 60`). **A bulk fetch can miss issues outside that window**, so for each candidate also run a targeted `gh issue list --repo <owner/repo> --search="$(cat <terms-file>)" --state all --limit 50`, using the input already written by its Phase 4 concern subagent (`subagent-prompts.md` Part B). The orchestrator does not Write a terms file or add a preparation agent. If that input is unavailable, report reconciliation incomplete and stop before drafting. `--state all` is mandatory here: `gh issue list` defaults to open-only, and the `regressed` bucket depends on the search returning *closed* matches. Bucket from the returned state: open exact match → `duplicate of #N`; open related → `extends #N`; closed exact/near recurrence → `regressed #N`; no match → `net-new`. If the repo has no GitHub remote or `gh` is unavailable, say so and reconcile against whatever tracker exists (`documentation/`, a TODO file) — never silently skip.
 2. **Reconcile every candidate** into exactly one bucket:
 
    | Bucket | Meaning | Fate |
@@ -133,7 +156,7 @@ The value of this review is the draft set surfaced *cleanly* — the duplicate c
 
 Delegate issue-doc authoring to **`general-purpose` subagents acting as Plan agents** (output guide §4.7; orchestration guide §3) — "Plan agent" is a role, not a subagent type, and only `general-purpose` has the Write tool (Explore is read-only). The orchestrator must not author docs itself. Launch one per finding (or per umbrella cluster from Phase 5.3); each reads its `findings-<lane>.md` from scratch (or, for a write-blocked lane, receives the finding detail inline in its prompt from the orchestrator's gate reconciliation), reads `issue-depth-standard.md` for the depth bar, writes a doc (frontmatter + the output-guide §4.1 body skeleton, junior-executable per the depth standard) to scratch, and returns only a metadata summary (path, title, severity, effort). The §4.1 body is what publish validates; the depth standard is what makes the issue self-sufficient.
 
-Before publishing, scrub every authored doc in scratch through the redactor — `python3 "<claudna-root>/scripts/redact.py" <scratch-dir>/<file>.md` per doc, with `<claudna-root>` resolved per `../../_shared/claudna-root.md` (not the literal `scripts/redact.py`, which won't exist in an arbitrary reviewed repo) — the mechanical gate that catches any raw value the security or other lanes quoted, independent of per-subagent memory. Then the orchestrator routes each doc through `/claudna:publish` (see Output Targets) — **always publish, never `gh` directly**. Publish validates, dedups a second time per-medium, applies labels, and files. File sequentially so publish's dedup sees prior creations; carry the Phase-5 bucket into each doc (`Related: #N` for extends, a regression note referencing #N for regressed); collect the returned URLs; end with a batch summary that also lists the dropped duplicates (per the Phase 5 partition).
+Before publishing, scrub every authored doc in scratch through the redactor — `python3 "<claudna-root>/scripts/redact.py" <scratch-dir>/<file>.md` per doc, with `<claudna-root>` resolved per `../../_shared/claudna-root.md` (not the literal `scripts/redact.py`, which won't exist in an arbitrary reviewed repo) — the mechanical gate that catches any raw value the security or other lanes quoted, independent of per-subagent memory. Then the orchestrator routes each doc through `/claudna:publish` (see Output Targets) — **output mutations use publish; Phase 5 tracker reads stay direct**. Publish validates, dedups a second time per-medium, applies labels, and files. File sequentially so publish's dedup sees prior creations; carry the Phase-5 bucket into each doc (`Related: #N` for extends, a regression note referencing #N for regressed); collect the returned URLs; end with a batch summary that also lists the dropped duplicates (per the Phase 5 partition).
 
 ---
 

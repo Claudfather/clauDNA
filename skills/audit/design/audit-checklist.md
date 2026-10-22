@@ -1,7 +1,7 @@
 # Design Audit Checklist
 
 
-Reference material for the `/claudna:audit design` lens. Apply these checks systematically across all pages in scope. Each finding gets an **impact rating** (High / Medium / Polish) and its category. Use the page-type classifier from Step 2 to weight findings — e.g., "no expressive typography" is High-impact on a marketing page but may be acceptable on an app UI.
+Reference material for the `/claudna:audit design` lens. Apply relevant checks systematically across the agreed pages/states. Label grades with that coverage; unobserved categories remain unassessed rather than receiving an A or a whole-app score. Each finding gets an **impact rating** (High / Medium / Polish) and its category. Use the page-type classifier from Step 2 to weight findings — e.g., "no expressive typography" is High-impact on a marketing page but may be acceptable on an app UI.
 
 ## 10 Categories
 
@@ -118,6 +118,6 @@ Design Gap Analysis
 ```
 
 For each finding, note:
-- Which screenshot shows it (reference the file)
+- Which evidence establishes it (screenshot for appearance/layout; observation, DOM/code/request result for other claims; short video only where static evidence is insufficient)
 - Which code file is responsible (component, route, style file)
 - How it connects to what the user said in the design intent interview

@@ -1,8 +1,8 @@
 ---
 name: audit
 user-invocable: true
-description: "Use for codebase audits — security vulnerabilities, technical debt, stale documentation, visual and UX design, frontend performance (janky scroll, slow loads), cross-cutting consistency of interfaces, data model fit and redesign, scale survival (high throughput, high user counts, multi-tenant isolation), a birds-eye view across repositories, whole-system comprehension, and prompt-cache efficiency."
-argument-hint: "[security|tech-debt|docs|design|access-path|data-model|data-model-redesign|frontend-perf|repo-health|system|cache|scale] [--auto] [--output github|session] [focus]"
+description: "Use for codebase audits — security vulnerabilities, technical debt, stale documentation, visual and UX design, frontend performance (janky scroll, slow loads), cross-cutting interfaces, data model fit and redesign, scale/throughput and multi-tenant isolation, birds-eye repositories, whole-system comprehension, decaying safeguards and operational footguns, and prompt-cache efficiency."
+argument-hint: "[security|tech-debt|docs|design|access-path|data-model|data-model-redesign|frontend-perf|repo-health|system|cache|scale|booby-traps] [--auto] [--output github|session] [focus]"
 requires:
   - cli: gh
     reason: "GitHub CLI for --output github issue filing (via publish) and the repo-health lens's PR/CI listing"
@@ -24,6 +24,7 @@ No lens token → infer only when the request wording is unambiguous (e.g. "chec
 |------|------|------|-------|
 | `security` | Security vulnerabilities — injection, auth/authz flaws, secrets exposure, unsafe dependencies | yes | `security/security.md` |
 | `tech-debt` | Technical debt — duplication, dead code, fragile modules, outdated patterns | yes | `tech-debt/tech-debt.md` |
+| `booby-traps` | Decaying safeguards and operational footguns — lapsed exemptions, person dependence, unconsumed outputs, drifting registries, hidden blast radius | yes | `booby-traps/booby-traps.md` |
 | `docs` | Project documentation stale, inaccurate, or incomplete vs the codebase | yes | `docs/docs.md` |
 | `design` | Visual and UX audit of a deployed app — spacing, typography, flows, accessibility | no | `design/design.md` |
 | `access-path` | Interfaces (API, CLI, Slack, MCP, SDK, workers) enforcing cross-cutting concerns consistently, at the right layer | yes | `access-path/access-path.md` |

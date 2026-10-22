@@ -13,7 +13,7 @@ The shared skeleton for the `/audit` engine and its lenses. The engine (`skills/
 Every lens accepts, via the engine:
 
 - `[focus]` — free-text scope narrowing (an area, path, page, or repo set, per the lens's Focus note in the table).
-- `--output github|session` — `github` files findings as issues per `../_shared/output-guide.md` (routing through `/claudna:publish`; lenses never call `gh` directly); `session` (default) presents the analysis in chat.
+- `--output github|session` — `github` files findings as issues per `../_shared/output-guide.md` (output mutations route through `/claudna:publish`; required read-only tracker/repo-health queries may use `gh` directly under existing permissions); `session` (default) presents the analysis in chat.
 - `--auto` — non-interactive run, only for lenses whose table row says **auto: yes**. See §4.
 
 ## 3. Shared output conventions
@@ -31,6 +31,8 @@ Every lens accepts, via the engine:
 ## 5. Orchestration
 
 Lenses that fan out (multi-area scans, per-repo sweeps) follow `../_shared/orchestration-guide.md`: research subagents write findings to `<scratch>` (its §1), the lens procedure aggregates; subagents never return long results through the orchestrator's context. Lens procedures reference their own `subagent-prompts.md` where one exists.
+
+Scratch is created only when needed. The owning workflow runs orchestration-guide §1.1 finalization before any terminal result, including no-findings, all-duplicate and blocked exits; borrowers return to that owner. Cleanup is part of the workflow, not a later user step.
 
 **Hosts without subagents.** Fan-out is the *preferred* path, not the only one. Where the host has no dispatch primitive (orchestration-guide §14.1), a fan-out lens scans its areas inline and sequentially per §14.2 — announcing the inline path, writing each area's findings to the same scratch-dir path and in the same shape the subagent prompt specifies, so the lens's aggregation step runs unchanged. The independence caveat in §14.3 applies and is reported: areas scanned inline share context.
 

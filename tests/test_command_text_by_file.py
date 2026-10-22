@@ -5,14 +5,16 @@ Write tool, and the command reads that file: `--body-file`, `-F body=@<file>`,
 `--input <file>`, a JSON job file for a bundled script, or `"$(cat <file>)"`
 where a flag takes the text itself.
 
-These tests read every skill and agent file and fail on a command that carries
-such text any other way. Each failure names the file and line. The lint's own
+Quoted single-line JSON objects may use stdin directly: JSON serialization
+escapes line breaks, and an object cannot equal an alphabetic heredoc delimiter.
+Other command text still arrives by file. Each failure names its file and line. The lint's own
 cases are pinned in `test_the_lint_flags_each_shape` and
 `test_the_lint_passes_the_file_forms`.
 """
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -61,12 +63,20 @@ def _heredocs_with_text(text: str) -> list[int]:
         m = _HEREDOC_START.search(line)
         if not m:
             continue
+        body_lines = []
         for body in lines[number:]:
             if body.strip() == m.group(2):
                 break
-            if re.search(_PLACEHOLDER, body):
-                hits.append(number)
-                break
+            body_lines.append(body)
+        if not any(re.search(_PLACEHOLDER, body) for body in body_lines):
+            continue
+        if m.group(1) and len(body_lines) == 1:
+            try:
+                if isinstance(json.loads(body_lines[0]), dict):
+                    continue
+            except ValueError:
+                pass
+        hits.append(number)
     return hits
 
 
@@ -148,6 +158,8 @@ def test_program_text_carries_no_placeholders():
         pytest.param('gh issue list --search "<term>"', id="search"),
         pytest.param('git log --oneline --grep="<keyword>"', id="grep"),
         pytest.param("gh issue create --body-file - <<'EOF'\n<body>\nEOF", id="heredoc"),
+        pytest.param('tool --input - <<EOF\n{"task":"<text>"}\nEOF', id="unquoted-json"),
+        pytest.param('tool --input - <<\'EOF\'\n{\n"task":"<text>"}\nEOF', id="multiline-json"),
         pytest.param("gh pr comment 1 --body '<body>'", id="single-quoted"),
         pytest.param("gh issue edit 1 --body <updated body>", id="bare"),
         pytest.param("git commit -F- --message \"$(cat<<'EOF'\n<message>\nEOF\n)\"", id="cat-heredoc"),
@@ -170,6 +182,8 @@ def test_the_lint_flags_each_shape(sample):
         pytest.param('gh issue list --search "$(cat <term-file>)" --state all', id="search-file"),
         pytest.param('gh issue edit <number> --add-label "in-progress"', id="label-name"),
         pytest.param("psql -X <<'EOF'\nSELECT 1;\nEOF", id="static-heredoc"),
+        pytest.param('tool --input - <<\'EOF\'\n{"task":"<text>\\nEOF\\n$(touch marker)"}\nEOF',
+                     id="quoted-single-line-json"),
         pytest.param("- `--title <s>` — short, unique title.", id="skill-argument"),
         pytest.param('claudron lookup --json -- "$(cat <terms-file>)"', id="text-argument-file"),
     ],

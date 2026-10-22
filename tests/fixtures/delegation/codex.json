@@ -1,0 +1,8 @@
+{
+  "provenance": "Native Codex CLI 0.162.1, 2026-10-20 disposable normalization edit probe; selected actual lifecycle records, no transcript copy",
+  "records": [
+    {"type": "thread.started", "thread_id": "01a1599f-0f74-7c80-b9b9-222de342de34"},
+    {"type": "turn.started"},
+    {"type": "turn.completed", "usage": {"input_tokens": 147576, "cached_input_tokens": 116736, "cache_write_input_tokens": 0, "output_tokens": 1263, "reasoning_output_tokens": 769}}
+  ]
+}

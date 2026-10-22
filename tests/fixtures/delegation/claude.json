@@ -1,0 +1,21 @@
+{
+  "provenance": "Selected native result fields consumed by NativeObservation in the 2026-10-20 Claude 2.1.304 live helper gate; Manual mode, existing subscription and policy, --permission-prompts none. Parent independently verified the existing unittest, changed files and cleanup. Omitted prose, usage and cost; sanitized tool ID.",
+  "records": [
+    {
+      "type": "result",
+      "subtype": "success",
+      "is_error": false,
+      "session_id": "fef966ca-7970-4800-90fc-071a6547cdbd",
+      "permission_denials": [
+        {
+          "tool_name": "Bash",
+          "tool_use_id": "denied-diagnostic",
+          "tool_input": {
+            "command": "python3 -m unittest -q; echo \"exit=$?\"; git status --short",
+            "description": "Run tests, print exit code, show git status"
+          }
+        }
+      ]
+    }
+  ]
+}

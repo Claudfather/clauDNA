@@ -13,7 +13,7 @@ Shared argument semantics live in `../../_shared/audit-lens-contract.md` §2. Le
 
 ## GitHub reads vs. issue filing
 
-Reading GitHub via `gh` (PR lists, CI checks, run history — see `health-checks.md`) is core to this lens and stays direct. Contract §2's rule that lenses never call `gh` directly governs issue **filing**: findings filed as issues route through `/claudna:publish`.
+Reading GitHub via `gh` (PR lists, CI checks, run history — see `health-checks.md`) is core to this lens and stays direct under existing permissions. Contract §2 routes output mutations through `/claudna:publish`: findings filed as issues use that path.
 
 ## Procedure
 
