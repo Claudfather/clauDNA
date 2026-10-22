@@ -23,7 +23,7 @@ Parse `$ARGUMENTS` at invocation:
 - `--validate-only`: Check frontmatter without regenerating INDEX.md.
 - `--recursive`: Index all subdirectories, not just the target.
 - `--fix`: Auto-fill missing required fields where inferrable.
-- `--stale`: Flag docs past their `expires:` date or with no update in >90 days.
+- `--stale`: Flag docs past their `expires:` date; apply the >90-day age checks below according to the document's role.
 
 ---
 
@@ -72,8 +72,10 @@ Write the fixed frontmatter back to the file. Report each auto-fix applied.
 
 ### --stale Mode
 
-When `--stale` is set, flag documents that may be outdated:
-- `expires:` date is in the past
+When `--stale` is set, check `expires:` on every document and flag any date in the past, including on historical records.
+
+If a document is a settled historical decision record whose content preserves a past choice rather than current guidance, skip the age checks below. Otherwise, apply every age check below, including to living policies/runbooks and abandoned drafts. Establish that role from the content and existing type/status; a folder name or `type: decision` alone does not establish it.
+
 - No `updated:` field and `created:` is >90 days ago
 - `updated:` is >90 days ago
 - `last_verified:` is >90 days ago
