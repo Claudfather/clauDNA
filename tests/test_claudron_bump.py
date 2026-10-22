@@ -95,6 +95,11 @@ class TestWorkflow:
         assert "schedule" in triggers and "workflow_dispatch" in triggers
         assert doc["permissions"] == {"contents": "write", "pull-requests": "write", "issues": "write"}
 
+    def test_one_run_at_a_time(self):
+        """Two overlapping runs (a dispatch during the scheduled one) could each find no issue and each open one."""
+        doc = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+        assert doc.get("concurrency") == {"group": "claudron-release", "cancel-in-progress": False}
+
     def test_it_moves_with_the_repo_tools_and_checks_with_the_makefile(self):
         text = WORKFLOW.read_text(encoding="utf-8")
         for needed in ("claudron_bump.py detect", "sync_claudron_contract.py --ref", "claudron_bump.py changelog",
@@ -176,7 +181,10 @@ def issue_row(number, tag=None, title=None, state="OPEN"):
 
 
 class FakeGh:
-    """`gh` for the issue door: answers the issues query a page at a time and records every call."""
+    """`gh` for the issue door: answers the issues query a page at a time and records every call.
+
+    Like GitHub, it leaves out the rows of any state the query's `states:` does not ask for.
+    """
 
     def __init__(self, *pages, created="https://github.com/o/r/issues/99", fail=None):
         self.pages, self.created, self.fail, self.calls = list(pages), created, fail, []
@@ -186,10 +194,28 @@ class FakeGh:
         if self.fail == args[:2]:
             raise subprocess.CalledProcessError(1, ["gh", *args], output="", stderr="HTTP 502: Bad Gateway")
         if args[:2] == ["api", "graphql"]:
-            return self.pages.pop(0)
+            return self.in_states(self.pages.pop(0), next(arg for arg in args if arg.startswith("query=")))
         if args[:2] == ["issue", "create"]:
             return self.created + "\n"
         raise AssertionError(f"unexpected gh call: {args}")
+
+    @staticmethod
+    def in_states(page, query):
+        """``page`` without the rows of any state ``query`` does not ask for, counted without them."""
+        if "states" not in query:
+            return page
+        asked = re.search(r"\bstates: \[([A-Z, ]*)\]", query)
+        assert asked, "this fake reads `states:` only as a list of literals"
+        states = re.findall(r"[A-Z]+", asked.group(1))
+        try:
+            doc = json.loads(page)
+            issues = doc["data"]["repository"]["issues"]
+        except (ValueError, KeyError, TypeError):
+            return page  # an unreadable page goes out as it is
+        kept = [node for node in issues["nodes"] if node["state"] in states]
+        issues["totalCount"] -= len(issues["nodes"]) - len(kept)
+        issues["nodes"] = kept
+        return json.dumps(doc)
 
     def created_issues(self):
         return [call for call in self.calls if call[0][:2] == ["issue", "create"]]
@@ -231,6 +257,11 @@ class TestIssueListing:
         assert [row["number"] for row in bump.list_issues("o/r", gh=gh)] == [1, 2, 3]
         first, second = (call[0] for call in gh.calls)
         assert "after=c1" in second and not [a for a in first if a.startswith("after=")]
+
+    def test_it_asks_for_closed_issues_too(self):
+        """A release's issue closed while its branch still waits is still its issue, so the read must return it."""
+        gh = FakeGh(issue_page([issue_row(4, "v0.10.0", state="CLOSED"), issue_row(5, "v0.9.0")], 2))
+        assert [row["number"] for row in bump.list_issues("o/r", gh=gh)] == [4, 5]
 
     @pytest.mark.parametrize("pages", [
         [issue_page([issue_row(1, title="An issue")], 228)],  # no next page, with 227 unread
@@ -289,6 +320,14 @@ class TestIssueMain:
         assert bump.main(["issue", "v0.10.0", "v0.9.0"]) == 0
         out = capsys.readouterr().out
         assert "::warning::" in out and "#4" in out and gh.created_issues() == []
+
+    def test_an_open_issue_it_finds_passes_and_opens_nothing(self, monkeypatch, capsys):
+        """Every daily run takes this path while the branch waits: failing here is #432's daily red run again."""
+        gh = FakeGh(issue_page([issue_row(4, "v0.10.0")], 1))
+        self._env(monkeypatch, gh)
+        assert bump.main(["issue", "v0.10.0", "v0.9.0"]) == 0
+        out = capsys.readouterr().out
+        assert "#4" in out and "::warning::" not in out and gh.created_issues() == []
 
     def test_a_failed_listing_fails_the_command(self, monkeypatch, capsys):
         gh = FakeGh(fail=["api", "graphql"])
