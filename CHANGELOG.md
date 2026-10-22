@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
-- **Moves to Claudron v0.10.0.** `contracts/claudron.json` and `contracts/claudron.ref` now come from v0.10.0, and output-guide §3's status table is re-rendered from it. Opened by the `claudron-release` workflow.
+- **Moves to Claudron v0.10.0.** `contracts/claudron.json` and `contracts/claudron.ref` now come from v0.10.0, and output-guide §3's status table is re-rendered from it. Made by the `claudron-release` workflow.
+
+### Fixed
+- **A Claudron release waiting for its PR no longer fails the `claudron-release` workflow every day.** GitHub Actions may not open PRs in this repo (#432), so when `gh pr create` fails, the run now leaves one issue for the release, asking a person or the fleet to open the PR from its `claudron/<tag>` branch, and ends green. Later runs find that issue again instead of opening another: the lookup reads every issue, and fails the run rather than open a second one when it cannot. A release with a PR still stops the run. The job's token gains `issues: write`. The move's CHANGELOG line and PR body no longer say the workflow opened the PR.
 
 ## [0.34.5] - 2026-10-22
 ### Fixed
