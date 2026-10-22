@@ -128,14 +128,14 @@ If no relevant skills exist:
 
 1. Acknowledge that no existing skill was found
 2. Offer to help with the task directly using your general capabilities
-3. Suggest the user could create their own skill with `npx skills@1.7.0 init`
+3. If the workflow recurs, first consider extending an existing clauDNA skill, lens or mode. For a pack contribution, use a clauDNA source checkout and the [contribution workflow](https://github.com/Claudfather/clauDNA/blob/main/CONTRIBUTING.md) and [authoring guide](https://github.com/Claudfather/clauDNA/blob/main/documentation/guides/SKILL_AUTHORING_GUIDE.md). The source-only `skill-scaffold` requires that checkout context and is excluded from the installed Codex catalog.
 
 Example:
 
 ```
 I searched for skills related to "xyz" but didn't find any matches.
-I can still help you with this task directly! Would you like me to proceed?
+I can still help you with this task directly.
 
-If this is something you do often, you could create your own skill:
-npx skills@1.7.0 init my-xyz-skill
+If this becomes a repeatable clauDNA workflow, we can extend an existing skill
+or propose an addition through clauDNA's source-checkout contribution workflow.
 ```
