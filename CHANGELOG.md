@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.5] - 2026-10-22
 ### Fixed
 - **Reviewer wording and skill-discovery fallback stay proportional:** evidence-backed clean reviews need no finding quota or repeat pass, and adequate existing verification is reused while concrete gaps and failed/unrun checks remain explicit. `find-skills` routes recurring clauDNA workflows through the existing source-checkout contribution process instead of generic personal scaffolding. Existing automatic cleanup is unchanged; no tests, helpers or workflow stages are added.
 
