@@ -1,15 +1,19 @@
 name: claudron-release
 
-# When Claudron publishes a release newer than contracts/claudron.ref, open a
-# PR that moves clauDNA to it: the contract copy, the pin and output-guide §3
-# re-rendered (scripts/sync_claudron_contract.py --ref), with the check-set's
-# results in the body. The logic lives in scripts/claudron_bump.py; the checks
-# are the Makefile's. Idempotent: a release that already has a PR stops the
-# run; a branch without one (a failed `gh pr create`) fails it, every day.
+# When Claudron publishes a release newer than contracts/claudron.ref, move
+# clauDNA to it on a claudron/<tag> branch: the contract copy, the pin and
+# output-guide §3 re-rendered (scripts/sync_claudron_contract.py --ref), with
+# the check-set run on it. The logic lives in scripts/claudron_bump.py; the
+# checks are the Makefile's.
 #
-# Needs "Allow GitHub Actions to create and approve pull requests" (Settings →
-# Actions → General). A PR opened with the workflow token doesn't start CI;
-# the body says so and how to start it.
+# Then it tries to open the PR. GitHub Actions may not create PRs in this repo
+# ("Allow GitHub Actions to create and approve pull requests" stays off, #432),
+# so the PR is left to the fleet: the run leaves one issue for the release,
+# asking for it, and ends green. Idempotent: a release that already has a PR
+# stops the run, and a branch still waiting for one finds its issue again (and
+# opens it only if it has none). With the setting on, the run opens the PR
+# itself; a PR opened with the workflow token doesn't start CI, and the body
+# says how to start it.
 
 on:
   schedule:
@@ -17,8 +21,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: write  # push claudron/<tag>
+  pull-requests: write  # try to open its PR
+  issues: write  # find or open the release's issue, when the PR can't be opened
 
 concurrency:
   group: claudron-release
@@ -47,12 +52,13 @@ jobs:
           python3 scripts/claudron_bump.py detect | tee -a "$GITHUB_OUTPUT"
           echo "pinned=$(cat contracts/claudron.ref)" >> "$GITHUB_OUTPUT"
 
-      - name: Stop if this release already has a PR
+      - name: Stop if this release already has a PR, or waits for one
         id: branch
         if: steps.latest.outputs.newer == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.latest.outputs.tag }}
+          PINNED: ${{ steps.latest.outputs.pinned }}
         run: |
           name="claudron/$TAG"
           echo "name=$name" >> "$GITHUB_OUTPUT"
@@ -62,10 +68,10 @@ jobs:
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "$name already has a PR"
           elif git ls-remote --exit-code --heads origin "$name" >/dev/null; then
-            # A pushed branch with no PR: an earlier run's `gh pr create` failed. Fail loudly, every day,
-            # rather than read the branch as done (the Actions setting in the header is the usual cause).
-            echo "::error::$name is on the remote but has no PR: open one from it, or delete the branch to retry"
-            exit 1
+            # Pushed by an earlier run, with no PR yet: Actions may not open one here (#432), so it waits for
+            # the fleet. Leave the release's issue, found again or opened once; failing that fails the run.
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            python3 scripts/claudron_bump.py issue "$TAG" "$PINNED"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
@@ -86,16 +92,23 @@ jobs:
           if make check; then echo "check=pass" >> "$GITHUB_OUTPUT"; else echo "check=fail" >> "$GITHUB_OUTPUT"; fi
           if make test-contract; then echo "contract=pass" >> "$GITHUB_OUTPUT"; else echo "contract=fail" >> "$GITHUB_OUTPUT"; fi
 
-      - name: Open the PR
+      - name: Open the PR, or leave the release's issue
+        id: pr
         if: steps.move.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.latest.outputs.tag }}
+          PINNED: ${{ steps.latest.outputs.pinned }}
+          BRANCH: ${{ steps.branch.outputs.name }}
+          CHECK: ${{ steps.move.outputs.check }}
+          CONTRACT: ${{ steps.move.outputs.contract }}
         run: |
-          git push origin "${{ steps.branch.outputs.name }}"
-          python3 scripts/claudron_bump.py body "$TAG" "${{ steps.latest.outputs.pinned }}" \
-            "${{ steps.move.outputs.check }}" "${{ steps.move.outputs.contract }}" > "$RUNNER_TEMP/body.md"
+          git push origin "$BRANCH"
+          python3 scripts/claudron_bump.py body "$TAG" "$PINNED" "$CHECK" "$CONTRACT" > "$RUNNER_TEMP/body.md"
           draft=""
-          if [ "${{ steps.move.outputs.check }}${{ steps.move.outputs.contract }}" != "passpass" ]; then draft="--draft"; fi
-          gh pr create $draft --base main --head "${{ steps.branch.outputs.name }}" \
-            --title "Move to Claudron $TAG" --body-file "$RUNNER_TEMP/body.md"
+          if [ "$CHECK$CONTRACT" != "passpass" ]; then draft="--draft"; fi
+          if ! gh pr create $draft --base main --head "$BRANCH" \
+              --title "Move to Claudron $TAG" --body-file "$RUNNER_TEMP/body.md"; then
+            # Actions may not create PRs here (#432): the pushed branch waits for the fleet, and the issue asks.
+            python3 scripts/claudron_bump.py issue "$TAG" "$PINNED" "$CHECK" "$CONTRACT"
+          fi
