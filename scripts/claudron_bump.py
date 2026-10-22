@@ -164,7 +164,7 @@ def list_issues(repo: str, gh=None) -> list[dict]:
 
     Raises ``RuntimeError`` unless the pages add up to the connection's ``totalCount``: a short read must never
     pass for "this release has no issue". (On 2026-10-22 REST's issue listing answered one query with an empty
-    page on 4 of 7 calls, where this connection read the same 100 of 228 issues each time.)
+    page on 5 of 8 calls, where this connection returned the same first 100 of 228 issues on all 4.)
     """
     gh = gh or run_gh
     owner, name = repo.split("/", 1)
