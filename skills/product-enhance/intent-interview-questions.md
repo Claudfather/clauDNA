@@ -16,6 +16,12 @@ Ask these one group at a time, waiting for answers. Reuse settled answers; ask o
 - What frustrates you or your users most?
 - Are there things the system *should* do but doesn't?
 
+When developer-facing onboarding or usability is in the discovery scope (API, CLI, SDK, library or developer docs), use these optional prompts for unanswered, relevant journeys. Reuse settled answers:
+
+- Can a first-time user reach a useful result?
+- Can users understand an error and recover?
+- After time away, can returning users reorient and find their next action?
+
 If positioning or product scope is under review, also ask:
 
 - Have accumulated features diluted the primary job? What usage or user observations support that?
