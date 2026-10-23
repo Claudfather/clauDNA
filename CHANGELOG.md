@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.34.7] - 2026-10-23
 ### Changed
 - **Product discovery offers optional developer-journey questions** when developer-facing onboarding or usability is in scope: first useful result, error recovery and returning-user reorientation. Settled answers are reused; existing triage, autonomous-mode and automatic cleanup behavior stays unchanged. No tests, helpers or workflow stages are added.
 
