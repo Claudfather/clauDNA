@@ -71,13 +71,13 @@ precedent-check both report all citations accurate):
   SessionEnd** and commits to detecting claudna and deferring — so the contract must be
   per-event, and the detection surface must be purpose-built (the reflect marker is
   transient; the opt-out env var is unset in the default case).
-- **The engine contract:** Claudron `03-mcp-server.md` — `claudron_write` returns
+- **The engine contract:** Claudron `03_mcp-server.md` — `claudron_write` returns
   `{action: created|updated|suggest_update|suggest_supersede, path, reason}` and
-  **routes near-duplicates, never hard-rejects**. `02-session-loop.md` — the same
+  **routes near-duplicates, never hard-rejects**. `02_session-loop.md` — the same
   validate/dedup/slug `engine.py` ships one epic earlier as CLI `recall`/`capture`
   (E2 PR2, release 0.2.0, **before Gate G1**) — but 0.2.0 is explicitly single-writer
   (the `flock` write-lock arrives in E3), which Track B's concurrency posture must
-  absorb. `01-schema.md` — SCHEMA.md as SSOT: `status` activity union includes clauDNA's
+  absorb. `01_schema.md` — SCHEMA.md as SSOT: `status` activity union includes clauDNA's
   values with documented mappings; `maturity` is a second axis; the type enum excludes
   `skill` **by design**; clauDNA's `output-guide.md` is named as the reconciliation
   target (their E1 PR4 lands the pointer; this epic owns the behavior).

@@ -28,7 +28,7 @@ external pre-1.0 SSOT going quiet — the sovereignty concern the panel raised).
 
 - Three near-identical type/status enum tables live at `skills/publish/SKILL.md`
   (Step 1a), `skills/index/SKILL.md` (Step 2), and `skills/_shared/output-guide.md` §3;
-  none validates against the others. Claudron `01-schema.md` names this three-repo
+  none validates against the others. Claudron `01_schema.md` names this three-repo
   drift and builds SCHEMA.md as the executable SSOT (status activity union with
   documented mappings, e.g. `current≈active`; `maturity` as a second axis;
   `schema_version` reserved).

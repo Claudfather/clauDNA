@@ -32,8 +32,8 @@ read-door parity P7's disposition (fork F4) depends on.
 
 - `documentation/archive/2026-05-15-session-handoff-resume-redesign-design.md:199-205`
   (the deferred bridge, ratified in PR #88) + `CHANGELOG.md:138`.
-- Claudron `02-session-loop.md` deliverable 2 — `capture` (flags, stdin JSON, dedup
-  warn/`--update`); `03-mcp-server.md` deliverable 2 — the routed envelope
+- Claudron `02_session-loop.md` deliverable 2 — `capture` (flags, stdin JSON, dedup
+  warn/`--update`); `03_mcp-server.md` deliverable 2 — the routed envelope
   `{action: created|updated|suggest_update|suggest_supersede, path, reason}` and
   `read`'s not-found → nearest-title candidates. **0.2.0 is single-writer** (the flock
   lock is E3) — hence the retry/degrade posture below.

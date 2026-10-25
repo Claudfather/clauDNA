@@ -42,7 +42,7 @@ states (vault, claudron-no-vault, no-claudron), and opens the consolidated
 - Residue: `documentation/specs/repo-documentation-standard.md` is a deprecated-in-place
   stub retained solely because `init-project/SKILL.md:125` links it (panel:
   precedent-check) — this phase already edits both sites.
-- Claudron `02-session-loop.md` deliverable 5 — the 0.2.0 quickstart is
+- Claudron `02_session-loop.md` deliverable 5 — the 0.2.0 quickstart is
   `claudron init --personal` (guidance text confirms exact flags at the epic's 0.2.0
   re-confirmation checkpoint; "adopt" appears in their docs as validate-tier leniency,
   not a confirmed init flag).
