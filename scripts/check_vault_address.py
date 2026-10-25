@@ -3,7 +3,7 @@
 
 The vault address is **Claudron's** contract — the canonical env name, its
 precedence, and the migration record live once in that repo's
-``documentation/specs/CLI_CONTRACT.md`` §Environment. clauDNA holds *conformance*: it points at
+``CLI_CONTRACT.md`` §Environment. clauDNA holds *conformance*: it points at
 the owner's text and never forks it (boundary phase D1).
 
 Two things go wrong without a gate, and both already happened:

@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
-- **References to Claudron's docs use the paths [Claudron#231](https://github.com/Claudfather/Claudron/pull/231) moved them to ([#437](https://github.com/Claudfather/clauDNA/issues/437)).** The old paths stopped resolving: Claudron's `CLI_CONTRACT.md` is now in `documentation/specs/`, the boundary spec is decision 005, and the roadmap and boundary re-architecture plans are under `documentation/planning/` and `documentation/archive/`. All 19 references here now use the new paths, including two in the 0.17.0 and 0.18.0 entries below. `scripts/check_vault_address.py` now requires the new `CLI_CONTRACT.md#environment` URL in `skills/_shared/documentation-standard.md` §10. Only paths change; no skill behaves differently.
+- **References to Claudron's docs follow its move to the `documentation/` layout ([Claudron#231](https://github.com/Claudfather/Claudron/pull/231), [#437](https://github.com/Claudfather/clauDNA/issues/437)).** The old `docs/` and `documentation/plans/` paths stopped resolving. Links and pointers now use the new paths, including two in the 0.17.0 and 0.18.0 entries below and the contract URL that `scripts/check_vault_address.py` requires in `skills/_shared/documentation-standard.md` §10. Code comments now cite `CLI_CONTRACT.md` by name, so the next move won't touch them. Only paths change; no skill behaves differently.
 
 ## [0.34.7] - 2026-10-23
 ### Changed
