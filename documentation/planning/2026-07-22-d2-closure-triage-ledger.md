@@ -12,8 +12,8 @@ repos: clauDNA
 # D2 — Closure-triage ledger (clauDNA)
 
 The clauDNA-side deliverable of **phase D2** of the Claudron·clauDNA·Claudlobby boundary
-re-architecture program (Claudron repo, `documentation/plans/2026-07-20-boundary-rearchitecture/07-d2-closure-triage.md`;
-boundary spec `documentation/plans/2026-07-20-claudfather-boundary-separation.md` §10.3 and §10.5.5).
+re-architecture program (Claudron repo, `documentation/archive/boundary-rearchitecture_2026-07-20/07_d2-closure-triage.md`;
+boundary spec `documentation/decisions/005-claudfather-boundary-separation.md` §10.3 and §10.5.5).
 
 This file is the **ledger** — the durable artifact of D2. It adopts the boundary spec §10.5.5
 inventory of skill-embedded reference payloads, records a verdict + one-line rationale + a named

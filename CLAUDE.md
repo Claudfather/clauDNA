@@ -55,11 +55,11 @@ scripts/
 
 ## Ecosystem boundary
 
-clauDNA is the stack's **behavior system**: procedural content — skills, agents, hooks — that steers what an agent does. Reference knowledge lives in Claudron; fleet composition and policy live in Claudlobby. The full placement test is the boundary spec (Claudron repo, `documentation/plans/2026-07-20-claudfather-boundary-separation.md` §10.3); the local rules:
+clauDNA is the stack's **behavior system**: procedural content — skills, agents, hooks — that steers what an agent does. Reference knowledge lives in Claudron; fleet composition and policy live in Claudlobby. The full placement test is the boundary spec (Claudron repo, `documentation/decisions/005-claudfather-boundary-separation.md` §10.3); the local rules:
 
 - **Procedural is a coupling, not a format.** A skill belongs here when it versions with an engineering workflow. Fleet-operations commands (dispatch, restart, pulse) are Claudlobby's even when they use the skill format.
 - **Reference payloads follow Q-closure.** Content that changes with your *method* stays in the skill (closure); content that tracks the *world or a sibling SSOT* becomes a Claudron vault note or a rendered copy with a CI drift gate (`skills/_shared/output-guide.md` §3 is the pattern).
-- **The engine is consumed through the door, never reimplemented.** Vault access is the `claudron` CLI per its contract (`docs/CLI_CONTRACT.md` in the Claudron repo); consumer policy lives in `skills/_shared/claudron-engine.md`. No transport, index, ranking, or schema logic lands here.
+- **The engine is consumed through the door, never reimplemented.** Vault access is the `claudron` CLI per its contract (`documentation/specs/CLI_CONTRACT.md` in the Claudron repo); consumer policy lives in `skills/_shared/claudron-engine.md`. No transport, index, ranking, or schema logic lands here.
 - **The raw-tree fallback is frozen** — no new capability on the no-engine paths (`claudron-engine.md` §4).
 
 ## Rules

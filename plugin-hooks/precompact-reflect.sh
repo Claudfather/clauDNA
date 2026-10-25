@@ -8,7 +8,7 @@
 #
 # Capture-prompt defer:
 # Claudron's engine also ships a PreCompact prompt. Exactly one participant may
-# hold R-capture-prompt per session (Claudron docs/CLI_CONTRACT.md §Session-loop
+# hold R-capture-prompt per session (Claudron documentation/specs/CLI_CONTRACT.md §Session-loop
 # protocol). When the engine's PreCompact hook is registered AND the engine is
 # new enough that it ALWAYS prompts (its transitional glob shim is gone), this
 # front-end stands aside and lets the engine's front-end-neutral prompt cover

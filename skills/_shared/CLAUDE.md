@@ -10,7 +10,7 @@ prompt templates, result-shape contracts.
 **What must never land here.**
 
 - **New SSOT text for another system's contract.** SSOTs live with their owner — Claudron's
-  `SCHEMA.md` / `docs/CLI_CONTRACT.md` / `VAULT-STRUCTURE.md`; Claudlobby's fleet.yaml schema. A
+  `SCHEMA.md` / `documentation/specs/CLI_CONTRACT.md` / `VAULT-STRUCTURE.md`; Claudlobby's fleet.yaml schema. A
   copy of owner text here must be a *rendered* copy carrying a CI drift gate —
   `output-guide.md` §3 is the precedent — never a hand-maintained fork. A consumer needing a
   contract change PRs the owner first.
@@ -18,4 +18,4 @@ prompt templates, result-shape contracts.
 
 **Placement test** (one line): if changing it correctly means PRing another repo first, it is
 that repo's contract — point at it or render it with a gate; don't fork it. Full algorithm:
-Claudron repo, `documentation/plans/2026-07-20-claudfather-boundary-separation.md` §10.3.
+Claudron repo, `documentation/decisions/005-claudfather-boundary-separation.md` §10.3.

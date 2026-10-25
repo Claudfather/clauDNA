@@ -3,7 +3,7 @@
 
 The vault address is **Claudron's** contract — the canonical env name, its
 precedence, and the migration record live once in that repo's
-``docs/CLI_CONTRACT.md`` §Environment. clauDNA holds *conformance*: it points at
+``documentation/specs/CLI_CONTRACT.md`` §Environment. clauDNA holds *conformance*: it points at
 the owner's text and never forks it (boundary phase D1).
 
 Two things go wrong without a gate, and both already happened:
@@ -101,7 +101,7 @@ SELF = {
 #: Deliberately one entry: every other file single-hops to §10 instead, so a
 #: renamed anchor upstream is one edit here, not N.
 LADDER_OWNER_DOC = "skills/_shared/documentation-standard.md"
-CONTRACT_URL_FRAGMENT = "Claudron/blob/main/docs/CLI_CONTRACT.md#environment"
+CONTRACT_URL_FRAGMENT = "Claudron/blob/main/documentation/specs/CLI_CONTRACT.md#environment"
 
 #: Failure shape 2, made checkable. Naming **both** env vars on one line is what
 #: a restatement of the ladder looks like — the file is enumerating the options

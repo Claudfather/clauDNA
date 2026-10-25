@@ -1171,7 +1171,7 @@ def check_settings_grants(allow_entries: list) -> list[str]:
 
 
 #: Claudron CLI verbs, per skills/_shared/claudron-engine.md §2 and Claudron's
-#: own docs/CLI_CONTRACT.md. Used only to recognize an *invocation*; this list
+#: own documentation/specs/CLI_CONTRACT.md. Used only to recognize an *invocation*; this list
 #: being incomplete makes the check miss a call, never invent one.
 CLAUDRON_CLI_VERBS = (
     "capture",
