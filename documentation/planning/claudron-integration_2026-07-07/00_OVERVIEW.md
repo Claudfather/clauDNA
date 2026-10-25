@@ -13,7 +13,7 @@ links:
 # EPIC: Claudron integration — the vault becomes the knowledge engine
 
 The companion epic to Claudron's v0.2→v0.6 roadmap (Claudfather/Claudron#14, docs under
-`documentation/plans/2026-07-07-claudron-roadmap/`). Claudron ships the engine; this epic
+`documentation/planning/claudron-roadmap_2026-07-07/`). Claudron ships the engine; this epic
 rewires clauDNA's knowledge-lifecycle skills to prefer it, provisions the vault seam that
 today has a consumer but no producer, and settles the two-doc-planes question that
 `output-guide.md:19` has deferred since the substrate shipped. Hardened by an ironclad
@@ -324,7 +324,7 @@ the record.
 ## Companion Plans
 
 - Claudfather/Claudron#14 (EPIC) + #15–#20, docs at
-  `documentation/plans/2026-07-07-claudron-roadmap/`. Cross-references: their E1 PR4
+  `documentation/planning/claudron-roadmap_2026-07-07/`. Cross-references: their E1 PR4
   (output-guide pointer), E2 PR3 (PreCompact stacking — coordinate before it merges),
   E3 PR4 (clauDNA handoff — becomes parity confirmation).
 - #165 (closed) — the F4 deprecation machinery, removed-names gate, and per-phase

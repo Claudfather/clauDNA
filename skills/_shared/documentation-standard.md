@@ -143,7 +143,7 @@ Documentation lives on two planes, and `/claudna:publish` is the single router o
 Consumers find the shared-docs root through two doors, env first:
 
 1. **Env override**, by mode — not a precedence chain: engine present ⇒ `CLAUDRON_VAULT_PATH`; no engine ⇒ `SHARED_DOCS_PATH` (raw tree). User-managed; no clauDNA skill ever sets env vars.
-   - `CLAUDRON_VAULT_PATH` is **Claudron's** name, owned by [its `docs/CLI_CONTRACT.md` §Environment](https://github.com/Claudfather/Claudron/blob/main/docs/CLI_CONTRACT.md#environment) — how the engine resolves a vault is not restated here or downstream; changing it is a PR against that repo.
+   - `CLAUDRON_VAULT_PATH` is **Claudron's** name, owned by [its `documentation/specs/CLI_CONTRACT.md` §Environment](https://github.com/Claudfather/Claudron/blob/main/documentation/specs/CLI_CONTRACT.md#environment) — how the engine resolves a vault is not restated here or downstream; changing it is a PR against that repo.
    - **`CLAUDRON_VAULT` (no `_PATH`) was removed** in Claudron 0.3.0. Neither the engine nor clauDNA reads it; honoring it would resolve a different vault than the engine does. Tell users to rename it.
 2. **CLAUDE.md section:** a section headed exactly `## Shared Documentation`. `/claudna:init-project`'s shared-docs seam step is the sole producer; `/claudna:recall` and `/claudna:index` parse it.
 

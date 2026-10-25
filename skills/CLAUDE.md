@@ -24,4 +24,4 @@ fleet works on.
 **Placement test** (one line): *what must change in the same commit when this changes?* Your
 method → here. The world or a sibling SSOT → vault note or rendered copy. The fleet runtime →
 Claudlobby. Full algorithm: Claudron repo,
-`documentation/plans/2026-07-20-claudfather-boundary-separation.md` §10.3.
+`documentation/decisions/005-claudfather-boundary-separation.md` §10.3.
