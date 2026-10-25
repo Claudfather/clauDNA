@@ -41,9 +41,9 @@ prompting hook.
   without a session id — `precompact-reflect.sh:31-33,:38-41,:45`);
   `CLAUDNA_PRECOMPACT_REFLECT` is read, never exported, and unset in the default-on
   case. Neither is observable by a sibling hook; a purpose-built signal is required.
-- Claudron `02-session-loop.md` deliverable 3 — their capture prompts fire on
+- Claudron `02_session-loop.md` deliverable 3 — their capture prompts fire on
   **PreCompact and SessionEnd**; they commit to detecting claudna and deferring; their
-  deliverable 4 + `03-mcp-server.md`: **the write lock arrives in E3** — 0.2.0 capture
+  deliverable 4 + `03_mcp-server.md`: **the write lock arrives in E3** — 0.2.0 capture
   is single-writer while parallel worktree sessions are the house workflow.
 - `skills/reflect/SKILL.md` Phases 3–4 — target heuristic, raw write to
   `shared/knowledge/reflections/`, same-day append rule, auto-`/index`.

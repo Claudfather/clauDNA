@@ -34,7 +34,7 @@ instead of a slogan.
   budget this phase keeps by design.
 - `skills/learn/SKILL.md` Phase 2 (dedup = grep INDEX.md for `source_url` — blind to
   anything unindexed) and Phase 4 (raw write + `/claudna:index`).
-- Claudron `02-session-loop.md` deliverable 1 — `recall [--project] [--query]`:
+- Claudron `02_session-loop.md` deliverable 1 — `recall [--project] [--query]`:
   project-tier-first ranked brief, `--json`, abstention threshold; "gets better under
   E4 without interface change."
 - Capture dedup keys are title+alias — **no `source_url` key**: the contract gap, filed
