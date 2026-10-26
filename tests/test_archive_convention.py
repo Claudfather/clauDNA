@@ -43,6 +43,8 @@ def test_section_6_closes_the_frontmatter() -> None:
     assert "git mv" in six
     for token in ("terminal", "`status:`", "`updated:`", "`superseded_by:`"):
         assert token in six, token
+    # audit, review and person have no `superseded`: the rule must check the type first.
+    assert "its type has `superseded`" in six
 
 
 def test_handoff_flags_both_kinds_of_drift() -> None:
@@ -50,3 +52,12 @@ def test_handoff_flags_both_kinds_of_drift() -> None:
     assert "documentation/archive/" in handoff
     assert "Archive (documentation-standard §6)" in handoff
     assert "Set terminal statuses (documentation-standard §6)" in handoff
+    # A phase that was never started has no marker, so the scan lists the phases themselves.
+    assert '--include="[0-9][0-9]_*.md"' in handoff
+
+
+def test_the_reaper_leaves_the_flags_to_handoff() -> None:
+    """Resume reaps before it briefs: the `✅ COMPLETE` drop must not eat the archive flag."""
+    reaper = (SKILLS / "_shared" / "reaper-rules.md").read_text(encoding="utf-8")
+    assert "Archive (documentation-standard §6):" in reaper
+    assert "Set terminal statuses (documentation-standard §6):" in reaper

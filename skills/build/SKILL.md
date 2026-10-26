@@ -217,7 +217,7 @@ digraph build {
     simplify_revert [label="Revert simplify\ncommit" shape=box];
     simplify_partial [label="EXIT outcome:\npartial (verification\nfailed after revert)" shape=doublecircle style=filled fillcolor=lightcoral];
 
-    step7 [label="Step 7: Create PR\nStatus → COMPLETE" shape=box];
+    step7 [label="Step 7: Create PR\nStatus → ✅ COMPLETE" shape=box];
     step7_auto_check [label="--auto?" shape=diamond];
     user_gate [label="Merge or\nstop?" shape=diamond];
 
@@ -713,7 +713,7 @@ Apply `engineering-principles.md` ("Applying During Implementation" checklist). 
 
 ### Step 6: Verify
 
-**A. Deliverable Audit** — Every deliverable in the phase doc must be marked `COMPLETE` or skipped with justification. Present audit table. Fix gaps.
+**A. Deliverable Audit** — Every deliverable in the phase doc must be marked `✅ COMPLETE` or skipped with justification. Present audit table. Fix gaps.
 
 Apply `../_shared/visual-evidence.md` §1's shared evidence decision and reason before
 capture. `none` uses relevant checks without media gates; screenshots need no video.
@@ -807,7 +807,7 @@ git reset --hard HEAD~1
 
 Create PR (title from plan header/issue title, body with summary + verification results).
 
-**For `--source docs`:** Set the plan document's status marker to `✅ COMPLETE` with timestamp and PR reference, and the overview doc's row if applicable. When every marker in the plan doc is `✅ COMPLETE`, set its frontmatter `status:` to `completed` in the same edit (`../_shared/documentation-standard.md` §5). Commit both to the PR branch, so main sees them only when the PR merges.
+**For `--source docs`:** Set the plan document's status marker to `✅ COMPLETE` with timestamp and PR reference, and the overview doc's row if applicable. When every marker in the plan doc is `✅ COMPLETE`, set its frontmatter `status:` to `completed` in the same edit (`../_shared/documentation-standard.md` §5). Commit both to the PR branch and push, so the PR carries them and main sees them only when it merges.
 
 **For `--source github`:** Include `Closes #<number>` in the PR body. Remove `in-progress` label via `gh issue edit <number> --remove-label "in-progress"`.
 

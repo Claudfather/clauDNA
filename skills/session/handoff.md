@@ -17,7 +17,9 @@ Run in parallel:
 - `git branch --list`
 - `gh pr list --author @me --json number,title,state,updatedAt`
 - If `documentation/planning/` exists, run `grep -rE "IN PROGRESS|PENDING|✅ COMPLETE" documentation/planning/ --include="*.md"`
-- If `documentation/archive/` exists, run `grep -rE "^(type|status):" documentation/archive/ --include="*.md"`
+- If `documentation/planning/` exists, run `grep -rL "✅ COMPLETE" documentation/planning/ --include="[0-9][0-9]_*.md" --exclude="00_*"`
+- If `documentation/planning/` exists, run `grep -rn "^type:" documentation/planning/ --include="[0-9][0-9]_*.md"`
+- If `documentation/archive/` exists, run `grep -rnE "^(type|status):" documentation/archive/ --include="*.md"`
 - If `documentation/archive/` exists, run `grep -rL "^status:" documentation/archive/ --include="*.md"`
 
 ### 3. Reaper pass
@@ -33,10 +35,10 @@ From the session conversation, identify new:
 - **Next Steps** — what the next session should start with
 
 Then flag documentation drift from the live scan as Next Steps, per `../_shared/documentation-standard.md` §6:
-- **Due for archiving:** a session (or standalone plan doc) under `documentation/planning/` whose markers are all `✅ COMPLETE` → `Archive (documentation-standard §6): <sessions>`.
-- **Archived but live:** a doc under `documentation/archive/` whose `status:` is missing or not terminal for its `type:` (`../_shared/output-guide.md` §3) → `Set terminal statuses (documentation-standard §6): <docs>`.
+- **Due for archiving:** a session under `documentation/planning/` whose every phase (that standard's §4) carries `✅ COMPLETE`, with no `PENDING` or `IN PROGRESS` anywhere in it. A phase that was never started has no marker at all, so check every phase, not just the markers present. A standalone plan doc is due when it carries `✅ COMPLETE` and neither of the others. → `Archive (documentation-standard §6): <sessions>`.
+- **Archived but live:** a doc under `documentation/archive/` whose frontmatter `status:` is missing or not terminal for its `type:` (`../_shared/output-guide.md` §3) → `Set terminal statuses (documentation-standard §6): <docs>`.
 
-One item per kind, naming every hit. Rebuild both from this scan: drop any earlier Next Steps item that starts with either lead-in, and add none when the scan is clean. Handoff only flags; it never archives or edits a doc.
+One item per kind, naming every hit. Rebuild both from this scan: drop any earlier Next Steps item whose text after the timestamp starts with either lead-in, and add none when the scan is clean. Handoff only flags; it never archives or edits a doc.
 
 Each item gets the current ISO-8601 UTC timestamp.
 
