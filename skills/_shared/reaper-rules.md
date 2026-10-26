@@ -24,7 +24,7 @@ The reaper runs on every handoff write and every resume read (`/claudna:session`
 | `Decisions` | Item timestamp > 30d old | soft — see "LLM judgment" below; default to drop if no current signal |
 | `Decisions` | Referenced verbatim by a current Next Step | never auto-drop (overrides the TTL soft rule) |
 | `Next Steps` | Commit message since last handoff references the step as done | hard drop, move to Activity with the commit timestamp |
-| `Next Steps` | Plan phase referenced is now `✅ COMPLETE` | hard drop |
+| `Next Steps` | Plan phase referenced is now `✅ COMPLETE`, unless the item is a documentation flag that handoff step 4 rebuilds (its text after the timestamp starts with `Archive (documentation-standard §6):` or `Set terminal statuses (documentation-standard §6):`) | hard drop |
 | `Next Steps` | Pure timestamp | never drop by TTL alone |
 | Any of `Activity` / `Decisions` / `Open Questions` / `Next Steps` | Section exceeds 10 bullets after other rules apply | drop oldest-first until ≤ 10 bullets remain (capacity cap, regardless of TTL) |
 

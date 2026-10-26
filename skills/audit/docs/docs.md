@@ -81,18 +81,18 @@ For each document categorized as **Development plan**:
 
 1. Read the plan and its phases/sections
 2. Use subagents to cross-reference each item against the codebase
-3. Mark each section/phase with a status:
+3. Mark each section/phase with a status marker from `../../_shared/documentation-standard.md` §5:
 
-| Status | Meaning |
+| Marker | Meaning |
 |--------|---------|
-| `✅ COMPLETED` | Code exists, feature is implemented |
-| `🔧 IN PROGRESS` | Partial implementation exists |
-| `📋 PENDING` | No implementation found |
+| `✅ COMPLETE` | Code exists, feature is implemented |
+| `IN PROGRESS` | Partial implementation exists |
+| `PENDING` | No implementation found |
 
-4. Update the doc in place with status markers
+4. Update the doc in place with status markers, in the body. If the doc has frontmatter, roll its `status:` up per the same §5; a marker never goes in frontmatter
 5. If the **entire document** is fully completed or no longer valid (superseded, abandoned):
    - Ask the user for confirmation
-   - Move it using `git mv` so the rename is tracked in history (ask user for preferred location, default to `archive/` in the doc's parent directory)
+   - Archive it per `../../_shared/documentation-standard.md` §6: `git mv` so the rename is tracked in history, then the terminal `status:` §6 picks. A doc under `documentation/planning/` follows §6 entirely, destination and any missing frontmatter included. For any other doc, ask the user for the location (default `archive/` in the doc's parent directory), and set a status only if it already has frontmatter
    - Create the archive directory first with `mkdir -p` if it doesn't exist
    - Note the move in the summary
 
@@ -142,7 +142,7 @@ Files reviewed:    N total
 
 Changes made:
   - docs/architecture.md: Fixed 3 file paths, added new API section
-  - docs/roadmap.md: Marked Phase 1 ✅, Phase 2 🔧, Phase 3 📋
+  - docs/roadmap.md: Marked Phase 1 ✅ COMPLETE, Phase 2 IN PROGRESS, Phase 3 PENDING
   - docs/old-plan.md: Archived → archive/old-plan.md (fully completed)
 
 Gaps identified:

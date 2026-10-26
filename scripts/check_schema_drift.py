@@ -14,7 +14,8 @@ Every check is offline (the copy is in the repo):
      maturity axis, are exactly the contract's: every type, canonical and
      terminal statuses, default, legacy mappings.
   3. Single-table invariant: §3 is the ONLY status enum table; publish Step
-     1a and index Step 2 point at §3 and never restate per-type enums.
+     1a, index Step 2 and the documentation standard's status rules (§5–§6)
+     point at §3 and never restate per-type enums.
 
 ``--write`` re-renders the table and the stamp from the contract, so a
 Claudron release reaches §3 without a hand edit
@@ -39,7 +40,7 @@ CONTRACT_REL = "contracts/claudron.json"
 REF_REL = "contracts/claudron.ref"
 OUTPUT_GUIDE_REL = "skills/_shared/output-guide.md"
 # The consumers that must point at §3 instead of restating the vocabulary.
-POINTER_FILES_REL = ("skills/publish/SKILL.md", "skills/index/SKILL.md")
+POINTER_FILES_REL = ("skills/publish/SKILL.md", "skills/index/SKILL.md", "skills/_shared/documentation-standard.md")
 
 TABLE_MARKER = "<!-- schema-drift: STATUS_TABLE"
 TABLE_HEADER = ("| type | canonical | terminal | default | accepted legacy → mapping |", "|---|---|---|---|---|")

@@ -265,7 +265,7 @@ Run it over any research or findings file that captured command output before th
 
 ## 8. Archive Convention
 
-Output directories follow this pattern per skill (reached via `publish --to docs --dir` — the registry in `../_shared/documentation-standard.md` §2; skills never *place finished docs* here directly. Documented exceptions: `/claudna:build`'s status-marker write-backs and its `git mv` archive move):
+Output directories follow this pattern per skill (reached via `publish --to docs --dir` — the registry in `../_shared/documentation-standard.md` §2; skills never *place finished docs* here directly. Documented exceptions: `/claudna:build`'s status-marker write-backs and its `git mv` archive move, which follow that standard's §5 and §6):
 
 ```
 documentation/planning/<subdirectory>/<session_name>_<YYYY-MM-DD>/
@@ -283,7 +283,7 @@ When all phases are complete, the session directory moves to:
 documentation/archive/<session_name>_<YYYY-MM-DD>/
 ```
 
-via `git mv`. This is handled by `/claudna:build` — planning skills only generate plans, never archive them.
+per `../_shared/documentation-standard.md` §6, which owns the procedure: `git mv`, then a terminal frontmatter `status:` on every doc. This is handled by `/claudna:build` — planning skills only generate plans, never archive them.
 
 ---
 
