@@ -73,7 +73,7 @@ The `00_` file uses a type-specific name: `00_TECH_DEBT.md`, `00_SECURITY_AUDIT.
 
 Phase files use: `NN_<phase-slug>.md` (e.g., `01_input-validation.md`).
 
-A session can also hold numbered docs that aren't phases, such as an ironclad review cycle, a decision or research notes. A numbered doc whose `type:` is something other than `plan` or `audit` isn't a phase.
+A session can also hold numbered docs that aren't phases, such as an ironclad review cycle, a decision or research notes. A numbered doc whose `type:` is something other than `plan` or `audit` isn't a phase. `/claudna:publish`'s family mode still calls every `NN_*` doc a phase doc and validates it in full; here, "phase" decides only what counts toward a session's progress and archiving.
 
 ## 5. Status Markers
 
@@ -99,18 +99,20 @@ Every change to `status:` also sets `updated:` to the date. Three more rules:
 
 ## 6. Archive Convention
 
-Archive a session when every phase in it (§4) is `✅ COMPLETE` and the final PR has merged, or when it was abandoned or replaced. Every skill that archives follows these steps, whether it moves a session directory or a standalone plan doc:
+Archive a session when it has at least one phase (§4), every phase is `✅ COMPLETE` and the final PR has merged, or when it was abandoned or replaced. Every skill that archives follows these steps, whether it moves a session directory or a standalone plan doc:
 
 1. Move it with `git mv`, so its history follows. `git mv` doesn't create `documentation/archive/`, so make it first if it's missing:
 
    ```
    mkdir -p documentation/archive
    git mv documentation/planning/<category>/<session>/ documentation/archive/<session>/
+   # or, for a standalone plan doc:
+   git mv documentation/planning/<category>/<doc>.md documentation/archive/<doc>.md
    ```
 
-2. Give every doc a terminal frontmatter `status:` from its type's terminal values (`../_shared/output-guide.md` §3). A doc with no frontmatter first gets the fields §3 requires; a plan's `type:` is `plan`. Then take the first rule that fits:
+2. Give every doc a terminal frontmatter `status:` from its type's terminal values (`../_shared/output-guide.md` §3). A doc with no frontmatter first gets the fields `../_shared/output-guide.md` §3 requires; a plan's `type:` is `plan`. Then take the first rule that fits:
    1. A doc that is already terminal keeps its status, such as a `ratified` decision or a `completed` review.
-   2. `superseded` if another doc replaced it and its type has `superseded`; otherwise go on to rule 3. Either way, set `superseded_by:` to the replacement.
+   2. `superseded` if another doc replaced it and its type has `superseded`; otherwise go on to rule 3. Either way, set `superseded_by:` to the replacement as a quoted wikilink, `"[[<its title>]]"`. Claudron's `SCHEMA.md` makes the field a wikilink, and YAML reads a bare `[[…]]` as a list.
    3. `completed` if its work shipped and its type has `completed`.
    4. `archived` otherwise: abandoned work, or a type with no `completed`.
 
@@ -141,10 +143,12 @@ Skills that scan documentation state (e.g., `/claudna:session` resume and handof
 # Find in-progress plans
 grep -r "IN PROGRESS" documentation/planning/
 
-# Find sessions due for archiving (§6): every phase (§4) carries ✅ COMPLETE,
-# and nothing in the session says PENDING or IN PROGRESS. A new phase doc has
-# no marker at all, so check each phase, not just the markers present:
-# numbered docs without ✅ COMPLETE, then the types that say which are phases
+# Find sessions due for archiving (§6): the session has at least one phase
+# (§4), every phase carries ✅ COMPLETE, and nothing in it says PENDING or
+# IN PROGRESS. A session with no phases (a retro, a decision) is never due.
+# A new phase doc has no marker at all, so check each phase, not just the
+# markers present: numbered docs without ✅ COMPLETE, then the types that say
+# which numbered docs are phases
 grep -rL "✅ COMPLETE" documentation/planning/ --include="[0-9][0-9]_*.md" --exclude="00_*"
 grep -rn "^type:" documentation/planning/ --include="[0-9][0-9]_*.md"
 grep -rnE "IN PROGRESS|PENDING" documentation/planning/ --include="*.md"

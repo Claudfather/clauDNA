@@ -56,6 +56,14 @@ def test_handoff_flags_both_kinds_of_drift() -> None:
     assert '--include="[0-9][0-9]_*.md"' in handoff
 
 
+def test_a_session_without_phases_is_never_due() -> None:
+    """'Every phase complete' alone is vacuously true of a retro or a decision session."""
+    six = section(STANDARD.read_text(encoding="utf-8"), 6)
+    handoff = (SKILLS / "session" / "handoff.md").read_text(encoding="utf-8")
+    assert "at least one phase" in six
+    assert "at least one phase" in handoff
+
+
 def test_the_reaper_leaves_the_flags_to_handoff() -> None:
     """Resume reaps before it briefs: the `✅ COMPLETE` drop must not eat the archive flag."""
     reaper = (SKILLS / "_shared" / "reaper-rules.md").read_text(encoding="utf-8")
