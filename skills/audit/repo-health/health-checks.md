@@ -14,8 +14,8 @@ Detailed definitions for each check performed by the repo-health skill.
 | **PRs to review** | `gh pr list -R <remote> --search "review-requested:@me" --json number,title,author` |
 | **CI status** | `gh pr checks <number>` for open PRs, or `gh run list -R <remote> --limit 1` |
 | **Stale branches** | Local branches with no commits in 14+ days |
-| **In-progress plans** | Search `documentation/planning/` for `🔧 IN PROGRESS` markers |
-| **Pending plans** | Search `documentation/planning/` for `📋 PENDING` markers |
+| **In-progress plans** | Search `documentation/planning/` for `IN PROGRESS` markers (`../../_shared/documentation-standard.md` §5) |
+| **Pending plans** | Search `documentation/planning/` for `PENDING` markers (`../../_shared/documentation-standard.md` §5) |
 | **Last commit** | `git -C <repo> log -1 --format="%ar — %s"` |
 | **Stashes** | `git -C <repo> stash list` count |
 
@@ -94,8 +94,8 @@ Only report items that need attention. Skip this step entirely if everything is 
 
 Check `documentation/planning/` for session directories where:
 - No file has been modified in 14+ days
-- The session contains a mix of `✅ COMPLETE` and `📋 PENDING` docs (abandoned mid-session)
-- Or all docs are still `📋 PENDING` (never started)
+- The session contains a mix of `✅ COMPLETE` and `PENDING` docs (abandoned mid-session)
+- Or all docs are still `PENDING` (never started)
 
 ```
 Stale Planning Sessions
@@ -113,7 +113,7 @@ Stale Planning Sessions
 ```
 
 For each stale session, ask: **"Archive it, delete it, or skip?"**
-- **Archive** — move the entire session directory to `documentation/archive/` (use `git mv`)
+- **Archive** — archive the session per `../../_shared/documentation-standard.md` §6: `git mv` the directory to `documentation/archive/`, and its docs take a terminal `status:` (§6 picks it; abandoned work gets `archived`)
 - **Delete** — remove the directory (confirm twice — this is destructive)
 - **Skip** — leave it for now
 

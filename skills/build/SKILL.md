@@ -22,6 +22,7 @@ allowed-tools:
   - "Bash(which *)"
   - "Bash(test *)"
   - "Bash(lsof *)"
+  - "Bash(mkdir *)"
   - "Read(*)"
   - "Write(*)"
   - "Edit(*)"
@@ -657,7 +658,7 @@ Read `challenge-round-questions.md` for the question matrix and `red-flags-and-r
 
 ### Step 4: Mark In Progress
 
-**For `--source docs`:** Update the plan document status to `IN PROGRESS` with a `Started: YYYY-MM-DD` timestamp. Update the overview doc if applicable.
+**For `--source docs`:** Set the plan document's status marker to `IN PROGRESS` with a `Started: YYYY-MM-DD` timestamp, and the overview doc's row if applicable. Roll frontmatter `status:` up in the same edit (`../_shared/documentation-standard.md` §5): a `draft` plan becomes `active`.
 
 **For `--source github`:** Add `in-progress` label to the issue via `gh issue edit <number> --add-label "in-progress"`.
 
@@ -806,7 +807,7 @@ git reset --hard HEAD~1
 
 Create PR (title from plan header/issue title, body with summary + verification results).
 
-**For `--source docs`:** Update plan document to `COMPLETE` with timestamp and PR reference.
+**For `--source docs`:** Set the plan document's status marker to `✅ COMPLETE` with timestamp and PR reference, and the overview doc's row if applicable. When every marker in the plan doc is `✅ COMPLETE`, set its frontmatter `status:` to `completed` in the same edit (`../_shared/documentation-standard.md` §5). Commit both to the PR branch, so main sees them only when the PR merges.
 
 **For `--source github`:** Include `Closes #<number>` in the PR body. Remove `in-progress` label via `gh issue edit <number> --remove-label "in-progress"`.
 
@@ -844,7 +845,7 @@ Tell the user: **"Say `merge` to merge and wrap up, or `stop` to end here."**
 
 On `merge`: merge PR, switch to main and pull (separate Bash calls).
 
-**For `--source docs`:** Archive plan doc via `git mv`, update cross-references.
+**For `--source docs`:** If this merge finishes the session (every phase `✅ COMPLETE`), or the plan doc stands alone, archive it per `../_shared/documentation-standard.md` §6: `git mv` (after `mkdir -p` if `documentation/archive/` is missing), then a terminal frontmatter `status:` on every doc, and cross-references updated.
 
 **For `--source github`:** The issue auto-closes when the PR merges (via `Closes #<number>`). No archival needed.
 

@@ -43,9 +43,9 @@ Read a planning document from the local filesystem. This is the current default 
 |---|---|
 | Receive plan | Read file from disk |
 | Challenge round updates | Edit the file directly |
-| Mark in progress | Update status field in the file |
-| Mark complete | Update status field in the file |
-| Archive | `git mv` to `documentation/archive/` |
+| Mark in progress | Set the `IN PROGRESS` marker in the body; roll frontmatter `status:` up per `../_shared/documentation-standard.md` §5 |
+| Mark complete | Set the `✅ COMPLETE` marker in the body; roll frontmatter `status:` up per `../_shared/documentation-standard.md` §5 |
+| Archive | `git mv` to `documentation/archive/` and a terminal frontmatter `status:`, per `../_shared/documentation-standard.md` §6 |
 
 ---
 

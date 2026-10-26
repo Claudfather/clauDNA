@@ -75,23 +75,49 @@ Phase files use: `NN_<phase-slug>.md` (e.g., `01_input-validation.md`).
 
 ## 5. Status Markers
 
-Embed these in plan documents. They are machine-read by `/claudna:session` (resume and handoff modes) and `/claudna:build`:
+Embed these in the body of plan documents: a doc's status line, the overview's phase rows, each deliverable. They are machine-read by `/claudna:session` (resume and handoff modes) and `/claudna:build`:
 
 | Marker | Meaning |
 |--------|---------|
 | `PENDING` | Not started |
-| `IN PROGRESS` | Currently being implemented |
+| `IN PROGRESS` | Started, not finished — including work that has partly shipped |
 | `✅ COMPLETE` | Done, PR merged |
+
+**Markers and frontmatter `status:`.** Markers record the progress of the work inside a doc. Frontmatter `status:` records the doc's lifecycle in its type's vocabulary, which Claudron's [`SCHEMA.md` §Status vocabulary](https://github.com/Claudfather/Claudron/blob/main/SCHEMA.md#status-vocabulary-per-type) owns; `../_shared/output-guide.md` §3 is clauDNA's rendered copy, terminal values included. Neither can be computed from the other, so frontmatter rolls the markers up: the skill that writes a marker updates `status:` in the same edit, at three points.
+
+1. **Work starts** (the first `IN PROGRESS`): a `draft` plan becomes `active`. A type without `active` keeps its status until the work is done.
+2. **Work is done** (every marker in the doc `✅ COMPLETE`, final PR merged): `completed`.
+3. **The doc is archived:** a terminal status, picked by §6.
+
+Every change to `status:` also sets `updated:` to the date. Three more rules:
+
+- **A marker never goes in frontmatter.** `status: ✅ COMPLETE` isn't a valid value.
+- **`PENDING` fits `draft` or `active`.** Approval isn't a marker: an approved plan can still be waiting to start.
+- **Partly shipped work is `IN PROGRESS`**, however long the rest waits — never `PENDING`.
 
 ## 6. Archive Convention
 
-When all phases are `✅ COMPLETE` and the final PR is merged:
+Archive a session when all its phases are `✅ COMPLETE` and the final PR has merged, or when it was abandoned or replaced. Every skill that archives follows these steps, whether it moves a session directory or a standalone plan doc:
 
-```
-git mv documentation/planning/<category>/<session>/ documentation/archive/<session>/
-```
+1. Move it with `git mv`, so its history follows. `git mv` doesn't create `documentation/archive/`, so make it first if it's missing:
 
-`/claudna:build` does this in Step 8. `/claudna:session` handoff mode flags completed-but-unarchived sessions.
+   ```
+   mkdir -p documentation/archive
+   git mv documentation/planning/<category>/<session>/ documentation/archive/<session>/
+   ```
+
+2. Give every doc a terminal frontmatter `status:` from its type's terminal values (`../_shared/output-guide.md` §3). Take the first that fits:
+   1. A doc that is already terminal keeps its status, such as a `ratified` decision or a `completed` review.
+   2. `superseded` if another doc replaced it. Also set `superseded_by:` to that doc.
+   3. `completed` if its work shipped and its type has `completed`.
+   4. `archived` otherwise: abandoned work, or a type with no `completed`.
+
+   Where the status changes, set `updated:` to the date too (§5).
+3. Update cross-references to the old path.
+
+Commit all three steps together, so no commit leaves a broken link or a live status. Nothing under `documentation/archive/` keeps a live status, because the directory doesn't say a doc is done; its `status:` does.
+
+`/claudna:build` archives in Step 8, and `/claudna:audit repo-health` archives abandoned sessions. `/claudna:session` handoff mode flags sessions due for archiving and archived docs whose `status:` is still live (§8).
 
 ## 7. Non-Planning Directories
 
@@ -113,12 +139,17 @@ Skills that scan documentation state (e.g., `/claudna:session` resume and handof
 # Find in-progress plans
 grep -r "IN PROGRESS" documentation/planning/
 
-# Find completed but unarchived sessions
-# (all phases ✅ COMPLETE but still in planning/)
-grep -rl "✅ COMPLETE" documentation/planning/ | xargs -I{} dirname {} | sort -u
+# Find sessions due for archiving (§6): list every marker, then keep the
+# sessions whose markers are all ✅ COMPLETE (no PENDING, no IN PROGRESS)
+grep -rE "IN PROGRESS|PENDING|✅ COMPLETE" documentation/planning/ --include="*.md"
 
 # Check for pending plans
 grep -r "PENDING" documentation/planning/
+
+# Find archived docs whose status is still live (§6): a status that isn't
+# terminal for the doc's type (../_shared/output-guide.md §3), or none at all
+grep -rE "^(type|status):" documentation/archive/ --include="*.md"
+grep -rL "^status:" documentation/archive/ --include="*.md"
 ```
 
 ## 9. PROJECT_MISSION.md

@@ -17,6 +17,8 @@ Run in parallel:
 - `git branch --list`
 - `gh pr list --author @me --json number,title,state,updatedAt`
 - If `documentation/planning/` exists, run `grep -rE "IN PROGRESS|PENDING|✅ COMPLETE" documentation/planning/ --include="*.md"`
+- If `documentation/archive/` exists, run `grep -rE "^(type|status):" documentation/archive/ --include="*.md"`
+- If `documentation/archive/` exists, run `grep -rL "^status:" documentation/archive/ --include="*.md"`
 
 ### 3. Reaper pass
 
@@ -29,6 +31,12 @@ From the session conversation, identify new:
 - **Decisions** — choices made and rationale
 - **Open Questions** — blockers, unknowns, pending inputs
 - **Next Steps** — what the next session should start with
+
+Then flag documentation drift from the live scan as Next Steps, per `../_shared/documentation-standard.md` §6:
+- **Due for archiving:** a session (or standalone plan doc) under `documentation/planning/` whose markers are all `✅ COMPLETE` → `Archive (documentation-standard §6): <sessions>`.
+- **Archived but live:** a doc under `documentation/archive/` whose `status:` is missing or not terminal for its `type:` (`../_shared/output-guide.md` §3) → `Set terminal statuses (documentation-standard §6): <docs>`.
+
+One item per kind, naming every hit. Rebuild both from this scan: drop any earlier Next Steps item that starts with either lead-in, and add none when the scan is clean. Handoff only flags; it never archives or edits a doc.
 
 Each item gets the current ISO-8601 UTC timestamp.
 

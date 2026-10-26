@@ -78,14 +78,23 @@ Validate against the schema (vocabulary SSOT: `skills/_shared/output-guide.md` ย
 1. **Primary:** active/current/ratified/draft first, then completed/stale/superseded/archived
 """
 
+DOC_STANDARD_STUB = """# Documentation Standard
+
+## 6. Archive Convention
+
+2. Give every doc a terminal frontmatter `status:` (`../_shared/output-guide.md` ยง3) and set `updated:`.
+"""
+
 
 def make_repo(tmp_path, *, guide: str | None = None, publish: str | None = None, index: str | None = None,
-              contract: dict | None = None, ref: str = REF) -> Path:
+              standard: str | None = None, contract: dict | None = None, ref: str = REF) -> Path:
     for d in ("skills/_shared", "skills/publish", "skills/index", "contracts"):
         (tmp_path / d).mkdir(parents=True)
     (tmp_path / "skills/_shared/output-guide.md").write_text(guide if guide is not None else guide_text())
     (tmp_path / "skills/publish/SKILL.md").write_text(publish if publish is not None else PUBLISH_STUB)
     (tmp_path / "skills/index/SKILL.md").write_text(index if index is not None else INDEX_STUB)
+    standard = standard if standard is not None else DOC_STANDARD_STUB
+    (tmp_path / "skills/_shared/documentation-standard.md").write_text(standard)
     (tmp_path / csd.CONTRACT_REL).write_text(json.dumps(contract if contract is not None else CONTRACT))
     (tmp_path / csd.REF_REL).write_text(ref + "\n")
     return tmp_path
@@ -173,6 +182,15 @@ class TestRunCheck:
     def test_a_missing_pointer_fails(self, tmp_path):
         errors = errors_of(make_repo(tmp_path, index="# Index\n\nNo pointer anywhere.\n"))
         assert any("skills/index/SKILL.md" in e and "no pointer" in e for e in errors)
+
+    def test_the_documentation_standard_restating_terminal_statuses_fails(self, tmp_path):
+        restated = DOC_STANDARD_STUB + "\n| plan | completed, superseded, archived |\n"
+        errors = errors_of(make_repo(tmp_path, standard=restated))
+        assert any("documentation-standard.md" in e and "inline status-enum" in e for e in errors)
+
+    def test_the_documentation_standard_without_a_pointer_fails(self, tmp_path):
+        errors = errors_of(make_repo(tmp_path, standard="# Documentation Standard\n\nNo pointer.\n"))
+        assert any("documentation-standard.md" in e and "no pointer" in e for e in errors)
 
 
 class TestWrite:
