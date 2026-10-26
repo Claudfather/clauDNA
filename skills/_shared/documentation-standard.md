@@ -73,7 +73,7 @@ The `00_` file uses a type-specific name: `00_TECH_DEBT.md`, `00_SECURITY_AUDIT.
 
 Phase files use: `NN_<phase-slug>.md` (e.g., `01_input-validation.md`).
 
-A session can also hold numbered docs that aren't phases, such as an ironclad review cycle, a decision or research notes. A numbered doc whose `type:` is something other than `plan` or `audit` isn't a phase.
+A session can also hold numbered docs that aren't phases, such as an ironclad review cycle, a decision or research notes. A numbered doc whose `type:` is something other than `plan` or `audit` isn't a phase. `/claudna:publish`'s family mode still calls every `NN_*` doc a phase doc and validates it in full; here, "phase" decides only what counts toward a session's progress and archiving.
 
 ## 5. Status Markers
 
