@@ -89,3 +89,4 @@ def test_the_archive_lands_through_a_pull_request() -> None:
     eight = step(build, 8)
     assert "git mv" not in eight
     assert "its own branch and PR" in eight
+    assert "merge the archive PR" in eight

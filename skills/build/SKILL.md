@@ -807,7 +807,7 @@ git reset --hard HEAD~1
 
 Create PR (title from plan header/issue title, body with summary + verification results).
 
-**For `--source docs`:** Set the plan document's status marker to `✅ COMPLETE` with timestamp and PR reference, and the overview doc's row if applicable. When every marker in the plan doc is `✅ COMPLETE`, set its frontmatter `status:` to `completed` in the same edit (`../_shared/documentation-standard.md` §5). Commit both to the PR branch and push, so the PR carries them and main sees them only when it merges.
+**For `--source docs`:** Set the plan document's status marker to `✅ COMPLETE` with timestamp and PR reference, and the overview doc's row if applicable. When every marker in the plan doc is `✅ COMPLETE`, set its frontmatter `status:` to `completed` in the same edit, and the overview's too once its last row is `✅ COMPLETE` (`../_shared/documentation-standard.md` §5). Commit both to the PR branch and push, so the PR carries them and main sees them only when it merges.
 
 If this PR finishes the session, with every phase (`../_shared/documentation-standard.md` §4) `✅ COMPLETE` on this branch, or the plan doc stands alone, archive it per `../_shared/documentation-standard.md` §6 on the same branch: `git mv` (after `mkdir -p` if `documentation/archive/` is missing), then a terminal frontmatter `status:` on every doc, and cross-references updated, in one commit. Push it and say so in the PR body, which now lands the archive with the work. Later fixes to this PR edit the plan docs at their archive paths.
 
@@ -847,7 +847,7 @@ Tell the user: **"Say `merge` to merge and wrap up, or `stop` to end here."**
 
 On `merge`: merge PR, switch to main and pull (separate Bash calls).
 
-**For `--source docs`:** If Step 7 archived the session, this merge landed the archive. If main now shows every phase `✅ COMPLETE` but the session still under `documentation/planning/`, because another phase's PR merged after this branch was cut, archive it per `../_shared/documentation-standard.md` §6 on its own branch and PR.
+**For `--source docs`:** If Step 7 archived the session, this merge landed the archive. If main now shows every phase `✅ COMPLETE` but the session still under `documentation/planning/`, because another phase's PR merged after this branch was cut, archive it per `../_shared/documentation-standard.md` §6 on its own branch and PR. Then offer the same gate for it: **"Say `merge` to merge the archive PR too, or `stop` to leave it for review."**
 
 **For `--source github`:** The issue auto-closes when the PR merges (via `Closes #<number>`). No archival needed.
 
