@@ -27,7 +27,7 @@ links: []
 **Prerequisites:**
 - Phase 1 merged: `/claudna:weigh-development-paths --auto` exists; structured-result shape is documented; `/claudna:adversarial-review --dispatch` is non-interactive.
 - Phase 2 merged: planning skills produce `## Adversarial Review Findings` sections; Step 3 is split into 3A/3B; Step 6.5 simplification pass exists.
-- Read `documentation/specs/2026-05-17-autonomous-mode-and-orchestration-design.md` §5.5, §5.5.1, §5.5.2 in full.
+- Read `documentation/archive/2026-05-17-autonomous-mode-and-orchestration-design.md` §5.5, §5.5.1, §5.5.2 in full.
 
 ---
 
@@ -1572,7 +1572,7 @@ gh pr create --title "Phase 3: /implement-plan --auto mode" \
   --body "$(cat <<'EOF'
 ## Summary
 
-Implements Phase 3 of the autonomous-mode-and-orchestration design (spec: `documentation/specs/2026-05-17-autonomous-mode-and-orchestration-design.md`).
+Implements Phase 3 of the autonomous-mode-and-orchestration design (spec: `documentation/archive/2026-05-17-autonomous-mode-and-orchestration-design.md`).
 
 Adds full `--auto` (alias `--autonomous`) mode to `/claudna:implement-plan`:
 

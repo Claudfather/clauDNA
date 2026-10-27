@@ -1,9 +1,10 @@
 ---
 title: Codex session-store adapter
 type: plan
-status: active
+status: completed
 owner: clauDNA
 created: 2026-10-16
+updated: 2026-10-27
 ---
 
 # Codex session-store adapter

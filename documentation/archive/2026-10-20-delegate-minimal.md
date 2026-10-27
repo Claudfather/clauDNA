@@ -1,9 +1,10 @@
 ---
 title: Minimal cross-provider delegation with existing session history
 type: plan
-status: proposed
+status: completed
 owner: clauDNA
 created: 2026-10-20
+updated: 2026-10-27
 tags: [delegation, session-store, cleanup]
 ---
 

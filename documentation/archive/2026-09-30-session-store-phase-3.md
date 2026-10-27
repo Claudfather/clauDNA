@@ -1,3 +1,12 @@
+---
+title: "Session store, phase 3: boundaries, complete — design notes"
+type: plan
+status: completed
+owner: chris
+created: 2026-09-30
+updated: 2026-10-27
+---
+
 # Session store, phase 3: boundaries, complete — design notes
 
 **Status:** built, 2026-09-30, on top of phase 2 (#373, merged). §1 and §3 are built, and §2 was done in #373.

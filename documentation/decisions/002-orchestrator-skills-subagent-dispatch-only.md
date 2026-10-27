@@ -1,10 +1,10 @@
 ---
 title: "Orchestrator-style skills dispatch via subagents, never fleet-specific mechanisms"
 type: decision
-status: accepted
+status: ratified
 owner: Chris Rogers
 created: 2026-07-06
-updated: 2026-07-06
+updated: 2026-10-27
 tags: [orchestration, ironclad, dispatch, claudlobby, architecture]
 ---
 

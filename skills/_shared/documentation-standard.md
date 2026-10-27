@@ -138,7 +138,7 @@ These hold permanent documentation, not ephemeral planning artifacts:
 | `specs/` | Technical specifications, API contracts | `<slug>.md` (e.g., `api-endpoints.md`) |
 | `guides/` | Setup, onboarding, runbooks | `<slug>.md` (e.g., `local-setup.md`) |
 
-These are not archived — they're living documents that evolve with the codebase.
+These are not archived — they're living documents that evolve with the codebase. A design written for one piece of work isn't one of them: it's a plan (`type: plan`), kept in `planning/` and archived with that work (§6).
 
 ## 8. Reading Documentation State
 

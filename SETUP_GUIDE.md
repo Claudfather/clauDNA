@@ -891,5 +891,5 @@ Codex installation does not add a summarizer provider.
 
 Declared/discovered hooks, trusted commands, actual firing and stdout context
 delivery are separate evidence. Local canaries do not establish a live mixed-fleet
-week; see the [workflow plan](documentation/plans/2026-10-16-codex-engineering-workflows.md)
-and [store adapter plan](documentation/plans/2026-10-16-codex-session-store-adapter.md).
+week; see the [workflow plan](documentation/planning/2026-10-16-codex-engineering-workflows.md)
+and [store adapter plan](documentation/archive/2026-10-16-codex-session-store-adapter.md).

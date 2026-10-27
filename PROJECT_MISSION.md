@@ -29,7 +29,7 @@ Materially smarter Claude Code with one install.
 
 **Consumes:** promotions from Claudosseum (champions ready to ship); manual additions during the early phase.
 
-**Produces:** a marketplace plugin that Claudlobby bots install and Claude Code, Cursor or Codex users can install, each with its declared host scope ([Codex workflow scope and evidence](documentation/plans/2026-10-16-codex-engineering-workflows.md)) — the "what skills exist" answer for the entire ecosystem.
+**Produces:** a marketplace plugin that Claudlobby bots install and Claude Code, Cursor or Codex users can install, each with its declared host scope ([Codex workflow scope and evidence](documentation/planning/2026-10-16-codex-engineering-workflows.md)) — the "what skills exist" answer for the entire ecosystem.
 
 **Sibling boundaries:**
 - clauDNA writes only to the user's disk — the session store (spec `documentation/specs/2026-09-28-session-store-design.md`) and, with `CLAUDNA_TELEMETRY=1`, the `skill_invocation` lines Claudosseum ingests (`plugin-hooks/telemetry-emit.sh`, `lib/claudna/session_store/telemetry.py`); it never transmits. Scoring and any hosted telemetry are Claudosseum's.

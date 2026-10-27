@@ -182,6 +182,6 @@ not execute skills or prove native automatic routing. Keep `make routing-eval`
 unchanged for Claude-only evaluation; do not run it in Codex-only verification.
 Native skill-read/action, same-host fresh reviewer spawn/wait, and packaged startup
 execution/context-delivery evidence are separate gates in the
-[Codex workflow plan](documentation/plans/2026-10-16-codex-engineering-workflows.md).
+[Codex workflow plan](documentation/planning/2026-10-16-codex-engineering-workflows.md).
 Do not transfer desktop delegation proof to native CLI or mark the mixed-fleet
 week complete from a local source/native canary.

@@ -20,7 +20,7 @@ links: []
 >
 > Strong candidate for archival to `documentation/archive/` as a directory once Claudlobby#294 is resolved or explicitly deprioritized — see each phase doc for full evidence.
 
-> **For implementing teams:** read `documentation/specs/2026-05-17-autonomous-mode-and-orchestration-design.md` before starting any phase. This overview names the phases, their deliverables, dependency order, and which repo each lives in.
+> **For implementing teams:** read `documentation/archive/2026-05-17-autonomous-mode-and-orchestration-design.md` before starting any phase. This overview names the phases, their deliverables, dependency order, and which repo each lives in.
 
 ## Goal
 

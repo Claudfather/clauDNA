@@ -22,7 +22,7 @@ links: []
 
 **Repo:** clauDNA (`/path/to/clauDNA`)
 
-**Prerequisites:** Read the design spec at `documentation/specs/2026-05-17-autonomous-mode-and-orchestration-design.md` end-to-end before starting. Especially §5.1, §5.2, §5.6, §5.7.
+**Prerequisites:** Read the design spec at `documentation/archive/2026-05-17-autonomous-mode-and-orchestration-design.md` end-to-end before starting. Especially §5.1, §5.2, §5.6, §5.7.
 
 ---
 
@@ -76,7 +76,7 @@ Files modified or created in this phase:
 > **Status: ✅ COMPLETE (implicit).** Read-only orientation task with no on-disk deliverable to verify directly. Confirmed by outcome: every downstream task (2-16) matches this plan's specified text, which would not be possible without this reading having happened.
 
 **Files:**
-- Read: `documentation/specs/2026-05-17-autonomous-mode-and-orchestration-design.md`
+- Read: `documentation/archive/2026-05-17-autonomous-mode-and-orchestration-design.md`
 - Read: `skills/_shared/orchestration-guide.md`
 - Read: `skills/_shared/output-guide.md`
 - Read: `skills/adversarial-review/SKILL.md`
@@ -1557,7 +1557,7 @@ gh pr create --title "Phase 1: Autonomous-mode contract & structured result shap
   --body "$(cat <<'EOF'
 ## Summary
 
-Implements Phase 1 of the autonomous-mode-and-orchestration design (spec: `documentation/specs/2026-05-17-autonomous-mode-and-orchestration-design.md`).
+Implements Phase 1 of the autonomous-mode-and-orchestration design (spec: `documentation/archive/2026-05-17-autonomous-mode-and-orchestration-design.md`).
 
 - Extends `orchestration-guide.md §10` with a Tier-3 (implementation skill) sub-section
 - Defines the structured-result shape (§10.C) emitted by every `--auto` skill

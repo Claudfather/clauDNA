@@ -30,7 +30,7 @@ links: []
 
 **Prerequisites:**
 - Phases 1-3 merged in clauDNA. The structured-result shape (§10.C), `/implement-plan --auto`, `/tech-debt --auto` (and the other 8 `--auto` skills) are live.
-- Read the design spec at `/path/to/clauDNA/documentation/specs/2026-05-17-autonomous-mode-and-orchestration-design.md` §6 in full.
+- Read the design spec at `/path/to/clauDNA/documentation/archive/2026-05-17-autonomous-mode-and-orchestration-design.md` §6 in full.
 - Read `/path/to/claudlobby/README.md` and `/path/to/claudlobby/CLAUDE.md` to understand claudlobby's compositor model.
 
 ---
@@ -63,7 +63,7 @@ This phase is in an unfamiliar codebase (vs. Phases 1-3 in clauDNA). Do not skip
 
 - [ ] **Step 1: Read the design spec §6 end-to-end**
 
-Open `/path/to/clauDNA/documentation/specs/2026-05-17-autonomous-mode-and-orchestration-design.md` and read §6 (claudlobby changes) twice. Pay attention to:
+Open `/path/to/clauDNA/documentation/archive/2026-05-17-autonomous-mode-and-orchestration-design.md` and read §6 (claudlobby changes) twice. Pay attention to:
 - §6.1 New skill: `library/skills/autonomous-runner`
 - §6.1's "Configuration via fleet.yaml" — note exact field names, types, and the `args:` block
 - §6.1's Procedure (steps 1-10)
@@ -1799,7 +1799,7 @@ gh pr create --title "Phase 4: autonomous-runner wrapper skill" \
   --body "$(cat <<'EOF'
 ## Summary
 
-Implements Phase 4 of the autonomous-mode-and-orchestration design (spec: clauDNA's `documentation/specs/2026-05-17-autonomous-mode-and-orchestration-design.md`).
+Implements Phase 4 of the autonomous-mode-and-orchestration design (spec: clauDNA's `documentation/archive/2026-05-17-autonomous-mode-and-orchestration-design.md`).
 
 New skill `library/skills/autonomous-runner/` that bots include in fleet.yaml as their continuous job:
 

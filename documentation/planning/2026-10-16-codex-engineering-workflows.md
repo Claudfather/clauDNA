@@ -216,7 +216,7 @@ Critical path: P4 release → A → B → C release → #2149 composition → ac
 ## Companion Plans
 
 - Claudfather/Claudlobby#2145 canonical runtime-neutral plan/run log: measured prerequisites and owner boundaries.
-- clauDNA P4 `documentation/plans/2026-10-16-codex-session-store-adapter.md`: released store substrate; F10/F8 remain intact.
+- clauDNA P4 `documentation/archive/2026-10-16-codex-session-store-adapter.md`: released store substrate; F10/F8 remain intact.
 - Claudron P4 runtime-neutral owner plan: complete owned session-loop pack and capability/release gate.
 - Claudfather/Claudlobby#2149: execution, composition, policy, supervision and the actual mixed-runtime week. This draft does not seize that ownership.
 
