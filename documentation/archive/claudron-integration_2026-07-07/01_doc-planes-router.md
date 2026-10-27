@@ -1,10 +1,10 @@
 ---
 title: "[plan] P1: publish two-plane router — docs adapter with family mode, disk→vault rename, plane doctrine"
 type: plan
-status: draft
+status: completed
 owner: chris
 created: 2026-07-07
-updated: 2026-07-07
+updated: 2026-10-27
 tags: [planning, claudron, publish, output-guide]
 repos: clauDNA
 links:

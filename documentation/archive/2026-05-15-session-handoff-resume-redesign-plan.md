@@ -1,3 +1,12 @@
+---
+title: "Session Handoff & Resume Redesign — Implementation Plan"
+type: plan
+status: completed
+owner: chris
+created: 2026-05-15
+updated: 2026-10-27
+---
+
 # Session Handoff & Resume Redesign — Implementation Plan
 
 > **✅ COMPLETE (verified 2026-07-06 docs audit).** All 8 tasks below are done and match the codebase exactly — see per-task markers. Candidate for archival to `documentation/archive/`.

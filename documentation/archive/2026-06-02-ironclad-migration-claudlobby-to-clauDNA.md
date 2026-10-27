@@ -1,11 +1,11 @@
 ---
 title: "Phase 3: Migrate /ironclad from claudlobby to clauDNA"
 type: plan
-status: ✅ COMPLETE (clauDNA-side); superseded by later §4.1 unification
+status: completed
 owner: alex
 tags: [planning, ironclad, migration, dispatch, clauDNA, claudlobby]
 created: 2026-06-02
-updated: 2026-06-03
+updated: 2026-10-27
 ---
 
 > **✅ COMPLETE, clauDNA-side (verified 2026-07-06 docs audit).** `skills/ironclad/SKILL.md` exists, is explicitly subagent-only (its own text: "the skill itself contains no fleet concepts (no tmux, no `[BOTREPORT]`, no `fleet-state.json`)" — grep-verified zero matches), dispatches lenses as parallel `general-purpose` subagents to a `/tmp/ironclad-<timestamp>/` scratch dir, and supports `--auto`. Phases 3a/3b (clauDNA-side) are done. Phase 3c (fleet-dispatch-capability protocol) and 3e (removal from claudlobby) are **UNVERIFIABLE FROM THIS REPO** — claudlobby is a sibling repo. Since this doc was written, the shipped skill evolved further: it now works on §4.1 plan Issues (not PRs) with a `--loops N` hardening loop and `forge --reforge`, superseding this doc's PR-based, single-cycle design. Candidate for archival once claudlobby-side Phase 3c/3e status is confirmed out-of-band.

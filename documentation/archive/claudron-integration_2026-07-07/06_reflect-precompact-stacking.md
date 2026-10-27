@@ -1,10 +1,10 @@
 ---
 title: "[plan] P6: /reflect writes vault-ward + the per-event stacking contract — one prompt per event, nothing lost"
 type: plan
-status: draft
+status: completed
 owner: chris
 created: 2026-07-07
-updated: 2026-07-07
+updated: 2026-10-27
 tags: [planning, claudron, reflect, hooks]
 repos: clauDNA
 links:

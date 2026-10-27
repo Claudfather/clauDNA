@@ -1,7 +1,10 @@
 ---
-status: ✅ COMPLETE
-date: 2026-05-15
+title: "Session Handoff & Resume Redesign"
+type: plan
+status: completed
 owner: chris
+created: 2026-05-15
+updated: 2026-10-27
 related_repos: clauDNA, Claudlobby, Claudron
 breaking_change: true
 sibling_issues:

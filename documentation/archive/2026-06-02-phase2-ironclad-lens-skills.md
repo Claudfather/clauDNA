@@ -1,11 +1,11 @@
 ---
 title: "Phase 2: Ironclad Review Lens Skills"
 type: plan
-status: ✅ COMPLETE
+status: completed
 owner: astrid
 tags: [planning, skills, ironclad, lenses, clauDNA, dispatch]
 created: 2026-06-02
-updated: 2026-06-02
+updated: 2026-10-27
 ironclad-cycle: 1
 ---
 
