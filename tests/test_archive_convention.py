@@ -121,9 +121,17 @@ def test_a_session_without_phases_is_never_due() -> None:
 
 
 def test_a_standalone_plan_doc_has_an_archive_trigger() -> None:
-    """§6 named a trigger for sessions only, though handoff flags a finished standalone doc (#448)."""
+    """§6 named a trigger for sessions only, though handoff flags a finished standalone doc (#448).
+
+    Both say it must carry `✅ COMPLETE`: "every marker is complete" alone is
+    vacuously true of a doc with no markers, the hole "at least one phase" closes.
+    """
     six = section(STANDARD.read_text(encoding="utf-8"), 6)
-    assert "a standalone plan doc when every marker in it is `✅ COMPLETE`" in six
+    handoff = (SKILLS / "session" / "handoff.md").read_text(encoding="utf-8")
+    assert "a standalone plan doc when it carries `✅ COMPLETE` and no other marker" in six
+    assert "carries `✅ COMPLETE` and neither of the others" in handoff
+    build = (SKILLS / "build" / "SKILL.md").read_text(encoding="utf-8")
+    assert "makes a standalone plan doc due for archiving" in step(build, 7)
 
 
 def test_the_reaper_leaves_the_flags_to_handoff() -> None:
