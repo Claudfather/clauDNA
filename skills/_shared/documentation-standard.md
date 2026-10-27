@@ -99,7 +99,7 @@ Every change to `status:` also sets `updated:` to the date. Three more rules:
 
 ## 6. Archive Convention
 
-Archive a session when it has at least one phase (§4) and every phase is `✅ COMPLETE`, or when it was abandoned or replaced. Every skill that archives follows these steps, whether it moves a session directory or a standalone plan doc:
+Archive a session when it has at least one phase (§4) and every phase is `✅ COMPLETE`, a standalone plan doc when every marker in it is `✅ COMPLETE` (§5), and either one when it was abandoned or replaced. Every skill that archives follows these steps, whether it moves a session directory or a standalone plan doc:
 
 1. Move it with `git mv`, so its history follows. `git mv` doesn't create `documentation/archive/`, so make it first if it's missing:
 
