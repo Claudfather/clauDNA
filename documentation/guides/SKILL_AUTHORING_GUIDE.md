@@ -1,3 +1,12 @@
+---
+title: "Skill Authoring Guide"
+type: knowledge
+status: current
+owner: chris
+created: 2026-05-17
+updated: 2026-10-27
+---
+
 # Skill Authoring Guide
 
 How to write, test, and submit a skill for clauDNA. This guide takes you from idea to merged PR.

@@ -26,7 +26,7 @@ links: []
 
 **Prerequisites:**
 - Phase 1 must be merged. The structured-result shape and `/claudna:adversarial-review --dispatch` non-interactive mode are required.
-- Read `documentation/specs/2026-05-17-autonomous-mode-and-orchestration-design.md` §5.3, §5.4, §5.5.1.
+- Read `documentation/archive/2026-05-17-autonomous-mode-and-orchestration-design.md` §5.3, §5.4, §5.5.1.
 
 ---
 
@@ -64,7 +64,7 @@ links: []
 - Read: `skills/_shared/orchestration-guide.md` (Phase 1 just updated it — review the §10.C structured result shape)
 - Read: `skills/adversarial-review/SKILL.md` (Phase 1 added the non-interactive --dispatch section — review its emission contract)
 - Read: `skills/implement-plan/challenge-round-questions.md`
-- Read: `documentation/specs/2026-05-17-autonomous-mode-and-orchestration-design.md` (§5.3, §5.4, §5.5.1)
+- Read: `documentation/archive/2026-05-17-autonomous-mode-and-orchestration-design.md` (§5.3, §5.4, §5.5.1)
 
 - [ ] **Step 1: Read the design spec sections**
 
@@ -1249,7 +1249,7 @@ gh pr create --title "Phase 2: clauDNA discipline chains (adversarial-review + /
   --body "$(cat <<'EOF'
 ## Summary
 
-Implements Phase 2 of the autonomous-mode-and-orchestration design (spec: `documentation/specs/2026-05-17-autonomous-mode-and-orchestration-design.md`).
+Implements Phase 2 of the autonomous-mode-and-orchestration design (spec: `documentation/archive/2026-05-17-autonomous-mode-and-orchestration-design.md`).
 
 - Adds adversarial-review chain at end of every planning skill (6 skills): plans arrive at /implement-plan already stress-tested
 - Adds Step 6.5 simplification pass to /implement-plan: post-verify quality polish via /simplify when diff > threshold

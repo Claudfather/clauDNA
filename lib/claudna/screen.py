@@ -4,7 +4,7 @@ A summary can carry an instruction planted in a transcript back as a "fact".
 Redaction (``claudna.redact``) masks secrets; this masks instructions. It is
 deterministic and deliberately narrow: it flags the shapes an attack takes, not
 every imperative, and it can't catch a well-written lie. Where it runs and why:
-``documentation/plans/2026-10-01-session-store-hardening.md`` §1.
+``documentation/planning/2026-10-01-session-store-hardening.md`` §1.
 """
 
 from __future__ import annotations

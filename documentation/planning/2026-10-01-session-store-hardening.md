@@ -1,3 +1,12 @@
+---
+title: "Session store hardening: an injection screen, and cutting what nobody reads"
+type: plan
+status: active
+owner: chris
+created: 2026-10-01
+updated: 2026-10-27
+---
+
 # Session store hardening: an injection screen, and cutting what nobody reads
 
 **Status:** decided 2026-10-02 (§3). The screen (§1) and cleanup ranks 1–2 (§2) shipped in 0.24.0; rank 3 waits for an envelope major, and the rest was kept or declined for now.

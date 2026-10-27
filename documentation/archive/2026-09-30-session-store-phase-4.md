@@ -1,3 +1,12 @@
+---
+title: "Session store, phase 4: activity — design notes"
+type: plan
+status: completed
+owner: chris
+created: 2026-09-30
+updated: 2026-10-27
+---
+
 # Session store, phase 4: activity — design notes
 
 **Status:** built, 2026-09-30, after phase 3 (#383). The owner's answers are recorded under "Decisions" at the end, and they override the proposals above where the two differ.

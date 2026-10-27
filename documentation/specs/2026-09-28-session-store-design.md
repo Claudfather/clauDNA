@@ -1,7 +1,10 @@
 ---
 title: Session Store — Session-Segmented Capture Design
-date: 2026-09-28
-status: draft
+type: knowledge
+owner: chris
+created: 2026-09-28
+updated: 2026-10-27
+status: current
 authors: [chrisrogers37]
 repos: [claudna, claudron, claudlobby]
 ---
@@ -511,7 +514,7 @@ The consumer does not export a store when there is no record (`no_entrypoint`), 
 9. **Python floor for hooks — shipped with phase 2.** The store runs unchanged on 3.9 (stock macOS), and `lib/CLAUDE.md` names the floor. The `runtime-floor` CI leg runs `make test-runtime` (the store, hook, summarizer, harvest, redact, layout and hook-script suites) on 3.9 with pytest 8.4.2, the last release that supports it. The layout gate falls back to a stdlib list read from the interpreter's own stdlib directory when `sys.stdlib_module_names` (3.10+) is missing, so on the floor leg it judges imports against the floor.
 11. **Hook cost on slow storage — decided 2026-09-30: fsync lifecycle events only.** On an SD card the fsync dominates: a reviewer measured a median of 32 ms, p95 of 154 ms and a worst case of 3.5 s per append on a loaded Raspberry Pi, where interpreter start plus import alone takes ~100 ms. Lifecycle events (opens, seals, close, summary jobs) are a handful per session and fix the byte ranges, so each is fsynced. Activity appends are not fsynced; a crash can lose at most a few tallies, which are derived counters. The SessionEnd hook entry sets an explicit `timeout` of 5 s, since SessionEnd hooks otherwise share a 1.5 s budget. `fsio.append_jsonl` gains a `durable` flag in phase 2, when the first hook is wired.
 10. **Skill contract and `lib/`** — `SKILL_CONTRACT.md` §1.1 and its validator know bundled scripts only as `scripts/<name>`. The first skill text that calls `lib/` (the `/claudna:session` readers, or `redact.py`'s move) extends the contract and the validator together.
-12. **Rule 4's summarizer comparison — decided 2026-10-04: waived (Claudlobby#2145 F15).** The pre-registration (`documentation/plans/2026-09-30-summarizer-comparison-preregistration.md`, #373) is withdrawn; its battery never started, and the digest's rows never reached their consumers (Claudlobby#1456/#1503), so there was no baseline. The store's summarizer is the single owner; coverage of skipped segments is F6's (`--include-skipped`, P3).
+12. **Rule 4's summarizer comparison — decided 2026-10-04: waived (Claudlobby#2145 F15).** The pre-registration (`documentation/archive/2026-09-30-summarizer-comparison-preregistration.md`, #373) is withdrawn; its battery never started, and the digest's rows never reached their consumers (Claudlobby#1456/#1503), so there was no baseline. The store's summarizer is the single owner; coverage of skipped segments is F6's (`--include-skipped`, P3).
 
 ## 12. Phasing
 
@@ -519,8 +522,8 @@ The loop closes first; everything else broadens a loop that already works.
 
 1. **Store core** — `store`, `events`, `project`, schemas + fixtures, `rebuild`. No hooks wired.
 2. **Thin vertical slice** (shipped 2026-09-30) — the minimum that proves the loop end to end: SessionStart / PreCompact / SessionEnd boundaries → segment summary with `journey` + `blocks` → harvest (one capture per block; the plan model waits on Claudron#200) → one draft note written through Claudron (today's `claudron capture` until [Claudron#200](https://github.com/Claudfather/Claudron/issues/200)'s pipes land) → visible in the recall brief's Unverified block. Ugly is fine; closed is required. Includes the liveness line.
-3. **Boundaries, complete** — clear lineage, `chain_id`, child isolation (done early, in #373), unclosed sessions closed as `abandoned` by `session seal <sid>` and a detached `session sweep`. Canaries for §11.3–11.4. Plan: `documentation/plans/2026-09-30-session-store-phase-3.md`.
-4. **Activity** — `prompt.submitted`, `skill.invoked`, `tool.failed`, `tool.interrupted`; `telemetry-emit.sh` migrated into the store (`telemetry.py`). Plan: `documentation/plans/2026-09-30-session-store-phase-4.md`.
-5. **Harvest, complete** — risk tiers, inbox + ambiguous queues, evidence counting, `revert-run`, the promotion digest (`/claudna:capture --review`). **Built, the clauDNA side:** the harvest ledger, evidence counting and the promotion digest. Built on Claudron 0.7's pipes: subject filing, section writes and `revert-run` (the filing slice, §7.2). Still to come: the plan model, risk tiers and the queues. Plan: `documentation/plans/2026-09-30-session-store-phases-5-7.md`.
+3. **Boundaries, complete** — clear lineage, `chain_id`, child isolation (done early, in #373), unclosed sessions closed as `abandoned` by `session seal <sid>` and a detached `session sweep`. Canaries for §11.3–11.4. Plan: `documentation/archive/2026-09-30-session-store-phase-3.md`.
+4. **Activity** — `prompt.submitted`, `skill.invoked`, `tool.failed`, `tool.interrupted`; `telemetry-emit.sh` migrated into the store (`telemetry.py`). Plan: `documentation/archive/2026-09-30-session-store-phase-4.md`.
+5. **Harvest, complete** — risk tiers, inbox + ambiguous queues, evidence counting, `revert-run`, the promotion digest (`/claudna:capture --review`). **Built, the clauDNA side:** the harvest ledger, evidence counting and the promotion digest. Built on Claudron 0.7's pipes: subject filing, section writes and `revert-run` (the filing slice, §7.2). Still to come: the plan model, risk tiers and the queues. Plan: `documentation/archive/2026-09-30-session-store-phases-5-7.md`.
 6. **Readers + export** — `list`, `show`, `timeline`, `failures`; the export envelope and acks; retention sweep. **Built**, with the §6.7 rollup.
 7. **Ops log** — `~/.claudna/runs/` and per-session ops records, mirroring `.claudron/`. **Built:** `runs/runs.jsonl`, one record per background run. Per-session history is the lifecycle log.

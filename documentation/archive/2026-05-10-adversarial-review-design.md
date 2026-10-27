@@ -1,3 +1,12 @@
+---
+title: "Adversarial Review Skill Design"
+type: plan
+status: completed
+owner: chris
+created: 2026-05-10
+updated: 2026-10-27
+---
+
 # Adversarial Review Skill Design
 
 **Date:** 2026-05-10

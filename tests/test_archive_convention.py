@@ -18,7 +18,8 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SKILLS = REPO_ROOT / "skills"
 STANDARD = SKILLS / "_shared" / "documentation-standard.md"
-ARCHIVE = REPO_ROOT / "documentation" / "archive"
+DOCUMENTATION = REPO_ROOT / "documentation"
+ARCHIVE = DOCUMENTATION / "archive"
 CONTRACT = REPO_ROOT / "contracts" / "claudron.json"
 
 
@@ -80,6 +81,25 @@ def test_every_archived_doc_carries_a_terminal_status() -> None:
             unlinked.append(f"{name}: superseded_by {link!r}")
     assert live == [], live
     assert unlinked == [], unlinked
+
+
+def test_every_doc_carries_the_vocabulary() -> None:
+    """Every doc under documentation/ has a type and a canonical status for it (#451).
+
+    A plan lives in planning/ or archive/, where the standard's scans read it: `documentation/plans/` held
+    eight that handoff never saw.
+    """
+    statuses = json.loads(CONTRACT.read_text(encoding="utf-8"))["statuses"]
+    canonical = {kind: set(vocab["canonical"]) for kind, vocab in statuses.items()}
+    off, stray = [], []
+    for md in sorted(DOCUMENTATION.rglob("*.md")):
+        fm, name = frontmatter(md), md.relative_to(DOCUMENTATION)
+        if str(fm.get("status")) not in canonical.get(str(fm.get("type")), set()):
+            off.append(f"{name}: type {fm.get('type')!r}, status {fm.get('status')!r}")
+        if fm.get("type") == "plan" and name.parts[0] not in ("planning", "archive"):
+            stray.append(str(name))
+    assert off == [], off
+    assert stray == [], stray
 
 
 def test_handoff_flags_both_kinds_of_drift() -> None:

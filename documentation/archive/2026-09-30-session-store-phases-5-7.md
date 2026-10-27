@@ -1,3 +1,12 @@
+---
+title: "Session store, phases 5–7: harvest (clauDNA side), readers and export, the ops log — design notes"
+type: plan
+status: completed
+owner: chris
+created: 2026-09-30
+updated: 2026-10-27
+---
+
 # Session store, phases 5–7: harvest (clauDNA side), readers and export, the ops log — design notes
 
 **Status:** built, 2026-09-30, on top of phase 4 (#386).

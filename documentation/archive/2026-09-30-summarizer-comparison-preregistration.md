@@ -1,3 +1,12 @@
+---
+title: "Pre-registration: session-end summarizer comparison"
+type: plan
+status: archived
+owner: chris
+created: 2026-09-30
+updated: 2026-10-27
+---
+
 # Pre-registration: session-end summarizer comparison
 
 **Withdrawn:** 2026-10-04 — Claudlobby#2145 F15; the battery period never started; the digest retires in #2145 P3. Below is the document as ratified and frozen on 2026-09-30; nothing else in it changes.

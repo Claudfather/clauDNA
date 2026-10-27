@@ -1,10 +1,10 @@
 ---
 title: "Shelve per-skill cheap-model subagent delegation"
 type: decision
-status: accepted
+status: ratified
 owner: Chris Rogers
 created: 2026-06-16
-updated: 2026-06-16
+updated: 2026-10-27
 tags: [agents, orchestration, model-tiering, performance, cost, rejected-approach]
 ---
 
