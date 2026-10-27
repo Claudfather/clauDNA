@@ -1,10 +1,10 @@
 ---
 title: "[plan] EPIC: Claudron integration — the vault becomes the knowledge engine"
 type: plan
-status: draft
+status: completed
 owner: chris
 created: 2026-07-07
-updated: 2026-07-07
+updated: 2026-10-27
 tags: [planning, epic, claudron, knowledge-lifecycle]
 repos: clauDNA
 links:

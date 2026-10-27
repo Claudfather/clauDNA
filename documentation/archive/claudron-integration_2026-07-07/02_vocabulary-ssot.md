@@ -1,10 +1,10 @@
 ---
 title: "[plan] P2: vocabulary SSOT — output-guide renders SCHEMA.md, with a drift check and an escape hatch"
 type: plan
-status: draft
+status: completed
 owner: chris
 created: 2026-07-07
-updated: 2026-07-07
+updated: 2026-10-27
 tags: [planning, claudron, schema, output-guide]
 repos: clauDNA
 links:

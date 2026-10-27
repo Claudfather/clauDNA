@@ -47,6 +47,6 @@ Fleet execution is added **externally**, at composition time, by Claudlobby: a c
 ## References
 
 - `skills/ironclad/SKILL.md` — shipped reference implementation (dispatch preamble, mode indicator, subagent-only body)
-- `documentation/planning/2026-06-02-ironclad-migration-claudlobby-to-clauDNA.md` — the migration plan this decision drove (Fork F1, Fork F2; PR #141 rescoping notes)
+- `documentation/archive/2026-06-02-ironclad-migration-claudlobby-to-clauDNA.md` — the migration plan this decision drove (Fork F1, Fork F2; PR #141 rescoping notes)
 - `documentation/archive/2026-06-01-forge-ironclad-plan-hardening-ecosystem.md` — original design that assumed `/ironclad` would stay in Claudlobby; superseded by this decision
 - `PROJECT_MISSION.md` — "No hosted dependencies for the user"

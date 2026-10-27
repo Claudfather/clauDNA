@@ -9,12 +9,17 @@ and `/claudna:session` handoff flags what slipped through.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
+
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SKILLS = REPO_ROOT / "skills"
 STANDARD = SKILLS / "_shared" / "documentation-standard.md"
+ARCHIVE = REPO_ROOT / "documentation" / "archive"
+CONTRACT = REPO_ROOT / "contracts" / "claudron.json"
 
 
 def section(text: str, number: int) -> str:
@@ -45,6 +50,36 @@ def test_section_6_closes_the_frontmatter() -> None:
         assert token in six, token
     # audit, review and person have no `superseded`: the rule must check the type first.
     assert "its type has `superseded`" in six
+
+
+def frontmatter(md: Path) -> dict:
+    """A doc's YAML frontmatter, or {} when it has none."""
+    text = md.read_text(encoding="utf-8")
+    if not text.startswith("---\n"):
+        return {}
+    data = yaml.safe_load(text.split("---\n", 2)[1])
+    return data if isinstance(data, dict) else {}
+
+
+def test_every_archived_doc_carries_a_terminal_status() -> None:
+    """The repo's own archive follows §6 (#444). The terminal sets are Claudron's, from the vendored contract."""
+    statuses = json.loads(CONTRACT.read_text(encoding="utf-8"))["statuses"]
+    terminal = {kind: set(vocab["terminal"]) for kind, vocab in statuses.items()}
+    docs = sorted(ARCHIVE.rglob("*.md"))
+    assert docs, "no doc under documentation/archive/"
+    live, unlinked = [], []
+    for md in docs:
+        fm, name = frontmatter(md), str(md.relative_to(REPO_ROOT))
+        if str(fm.get("status")) not in terminal.get(str(fm.get("type")), set()):
+            live.append(f"{name}: type {fm.get('type')!r}, status {fm.get('status')!r}")
+        # §6 rule 2: a quoted wikilink, since YAML reads a bare [[…]] as a list.
+        link = fm.get("superseded_by")
+        if (link is not None or fm.get("status") == "superseded") and not (
+            isinstance(link, str) and re.fullmatch(r"\[\[[^\[\]]+\]\]", link)
+        ):
+            unlinked.append(f"{name}: superseded_by {link!r}")
+    assert live == [], live
+    assert unlinked == [], unlinked
 
 
 def test_handoff_flags_both_kinds_of_drift() -> None:

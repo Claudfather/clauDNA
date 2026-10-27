@@ -1,10 +1,10 @@
 ---
 title: "[plan] P3: init-project provisions the vault seam — the consumer finally gets a producer"
 type: plan
-status: draft
+status: completed
 owner: chris
 created: 2026-07-07
-updated: 2026-07-07
+updated: 2026-10-27
 tags: [planning, claudron, init-project]
 repos: clauDNA
 links:

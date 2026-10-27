@@ -1,10 +1,10 @@
 ---
 title: "[plan] P5: /remember + /learn prefer the Claudron engine — INDEX scan becomes the frozen fallback"
 type: plan
-status: draft
+status: completed
 owner: chris
 created: 2026-07-07
-updated: 2026-07-07
+updated: 2026-10-27
 tags: [planning, claudron, remember, learn]
 repos: clauDNA
 links:

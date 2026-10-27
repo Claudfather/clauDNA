@@ -1,11 +1,12 @@
 ---
 title: "Build the /forge and /ironclad Plan-Hardening Skill Ecosystem"
 type: plan
-status: ✅ COMPLETE (superseded — see note)
+status: superseded
+superseded_by: "[[Orchestrator-style skills dispatch via subagents, never fleet-specific mechanisms]]"
 owner: alex
 tags: [planning, skills, orchestration, forge, ironclad, claudlobby, clauDNA]
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-10-27
 ---
 
 > **✅ COMPLETE, then superseded (verified 2026-07-06 docs audit).** All four phases' clauDNA-side goals shipped: `/forge` gained `--auto`, all 6 review lenses exist (`skills/{first-principles,align-to-mission,extension-check,precedent-check,plan-health-audit,cost-benefit}/SKILL.md`), and `/ironclad` exists and dispatches them. However, the architecture diverged from this doc's design: `/ironclad` did not stay in claudlobby dispatching over tmux/fleet — a later migration (see companion `2026-06-02-ironclad-migration-claudlobby-to-clauDNA.md`) moved it into clauDNA as a subagent-only skill, and a still-later unification (tracked as epic #155, not covered by any doc in this planning directory) rebuilt both `/forge` and `/ironclad` on a shared "§4.1 Issue/publish substrate" with `--reforge` and `--loops N` — mechanisms this doc doesn't mention. Treat this doc as the **origin story**, not the current architecture; see `skills/forge/SKILL.md` and `skills/ironclad/SKILL.md` directly for what's actually shipped. Strong candidate for archival. Fork F1's lean (lenses in clauDNA, orchestration in claudlobby) was ultimately overtaken — orchestration moved to clauDNA too.
@@ -373,7 +374,7 @@ Verify: findings are accurate, forks lock correctly, convergence detection works
 
 ## Companion Plans
 
-- `documentation/planning/autonomous-mode-and-orchestration_2026-05-17/` — the v0.4 autonomy rollout plan that established the `--auto` contract, structured-result emission, and discipline chains. This plan extends that foundation into the planning phase.
+- `documentation/archive/autonomous-mode-and-orchestration_2026-05-17/` — the v0.4 autonomy rollout plan that established the `--auto` contract, structured-result emission, and discipline chains. This plan extends that foundation into the planning phase.
 
 ## Dependencies
 

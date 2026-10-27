@@ -1,9 +1,10 @@
 ---
 title: Phase 4 — claudlobby autonomous-runner Wrapper
 type: plan
-status: mostly complete (Claudlobby-side); validation deployment pending — Claudlobby#294
+status: completed
 owner: chrisrogers37
 created: 2026-05-17
+updated: 2026-10-27
 tags: [autonomous-mode, phase-4, claudlobby, autonomous-runner, wrapper]
 repos: [Claudlobby]
 links: []
@@ -13,7 +14,7 @@ links: []
 >
 > **Timeline:** clauDNA Phases 1-3 (the prerequisite contract this phase depends on) merged 2026-05-17/18 (`d46699c`, `31accf6`, `765b2c7`). Claudlobby Phase 4 **Part A** (Tasks 1-5, schema layer — [Claudfather/Claudlobby#278](https://github.com/Claudfather/Claudlobby/issues/278)) and **Part B** (Tasks 6-9 + 11, skill body + docs — [Claudfather/Claudlobby#279](https://github.com/Claudfather/Claudlobby/issues/279)) both merged the same day, 2026-05-18 (`d98e7e0`, `a541004`) — within hours of clauDNA Phase 3 landing. **Task 10 (end-to-end validation deployment)** was deliberately descoped into its own tracked issue, **[Claudfather/Claudlobby#294 — "Phase 4 Part C — autonomous-runner validation deployment"](https://github.com/Claudfather/Claudlobby/issues/294), still OPEN** as of this audit. That is the one real gap — this phase is not abandoned or blocked; it shipped fast and the remainder is explicitly tracked.
 >
-> **Not superseded by the later ironclad-migration decision** (ratified 2026-06-03, ~2 weeks after this phase shipped — see `documentation/planning/2026-06-02-ironclad-migration-claudlobby-to-clauDNA.md`). That decision's principle — "clauDNA skills are subagent-only; fleet dispatch is a claudlobby concern injected at composition time" — is exactly what this phase already did: every fleet.yaml/dataclass/composer/telegram concept here lives in Claudlobby, never in clauDNA. This phase and `/ironclad`'s `fleet-dispatch-capability` override are two independent, complementary instances of the same boundary, not competing designs (see Task 10's marker below for how the two mechanisms differ). See per-task markers below for file-level evidence.
+> **Not superseded by the later ironclad-migration decision** (ratified 2026-06-03, ~2 weeks after this phase shipped — see `documentation/archive/2026-06-02-ironclad-migration-claudlobby-to-clauDNA.md`). That decision's principle — "clauDNA skills are subagent-only; fleet dispatch is a claudlobby concern injected at composition time" — is exactly what this phase already did: every fleet.yaml/dataclass/composer/telegram concept here lives in Claudlobby, never in clauDNA. This phase and `/ironclad`'s `fleet-dispatch-capability` override are two independent, complementary instances of the same boundary, not competing designs (see Task 10's marker below for how the two mechanisms differ). See per-task markers below for file-level evidence.
 
 # Phase 4 Implementation Plan — claudlobby `autonomous-runner` wrapper
 
@@ -1580,7 +1581,7 @@ git commit -m "docs(archetypes): add Autonomous Worker bot archetype"
 
 **PENDING** — deliberately descoped into its own open issue: [Claudfather/Claudlobby#294 — "Phase 4 Part C — autonomous-runner validation deployment"](https://github.com/Claudfather/Claudlobby/issues/294), filed 2026-05-18 (same day as Parts A/B merged), still **OPEN** as of this 2026-07-06 audit. Claudlobby's CHANGELOG.md states plainly: "End-to-end validation deployment is deferred to Phase 4 Part C." No `local/<fleet-name>/` overlay and no real (non-`.example`) `fleet.yaml` with an `autonomous_runner` block were found in the current checkout, consistent with this never having run. This is the one genuinely incomplete piece of Phase 4 — not blocked technically (Phases 1-3 prerequisites are met, and the wrapper skill exists), just not yet executed/prioritized.
 
-**Re: the `/ironclad` fleet-override comparison** — `/ironclad`'s `fleet-dispatch-capability` protocol (see `documentation/planning/2026-06-02-ironclad-migration-claudlobby-to-clauDNA.md`) overrides an *existing* clauDNA skill's internal dispatch step at composition time, so the same command (`/ironclad`) behaves differently under a fleet vs. standalone. `autonomous-runner` is a different shape entirely: a wholly new Claudlobby-native skill that *wraps* clauDNA `--auto` skills (invoking them as subagents on a cadence, picking work, classifying risk, reporting to Telegram) — it doesn't override any clauDNA skill's dispatch. Both respect the same boundary (no fleet concepts inside clauDNA), but neither supersedes nor substitutes for the other; they solve different problems.
+**Re: the `/ironclad` fleet-override comparison** — `/ironclad`'s `fleet-dispatch-capability` protocol (see `documentation/archive/2026-06-02-ironclad-migration-claudlobby-to-clauDNA.md`) overrides an *existing* clauDNA skill's internal dispatch step at composition time, so the same command (`/ironclad`) behaves differently under a fleet vs. standalone. `autonomous-runner` is a different shape entirely: a wholly new Claudlobby-native skill that *wraps* clauDNA `--auto` skills (invoking them as subagents on a cadence, picking work, classifying risk, reporting to Telegram) — it doesn't override any clauDNA skill's dispatch. Both respect the same boundary (no fleet concepts inside clauDNA), but neither supersedes nor substitutes for the other; they solve different problems.
 
 **Files:**
 - Possibly create: a local fleet overlay under `local/<fleet-name>/`

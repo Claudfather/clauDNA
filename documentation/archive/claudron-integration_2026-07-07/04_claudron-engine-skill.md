@@ -1,10 +1,10 @@
 ---
 title: "[plan] P4: /claudron engine skill + the engine contract — write|read|status, drafts by default, degrade loudly"
 type: plan
-status: draft
+status: completed
 owner: chris
 created: 2026-07-07
-updated: 2026-07-07
+updated: 2026-10-27
 tags: [planning, claudron, new-skill]
 repos: clauDNA
 links:
