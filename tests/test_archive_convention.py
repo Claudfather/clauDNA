@@ -113,10 +113,25 @@ def test_handoff_flags_both_kinds_of_drift() -> None:
 
 def test_a_session_without_phases_is_never_due() -> None:
     """'Every phase complete' alone is vacuously true of a retro or a decision session."""
+    text = STANDARD.read_text(encoding="utf-8")
+    handoff = (SKILLS / "session" / "handoff.md").read_text(encoding="utf-8")
+    assert "at least one phase" in section(text, 6)
+    assert "at least one phase" in section(text, 8)  # the scan's comment states it too (#448)
+    assert "at least one phase" in handoff
+
+
+def test_a_standalone_plan_doc_has_an_archive_trigger() -> None:
+    """§6 named a trigger for sessions only, though handoff flags a finished standalone doc (#448).
+
+    Both say it must carry `✅ COMPLETE`: "every marker is complete" alone is
+    vacuously true of a doc with no markers, the hole "at least one phase" closes.
+    """
     six = section(STANDARD.read_text(encoding="utf-8"), 6)
     handoff = (SKILLS / "session" / "handoff.md").read_text(encoding="utf-8")
-    assert "at least one phase" in six
-    assert "at least one phase" in handoff
+    assert "a standalone plan doc when it carries `✅ COMPLETE` and no other marker" in six
+    assert "carries `✅ COMPLETE` and neither of the others" in handoff
+    build = (SKILLS / "build" / "SKILL.md").read_text(encoding="utf-8")
+    assert "makes a standalone plan doc due for archiving" in step(build, 7)
 
 
 def test_the_reaper_leaves_the_flags_to_handoff() -> None:
