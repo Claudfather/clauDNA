@@ -104,3 +104,24 @@ def test_the_reaper_leaves_the_flags_to_handoff() -> None:
     reaper = (SKILLS / "_shared" / "reaper-rules.md").read_text(encoding="utf-8")
     assert "Archive (documentation-standard §6):" in reaper
     assert "Set terminal statuses (documentation-standard §6):" in reaper
+
+
+def step(text: str, number: int) -> str:
+    """`### Step <number>:` up to the next `### ` heading."""
+    m = re.search(rf"^### Step {number}:.*?(?=^### )", text, re.M | re.S)
+    assert m, f"Step {number} not found"
+    return m.group(0)
+
+
+def test_the_archive_lands_through_a_pull_request() -> None:
+    """A protected main rejects a direct push (#447), so finished work carries its archive in its final PR."""
+    six = section(STANDARD.read_text(encoding="utf-8"), 6)
+    assert "through a pull request, never a direct push" in six
+    assert "`/claudna:build` archives in Step 7" in six
+    build = (SKILLS / "build" / "SKILL.md").read_text(encoding="utf-8")
+    # Step 7 archives on the PR branch; Step 8 runs after the switch to main, so it never moves docs itself.
+    assert "git mv" in step(build, 7)
+    eight = step(build, 8)
+    assert "git mv" not in eight
+    assert "its own branch and PR" in eight
+    assert "merge the archive PR" in eight

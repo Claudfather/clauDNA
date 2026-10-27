@@ -99,7 +99,7 @@ Every change to `status:` also sets `updated:` to the date. Three more rules:
 
 ## 6. Archive Convention
 
-Archive a session when it has at least one phase (§4), every phase is `✅ COMPLETE` and the final PR has merged, or when it was abandoned or replaced. Every skill that archives follows these steps, whether it moves a session directory or a standalone plan doc:
+Archive a session when it has at least one phase (§4) and every phase is `✅ COMPLETE`, or when it was abandoned or replaced. Every skill that archives follows these steps, whether it moves a session directory or a standalone plan doc:
 
 1. Move it with `git mv`, so its history follows. `git mv` doesn't create `documentation/archive/`, so make it first if it's missing:
 
@@ -121,7 +121,12 @@ Archive a session when it has at least one phase (§4), every phase is `✅ COMP
 
 Commit all three steps together, so no commit leaves a broken link or a live status. Nothing under `documentation/archive/` keeps a live status, because the directory doesn't say a doc is done; its `status:` does.
 
-`/claudna:build` archives in Step 8, and `/claudna:audit repo-health` archives abandoned sessions. `/claudna:session` handoff mode flags sessions due for archiving and archived docs whose `status:` is still live (§8).
+That commit reaches the default branch through a pull request, never a direct push, since the default branch may be protected:
+
+- **Finished work rides its final PR.** Commit the archive on the branch of the PR that completes the session's last phase, or that implements a standalone plan doc, so the work and its archive land together when that PR merges.
+- **Anything else gets its own branch and PR:** an abandoned or replaced session, or a finished one whose final PR merged without the archive.
+
+`/claudna:build` archives in Step 7, on its final PR's branch, and `/claudna:audit repo-health` archives abandoned sessions. `/claudna:session` handoff mode flags sessions due for archiving and archived docs whose `status:` is still live (§8).
 
 ## 7. Non-Planning Directories
 
