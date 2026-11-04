@@ -44,7 +44,7 @@ in_flight_branches:
 
 Legacy files at `~/.claude/notes/projects/<slug>/context-resume.md` use schema_version: 1 (no per-item timestamps; bullets in plain `- text` form; frontmatter with `session_date` only).
 
-When resume mode imports a v1 file, it assigns the file's `session_date` as the timestamp for every imported item, then runs the reaper. Most v1 items will hard-drop on first reap because they exceed TTL (Activity > 7d, etc.) — which is the correct behavior.
+When resume mode imports a v1 file, it preserves the source unchanged and assigns the file's `session_date` as the timestamp for every imported item in the project copy, then runs the reaper on that copy. Most v1 items will hard-drop on first reap because they exceed TTL (Activity > 7d, etc.) — which is the correct behavior. The source remains available; an existing project handoff skips the fallback.
 
 ## Stable surface
 

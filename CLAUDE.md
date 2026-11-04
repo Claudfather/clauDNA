@@ -23,19 +23,24 @@ plugin-hooks/                   → Hook scripts + declarative hook config (rena
   codex-hooks.json              → Codex store + startup wiring; store explicitly selects --host codex
   hooks.json                    → Declarative hook wiring (referenced from .claude-plugin/plugin.json; loaded on plugin enable)
   *.sh                          → Hook scripts referenced from hooks.json via ${CLAUDE_PLUGIN_ROOT}/plugin-hooks/
-project-template/               → Aux: per-project .claude/ setup template (not shipped via plugin)
-shell/                          → Aux: zshrc additions (not shipped via plugin)
-snowflake/                      → Aux: Snowflake connection config template (not shipped via plugin)
+project-template/               → Optional project setup resources; applied manually or by init-project
+shell/                          → Optional shell integration; user installs it manually
+snowflake/                      → Optional SnowSQL connection template; user configures it manually
 contracts/                      → Vendored copy of Claudron's `contract --json` (claudron.json) + the release it came from (claudron.ref); CONTRIBUTING § The Claudron contract
 lib/                            → Runtime Python (stdlib-only; hooks and skills call it). Rules: lib/CLAUDE.md
   claudna/session_store/        → Session store core: event logs, projections, schemas, CLI
 scripts/
   validate-skills.py            → CI-enforced SKILL_CONTRACT validator (walks skills/)
 .claude/                        → Repo-local settings (permission allowlists for working in this repo)
-.cursor/                        → Cursor Cloud Agent environment (not part of the shipped plugin)
+.cursor/                        → Contributor cloud environment; not activated by plugin installation
   environment.json              → Declares the `install` step; no start/services (nothing to serve)
   install.sh                    → Runs `make deps` for the pinned toolchain; see CONTRIBUTING § Cloud Agents
 ```
+
+The maintainer source package includes all tracked files. Presence in that package
+does not register a component or apply user configuration: host manifests control
+discovery, hooks control automatic execution, and the optional setup resources
+above require an explicit setup action. See [SETUP_GUIDE](./SETUP_GUIDE.md#optional-setup-resources).
 
 ## Install Paths
 
@@ -99,4 +104,4 @@ When modifying components inside the plugin tree (`skills/`, `agents/`, `plugin-
 4. Before opening a PR, run `make check` — CI runs the same target (the check-set is defined once, in the `Makefile`) and will block merge on violations.
 5. When bumping for release, update `version` in **all three** `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json` and `.codex-plugin/plugin.json` — `scripts/release.sh` updates all three, and `make check-manifest` fails if they disagree. Without a bump, marketplace users do not receive the update.
 
-When adding or modifying a skill, the binding rules live in [SKILL_CONTRACT.md](./SKILL_CONTRACT.md). The contract is enforced by `scripts/validate-skills.py` and the `validate-skills` GitHub Actions workflow. If you need to relax a rule, update both the contract and the validator together — never one without the other.
+When adding or modifying a skill, the binding rules live in [SKILL_CONTRACT.md](./SKILL_CONTRACT.md). The contract is enforced by `scripts/validate-skills.py` through `make check` in `.github/workflows/ci.yml`. If you need to relax a rule, update both the contract and the validator together — never one without the other.

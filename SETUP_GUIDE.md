@@ -18,6 +18,24 @@ This guide is the deep-dive companion to [README.md](./README.md). The README co
 
 If all you need is "install clauDNA", read the README. Come here when something goes sideways or you want to understand *why* the defaults are what they are.
 
+## Optional setup resources
+
+The source tree and full maintainer package include these resources for real
+setup. Plugin installation does not apply them to your project or user settings.
+They are separate from the skills, agents and hooks selected by each host's
+manifest; a packaged file is not necessarily a discovered or executed component.
+
+| Resource | Purpose | How it takes effect |
+|----------|---------|---------------------|
+| [`project-template/`](./project-template/) | Starter project instructions and `.claude/` settings | Copy and adapt manually; `/claudna:init-project` uses its own generation templates for guided setup |
+| [`shell/zshrc-additions.sh`](./shell/zshrc-additions.sh) | Optional worktree aliases and shell functions | Review and merge into your shell configuration yourself ([§6](#6-shell-configuration)) |
+| [`snowflake/snowsql-config-template`](./snowflake/snowsql-config-template) | SnowSQL connection configuration template | Fill in your connection details and apply to your own SnowSQL configuration ([§5.5](#55-configure-snowsql)) |
+
+The shell integration and SnowSQL template stay in their named root directories.
+The plugin does not source the shell file, configure SnowSQL, or copy project
+templates just because it is enabled. `.cursor/` configures contributor cloud
+environments; `.cursor-plugin/` describes the consumer plugin.
+
 ---
 
 ## Table of Contents
@@ -532,7 +550,7 @@ If you hit `Insufficient privileges to operate on user`, send your admin:
 
 ### 5.5 Configure SnowSQL
 
-Use the template at `snowflake/snowsql-config-template` in this repo as a starting point, then write to `~/.snowsql/config`:
+Use the template at `snowflake/snowsql-config-template` in this repo as a starting point, then apply your completed configuration to `~/.snowsql/config` yourself. Enabling clauDNA does not create or modify this file:
 
 ```ini
 [connections]
@@ -581,7 +599,7 @@ No browser should open. If one does, see [Troubleshooting](#9-troubleshooting).
 
 ## 6. Shell Configuration
 
-claudna ships shell aliases for git worktrees in [`shell/zshrc-additions.sh`](./shell/zshrc-additions.sh). To install:
+clauDNA includes optional shell integration for git worktrees in [`shell/zshrc-additions.sh`](./shell/zshrc-additions.sh). Plugin installation does not source it or modify `~/.zshrc`. Review the file, then merge the functions you want into your own shell configuration. To append the complete file once from a source checkout:
 
 ```bash
 cat shell/zshrc-additions.sh >> ~/.zshrc

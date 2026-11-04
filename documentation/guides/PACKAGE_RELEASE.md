@@ -14,6 +14,12 @@ and release qualification; generating it does not install, publish, promote or
 update a user's plugin. The runtime and pure package export remain stdlib-only.
 Qualification uses the pinned development toolchain in `requirements-dev.txt`.
 
+The export includes contributor tooling and optional setup resources such as
+`project-template/`, `shell/` and `snowflake/`. Packaging those files does not
+register or execute them. Host manifests select plugin components; the
+[setup guide](../../SETUP_GUIDE.md#optional-setup-resources) explains which
+resources a user applies manually.
+
 ## Qualification toolchain
 
 Use Python 3.12, matching the development CI baseline, to create and select a
