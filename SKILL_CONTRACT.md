@@ -136,7 +136,7 @@ The Cursor consumer is `scripts/check_cursor_scope.py` (`make check-manifest`), 
 
 **Claude Code's own manifest is unaffected by either field** — it ships every skill regardless, as it always has. That is a deliberate, conservative scoping choice for #340 (limit the fix to the surface the issue is actually about), not a claim that Claude Code is somehow exempt from what the fields describe: a `requires-context: repo-clone` skill installed via marketplace onto a random project is just as non-functional there as it would be on Cursor. Codex has its own explicit gate below; `cursor_should_exclude()` remains solely Cursor policy.
 
-Codex uses the separate `scripts/check_codex_scope.py` gate: an explicit nonempty list includes all unrestricted skills plus skills whose hosts contain `codex`, excluding repo-clone skills. Cursor's predicate and declared 35-skill set remain unchanged; Claude ships all 39. Codex tool and role semantics live in `skills/_shared/codex-tools.md`.
+Codex uses the separate `scripts/check_codex_scope.py` gate: an explicit nonempty list includes all unrestricted skills plus skills whose hosts contain `codex`, excluding repo-clone skills. Cursor's exclusion predicate is unchanged; Claude discovers the canonical skill set. The [generated support table](documentation/guides/PACKAGE_SUPPORT.md#declared-support) derives current per-host selections and counts. Codex tool and role semantics live in `skills/_shared/codex-tools.md`.
 
 `scripts/skill_checks.py` validates the field *shapes* (`validate_hosts`, `validate_requires_context`) as part of `make check-skills` — unknown values are rejected there, independent of what any one consumer does with them.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# release.sh — bump version, update CHANGELOG, commit, tag.
+# release.sh — bump version, regenerate support, update CHANGELOG, commit, tag.
 #
 # Usage:
 #   ./scripts/release.sh patch          # 0.3.0 → 0.3.1
@@ -21,6 +21,8 @@ PLUGIN_JSON="$REPO_ROOT/.claude-plugin/plugin.json"
 CURSOR_PLUGIN_JSON="$REPO_ROOT/.cursor-plugin/plugin.json"
 CODEX_PLUGIN_JSON="$REPO_ROOT/.codex-plugin/plugin.json"
 VERSIONED_MANIFESTS=("$PLUGIN_JSON" "$CURSOR_PLUGIN_JSON" "$CODEX_PLUGIN_JSON")
+SUPPORT_CATALOG="$REPO_ROOT/lib/claudna/package_support/catalog.json"
+SUPPORT_GUIDE="$REPO_ROOT/documentation/guides/PACKAGE_SUPPORT.md"
 
 # --- Arg parsing ---
 
@@ -128,6 +130,17 @@ if [[ -z "$UNRELEASED_TRIMMED" ]]; then
     exit 1
 fi
 
+# Validate generator inputs and its development dependencies before changing
+# any release files. Suppress bytecode so preflight and dry-run stay read-only.
+if ! command -v python3 &>/dev/null; then
+    echo "error: python3 and the pinned development toolchain are required — run make deps" >&2
+    exit 1
+fi
+if ! PYTHONDONTWRITEBYTECODE=1 python3 "$REPO_ROOT/scripts/generate_package_support.py" --check; then
+    echo "error: package support preflight failed; run make deps, regenerate support, and commit before releasing" >&2
+    exit 1
+fi
+
 # --- Summary ---
 
 RELEASE_DATE="$(date +%Y-%m-%d)"
@@ -149,7 +162,7 @@ echo ""
 
 if [[ "$DRY_RUN" == "true" ]]; then
     echo "[dry-run] would update all three plugin.json manifests (.claude-plugin/," \
-         ".cursor-plugin/, .codex-plugin/), CHANGELOG.md, commit, and tag $TAG"
+         ".cursor-plugin/, .codex-plugin/), regenerate package support, update CHANGELOG.md, commit, and tag $TAG"
     exit 0
 fi
 
@@ -161,6 +174,9 @@ for manifest in "${VERSIONED_MANIFESTS[@]}"; do
     mv "$TMP_PLUGIN" "$manifest"
     echo "updated $manifest → $NEW_VERSION"
 done
+
+# Source hashes and the displayed version must describe the bumped manifests.
+PYTHONDONTWRITEBYTECODE=1 python3 "$REPO_ROOT/scripts/generate_package_support.py"
 
 # --- Update CHANGELOG.md ---
 
@@ -187,7 +203,7 @@ echo "updated $CHANGELOG — moved unreleased entries under [$NEW_VERSION]"
 
 # --- Git commit + tag ---
 
-git -C "$REPO_ROOT" add "${VERSIONED_MANIFESTS[@]}" "$CHANGELOG"
+git -C "$REPO_ROOT" add "${VERSIONED_MANIFESTS[@]}" "$CHANGELOG" "$SUPPORT_CATALOG" "$SUPPORT_GUIDE"
 git -C "$REPO_ROOT" commit -m "release: v$NEW_VERSION"
 git -C "$REPO_ROOT" tag -a "$TAG" -m "Release $TAG"
 

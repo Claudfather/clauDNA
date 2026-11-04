@@ -1,5 +1,9 @@
 # clauDNA Setup Guide
 
+For host-specific scope, install/update/removal, pin/rollback limits and retained
+data, start with the [package support guide](documentation/guides/PACKAGE_SUPPORT.md).
+Its generated catalog derives counts and prerequisites from the package sources.
+
 ## Cross-provider delegation
 
 `/claudna:delegate run` supports Claude-to-Codex and Codex-to-Claude. It requires Python 3.9+, the destination's installed/authenticated native CLI (measured with Codex 0.162.1 and Claude 2.1.304), and the actual parent session recorded by clauDNA. It reuses native account/model/permission policy; no API key is required to install the plugin. Claude uses its native `--permission-prompts none` flag: unanswered permission requests are denied without a permission broker or launcher retry. Denied calls remain visible separately from native completion; parent checks must establish the required result before acceptance. No permission is broadened.
@@ -865,7 +869,8 @@ The clauDNA project template (`project-template/CLAUDE.md`) embeds these princip
 
 ## Codex workflows and continuity
 
-The `Claudfather/claudna` Codex plugin selects 37 engineering skills explicitly,
+The `Claudfather/claudna` Codex plugin selects its engineering skills explicitly
+in the [generated host catalog](documentation/guides/PACKAGE_SUPPORT.md#declared-support),
 plus five store handlers and a startup-only briefing. It excludes Claude-only
 `cleanup-legacy-install` and repo-clone `promotion-intake`/`skill-scaffold`.
 Bundled agent prompts map to a read-and-dispatch procedure. Support requires

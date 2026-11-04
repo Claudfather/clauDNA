@@ -18,9 +18,9 @@
 #                    (CI forwards PR labels via this env var; consumed
 #                    by scripts/skill_checks.py)
 
-.PHONY: routing-eval-codex check deps deps-runtime deps-eval deps-contract test-contract test-contract-floor test-runtime routing-eval check-skills check-integration check-agents check-manifest check-changelog lint test
+.PHONY: routing-eval-codex check deps deps-runtime deps-eval deps-contract test-contract test-contract-floor test-runtime routing-eval check-skills check-integration check-agents check-manifest check-package-support check-changelog lint test
 
-check: routing-eval-codex check-skills check-integration check-agents check-manifest check-changelog lint test
+check: routing-eval-codex check-skills check-integration check-agents check-manifest check-package-support check-changelog lint test
 
 deps:
 	python3 -m pip install -r requirements-dev.txt
@@ -36,6 +36,9 @@ check-agents:
 
 check-manifest:
 	python3 scripts/validate-manifest.py
+
+check-package-support:
+	python3 scripts/generate_package_support.py --check
 
 check-changelog:
 	bash scripts/check-changelog.sh

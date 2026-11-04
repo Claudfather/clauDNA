@@ -18,6 +18,7 @@ if the functions were imported and called in-process.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import subprocess
@@ -423,17 +424,44 @@ def test_codex_inert_component_directory_cannot_grow_content(tmp_path):
 
 def test_release_bumps_all_three_manifests_together(tmp_path):
     root = build_repo(tmp_path)
-    shutil.copy2(REPO_ROOT / "scripts/release.sh", root / "scripts/release.sh")
+    catalog_path = "lib/claudna/package_support/catalog.json"
+    guide_path = "documentation/guides/PACKAGE_SUPPORT.md"
+    for relative in ("scripts/release.sh", "scripts/generate_package_support.py",
+                     "lib/claudna/package_support/host-policy.json", catalog_path, guide_path,
+                     "plugin-hooks/hooks.json"):
+        destination = root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(REPO_ROOT / relative, destination)
     (root / "CHANGELOG.md").write_text("# Changelog\n\n## [Unreleased]\n\n### Added\n- Fixture release.\n")
     for args in (["init", "-q"], ["config", "user.name", "Fixture"],
                  ["config", "user.email", "fixture@example.invalid"], ["add", "."],
                  ["commit", "-qm", "fixture"]):
         subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
+    original_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root)
+    result = subprocess.run(["bash", "scripts/release.sh", "--dry-run", "patch"],
+                            cwd=root, text=True, capture_output=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root) == original_head
+    assert subprocess.check_output(["git", "status", "--porcelain"], cwd=root) == b""
+    assert subprocess.check_output(["git", "tag"], cwd=root) == b""
     result = subprocess.run(["bash", "scripts/release.sh", "patch"], cwd=root, text=True, capture_output=True)
     assert result.returncode == 0, result.stdout + result.stderr
     versions = [json.loads((root / component / "plugin.json").read_text())["version"]
                 for component in (".claude-plugin", ".cursor-plugin", ".codex-plugin")]
     assert len(set(versions)) == 1 and versions[0] != json.loads((REPO_ROOT / CLAUDE).read_text())["version"]
+    # Inspect the release commit itself: generated outputs must travel with the
+    # version bump, and their hashes must bind to the committed inputs.
+    catalog = json.loads(subprocess.check_output(["git", "show", f"HEAD:{catalog_path}"], cwd=root))
+    assert catalog["package_version"] == versions[0]
+    for relative, expected_hash in catalog["sources"].items():
+        committed = subprocess.check_output(["git", "show", f"HEAD:{relative}"], cwd=root)
+        assert hashlib.sha256(committed).hexdigest() == expected_hash, relative
+    guide = subprocess.check_output(["git", "show", f"HEAD:{guide_path}"], cwd=root).decode()
+    assert f"Source package version: **{versions[0]}**" in guide
+    assert subprocess.check_output(["git", "rev-parse", f"v{versions[0]}^{{commit}}"], cwd=root) == (
+        subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root)
+    )
+    assert subprocess.check_output(["git", "status", "--porcelain"], cwd=root) == b""
 
 
 def test_codex_marketplace_uses_native_source_grammar(tmp_path):
