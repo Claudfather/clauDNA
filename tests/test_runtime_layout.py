@@ -52,6 +52,7 @@ SESSION_STORE_LAYERS = {
     "export": 5,
     "unclosed": 5,
     "harvest": 6,
+    "health": 6,
     "host": 5,
     "host_claude": 6,
     "host_codex": 6,

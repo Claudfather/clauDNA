@@ -22,7 +22,7 @@ Guards, in order (each makes the hook record nothing):
 
 After a seal, the adapter starts the summarizer for that segment as a detached
 process (:func:`spawn_summarizer`) and returns at once — unless the summary
-gate is closed for the session (private, headless, a bot, switched off), in
+gate is closed for the session (private, opted out, or historical defaults), in
 which case it records ``summary.skipped`` itself and starts nothing. A ``/clear``
 records its lineage through :mod:`lineage` (spec §4.3). It never prints: SessionStart stdout
 would land in the agent's context.
@@ -92,9 +92,12 @@ def origin_from_cwd(cwd: str) -> dict:
 # ── actions ──────────────────────────────────────────────────────────────────
 
 
-def harvest_choice(env: Mapping[str, str]) -> dict:
-    """This session's own harvest choice, recorded at open: opted in, and the vault it would pick."""
-    return {"enabled": env.get("CLAUDNA_HARVEST") == "1", "vault": env.get("CLAUDRON_VAULT_PATH") or None}
+def harvest_choice(env: Mapping[str, str], previous: SessionFacts | None = None) -> dict:
+    """Default on for new sessions; preserve recorded choices on resume unless explicitly changed."""
+    prior = (previous.harvest or {}) if previous else {}
+    default = bool(prior.get("enabled")) if previous and previous.status != "unknown" else True
+    return {"enabled": env.get("CLAUDNA_HARVEST", "1" if default else "0") != "0",
+            "vault": env.get("CLAUDRON_VAULT_PATH") or prior.get("vault") or None}
 
 
 def write_entrypoint(root: Path, *, agent_cli: str) -> Path:
@@ -139,9 +142,20 @@ def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str],
     if source == "clear":  # spec §4.3: the SessionEnd(clear) before us left a link under our claude's pid
         pid = find_pid()
         parent = lineage.take_link(root, pid, sid=handle.sid) if pid else None
+    prior = _facts(handle)
+    harvest_settings = harvest_choice(env, prior)
+    # Store decisions with their session: harvest/sweep may run under another session's environment.
+    summary = harvest_settings["enabled"]
+    if prior.status != "unknown":
+        summary = prior.summary_enabled if prior.summary_enabled is not None else summary_gate(prior, {}) is None
+    if env.get("CLAUDNA_HARVEST") == "0":
+        summary = False
+    summary = env.get("CLAUDNA_SESSION_SUMMARY", "1" if summary else "0") != "0"
+    prompts = env.get(activity.CAPTURE_PROMPTS_ENV, "0" if prior.capture_prompts is False else "1") != "0"
     handle.open_session(source, actor=host.actor(env),
                         origin=origin_from_cwd(payload.get("cwd") or os.getcwd()),
-                        transcript_path=transcript, claude_pid=host.owner_pid(env), harvest=harvest_choice(env),
+                        transcript_path=transcript, claude_pid=host.owner_pid(env), harvest=harvest_settings,
+                        summary_enabled=summary, capture_prompts=prompts,
                         agent_cli=host.name,
                         parent_sid=parent["sid"] if parent else None,
                         chain_id=parent["chain_id"] if parent else None)
@@ -261,6 +275,10 @@ def _record_activity(handle: SessionHandle, event: str, payload: dict, facts: Se
     raced it) or before its first segment exists. That is expected, not an
     error: nothing is recorded and nothing is logged.
     """
+    if facts.private:
+        return "ignored: private session"
+    if facts.capture_prompts is False:
+        env = {**env, activity.CAPTURE_PROMPTS_ENV: "0"}
     mapped = activity.event_for(event, payload, env)
     if mapped is None:
         return f"ignored: nothing to record for {event}"

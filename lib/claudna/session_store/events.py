@@ -102,7 +102,8 @@ REGISTRY: dict[str, KindSpec] = {
         # agent_cli: the agent CLI that opened the session (Claudlobby#2145 P1). Absent on logs written
         # before 0.27 and read as "claude". Top-level on purpose: actor is additionalProperties: false, so
         # a key nested there would make a 0.23-0.26 reader skip the event.
-        optional={"claude_pid": _OPT_INT, "harvest": _DICT, "agent_cli": _STR},
+        optional={"claude_pid": _OPT_INT, "harvest": _DICT, "agent_cli": _STR,
+                  "summary_enabled": _BOOL, "capture_prompts": _BOOL},
         choices={"source": ("startup", "clear", "resume", "fork"), "agent_cli": AGENT_CLIS},
         constraints={"actor": _SESSION_DEFS["actor_or_null"], "origin": _SESSION_DEFS["origin_or_null"],
                      "claude_pid": {"type": ["integer", "null"], "minimum": 1},
@@ -209,17 +210,19 @@ REGISTRY: dict[str, KindSpec] = {
     "skill.invoked": KindSpec(
         log=ACTIVITY,
         seg=True,
-        fields={"skill": _STR, "args_chars": _INT},
-        optional={"ok": _OPT_BOOL, "duration_ms": _OPT_INT, "prompt_id": _OPT_STR, "tool_use_id": _OPT_STR},
+        fields={"skill": _STR, "args_chars": _OPT_INT},
+        optional={"ok": _OPT_BOOL, "duration_ms": _OPT_INT, "prompt_id": _OPT_STR, "tool_use_id": _OPT_STR,
+                  "observation": _STR, "plugin_version": _OPT_STR, "invocation_id": _STR},
+        choices={"observation": ("agent_procedure_start",)},
         constraints={"args_chars": _NON_NEGATIVE, "duration_ms": _NON_NEGATIVE},
     ),
     "tool.failed": KindSpec(
         log=ACTIVITY,
         seg=True,
         fields={"tool": _STR, "signature": _STR, "exit_code": _OPT_INT},
-        optional={"duration_ms": _OPT_INT, "prompt_id": _OPT_STR, "tool_use_id": _OPT_STR},
+        optional={"duration_ms": _OPT_INT, "prompt_id": _OPT_STR, "tool_use_id": _OPT_STR, "skill": _STR},
         # signature is a normalized, redacted first error line; capped so it can't smuggle stderr in
-        caps={"signature": 200},
+        caps={"signature": 200, "skill": 100},
         constraints={"duration_ms": _NON_NEGATIVE},
     ),
     # The user stopped a tool call (Esc): intent, not a failure, so it never counts as one.

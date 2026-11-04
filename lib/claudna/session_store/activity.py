@@ -6,7 +6,7 @@ it after the usual guards (a child, a nested ``claude``, no open session).
 
 | Hook | Kind |
 |---|---|
-| UserPromptSubmit | ``prompt.submitted``: ``prompt_id``, ``chars``; text only with ``CLAUDNA_CAPTURE_PROMPTS=1`` |
+| UserPromptSubmit | ``prompt.submitted``: ID, length, redacted text (``CLAUDNA_CAPTURE_PROMPTS=0`` opts out) |
 | PostToolUse (``Skill``) | ``skill.invoked``: the skill as called, its real ``ok`` and ``duration_ms`` |
 | PostToolUseFailure | ``tool.failed``, or ``tool.interrupted`` when the user stopped the call (Esc) |
 
@@ -37,6 +37,7 @@ from typing import Callable, Mapping
 from .schema import is_instance
 
 CAPTURE_PROMPTS_ENV = "CLAUDNA_CAPTURE_PROMPTS"
+SKILLS_ENV = "CLAUDNA_SKILL_LOG"
 
 
 @functools.lru_cache(maxsize=None)
@@ -114,12 +115,14 @@ def _prompt(payload: dict, env: Mapping[str, str]) -> tuple[str, dict] | None:
     if not isinstance(prompt, str):
         return None
     data = {"prompt_id": _str(payload.get("prompt_id")), "chars": len(prompt)}
-    if env.get(CAPTURE_PROMPTS_ENV) == "1":
+    if env.get(CAPTURE_PROMPTS_ENV) != "0":
         data["text"] = prompt  # redacted and capped by make_event
     return "prompt.submitted", data
 
 
 def _skill(payload: dict, env: Mapping[str, str]) -> tuple[str, dict] | None:
+    if env.get(SKILLS_ENV) == "0":
+        return None
     data = skill_call(payload)
     return ("skill.invoked", data) if data else None
 
@@ -131,7 +134,9 @@ def _failure(payload: dict, env: Mapping[str, str]) -> tuple[str, dict] | None:
     if payload.get("is_interrupt") is True:
         return "tool.interrupted", {"tool": tool, **_pointers(payload)}
     error = payload.get("error") if isinstance(payload.get("error"), str) else ""
-    return "tool.failed", {"tool": tool, "signature": signature(tool, error), "exit_code": exit_code(error),
+    call = skill_call(payload) if env.get(SKILLS_ENV) != "0" else None
+    extra = {"skill": call["skill"]} if call else {}
+    return "tool.failed", {"tool": tool, "signature": signature(tool, error), "exit_code": exit_code(error), **extra,
                            **_pointers(payload)}
 
 

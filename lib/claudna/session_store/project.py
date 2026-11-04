@@ -178,6 +178,8 @@ class SessionFacts:
     # The first session.opened's; a log written before 0.27 reads as claude. Detached workers
     # (summarizer, harvest, sweep) dispatch on this, never on a hook flag (Claudlobby#2145 P1).
     agent_cli: str = ev.DEFAULT_AGENT_CLI
+    summary_enabled: bool | None = None  # None keeps the pre-default-on policy for historical sessions
+    capture_prompts: bool | None = None
 
 
 def latest_origin(lifecycle: list[dict]) -> dict:
@@ -271,18 +273,18 @@ SUMMARY_ENV = "CLAUDNA_SESSION_SUMMARY"
 def summary_gate(facts: SessionFacts, env) -> str | None:
     """The ``summary.skipped`` reason for a session's segments, or ``None`` to summarize (spec §7.1).
 
-    Phase 2 has one reader of summaries, harvest, so a summary is only paid for
-    when something will read it: an interactive session that opted into
-    harvest (``CLAUDNA_HARVEST=1`` when it opened), or anywhere
-    ``CLAUDNA_SESSION_SUMMARY=1`` asks. Headless ``claude -p`` and Claudlobby
-    bots need ``=1``; ``=0`` turns them off everywhere; a private session is
-    never summarized.
+    New sessions record their default-on choice at open, including headless
+    sessions and bots. A recorded opt-out wins over another worker's environment.
+    Historical sessions without a choice retain the old interactive/harvest gate;
+    upgrading never opts those sessions into paid processing retroactively.
     """
     if facts.private:
         return "private"
     switch = env.get(SUMMARY_ENV)
-    if switch == "0":
+    if switch == "0" or facts.summary_enabled is False:
         return "disabled"
+    if facts.summary_enabled is True:
+        return None
     if switch == "1":
         return None
     if (facts.actor or {}).get("kind") in ("headless", "bot"):
@@ -294,16 +296,20 @@ def summary_gate(facts: SessionFacts, env) -> str | None:
 
 def session_facts(lifecycle: list[dict]) -> SessionFacts:
     actor, private, chain_id, claude_pid, harvest, agent_cli = None, False, None, None, None, None
+    summary_enabled = capture_prompts = None
     for e in lifecycle:
         if e["kind"] == "session.opened":
             actor, chain_id = e["data"]["actor"], chain_id or e["data"]["chain_id"]
             claude_pid, harvest = e["data"].get("claude_pid"), e["data"].get("harvest")
+            summary_enabled = e["data"].get("summary_enabled")
+            capture_prompts = e["data"].get("capture_prompts")
             if agent_cli is None:  # the first session.opened's, like chain_id; a log from before 0.27 names none
                 agent_cli = e["data"].get("agent_cli", ev.DEFAULT_AGENT_CLI)
         elif e["kind"] == "session.privacy_set":
             private = e["data"]["private"]
     return SessionFacts(status=session_status(lifecycle)[0], actor=actor, private=private, chain_id=chain_id,
-                        claude_pid=claude_pid, harvest=harvest, agent_cli=agent_cli or ev.DEFAULT_AGENT_CLI)
+                        claude_pid=claude_pid, harvest=harvest, agent_cli=agent_cli or ev.DEFAULT_AGENT_CLI,
+                        summary_enabled=summary_enabled, capture_prompts=capture_prompts)
 
 
 def next_segment_index(paths: SessionPaths) -> int:

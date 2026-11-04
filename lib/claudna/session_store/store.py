@@ -156,6 +156,26 @@ class SessionHandle:
                     seg = current
             return self._append_locked(kind, data, seg=seg, current=current)
 
+    def record_skill_start(self, data: dict) -> str:
+        """Best-effort Codex procedure entry; never create a session or wait for its lock.
+
+        Privacy/host/status are checked under the same lock as the append. No
+        lifecycle, summary, harvest or transcript operation is started here.
+        """
+        if not self.exists():
+            return "ignored: session unavailable"
+        with exclusive_lock(self.paths.lock, blocking=False) as taken:
+            if not taken:
+                return "ignored: session busy"
+            facts = session_facts(load_lifecycle(self.paths).events)
+            if facts.status != "open" or facts.private or facts.agent_cli != "codex":
+                return "ignored: session closed, private or not codex"
+            index = self.current_segment()
+            if index is None:
+                return "ignored: no segment"
+            self._append_locked("skill.invoked", data, seg=index, current=index)
+        return "recorded: agent procedure start (execution and task outcome unknown)"
+
     def _append_locked(self, kind: str, data: dict, *, seg: int | None, current: int | None = None) -> dict:
         """Append and re-project; the caller holds the session lock.
 
@@ -168,6 +188,8 @@ class SessionHandle:
         """
         event = ev.make_event(kind, self.sid, data, seg=seg)
         if ev.REGISTRY[kind].log == ev.ACTIVITY:
+            if self._current_session().get("private"):
+                raise NotAppendable(f"session {self.sid} is private")
             current = current if current is not None else self.current_segment()
             if seg != current:  # the current segment's directory exists by definition
                 state = "is superseded; its log is frozen" if self.paths.segment(seg).dir.is_dir() else "does not exist"
@@ -216,6 +238,8 @@ class SessionHandle:
         claude_pid: int | None = None,
         harvest: dict | None = None,
         agent_cli: str | None = None,
+        summary_enabled: bool | None = None,
+        capture_prompts: bool | None = None,
     ) -> dict:
         """Record ``session.opened``. A session with no parent is its own chain root.
 
@@ -238,6 +262,10 @@ class SessionHandle:
             data["harvest"] = harvest
         if agent_cli is not None:
             data["agent_cli"] = agent_cli
+        if summary_enabled is not None:
+            data["summary_enabled"] = summary_enabled
+        if capture_prompts is not None:
+            data["capture_prompts"] = capture_prompts
         return self.append("session.opened", data)
 
     def boundary(self, index: int, lifecycle: list[dict] | None = None):

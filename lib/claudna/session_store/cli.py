@@ -338,6 +338,9 @@ def main(argv: list[str] | None = None) -> int:
     rooted = argparse.ArgumentParser(add_help=False)
     rooted.add_argument("--root", help="store root (default: $CLAUDNA_STATE_DIR or ~/.claudna)")
     sub = parser.add_subparsers(dest="verb", required=True)
+    skill = sub.add_parser("skill-start", help="best-effort Codex agent procedure entry; not task success",
+                           parents=[rooted])
+    skill.add_argument("skill", help="selected claudna skill slug; no task arguments")
     for verb, text in (("rebuild", "regenerate projections from logs"),
                        ("check", "validate logs and projections; writes nothing"),
                        ("summarize", "summarize one sealed segment (the detached worker)"),
@@ -398,6 +401,9 @@ def main(argv: list[str] | None = None) -> int:
     rns.add_argument("--since", help=_SINCE_HELP)
     rns.add_argument("--limit", type=int, default=50)
     rns.add_argument("--json", action="store_true")
+    health = sub.add_parser("health", help="read-only pipeline coverage, backlog and review decisions",
+                            parents=[rooted])
+    health.add_argument("--json", action="store_true")
     harv = sub.add_parser("harvest", help="write summarized blocks to the vault as drafts (via claudron)",
                           parents=[rooted])
     harv.add_argument("--force", action="store_true", help="run even if the last run is recent")
@@ -405,6 +411,15 @@ def main(argv: list[str] | None = None) -> int:
     hook.add_argument("--host", default="claude")
     hook.add_argument("event")
     args = parser.parse_args(argv)
+    if args.verb == "skill-start":
+        from .host_codex import record_skill_start
+
+        try:
+            print(record_skill_start(args.skill, os.environ, Path(args.root) if args.root else None))
+        except Exception as exc:  # noqa: BLE001 — logging must not break the skill
+            # A diagnostic without task content, paths or exception payloads.
+            print(f"skill logging unavailable: {type(exc).__name__}", file=sys.stderr)
+        return 0
     if args.verb == "hook":
         run_hook(args.event, sys.stdin.buffer.read(), host=args.host)
         return 0
@@ -434,7 +449,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         env = dict(os.environ)
         # The sweep acts for every session, so no session's summary override applies to the others:
-        # each abandoned session is summarized only by its own recorded opt-in (the #373 B2 rule).
+        # each abandoned session is summarized only by its own recorded policy (the #373 B2 rule).
         own = {k: v for k, v in env.items() if k != SUMMARY_ENV}
         from . import ops
 
@@ -461,6 +476,26 @@ def main(argv: list[str] | None = None) -> int:
                                detail={"closed": len(report["closed"]), "retired": len(retired),
                                        "repaired": len(report["retention"]["repaired"]), "errors": errors[:5]})
         print(json.dumps(report))
+        return 0
+    if args.verb == "health":
+        from .health import report
+
+        store = _store(args)
+        if store is None:
+            return 1
+        found = report(store)
+        if args.json:
+            print(json.dumps(found, indent=2))
+        else:
+            print(f"Pipeline: {found['status']} (retained evidence only)")
+            print(f"Sessions by host: {found['sessions_by_host']}")
+            print(f"Final summaries: {found['final_segment_summaries']}")
+            print(f"Harvest: {found['harvest']}")
+            print(f"Draft reviews: {found['draft_reviews']}")
+            for warning in found["warnings"]:
+                print(f"WARN: {warning}")
+            for limit in found["limits"]:
+                print(f"INFO: {limit}")
         return 0
     if args.verb == "runs":
         store = _store(args)

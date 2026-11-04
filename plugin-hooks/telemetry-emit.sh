@@ -1,24 +1,27 @@
 #!/bin/bash
 # Skill telemetry for Claudosseum (PostToolUse, matcher Skill; async).
 #
-# With CLAUDNA_TELEMETRY=1 (Claudlobby sets it for fleet bots), each claudna:*
+# On by default, each claudna:*
 # Skill call appends one line to
 # ${CLAUDNA_TELEMETRY_PATH:-~/.claude/telemetry/skill-events.jsonl}:
 #   {"ts","bot","type":"skill_invocation","source":"vitals",
 #    "data":{"skill_slug","duration_ms","success","session_id"}}
 # The writer is the session store's telemetry.py (it decodes the Skill payload
 # once, with the same code that records skill.invoked); this script only gates
-# on the opt-in, so telemetry costs nothing when off and works with the session
-# store off. Always exits 0 and prints nothing. A failure (an ImportError
+# on opt-outs, so telemetry costs nothing when off. Explicit CLAUDNA_TELEMETRY=1
+# also works with the session store off. Always exits 0 and prints nothing. A failure (an ImportError
 # included) lands in <telemetry file>.stderr, capped at 1 MiB like the store's
 # own capture: failing open, never silently (lib/CLAUDE.md).
 #
 # Env vars:
-#   CLAUDNA_TELEMETRY       — "1" to enable, anything else disables
+#   CLAUDNA_TELEMETRY       — "0" to disable; defaults on
 #   CLAUDNA_TELEMETRY_PATH  — output file
 #   BOT_NAME                — bot identity (default: "interactive")
 
-[ "${CLAUDNA_TELEMETRY:-0}" = "1" ] || exit 0
+[ "${CLAUDNA_TELEMETRY:-1}" != "0" ] || exit 0
+[ "${CLAUDNA_SESSION_CHILD:-0}" != "1" ] || exit 0
+[ "${CLAUDNA_SKILL_LOG:-1}" != "0" ] || exit 0
+if [ "${CLAUDNA_SESSION_STORE:-1}" = "0" ] && [ "${CLAUDNA_TELEMETRY:-}" != "1" ]; then exit 0; fi
 command -v python3 > /dev/null 2>&1 || exit 0
 umask 077
 OUT="${CLAUDNA_TELEMETRY_PATH:-${HOME:+$HOME/.claude/telemetry/skill-events.jsonl}}"

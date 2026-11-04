@@ -27,6 +27,64 @@ def captured(prefix):
     return json.loads(next(FIXTURES.glob(prefix + "-*.json")).read_text())
 
 
+def test_procedure_entry_is_local_metadata_not_execution_or_outcome(isolated):
+    from claudna.session_store.host_codex import record_skill_start
+    from claudna.session_store.fsio import read_jsonl
+
+    store, path = isolated
+    env = {"CODEX_THREAD_ID": SID, "CLAUDNA_STATE_DIR": str(store.root)}
+    assert "unavailable" in record_skill_start("audit", env)
+    assert not store.root.exists()
+    boundaries.handle("SessionStart", {"session_id": SID, "source": "startup", "transcript_path": str(path)},
+                      store=store, env=env, host=boundaries.HOSTS["codex"])
+    assert record_skill_start("claudna:audit", env).startswith("recorded:")
+    (event,) = read_jsonl(store.session(SID).paths.segment(1).events).records
+    assert event["kind"] == "skill.invoked"
+    data = event["data"]
+    assert data["observation"] == "agent_procedure_start"
+    assert data["skill"] == "claudna:audit"
+    assert data["ok"] is data["duration_ms"] is data["args_chars"] is data["tool_use_id"] is None
+    assert set(data) == {"skill", "args_chars", "ok", "duration_ms", "tool_use_id", "prompt_id",
+                         "observation", "plugin_version", "invocation_id"}
+    assert path.read_bytes() == b""
+
+
+@pytest.mark.parametrize("extra", [
+    {"CLAUDNA_SESSION_STORE": "0"}, {"CLAUDNA_SKILL_LOG": "0"}, {"CLAUDNA_SESSION_CHILD": "1"},
+    {"CODEX_SESSION_ID": "different"},
+])
+def test_procedure_entry_respects_explicit_choices_without_creating_state(tmp_path, extra):
+    from claudna.session_store.host_codex import record_skill_start
+
+    root = tmp_path / "absent"
+    env = {"CODEX_THREAD_ID": SID, "CLAUDNA_STATE_DIR": str(root), **extra}
+    assert record_skill_start("audit", env).startswith("ignored:")
+    assert not root.exists()
+
+
+def test_procedure_entry_skips_busy_private_closed_and_wrong_host(isolated):
+    from claudna.session_store.host_codex import record_skill_start
+    from claudna.session_store.fsio import exclusive_lock
+
+    store, path = isolated
+    env = {"CODEX_THREAD_ID": SID, "CLAUDNA_STATE_DIR": str(store.root)}
+    payload = {"session_id": SID, "source": "startup", "transcript_path": str(path)}
+    boundaries.handle("SessionStart", payload, store=store, env=env, host=boundaries.HOSTS["codex"])
+    handle = store.session(SID)
+    with exclusive_lock(handle.paths.lock):
+        assert record_skill_start("audit", env) == "ignored: session busy"
+    handle.set_private(True)
+    assert "private" in record_skill_start("audit", env)
+    handle.set_private(False)
+    handle.end_session(0, "other")
+    assert "closed" in record_skill_start("audit", env)
+    assert "not selected" in record_skill_start("../../../bad", env)
+    assert "identity" in record_skill_start("audit", {"CLAUDNA_STATE_DIR": str(store.root)})
+    other = {**payload, "session_id": "claude-session"}
+    boundaries.handle("SessionStart", other, store=store, env=env)
+    assert "not codex" in record_skill_start("audit", {**env, "CODEX_THREAD_ID": "claude-session"})
+
+
 @pytest.fixture
 def isolated(monkeypatch, tmp_path):
     monkeypatch.setattr(harvest, "is_due", lambda root, env: False)
@@ -79,6 +137,8 @@ def test_captured_native_envelopes_drive_codex_store(isolated):
         payload = {**captured(prefix), "transcript_path": str(path), "cwd": str(path.parent)}
         assert run_hook(payload["hook_event_name"], json.dumps(payload), env, host="codex").startswith(expected)
     assert session_facts(load_lifecycle(store.session(SID).paths).events).status == "closed"
+    prompt_events = [json.loads(line) for line in store.session(SID).paths.segment(1).events.read_text().splitlines()]
+    assert prompt_events[0]["kind"] == "prompt.submitted" and prompt_events[0]["data"]["text"]
 
 
 def test_codex_owner_is_own_ancestor_not_inherited_claude_pid(isolated, monkeypatch):

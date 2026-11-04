@@ -213,6 +213,23 @@ class TestSummarize:
         assert summarize.summarize(h, 1, env={"CLAUDNA_SESSION_SUMMARY": "1"}, runner=FakeRunner()) \
             == "summarized: 1 block(s)"
 
+    @pytest.mark.parametrize("kind", ["interactive", "headless", "bot"])
+    def test_recorded_default_runs_and_recorded_opt_out_blocks_other_workers(self, store, tmp_path, kind):
+        path = tmp_path / "t.jsonl"
+        write_transcript(path, DIALOGUE)
+        for enabled in (False, True):
+            h = store.session(f"new-{kind}-{enabled}")
+            h.open_session("startup", actor={**ACTOR, "kind": kind}, origin=ORIGIN,
+                           transcript_path=str(path), harvest=OPTED_IN, summary_enabled=enabled)
+            h.open_segment("session_open", 0)
+            h.seal_segment(path.stat().st_size, "session_end")
+            runner = FakeRunner()
+            env = {} if enabled else {"CLAUDNA_SESSION_SUMMARY": "1"}
+            result = summarize.summarize(h, 1, env=env, runner=runner)
+            assert result == ("summarized: 1 block(s)" if enabled else "skipped: disabled")
+            assert bool(runner.calls) is enabled
+            assert h.paths.segment(1).summary.exists() is enabled
+
     def test_a_missing_transcript_and_a_slice_without_user_turns_are_skipped(self, sealed, tmp_path):
         (tmp_path / "t.jsonl").unlink()
         assert summarize.summarize(sealed, 1, env={}, runner=FakeRunner()) == "skipped: no_transcript"

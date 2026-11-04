@@ -1,7 +1,7 @@
 ---
 name: using-claudna
 user-invocable: true
-description: "Use at conversation start to orient in the clauDNA skill set, when unsure which installed skill fits a task, or to verify the installation is healthy — version, hooks, skills loadable, dependencies (Installation Health section). For discovering third-party skills from the public ecosystem, use /claudna:find-skills. Replaces /skill-health."
+description: "Use to verify clauDNA installation is healthy — hooks, skills and capture — or orient at conversation start and choose an installed skill for a task. For discovering third-party skills from the public ecosystem, use /claudna:find-skills. Replaces /skill-health."
 hosts: [claude-code, codex]
 argument-hint: "[health]"
 ---
@@ -17,7 +17,7 @@ The orientation skill: how to find the right installed skill for a task, and how
 ## Finding Skills
 
 1. Resolve the loaded plugin root per `../_shared/claudna-root.md`. Use that installed copy, never a newer cache inferred from the project cwd.
-2. Enumerate the host's declared set: on Codex read `.codex-plugin/plugin.json`'s explicit 36 `skills` paths; on Claude Code enumerate the canonical 39 skill directories. `_shared` is supporting material.
+2. Enumerate the host's declared set: on Codex read `.codex-plugin/plugin.json`'s explicit `skills` paths; on Claude Code enumerate the canonical skill directories. Derive counts from this installation, not a remembered release. `_shared` is supporting material.
 3. Match intent against frontmatter descriptions. Read the complete matching SKILL.md before action. Infra engines carry verbs, `audit` carries lenses, `session` carries modes, and `review-work` carries review modes; preserve arguments.
 4. Nothing fits → use `find-skills` for third-party discovery. On Codex, a new executable procedure belongs in a clauDNA source checkout and its contribution workflow; the repo-clone-only `skill-scaffold` is excluded from this installed catalog. Claude Code can use `/claudna:skill-scaffold` from its required source context.
 
@@ -67,9 +67,11 @@ PASS when every wired entry and referenced script exists; WARN for missing entri
 
 ### 4. Catalog
 
-On Codex, validate each of the 36 declared paths exists, has a matching `name` and a nonempty description. No folder discovery or empty list is acceptable. Exclude `cleanup-legacy-install` (Claude-only), `promotion-intake` and `skill-scaffold` (source-checkout context). If native skill listing is exposed, compare the discovered plugin names against the declared set and report missing/extra names. Local parsing is only static health; do not claim native discovery from it. Agents remain inert prompt files: use the read-and-dispatch mapping only when actual same-host controls exist.
+On Codex, validate each declared path exists, has a matching `name` and a nonempty description. No folder discovery or empty list is acceptable. Exclude `cleanup-legacy-install` (Claude-only), `promotion-intake` and `skill-scaffold` (source-checkout context). If native skill listing is exposed, compare the discovered plugin names against the declared set and report missing/extra names. Local parsing is only static health; do not claim native discovery from it. Agents remain inert prompt files: use the read-and-dispatch mapping only when actual same-host controls exist.
 
-On Claude Code scan all 39 canonical skills: parse frontmatter, match `name` to directory and require a nonempty description. PASS when all parse; WARN for 1–2 failures, listing them; FAIL for 3+ failures or a missing/empty skill directory. Report parsed, failed and discovered counts separately where available.
+On Claude Code scan all canonical skills: parse frontmatter, match `name` to directory and require a nonempty description. PASS when all parse; WARN for 1–2 failures, listing them; FAIL for 3+ failures or a missing/empty skill directory. Report parsed, failed and discovered counts separately where available.
+
+Check for competing copies of the declared names in the host's standalone skill roots (including `~/.agents/skills` on Codex and `~/.claude/skills` on Claude), and project-local roots when relevant. Record the declared name, absolute path, resolved symlink target and content hash; compare with the loaded plugin. Equal names alone establish overlap, not which copy wins. Different bytes may be intentional custom work. Report WARN for ambiguous provenance and keep all copies intact during health. A native read/invocation receipt must identify the selected copy before claiming routing works. Prefer explicit `claudna:` selection where the host exposes it; an update or restart alone does not remove standalone copies.
 
 ### 5. Dependencies
 
@@ -85,11 +87,15 @@ done
 
 PASS when all baseline commands exist; WARN with the missing command names and manual install guidance otherwise. In particular, missing `jq` silently disables the Claude permission hook, so report that consequence. Optional formatters (`prettier`, `ruff`, `sqlfluff`) are informational; auto-format degrades when absent. Skills' own `requires` still apply. Do not install anything during health.
 
+These baseline diagnostics are not a single dependency gate: missing `gh`, `git`, `node` or `npx` does not disable the permission hook. Attribute each missing dependency to the particular workflow that uses it.
+
 ### 6. Telemetry and continuity
 
-On Codex, report Claude Skill telemetry as unsupported by this hook set. Do not read a Claude telemetry file as Codex activity proof. Inspect only the authorized project's `.claude/session.md` when continuity is relevant; it is shared per-cwd compatibility state. Actual packaged startup execution and stdout delivery require a separate native canary; health does not assert them.
+On either supported capture host, run `python3 "<loaded-plugin-root>/lib/claudna/session_store" health --json` against its configured store. Older installed copies may lack this verb: report that version gap rather than silently using the source checkout. The view reads existing lifecycle logs, worker receipts and draft review decisions without writing, starting workers or contacting a provider. Report recorded opt-outs/unknown policy, final summary failures, harvest backlog and proximity to retention, latest worker problems, and the number of explicitly decided draft revisions. `no_evidence` is unknown coverage; `observed` is not a whole-system PASS. An acceptance fraction with no decisions is null, not zero, and cannot rank skill usefulness. Use `runs` for a reported worker problem and `digest` / `/claudna:capture --review` for human review; health itself never promotes or discards drafts. Historical capture choices and retained evidence do not establish the defaults of the currently installed package.
 
-On Claude Code, report opt-in from `CLAUDNA_TELEMETRY` (unset/disabled → INFO). When enabled, resolve `CLAUDNA_TELEMETRY_PATH` if set, else `~/.claude/telemetry/skill-events.jsonl`. Read-only: check the file exists, check writability with `test -w` without writing a probe, and report its size, line count and latest timestamp (parse the last event's timestamp only; never print its full body). PASS when enabled with a writable output file; WARN when the enabled file/directory is missing, unreadable or not writable. Do not create or repair it during health. Do not print raw events or personal paths in a public receipt.
+On Codex, report Claude Skill telemetry as unsupported by this hook set. The shared Codex procedure records local agent procedure entries by default, with `CLAUDNA_SKILL_LOG=0` as opt-out; they prove neither completion nor task success. Report missing identity/store as a capture gap. A trusted `Skill` matcher does not establish native skill capture, and a Claude telemetry file is not Codex activity proof. Inspect only the authorized project's `.claude/session.md` when continuity is relevant; it is shared per-cwd compatibility state. Actual packaged startup execution and stdout delivery require a separate native canary; health does not assert them.
+
+On Claude Code, telemetry defaults on. Report INFO when `CLAUDNA_TELEMETRY=0`, `CLAUDNA_SKILL_LOG=0`, a private session, or a clauDNA child suppresses it; `CLAUDNA_SESSION_STORE=0` also suppresses the default unless `CLAUDNA_TELEMETRY=1` explicitly requests the compatibility file. When enabled, resolve `CLAUDNA_TELEMETRY_PATH` if set, else `~/.claude/telemetry/skill-events.jsonl`. Read-only: check the file exists, check writability with `test -w` without writing a probe, and report its size, line count and latest timestamp (parse the last event's timestamp only; never print its full body). PASS when enabled with a writable output file; INFO when no Skill event has created it yet; WARN when an existing file/directory is unreadable or not writable. Do not create or repair it during health. Do not print raw events or personal paths in a public receipt.
 
 ### Results
 

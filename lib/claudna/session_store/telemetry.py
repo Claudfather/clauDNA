@@ -1,6 +1,6 @@
 """Skill telemetry for Claudosseum: a projection of ``skill.invoked`` (phase 4).
 
-With ``CLAUDNA_TELEMETRY=1`` (a fleet sets it per bot through ``env:``; Claudlobby composes no default), every
+On by default (``CLAUDNA_TELEMETRY=0`` opts out), every
 ``claudna:*`` Skill call appends one line to
 ``${CLAUDNA_TELEMETRY_PATH:-~/.claude/telemetry/skill-events.jsonl}``, in
 Claudosseum's ingestion format::
@@ -9,14 +9,14 @@ Claudosseum's ingestion format::
      "data": {"skill_slug", "duration_ms", "success", "session_id"}}
 
 The shape is the one ``telemetry-emit.sh`` always wrote; that hook now just
-gates on the opt-in and calls ``session_store telemetry``. Three values became
+applies opt-outs and calls ``session_store telemetry``. Three values became
 real (owner decision, 2026-09-30): ``success`` comes from the tool response,
 not a grep of its output for "error"; ``duration_ms`` is the call's duration,
 not ``null``; and ``session_id`` is Claude Code's session id, not the hook
 shell's pid. ``ts`` keeps its second-resolution ``Z`` form.
 
 It has its own entry point, apart from the session store's hook, so it works
-with ``CLAUDNA_SESSION_STORE=0``. The payload is decoded once, by
+with ``CLAUDNA_SESSION_STORE=0`` when ``CLAUDNA_TELEMETRY=1`` explicitly asks. The payload is decoded once, by
 :func:`activity.skill_call`, the same decoder ``skill.invoked`` uses.
 :func:`prune` (30 days) runs at most once a day, from this same async hook, so it works with the store off.
 """
@@ -32,7 +32,8 @@ from pathlib import Path
 from typing import Mapping
 
 from .activity import skill_call
-from .fsio import FILE_MODE, append_jsonl, ensure_dir, exclusive_lock, utc_seconds
+from .fsio import FILE_MODE, append_jsonl, ensure_dir, exclusive_lock, read_jsonl, utc_seconds
+from .paths import CHILD_ENV, SessionPaths, state_root, validate_sid
 
 ENABLE_ENV = "CLAUDNA_TELEMETRY"
 PATH_ENV = "CLAUDNA_TELEMETRY_PATH"
@@ -45,6 +46,13 @@ _SLUG = re.compile(r"^[A-Za-z0-9:_-]+$")
 def telemetry_path(env: Mapping[str, str]) -> Path:
     return Path(env.get(PATH_ENV) or Path(env.get("HOME") or os.path.expanduser("~")) / ".claude" / "telemetry"
                 / "skill-events.jsonl")
+
+
+def enabled(env: Mapping[str, str]) -> bool:
+    """Default on, while preserving store/skill opt-outs and suppressing our own children."""
+    if env.get(CHILD_ENV) == "1" or env.get(ENABLE_ENV) == "0" or env.get("CLAUDNA_SKILL_LOG") == "0":
+        return False
+    return env.get("CLAUDNA_SESSION_STORE") != "0" or env.get(ENABLE_ENV) == "1"
 
 
 def record_for(payload: dict, env: Mapping[str, str], *, now: float | None = None) -> dict | None:
@@ -74,17 +82,36 @@ def record_for(payload: dict, env: Mapping[str, str], *, now: float | None = Non
     }
 
 
-def emit(payload: dict, env: Mapping[str, str]) -> bool:
-    """Append the line for ``payload`` when telemetry is on and it's a claudna skill; return whether it did."""
-    if env.get(ENABLE_ENV) != "1":
-        return False
-    record = record_for(payload, env)
-    if record is None:
-        return False
+def _append_record(record: dict, env: Mapping[str, str]) -> bool:
     path = telemetry_path(env)
     ensure_dir(path.parent)
     append_jsonl(path, record, durable=False)
     return True
+
+
+def emit(payload: dict, env: Mapping[str, str]) -> bool:
+    """Append the line for ``payload`` when telemetry is on and it's a claudna skill; return whether it did."""
+    if not enabled(env):
+        return False
+    record = record_for(payload, env)
+    if record is None:
+        return False
+    sid = record["data"]["session_id"]
+    if sid:
+        # Read only the existing lifecycle; never create a session for this compatibility projection.
+        paths = SessionPaths(state_root(dict(env)), validate_sid(sid))
+        if paths.lifecycle.is_file():
+            with exclusive_lock(paths.lock, blocking=False) as taken:
+                if not taken:
+                    return False
+                private = False
+                for event in read_jsonl(paths.lifecycle).records:
+                    if event.get("kind") == "session.privacy_set":
+                        private = event.get("data", {}).get("private") is True
+                if private:
+                    return False
+                return _append_record(record, env)
+    return _append_record(record, env)
 
 
 def run_hook(raw: bytes | str, env: Mapping[str, str]) -> str:
@@ -94,6 +121,8 @@ def run_hook(raw: bytes | str, env: Mapping[str, str]) -> str:
     ``<telemetry file>.stderr``: failing open never means failing silently.
     """
     try:
+        if not enabled(env):
+            return "ignored"
         if isinstance(raw, bytes):
             raw = raw.decode("utf-8")
         payload = json.loads(raw) if raw.strip() else None

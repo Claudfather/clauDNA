@@ -5,9 +5,9 @@ spawned detached by the hook that sealed the segment. One run:
 
 1. **Gates.** Records ``summary.skipped`` and stops when
    :func:`project.summary_gate` says so — the session is private, summaries
-   are switched off (``CLAUDNA_SESSION_SUMMARY=0``), or, unless
-   ``CLAUDNA_SESSION_SUMMARY=1`` switches them on, it is headless or a bot or
-   didn't opt into harvest when it opened — or when the transcript is gone, or
+   are switched off (``CLAUDNA_SESSION_SUMMARY=0``), or its recorded choice is
+   off. New sessions default on; historical sessions retain their prior gate.
+   It also stops when the transcript is gone, or
    the slice holds no prose.
 2. **Idempotence.** Stops without an event when a ``done`` summary already
    covers the same transcript range with the same prompt version — checked

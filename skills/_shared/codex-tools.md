@@ -4,6 +4,33 @@ Read this before acting on a selected clauDNA skill on Codex, including its nest
 references. Apply the same task, evidence gates and permissions; a familiar tool
 name in an instruction does not create a capability.
 
+## Local skill entry record
+
+When you **begin executing** a selected clauDNA skill's procedure, resolve its
+actual loaded root per `claudna-root.md` and run this once with the canonical slug:
+
+```sh
+python3 "<claudna-root>/lib/claudna/session_store" skill-start <skill-slug>
+```
+
+This is part of the installed workflow, on by default; no separate telemetry
+setup is needed. Do not run it for a mention, discovery, reading for evaluation,
+or resuming the same invocation after compaction. Never fabricate a Skill hook.
+The helper uses the native `CODEX_THREAD_ID` (or `CODEX_SESSION_ID`) and an already
+open Codex session. Missing/conflicting identity, an unavailable store, a private
+session or a busy lock means no record; continue the skill without retries. Never
+guess another session or initialize a replacement store. For an older installed
+copy without this verb, continue and report capture unavailable.
+
+The metadata-only `skill.invoked` record is labeled
+`observation: agent_procedure_start`: an agent reported entering the procedure.
+It is **not** native execution confirmation or task success; those values remain
+unknown. It uses existing segment retention and never enables summaries, prompt
+capture, harvest, or uploads. `CLAUDNA_SKILL_LOG=0` opts out of skill records;
+`CLAUDNA_SESSION_STORE=0` and `CLAUDNA_SESSION_CHILD=1` also suppress them.
+Honor these settings; do not change global configuration. Claude's native Skill
+hook remains its capture route; Cursor remains hook-free and unsupported here.
+
 | Skill wording | Action on the current Codex execution host |
 |---|---|
 | Read / Glob / Grep | Use available file reads and path/text search; prefer `rg`. |

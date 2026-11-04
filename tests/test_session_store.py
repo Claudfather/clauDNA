@@ -593,10 +593,14 @@ class TestProjection:
         old = load(handle.paths.segment(1).segment_json)
         old.update(schema="claudna.segment/1")
         atomic_write_json(handle.paths.segment(1).segment_json, old)
-        report = retention.sweep(store, {})
+        # Exercise migration at the fixture's close, before retention is due.
+        # The wall clock eventually retires its dated segments before this assertion.
+        now = retention.epoch_of(load_lifecycle(handle.paths).events[-1]["ts"])
+        report = retention.sweep(store, {}, now=now)
         assert report.upgraded == [FIXTURE_SID]
+        assert report.retired == []
         assert load(handle.paths.segment(1).segment_json)["schema"] == "claudna.segment/2"
-        assert retention.sweep(store, {}).upgraded == []  # once
+        assert retention.sweep(store, {}, now=now).upgraded == []  # once
 
     def test_a_0_26_session_projection_is_refolded_to_the_current_schema(self, tmp_path):
         """A ``claudna.session/1`` file (0.26, no ``agent_cli``) is folded from the log, never served."""
