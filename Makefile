@@ -18,7 +18,7 @@
 #                    (CI forwards PR labels via this env var; consumed
 #                    by scripts/skill_checks.py)
 
-.PHONY: routing-eval-codex check deps deps-runtime deps-eval deps-contract test-contract test-contract-floor test-runtime routing-eval check-skills check-integration check-agents check-manifest check-package-support check-changelog lint test
+.PHONY: routing-eval-codex check deps deps-runtime deps-eval deps-contract test-contract test-contract-floor test-runtime routing-eval check-skills check-integration check-agents check-manifest check-package-support check-changelog lint test test-package check-release package qualify-package qualify-release tag-release publish-release
 
 check: routing-eval-codex check-skills check-integration check-agents check-manifest check-package-support check-changelog lint test
 
@@ -40,6 +40,29 @@ check-manifest:
 check-package-support:
 	python3 scripts/generate_package_support.py --check
 
+# Explicit refs prevent a dirty checkout or a moving branch from becoming an
+# implicit release input. Outputs must be new directories owned by this run.
+package:
+	@test -n "$(PACKAGE_REF)" && test -n "$(PACKAGE_OUTPUT)" || { echo "PACKAGE_REF and PACKAGE_OUTPUT are required" >&2; exit 2; }
+	python3 scripts/package_release.py --ref "$(PACKAGE_REF)" --output "$(PACKAGE_OUTPUT)"
+
+qualify-package:
+	@test -n "$(PACKAGE_REF)" && test -n "$(PACKAGE_OUTPUT)" || { echo "PACKAGE_REF and PACKAGE_OUTPUT are required" >&2; exit 2; }
+	python3 scripts/package_release.py --ref "$(PACKAGE_REF)" --output "$(PACKAGE_OUTPUT)" --qualify
+
+qualify-release:
+	@test -n "$(RELEASE_REF)" && test -n "$(RELEASE_OUTPUT)" || { echo "RELEASE_REF and RELEASE_OUTPUT are required" >&2; exit 2; }
+	python3 scripts/release_candidate.py --ref "$(RELEASE_REF)" --output "$(RELEASE_OUTPUT)"
+
+tag-release:
+	@test -n "$(RELEASE_REF)" && test -n "$(RELEASE_OUTPUT)" || { echo "RELEASE_REF and RELEASE_OUTPUT are required" >&2; exit 2; }
+	python3 scripts/release_candidate.py --ref "$(RELEASE_REF)" --output "$(RELEASE_OUTPUT)" --tag
+
+RELEASE_REMOTE ?= origin
+publish-release:
+	@test -n "$(RELEASE_REF)" && test -n "$(RELEASE_OUTPUT)" && test -n "$(RELEASE_REPO)" || { echo "RELEASE_REF, RELEASE_OUTPUT and RELEASE_REPO are required" >&2; exit 2; }
+	python3 scripts/release_candidate.py --ref "$(RELEASE_REF)" --output "$(RELEASE_OUTPUT)" --publish --remote "$(RELEASE_REMOTE)" --repo "$(RELEASE_REPO)"
+
 check-changelog:
 	bash scripts/check-changelog.sh
 
@@ -48,6 +71,12 @@ lint:
 
 test:
 	python3 -m pytest tests/
+
+check-release:
+	python3 -m pytest tests/test_release_candidate.py tests/test_changelog.py tests/test_validate_manifest.py
+
+test-package:
+	python3 -m pytest tests/test_package_release.py
 
 # The runtime floor: hooks and the session store run under the user's own
 # python3, which is 3.9 on stock macOS. CI runs these suites on 3.9 too; they

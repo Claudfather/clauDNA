@@ -25,6 +25,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = REPO_ROOT / "scripts" / "validate-manifest.py"
 
@@ -422,8 +424,14 @@ def test_codex_inert_component_directory_cannot_grow_content(tmp_path):
     assert "inert .gitkeep" in output
 
 
-def test_release_bumps_all_three_manifests_together(tmp_path):
+@pytest.mark.parametrize("qualification_passes", [True, False])
+def test_release_bumps_all_three_manifests_together(tmp_path, qualification_passes, maintainer_toolchain):
+    from test_release_candidate import fixture_targets
+
     root = build_repo(tmp_path)
+    fixture_targets(root)
+    if not qualification_passes:
+        (root / "scripts/fixture_check.py").write_text("raise SystemExit('fixture source check failed')\n")
     catalog_path = "lib/claudna/package_support/catalog.json"
     guide_path = "documentation/guides/PACKAGE_SUPPORT.md"
     for relative in ("scripts/release.sh", "scripts/generate_package_support.py",
@@ -438,6 +446,8 @@ def test_release_bumps_all_three_manifests_together(tmp_path):
                  ["commit", "-qm", "fixture"]):
         subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
     original_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root)
+    subprocess.run(["git", "update-ref", "refs/remotes/origin/main", original_head.decode().strip()],
+                   cwd=root, check=True)
     result = subprocess.run(["bash", "scripts/release.sh", "--dry-run", "patch"],
                             cwd=root, text=True, capture_output=True)
     assert result.returncode == 0, result.stdout + result.stderr
@@ -445,7 +455,10 @@ def test_release_bumps_all_three_manifests_together(tmp_path):
     assert subprocess.check_output(["git", "status", "--porcelain"], cwd=root) == b""
     assert subprocess.check_output(["git", "tag"], cwd=root) == b""
     result = subprocess.run(["bash", "scripts/release.sh", "patch"], cwd=root, text=True, capture_output=True)
-    assert result.returncode == 0, result.stdout + result.stderr
+    if qualification_passes:
+        assert result.returncode == 0, result.stdout + result.stderr
+    else:
+        assert result.returncode != 0 and "qualification failed" in result.stderr
     versions = [json.loads((root / component / "plugin.json").read_text())["version"]
                 for component in (".claude-plugin", ".cursor-plugin", ".codex-plugin")]
     assert len(set(versions)) == 1 and versions[0] != json.loads((REPO_ROOT / CLAUDE).read_text())["version"]
@@ -458,9 +471,13 @@ def test_release_bumps_all_three_manifests_together(tmp_path):
         assert hashlib.sha256(committed).hexdigest() == expected_hash, relative
     guide = subprocess.check_output(["git", "show", f"HEAD:{guide_path}"], cwd=root).decode()
     assert f"Source package version: **{versions[0]}**" in guide
-    assert subprocess.check_output(["git", "rev-parse", f"v{versions[0]}^{{commit}}"], cwd=root) == (
-        subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root)
-    )
+    if qualification_passes:
+        assert subprocess.check_output(["git", "rev-parse", f"v{versions[0]}^{{commit}}"], cwd=root) == (
+            subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root)
+        )
+    else:
+        assert subprocess.check_output(["git", "tag"], cwd=root) == b""
+        assert subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root) != original_head
     assert subprocess.check_output(["git", "status", "--porcelain"], cwd=root) == b""
 
 

@@ -41,7 +41,7 @@ Run directory entrypoint with python -S in a fresh export/private HOME/TMP. Asse
 - [x] Deliverables inspected against this plan.
 - [x] Targeted behavioral evidence and fresh isolated checks recorded.
 - [x] Independent simplify/review complete; scope excludes unrelated work.
-- [ ] PR and deploy reachability recorded in RUN_LOG.md.
+- [x] PR and deploy reachability recorded in RUN_LOG.md.
 
 ## What NOT To Do
 No scanning unrelated private caches by default, native host/auth launches, dependency installation, telemetry ledger or unverified native-success claims.

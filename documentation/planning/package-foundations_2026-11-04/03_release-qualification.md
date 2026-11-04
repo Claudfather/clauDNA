@@ -11,7 +11,7 @@ links: [https://github.com/Claudfather/clauDNA/issues/462]
 ---
 # P3: Exact-commit release staging and lifecycle qualification
 
-Status: PENDING
+Status: SOURCE VERIFIED; independent review complete. Publication receipts are tracked in [#462](https://github.com/Claudfather/clauDNA/issues/462); merge and native acceptance remain owner-gated.
 
 ## Summary
 P3: Exact-commit release staging and lifecycle qualification implements one bounded slice of the approved package-foundations workstream.
@@ -40,10 +40,10 @@ Owner-controlled merge, native acceptance and distribution promotion.
 Reproduce identical artifact bytes twice for one ref; dirty working files do not leak. Negative cases reject missing dependencies, path escapes and mismatched version tags. Packaged CLI/hook smoke verifies actual exported code. Fresh make check plus qualification target. Native discovery/trust/update/remove proof is separately queued if unavailable.
 
 ## Verification Checklist
-- [ ] Deliverables inspected against this plan.
-- [ ] Targeted behavioral evidence and fresh isolated checks recorded.
-- [ ] Independent simplify/review complete; scope excludes unrelated work.
-- [ ] PR and deploy reachability recorded in RUN_LOG.md.
+- [x] Deliverables inspected against this plan.
+- [x] Targeted behavioral evidence and fresh isolated checks recorded.
+- [x] Independent simplify/review complete; scope excludes unrelated work.
+- [x] Publication, merge and native reachability recorded in RUN_LOG.md; final PR/head/CI receipts are linked through the tracking issue.
 
 ## What NOT To Do
 No guessed cross-host pin fields, tag rewrites, automatic merge/release, global installation changes, provider network calls or fake native acceptance. Do not turn full source tests into a claim that users received that commit.
