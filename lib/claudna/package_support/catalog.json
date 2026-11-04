@@ -227,7 +227,7 @@
       ]
     }
   },
-  "package_version": "0.34.9",
+  "package_version": "0.34.10",
   "schema": "claudna.package-support/1",
   "skills": {
     "adversarial-review": {
@@ -779,10 +779,10 @@
   "sources": {
     ".agents/plugins/marketplace.json": "b537c39cf727d44c93da3c55892daf382394e163dd26f3aeabcc12d21d36163e",
     ".claude-plugin/marketplace.json": "951282634d5c2369fcd5b1904c45821ac5a0dfcd365377074fd34f706018d6d1",
-    ".claude-plugin/plugin.json": "5c4686f1f1b54d633e07f17ef258b8a25456b2fff45b58916e212e4e0eeb4b0e",
-    ".codex-plugin/plugin.json": "93d5c7883d0a4caea239d5453ef54a0b9baa01f3cc421ec41bc0e6edc6616164",
+    ".claude-plugin/plugin.json": "b94bf14fdd977e2c288e6b45bbaccfc2cd428c74732665ea10a8a42f4ad8a786",
+    ".codex-plugin/plugin.json": "e3c8b9867e21fb14ef3fe3d92ac2893b635ddf38d45d7c7741804b16dfc3dcc4",
     ".cursor-plugin/marketplace.json": "bf37d8df35f18fcdb1d6b677a7ac5551d1873a378603ad649da97a2d3495e852",
-    ".cursor-plugin/plugin.json": "8fed83fdc858948ac57f51162bc75f2c8418b12568435d2a24e6cb1694b15eb2",
+    ".cursor-plugin/plugin.json": "6dc93c5a8ce7d08b56dfb491a104abd8e489ed80808961710796b533fcd94cf9",
     "lib/claudna/package_support/host-policy.json": "6da6b14b449044cb4c98f17b49bcb81f21039b175bd7391d6646d3ba24079e1d",
     "plugin-hooks/codex-hooks.json": "af70a1713baf6285f05418256aab06b074fb8976eaecef2855c00f0c4da66e8c",
     "plugin-hooks/hooks.json": "d64bf123e5c8a8faab67f8f7d2061b7c8a81d94e842d018f921b35a35d961a4e",
@@ -821,7 +821,7 @@
     "skills/ship/SKILL.md": "efb9cedd2de8b5130ad8bb0ecdfc5182d44e027578ffd52d31cb503c190a66dd",
     "skills/skill-scaffold/SKILL.md": "202908b7c463c6eb7e85a9763a8b7c3139ac3bd37f23ddc7597962ae0c207e74",
     "skills/sync-branches/SKILL.md": "ee239925a37a71936497a6043b3c15e605037e9838baa37c319e25953f66aa04",
-    "skills/using-claudna/SKILL.md": "400704f53f8cdb5a6190022170950fb6c4030829da1d96b6f7c58ef5a786141b",
+    "skills/using-claudna/SKILL.md": "d5a0a24952df01a542dcf2235f2ba68d805e06c155d3e8b56b673778883f724b",
     "skills/vercel/SKILL.md": "60c4641a94c521c4975d1c95db6af7a9715cd792aea3d8c887c59a7c361766fb",
     "skills/verify-completion/SKILL.md": "8ead1f37e9e0ee45cd317d75146b632eb94bc5d8f7d56cd5818aaedf1b778226",
     "skills/weigh-development-paths/SKILL.md": "1b687b321e62c9f6b9c19d9b311f33ded0cd6a02a3c800001a1df48f0898141a",

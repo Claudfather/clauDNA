@@ -51,8 +51,8 @@ Each phase uses the build-all in-session decomposition path plus separate simpli
 
 | Phase | Doc | Status | PR | CI |
 |---|---|---|---|---|
-| P1 | 01_support-contract.md | SOURCE VERIFIED; owner-gated merge | creation follows this checkpoint | pending remote run |
-| P2 | 02_package-doctor.md | PENDING | pending | pending |
+| P1 | 01_support-contract.md | owner-gated merge; source verified | [#463](https://github.com/Claudfather/clauDNA/pull/463) | all 9 provider checks succeeded at 874e6f7 |
+| P2 | 02_package-doctor.md | source verified; owner-gated merge | publication next | require provider readback |
 | P3 | 03_release-qualification.md | PENDING | pending | pending |
 
 ## Per-phase entries
@@ -75,8 +75,33 @@ Each phase uses the build-all in-session decomposition path plus separate simpli
 - Scope: generated support data/docs, generator/gate/tests, existing release-helper integration, version 0.34.9 and sprint planning only. Doctor/runtime and exact-ref release machinery remain P2/P3. No skill/hook selection or global installation changes.
 - Reachability: source is not installed. Merging a version bump currently triggers the existing main release workflow; consumers still require native marketplace refresh/update and a fresh session. P3 must land before claiming the new qualification path. Native discovery/trust/execution remains BLOCKED on separate operator acceptance; no native lifecycle command was executed here.
 - Parent carries the actual PR URL/head into the next phase ledger after the initial push, avoiding repeated pushes just to self-reference a PR.
+- P1 published once as PR #463, head `874e6f735a442ab4389d511b68f7180ec6c97785`, base main `51c6be29a4a1a16dcba2cc103e40badaa6bf776f`. Provider readback confirms open/unmerged, expected head/base, saved body and 24-file scope. This is the P2 rebase boundary after a future P1 squash.
+
+### P2 kickoff
+
+- Created `/Users/artemis/Projects/claudna-worktrees/package-doctor`, branch `implement/package-doctor`, from exact P1 head `874e6f735a442ab4389d511b68f7180ec6c97785`; PR will target `implement/package-support-contract`.
+- Real worker `/root/phase2_doctor` owns implementation; parent owns planning/log/shipping. Fresh private baseline export started before worker edits and passed `make check`: 2342 passed, 9 skipped (70.52s), exact candidate P1 head, log `/tmp/claudna-foundations-Tet0Jy/p2-baseline.log`. No baseline failures. Runtime remains stdlib-only/Python 3.9 with no default global store scan.
+- Provider check read for P1 at kickoff: nine checks queued; no CI success claimed.
+- Subsequent exact-head provider read: all nine P1 checks succeeded, including `make check`, Python 3.9, current Claudron contract and four compatibility floors. [CI run](https://github.com/Claudfather/clauDNA/actions/runs/41881559044). This does not establish native marketplace acceptance or publication.
 
 ## Review rounds
+
+### P2 source verification
+
+- Frozen isolated snapshot `4b9870fdfc1ef4a610f89b857413d8e32be529ad`: `make check` exit 0, `2399 passed, 9 skipped in 112.43s`; Python 3.9.6 `make test-runtime` exit 0, `1059 passed in 72.08s`. Logs `/tmp/claudna-foundations-Tet0Jy/p2-full.log` and `p2-floor.log`. No baseline failures carried forward.
+- Direct packaged directory CLI from an unrelated cwd with a hostile `json.py`, private HOME/TMP, restricted PATH and irrelevant source override: `python3 -S -B .../package_support doctor --host codex --json` reported 0.34.10 and exit 0; missing explicit root returned exit 2. Native states remained unknown, default store was not read, and package/private file snapshots were unchanged. Receipt `/tmp/claudna-foundations-Tet0Jy/p2-cli-receipt.json`.
+- Invariants rechecked: Claude 40 / Cursor 35 / Codex 37; all manifest versions 0.34.10; both hook configs byte-identical to 51c6be2; Cursor remains hook-free and excludes using-claudna. Original main still contains only its pre-existing untracked skill-usefulness directory. `git diff --check` passed.
+- Scope: local package doctor, explicit existing-store health aggregation, docs/tests/runtime gates, and version 0.34.10. No native host invocation, authentication, provider work, environment-value output, telemetry store, install or global configuration mutation.
+- Reachability: source only, uninstalled. Merge/release and native refresh/fresh-session acceptance remain distinct owner steps; inherited release automation is not yet P3-qualified.
+
+### P2, round 1
+
+- Early implementation checks exposed three compatibility classes: Claude canonical discovery must not enforce host eligibility; ancillary directories without SKILL.md must not become skills; PATH `python3` presence is not its measured version. Worker swept the changed catalog/runtime branches and corrected each, retaining explicit actual-interpreter evidence.
+- No-write subprocess tests exposed CPython creating `__main__.pyc` before directory-entrypoint code can disable bytecode. All supported doctor invocations and subprocess tests now use `python3 -B`; no deletion or wrapper workaround. Initial failing log `p2-focused-02.log` is retained; final focused checks and full/floor checks passed. The package main also disables subsequent bytecode writes.
+- Independent spec reviewer `/root/p2_spec_review` returned compliant/no findings, inspecting all 15 owned implementation files against the plan and both validated exports. Role hash `27422c452fe226bf12c00a83b5337d0d836697c3e0ec44c1fcb8bec959607185`.
+- Fresh independent reuse `/root/p2_simplify_reuse` and efficiency `/root/p2_simplify_efficiency` reviews completed NO FINDINGS. Reviewers used read-only source/diff inspection and did not execute the reviewed branch.
+- Independent altitude `/root/p2_simplify_altitude` completed NO FINDINGS. Quality reviewer `/root/p2_quality_simplify` completed APPROVE / NO FINDINGS and the separate simplification lens found no unnecessary state/branches/abstractions. Quality role hash `b7d5159100f8bba6e407406e439c743c69cd3154abcb1533759d761a49e0b15d`. All four real same-host fresh reviewers completed; parent collected completion receipts. No simplification edit or rollback needed.
+- Exact remote P1 base refreshed before shipping: `874e6f735a442ab4389d511b68f7180ec6c97785`; remote main remains `51c6be29a4a1a16dcba2cc103e40badaa6bf776f`. Phase-only scope is 15 implementation files plus three parent-owned planning documents. Core CI currently filters PR base main; stacked P2 must be retargeted after rebase before that workflow supplies a verdict.
 
 ### P1, round 1
 
