@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.11] - 2026-11-04
+
 ### Added
+- Exact-commit source packages with reproducible archives, file hashes, a reviewable SHA-pinned Claude marketplace descriptor and isolated packaged lifecycle receipts. Release qualification preflights an isolated development interpreter, checks the candidate before tagging, binds both Git and publication-repository tags, and preserves existing release assets. Native marketplace acceptance and promotion remain separate operator steps.
 - A read-only Python 3.9+ package doctor with stable text/JSON diagnostics for package consistency, host selection and workflow prerequisites. It defaults to its loaded package, never executes PATH tools, and reads existing pipeline health only with an explicit store root. Native discovery/trust/execution and unprobed binary versions remain unknown.
 - A source-bound package support catalog and generated host/skill table, derived from the existing manifests and validated skill frontmatter. `make check-package-support` checks drift without writing; runtime consumers need no YAML dependency. Host selection and hook configuration are unchanged.
 - Consumer installation, update, pin/rollback limits, removal, retained-data and privacy guidance for Claude Code, Cursor and Codex, with native certification explicitly separate from declared packaging.

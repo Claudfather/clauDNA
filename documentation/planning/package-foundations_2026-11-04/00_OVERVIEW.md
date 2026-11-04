@@ -15,6 +15,8 @@ links: [https://github.com/Claudfather/clauDNA/issues/462]
 
 Implement the owner-approved comparison of Superpowers and gstack in three ordered, reviewable PRs. Preserve native marketplace installation, canonical skill scope and the existing local session store.
 
+Source implementation and independent reviews are complete for all three phases. Merge, release and native acceptance remain owner-gated. The [sprint ledger](RUN_LOG.md) records validation and merge boundaries; [tracking issue #462](https://github.com/Claudfather/clauDNA/issues/462) carries the final publication and exact-head CI receipts.
+
 ## Evidence
 
 Baseline: 51c6be29a4a1a16dcba2cc103e40badaa6bf776f (0.34.8). Existing manifests select Claude 40, Cursor 35 and Codex 37 skills; Cursor has no hooks. The health skill and pipeline health already exist. CONTRIBUTING still carries stale catalog counts. Release tagging does not require an existing tag to point to the candidate.
@@ -40,9 +42,9 @@ All three scoped implementations have independently reviewed PRs, fresh isolated
 Fresh isolated exports with private HOME/TMP, pinned Python 3.12 tooling, targeted regressions, make check and Python 3.9 runtime qualification where available. Keep baseline failures separate. Media: none (CLI/package work).
 
 ## Verification Checklist
-- [ ] Three phase PRs reviewed and checked.
-- [ ] Final invariants recorded in RUN_LOG.md.
-- [ ] Native acceptance and release/promotion queue complete.
+- [x] Three phase implementations independently reviewed and checked.
+- [x] Final invariants recorded in RUN_LOG.md.
+- [x] Native acceptance and release/promotion owner queue recorded; acceptance itself remains pending.
 
 ## What NOT To Do
 No global auth/settings/cache edits, new skills, extra analytics or runtime dependencies, automatic updates, new hooks, unsupported manifest fields, default branch pushes, merges or live release publication.

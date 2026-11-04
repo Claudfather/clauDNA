@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -11,6 +13,43 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
 
 from claudna.session_store.store import SessionStore  # noqa: E402
+
+RUNNER_PYTHON = sys.executable
+
+
+@pytest.fixture(scope="session")
+def _offline_maintainer_python(tmp_path_factory):
+    """Provision qualification tests offline from this runner's installed sites.
+
+    Ordinary `make deps` may use the user site. Production qualification must
+    still reject ambient-only dependencies, so these tests deliberately provision
+    a private venv with an explicit .pth to existing site roots already on the
+    runner's path. This includes site roots exposed by an existing .pth, without
+    adding arbitrary project/PYTHONPATH directories. No install, network, copied
+    package tree or production preflight override is involved. Negative tests
+    continue to create separate empty virtual environments without this .pth.
+    """
+    directory = tmp_path_factory.mktemp("offline-maintainer")
+    roots = list(dict.fromkeys(str(Path(entry).resolve()) for entry in sys.path if entry
+                              and Path(entry).name in ("site-packages", "dist-packages") and Path(entry).is_dir()))
+    assert roots, "the test runner must have an installed development toolchain"
+    subprocess.run([RUNNER_PYTHON, "-I", "-B", "-m", "venv", "--without-pip", str(directory)], check=True)
+    interpreter = directory / "bin/python3"
+    site = Path(subprocess.check_output(
+        [str(interpreter), "-I", "-B", "-c", "import site; print(site.getsitepackages()[0])"], text=True).strip())
+    (site / "installed-test-toolchain.pth").write_text("\n".join(roots) + "\n")
+    subprocess.run([str(interpreter), "-I", "-B", "-c", "import yaml; import ruff; import pytest"], check=True)
+    return interpreter
+
+
+@pytest.fixture
+def maintainer_toolchain(_offline_maintainer_python, monkeypatch):
+    """Run real qualification with an explicitly provisioned isolated interpreter."""
+    monkeypatch.setattr(sys, "executable", str(_offline_maintainer_python))
+    monkeypatch.setenv("PATH", str(_offline_maintainer_python.parent) + os.pathsep + os.environ["PATH"])
+    monkeypatch.setenv("PYTHONNOUSERSITE", "1")
+    return _offline_maintainer_python
+
 
 ACTOR = {"kind": "interactive", "fleet": None, "bot_id": None, "bot_name": None, "model": None, "entrypoint": "cli"}
 ORIGIN = {"cwd": "/work", "repo": None, "branch": None, "head": None}

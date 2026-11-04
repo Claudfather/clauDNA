@@ -9,6 +9,8 @@ updated: 2026-11-04
 
 # Package support and lifecycle
 
+For maintainers, the [package release guide](PACKAGE_RELEASE.md) covers exact-commit artifacts, qualification receipts and the separate native acceptance procedure.
+
 clauDNA is a marketplace plugin, with no server to start. The table below is a
 projection of the package manifests and skill frontmatter. Selection means the
 package declares a skill; it does not prove native discovery, execution or task
@@ -81,7 +83,7 @@ stale while another process changes package or store files.
 
 <!-- BEGIN GENERATED PACKAGE SUPPORT -->
 
-Source package version: **0.34.10**. Generated declarations; native certification is **unknown**.
+Source package version: **0.34.11**. Generated declarations; native certification is **unknown**.
 
 | Host | Selected skills | Agent policy | Declared hook handlers | Baseline checks |
 |---|---:|---|---|---|
