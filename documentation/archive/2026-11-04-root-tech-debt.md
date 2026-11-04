@@ -1,7 +1,7 @@
 ---
 title: "Root structure and maintenance cleanup"
 type: plan
-status: active
+status: completed
 owner: claudna
 created: 2026-11-04
 updated: 2026-11-04
@@ -9,7 +9,8 @@ updated: 2026-11-04
 
 # Root structure and maintenance cleanup
 
-IN PROGRESS — Started 2026-11-04. Implements the approved root audit, including
+✅ COMPLETE — Implementation verified 2026-11-04; this record lands with its
+final PR, which remains unmerged until owner review. Implements the approved root audit, including
 the correction that `shell/` and `snowflake/` are optional setup resources, not
 examples. One follow-up PR; no installation, release, merge or global settings change.
 
@@ -103,4 +104,17 @@ merge. The PR is left unmerged for review.
   root after checking tracked paths. The foreign untracked skill-usefulness
   planning directory remains untouched.
 - Media: none; source, command, test and procedure evidence fit these changes.
-- Independent final reviews and PR publication pending.
+- Independent spec review (`/root/cleanup_spec_review`) closed the parser and
+  main-push findings on final reviewed export `5acb34fe`. Installed spec role
+  SHA-256: `27422c452fe226bf12c00a83b5337d0d836697c3e0ec44c1fcb8bec959607185`.
+- Quality review (`/root/cleanup_quality`) found one minor routing-eval path-filter
+  dependency after discovery moved. Added the new module to that filter; the
+  dependency sweep also updated `.gitignore`'s owner pointer. Existing test-copy
+  dependency lists already contain both extracted modules. Installed quality
+  role SHA-256: `b7d5159100f8bba6e407406e439c743c69cd3154abcb1533759d761a49e0b15d`.
+- All four independent simplification lenses completed through desktop spawn and
+  completed-return controls: `/root/cleanup_reuse`, `/root/cleanup_simplification`,
+  `/root/cleanup_quality` (efficiency), `/root/cleanup_altitude`. No simplification
+  edits were recommended; the quality dependency correction is a separate commit.
+- Final owned scope: this cleanup alone above PR #465. The PR remains unmerged;
+  no plugin installation, publication, version bump or global configuration edit.

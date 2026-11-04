@@ -17,7 +17,7 @@ __pycache__/
 # Python virtual environments. CONTRIBUTING.md's `make deps` is a bare
 # `pip install`, which PEP 668 hosts (Debian, Homebrew) refuse outright, so the
 # standard remedy is a venv in the repo root. Ignored here; the repo-walking
-# gates prune it separately (scripts/skill_checks.py::is_virtualenv), since a
+# gates prune it separately (scripts/skill_discovery.py::is_virtualenv), since a
 # gitignore entry is invisible to them.
 .venv/
 venv/
