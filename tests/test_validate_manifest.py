@@ -41,10 +41,10 @@ def build_repo(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     (root / "scripts").mkdir(parents=True)
     shutil.copy2(SCRIPT, root / "scripts" / "validate-manifest.py")
-    # validate-manifest.py imports check_cursor_scope, which imports
-    # skill_checks (#340) -- both travel with it so the subprocess's
-    # top-level import resolves.
-    for module in ("check_cursor_scope.py", "check_codex_scope.py", "plugin_scope.py", "skill_checks.py"):
+    # Include the scope checks and their discovery/parsing dependencies so the
+    # staged subprocess resolves the same modules as the real manifest gate.
+    for module in ("check_cursor_scope.py", "check_codex_scope.py", "plugin_scope.py",
+                   "skill_checks.py", "skill_discovery.py", "skill_frontmatter.py"):
         shutil.copy2(REPO_ROOT / "scripts" / module, root / "scripts" / module)
 
     for manifest_dir in (".claude-plugin", ".cursor-plugin"):
@@ -367,11 +367,10 @@ def test_cursor_manifest_shipping_a_restricted_skill_is_rejected(tmp_path):
     issuecomment-5883111726). If validate-manifest.py's call to
     run_cursor_scope_check were removed, or its errors were printed instead
     of passed to error(), this is the only test in the suite that would
-    notice: make check still catches manifest drift through
+    notice: make check also catches manifest drift through
     test_cursor_scope.py's test_real_repo_passes_clean, which calls run_check
-    directly, but the standalone `validate-manifest.yml` workflow runs only
-    this script as a subprocess, with no such backstop -- and that gap is
-    exactly what let a restricted skill ship to Cursor in the first place.
+    directly. Direct `make check-manifest` and staged package validation must
+    still reject a restricted skill without relying on the pytest backstop.
     """
     root, marked = build_repo_with_restricted_skill(tmp_path)
     code, output = run_gate(root)

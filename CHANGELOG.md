@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Session resume now preserves legacy personal handoffs during both automatic and interactive imports. Timestamp conversion and reaping apply only to the project copy; existing project handoffs skip the fallback.
+
+### Changed
+- Unified CI owns skill and manifest validation on pull requests and main pushes; retired duplicate workflows and their unpinned dependency installation.
+- Separated skill discovery and frontmatter parsing from validation policy, preserving existing imports and parser error behavior.
+- Clarified packaged versus manually applied setup resources while keeping the shell integration, SnowSQL template and project templates in place. Moved the D2 placement ledger from active planning to a living guide.
+
 ## [0.34.11] - 2026-11-04
 
 ### Added

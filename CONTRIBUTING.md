@@ -41,6 +41,13 @@ Every check-set target invokes its tool as `python3 -m <tool>` rather than by ba
 
 Release qualification deliberately uses a private HOME and excludes user-site packages. For that maintainer workflow, install the same pinned dependencies in a Python 3.12 virtual environment as described in the [package release guide](documentation/guides/PACKAGE_RELEASE.md). Qualification preflights the selected interpreter; `release.sh` performs that check before changing files or committing a version bump. Ordinary `make check` retains its user-install support.
 
+The unified CI workflow runs the check-set on pull requests (including stacked
+branches) and pushes to `main`. Add validation commands to Makefile targets, not
+standalone validation workflows; all use `requirements-dev.txt`.
+Main pushes set `FULL_VALIDATE=1`, so an empty diff against `origin/main` cannot
+demote skill errors to warnings. PRs retain touched-skill scoping and the
+`full-validate` label override.
+
 ### Cloud Agents
 
 [`.cursor/environment.json`](./.cursor/environment.json) makes the repo ready to work in from the first prompt in a [Cursor Cloud Agent](https://cursor.com/docs/cloud-agent/setup). It declares one `install` step — [`.cursor/install.sh`](./.cursor/install.sh), which runs `make deps` — so an agent boots with the same pinned toolchain CI uses. The requirements list is not duplicated there; the toolchain stays defined once, in `requirements-dev.txt`.

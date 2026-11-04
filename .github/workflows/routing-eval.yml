@@ -17,6 +17,7 @@ on:
       - "tests/fixtures/routing-matrix.yaml"
       - "scripts/routing_eval.py"
       - "scripts/skill_checks.py"
+      - "scripts/skill_discovery.py"
       - "lib/**"
       - "Makefile"
       - ".github/workflows/routing-eval.yml"

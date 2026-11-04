@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from skill_checks import SKIP_DIRS
+from skill_discovery import SKIP_DIRS
 
 
 def declared_skills(plugin_dir: Path) -> tuple[set[str] | None, bool, str]:

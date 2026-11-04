@@ -2,6 +2,8 @@ name: CI
 
 on:
   pull_request:
+  push:
+    branches: [main]
 
 jobs:
   check:
@@ -26,6 +28,8 @@ jobs:
         run: make check
         env:
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          # A main push has no PR diff: origin/main can already equal HEAD.
+          FULL_VALIDATE: ${{ github.event_name == 'push' && '1' || '' }}
 
   package-macos:
     name: packaged lifecycle on macOS

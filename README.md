@@ -216,11 +216,11 @@ The marketplace install is managed by Claude Code: plugins live under `~/.claude
 
 **Never touched by claudna:**
 - `~/.claude/settings.json` — user-managed. claudna never writes here. Recommended snippets are documented in SETUP_GUIDE for you to merge manually.
-- `~/.claude/notes/` — your personal files. claudna never writes here; the session engine's resume mode reads legacy `notes/projects/<slug>/context-resume.md` handoffs as a one-shot migration fallback.
+- `~/.claude/notes/` — your personal files. claudna never writes here; the session engine's resume mode can copy a legacy `notes/projects/<slug>/context-resume.md` handoff into a project with no handoff yet. It preserves the source unchanged, and subsequent resumes use the project copy.
 
 ## Project Template
 
-`project-template/` provides a starter `.claude/` directory for individual projects. It's not shipped via the plugin — copy it manually or use `/claudna:init-project`:
+`project-template/` provides starter project instructions and `.claude/` settings. These are packaged setup resources; enabling the plugin does not apply them to your project. Copy them manually or use `/claudna:init-project`:
 
 | File | Purpose |
 |------|---------|
