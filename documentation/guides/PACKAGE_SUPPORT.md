@@ -15,11 +15,73 @@ package declares a skill; it does not prove native discovery, execution or task
 success on any particular host/version. Native certification remains unknown
 until a separate acceptance receipt identifies the host, version and package bytes.
 
+## Local package doctor
+
+Use the absolute root of the package that the host actually loaded. The directory
+entrypoint works with Python 3.9+ and its standard library, including `python3 -S -B`,
+from any working directory (including paths with spaces):
+
+```sh
+python3 -B "/absolute/loaded/package/lib/claudna/package_support" doctor --host codex --json
+python3 -B "/absolute/loaded/package/lib/claudna/package_support" doctor --host cursor --skill capture
+```
+
+Keep `-B` to suppress CPython's entrypoint bytecode cache, which can be written
+before the doctor's own no-bytecode setting runs. `--host` is required:
+`claude-code`, `cursor` or `codex`. `--skill` checks only that
+manifest-selected workflow's declared prerequisites. Cursor can call this CLI
+directly; its excluded `using-claudna` skill remains excluded. `--root` selects an
+explicit alternate package to inspect; without it the root comes from the loaded
+doctor code, never cwd, environment overrides or a cache search. An older package
+without this entrypoint needs the supported update workflow, not a doctor borrowed
+silently from another checkout.
+
+The doctor validates the generated JSON schema, its source inventory and hashes,
+manifest membership, declared hook paths and required bundled files. It does not
+parse YAML at runtime. Hashes establish consistency with the generator's recorded
+sources, not publisher authenticity or a signature. Missing/stale/malformed
+metadata, missing files, traversal and symlinked metadata fail diagnosis.
+
+Dependency checks inspect PATH presence and environment-variable presence only.
+Values, resolved executable paths, parser input and raw errors are not printed.
+No PATH command is launched, so a found versioned binary remains **unknown** until
+separately checked. `runtime.python` measures the running interpreter; a different
+`python3` on PATH is only presence-checked. Missing baseline commands affect their
+consumers, not all workflows. In particular, absent `jq` disables the Claude
+permission hook. Native installed/discovered, trusted and executed states remain
+separate unknowns.
+
+Text and `--json` share the following exit contract. JSON schema
+`claudna.package-doctor/1` includes `package_version`, `host`, `skill`, `status`,
+`exit_code`, stable `checks` rows (`id`, `status`, `summary`), `pipeline_health`
+and `limits`. Row statuses are `pass`, `warn`, `fail` and `unknown`; unknown alone
+does not make the exit nonzero.
+
+| Exit | Report status | Meaning |
+|---:|---|---|
+| 0 | `observed` | No concrete local issue found; unknowns still require separate evidence. |
+| 1 | `attention` | A scoped dependency/runtime issue or pipeline evidence needs attention. |
+| 2 | `invalid` | The request or package cannot be diagnosed; do not treat partial checks as acceptance. |
+
+By default no store or other user cache is scanned. To include retained pipeline
+evidence, select its root explicitly:
+
+```sh
+python3 -B "/absolute/loaded/package/lib/claudna/package_support" doctor --host codex --store-root "/absolute/selected/store" --json
+```
+
+This reuses `session_store.health.report`; it adds no records, workers or ledger.
+An absent store stays absent and reports `no_evidence`, not healthy coverage.
+Private-session content is excluded by that existing health boundary. Neither
+mode writes bytecode, repairs files, installs dependencies, probes a provider,
+launches a native host nor changes auth/trust/settings. The snapshot can become
+stale while another process changes package or store files.
+
 ## Declared support
 
 <!-- BEGIN GENERATED PACKAGE SUPPORT -->
 
-Source package version: **0.34.9**. Generated declarations; native certification is **unknown**.
+Source package version: **0.34.10**. Generated declarations; native certification is **unknown**.
 
 | Host | Selected skills | Agent policy | Declared hook handlers | Baseline checks |
 |---|---:|---|---|---|

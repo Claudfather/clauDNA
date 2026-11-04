@@ -1,6 +1,6 @@
 # clauDNA
 
-Curated skills, agents, and hooks for shipping software — codebase audits, plan review, build workflows, and infrastructure operations. Packaged for **Claude Code** (via the `Claudfather` marketplace), **Cursor**, and **Codex**. See the [generated support table and lifecycle guide](documentation/guides/PACKAGE_SUPPORT.md) for each host's selected skills, prerequisites, update/removal paths and evidence limits.
+Curated skills, agents, and hooks for shipping software — codebase audits, plan review, build workflows, and infrastructure operations. Packaged for **Claude Code** (via the `Claudfather` marketplace), **Cursor**, and **Codex**. See the [generated support table and lifecycle guide](documentation/guides/PACKAGE_SUPPORT.md) for each host's selected skills, prerequisites, update/removal paths and evidence limits. The [local package doctor](documentation/guides/PACKAGE_SUPPORT.md#local-package-doctor) checks the loaded package without launching tools or changing settings.
 
 ## Quick Start
 
@@ -19,7 +19,7 @@ That's it. Skills become available as `/claudna:<skill-name>` (namespaced under 
 
 ### Cursor
 
-The Cursor manifest is [`.cursor-plugin/plugin.json`](./.cursor-plugin/plugin.json). It ships `skills/` (minus a few host-/context-restricted skills, #340) and `agents/`, and **deliberately no hooks** — the shell hooks in `plugin-hooks/` are wired only from `.claude-plugin/plugin.json`, so nothing from this pack fires in a Cursor-based environment. Skills appear under *Agent Decides* and are invocable as `/<skill-name>` in chat.
+The Cursor manifest is [`.cursor-plugin/plugin.json`](./.cursor-plugin/plugin.json). It ships `skills/` (minus a few host-/context-restricted skills, #340) and `agents/`, and **deliberately no hooks**. The shell hooks in `plugin-hooks/` are wired through the respective Claude Code and Codex manifests; Cursor remains hook-free. Skills appear under *Agent Decides* and are invocable as `/<skill-name>` in chat.
 
 Three install paths, depending on what you have:
 

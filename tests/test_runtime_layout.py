@@ -61,6 +61,8 @@ SESSION_STORE_LAYERS = {
     "__main__": 9,
 }
 
+PACKAGE_SUPPORT_LAYERS = {"catalog": 0, "doctor": 1, "__main__": 2}
+
 
 def lib_modules() -> list[Path]:
     return sorted(p for p in (LIB / PACKAGE).rglob("*.py") if "__pycache__" not in p.parts)
@@ -166,6 +168,20 @@ def test_session_store_imports_only_lower_layers(path):
             f"{path.name}:{line} imports {target} (layer {SESSION_STORE_LAYERS[target]}) "
             f"from layer {rank} — imports must point strictly downward"
         )
+
+
+@pytest.mark.parametrize(
+    "path", sorted((LIB / PACKAGE / "package_support").glob("*.py")), ids=lambda p: p.stem
+)
+def test_package_support_imports_only_lower_layers(path):
+    assert path.stem in PACKAGE_SUPPORT_LAYERS or path.stem == "__init__"
+    rank = PACKAGE_SUPPORT_LAYERS.get(path.stem, -1)
+    for name, line in imports_of(path.read_text(), dotted(path)):
+        if name.startswith("claudna.package_support."):
+            target = name.split(".")[2]
+            assert PACKAGE_SUPPORT_LAYERS[target] < rank, f"{path.name}:{line} imports upward"
+        if name.startswith("claudna.session_store."):
+            assert path.stem == "doctor" and name.split(".")[2] in {"health", "store"}
 
 
 @pytest.mark.parametrize("path", lib_modules(), ids=lambda p: dotted(p))

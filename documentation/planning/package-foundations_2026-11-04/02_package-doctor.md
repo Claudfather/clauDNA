@@ -11,7 +11,7 @@ links: [https://github.com/Claudfather/clauDNA/issues/462]
 ---
 # P2: Read-only package doctor
 
-Status: PENDING
+Status: SOURCE VERIFIED; owner-gated merge and native acceptance, PR publication recorded in RUN_LOG.md.
 
 ## Summary
 P2: Read-only package doctor implements one bounded slice of the approved package-foundations workstream.
@@ -38,9 +38,9 @@ P3.
 Run directory entrypoint with python -S in a fresh export/private HOME/TMP. Assert no package/state writes, JSON exit-status contract and failure diagnostics. Run focused tests, runtime structural gates and make check.
 
 ## Verification Checklist
-- [ ] Deliverables inspected against this plan.
-- [ ] Targeted behavioral evidence and fresh isolated checks recorded.
-- [ ] Independent simplify/review complete; scope excludes unrelated work.
+- [x] Deliverables inspected against this plan.
+- [x] Targeted behavioral evidence and fresh isolated checks recorded.
+- [x] Independent simplify/review complete; scope excludes unrelated work.
 - [ ] PR and deploy reachability recorded in RUN_LOG.md.
 
 ## What NOT To Do

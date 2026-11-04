@@ -41,7 +41,7 @@ Generator --check must detect modified frontmatter and manifest selection withou
 - [x] Deliverables inspected against this plan.
 - [x] Targeted behavioral evidence and fresh isolated checks recorded.
 - [x] Independent simplify/review complete; scope excludes unrelated work.
-- [ ] PR and deploy reachability recorded in RUN_LOG.md.
+- [x] PR and deploy reachability recorded in RUN_LOG.md.
 
 ## What NOT To Do
 No duplicate YAML parser, new runtime dependency, expanded host scope, or new skill. Do not infer installed/native support from generated metadata.

@@ -25,7 +25,23 @@ Newly installed names may require a catalog refresh or session restart on the ex
 
 ## Installation Health
 
-Read-only diagnostics: inspect local installation first; optional remote update checks must be bounded and degrade loudly when unavailable. Do not install dependencies, modify trust or launch agents. Report the observed duration rather than promising every environment finishes in five seconds.
+Read-only diagnostics: inspect the loaded local package first. Do not install dependencies, modify trust or launch agents. Report the observed duration rather than promising every environment finishes in five seconds.
+
+### Package doctor (default)
+
+Resolve the actual loaded root per `../_shared/claudna-root.md`, then run the bundled directory entrypoint with the current host explicitly selected:
+
+```sh
+python3 -B "<claudna-root>/lib/claudna/package_support" doctor --host codex --json
+```
+
+Use `--host claude-code` on Claude Code. Add `--skill <canonical-name>` only for the selected workflow's prerequisites. The root defaults to the loaded package, never cwd or a guessed cache. An absent entrypoint on an older package is a version gap; do not borrow another checkout's doctor. Report the package version, check rows and limits. Exit 0 means no concrete local issue observed (unknowns remain unknown), 1 means attention, and 2 means invalid request or package diagnosis. Source hashes establish consistency, not authenticity. Found versioned PATH binaries remain version-unverified; the doctor never launches them. Missing baseline tools affect only their consumers.
+
+The default does not scan other caches, standalone skills, telemetry or the session store. To include retained pipeline evidence, the operator must select an explicit store root; add `--store-root /absolute/selected/store`. This calls the existing read-only health report without creating a store, records or workers. Never infer installed/discovered, trusted or executed from a declared manifest.
+
+The following sections are targeted follow-ups when the user requests that evidence, not extra default scans. Cursor can use the direct CLI with `--host cursor`; this skill remains excluded from Cursor's manifest. See [package support](../../documentation/guides/PACKAGE_SUPPORT.md#local-package-doctor) for the full command and output contract.
+
+Keep `-B`: CPython otherwise may write an entrypoint bytecode cache before the doctor starts.
 
 ### 1. Locate and identify the installation
 
@@ -33,7 +49,7 @@ Resolve the actual loaded root per `../_shared/claudna-root.md`, verifying the h
 
 ### 2. Version
 
-Report the installed version. If `gh` is available and a bounded read is permitted, run `gh release view --repo Claudfather/clauDNA --json tagName` with a three-second subprocess timeout. Compare versions semantically. Offline/timeout → INFO with installed version, not a claim of latest release. Updating remains a separate authorized action.
+Report the installed version. Only for a requested remote update check, if `gh` is available and a bounded read is permitted, run `gh release view --repo Claudfather/clauDNA --json tagName` with a three-second subprocess timeout. Compare versions semantically. Offline/timeout → INFO with installed version, not a claim of latest release. Updating remains a separate authorized action.
 
 ### 3. Hook declaration, trust and observation
 
