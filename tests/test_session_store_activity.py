@@ -4,7 +4,7 @@ in boundaries.py and cli.py) — session store phase 4.
 What these guard:
 
 * **One event per hook, mapped from the canaried payloads.** ``prompt.submitted``
-  carries ``chars`` and no text unless ``CLAUDNA_CAPTURE_PROMPTS=1``;
+  carries ``chars`` and redacted text unless ``CLAUDNA_CAPTURE_PROMPTS=0``;
   ``skill.invoked`` carries the real ``ok`` and ``duration_ms``; a failure is
   ``tool.failed`` with an exit code and a normalized, redacted signature, and
   an interrupt is ``tool.interrupted``, never a failure.
@@ -71,13 +71,13 @@ class TestFrozenLayer:
 
 
 class TestEventFor:
-    def test_a_prompt_is_counted_not_copied(self):
+    def test_a_prompt_is_captured_by_default(self):
         kind, data = activity.event_for("UserPromptSubmit", {"prompt": "fix the bug", "prompt_id": "p1"}, {})
-        assert (kind, data) == ("prompt.submitted", {"prompt_id": "p1", "chars": 11})
+        assert (kind, data) == ("prompt.submitted", {"prompt_id": "p1", "chars": 11, "text": "fix the bug"})
 
-    def test_prompt_text_only_with_the_opt_in(self):
-        _, data = activity.event_for("UserPromptSubmit", {"prompt": "hi"}, {activity.CAPTURE_PROMPTS_ENV: "1"})
-        assert data["text"] == "hi" and data["prompt_id"] is None
+    def test_prompt_text_has_an_explicit_opt_out(self):
+        _, data = activity.event_for("UserPromptSubmit", {"prompt": "hi"}, {activity.CAPTURE_PROMPTS_ENV: "0"})
+        assert data == {"prompt_id": None, "chars": 2}
 
     def test_a_skill_call_carries_its_real_outcome(self):
         kind, data = activity.event_for("PostToolUse", SKILL_CALL, {})
@@ -96,6 +96,13 @@ class TestEventFor:
         assert data == {"tool": "Bash", "signature": "Bash: ls: cannot access <str>: No such file or directory",
                         "exit_code": 2, "duration_ms": 414, "prompt_id": "p1", "tool_use_id": "toolu_1"}
         assert "command" not in data and "error" not in data
+
+    def test_skill_opt_out_and_failed_skill_attribution(self):
+        assert activity.event_for("PostToolUse", SKILL_CALL, {"CLAUDNA_SKILL_LOG": "0"}) is None
+        kind, data = activity.event_for("PostToolUseFailure", {**SKILL_CALL, "error": "not available"}, {})
+        assert kind == "tool.failed" and data["skill"] == "claudna:recall"
+        _, opted_out = activity.event_for("PostToolUseFailure", SKILL_CALL, {"CLAUDNA_SKILL_LOG": "0"})
+        assert "skill" not in opted_out
 
     def test_an_interrupt_is_not_a_failure(self):
         kind, data = activity.event_for("PostToolUseFailure", {**BASH_FAILURE, "is_interrupt": True}, {})
@@ -167,10 +174,18 @@ class TestAdapter:
 
     def test_prompt_text_is_redacted_when_captured(self, store, tmp_path):
         self.open(store, tmp_path)
-        fire(store, "UserPromptSubmit", "s1", tmp_path, env={**CLI_ENV, activity.CAPTURE_PROMPTS_ENV: "1"},
+        fire(store, "UserPromptSubmit", "s1", tmp_path, env=CLI_ENV,
              prompt=f"use {FAKE_TOKEN}", prompt_id="p1")
         (e,) = events(store, "s1")
         assert "aB3aB3" not in e["data"]["text"] and "[REDACTED]" in e["data"]["text"]
+
+    def test_prompt_opt_out_persists_and_private_sessions_capture_no_activity(self, store, tmp_path):
+        self.open(store, tmp_path, env={**CLI_ENV, activity.CAPTURE_PROMPTS_ENV: "0"})
+        fire(store, "UserPromptSubmit", "s1", tmp_path, prompt="sensitive")
+        assert "text" not in events(store, "s1")[0]["data"]
+        store.session("s1").set_private(True)
+        assert fire(store, "UserPromptSubmit", "s1", tmp_path, prompt="private") == "ignored: private session"
+        assert len(events(store, "s1")) == 1
 
     def test_activity_after_session_end_records_nothing_and_logs_nothing(self, store, tmp_path):
         self.open(store, tmp_path)
@@ -216,7 +231,31 @@ class TestTelemetry:
     def test_only_claudna_skills_only_when_enabled(self, tmp_path):
         other = {**SKILL_CALL, "tool_input": {"skill": "canary:hello"}}
         assert not telemetry.emit(other, self.env(tmp_path))
-        assert not telemetry.emit(SKILL_CALL, {"CLAUDNA_TELEMETRY_PATH": str(tmp_path / "t.jsonl")})
+        assert not telemetry.emit(SKILL_CALL, self.env(tmp_path, CLAUDNA_TELEMETRY="0"))
+        assert self.lines(tmp_path) == []
+
+    def test_default_on_respects_existing_capture_opt_outs(self, tmp_path):
+        env = {"CLAUDNA_TELEMETRY_PATH": str(tmp_path / "t.jsonl")}
+        assert telemetry.emit(SKILL_CALL, env)
+        for switch in ("CLAUDNA_SESSION_STORE", "CLAUDNA_SKILL_LOG", "CLAUDNA_TELEMETRY"):
+            assert not telemetry.emit(SKILL_CALL, {**env, switch: "0"})
+        assert not telemetry.emit(SKILL_CALL, {**env, "CLAUDNA_SESSION_CHILD": "1"})
+        assert len(self.lines(tmp_path)) == 1
+
+    def test_private_session_suppresses_the_compatibility_projection(self, store, tmp_path):
+        from conftest import ACTOR, ORIGIN
+        from claudna.session_store.fsio import exclusive_lock
+
+        handle = store.session("s-private")
+        handle.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path=None)
+        handle.set_private(True)
+        assert not telemetry.emit({**SKILL_CALL, "session_id": handle.sid},
+                                  self.env(tmp_path, CLAUDNA_STATE_DIR=str(store.root)))
+        assert self.lines(tmp_path) == []
+        handle.set_private(False)
+        with exclusive_lock(handle.paths.lock):
+            assert not telemetry.emit({**SKILL_CALL, "session_id": handle.sid},
+                                      self.env(tmp_path, CLAUDNA_STATE_DIR=str(store.root)))
         assert self.lines(tmp_path) == []
 
     def test_the_bot_defaults_to_interactive(self, tmp_path):

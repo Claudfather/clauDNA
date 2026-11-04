@@ -350,7 +350,7 @@ class TestScheduling:
         with exclusive_lock(store.root / "harvest" / "lock", blocking=False):
             assert harvest.harvest(store, env=ON, capture=FakeCapture()).reason == "another harvest is running"
         assert harvest.harvest(store, env={"CLAUDNA_HARVEST": "0"}, capture=FakeCapture()).reason == "disabled"
-        assert harvest.harvest(store, env={}, capture=FakeCapture()).reason == "disabled"  # opt-in
+        assert harvest.harvest(store, env={}, capture=FakeCapture()).status == "ok"  # default on
 
     def test_is_due_needs_claudron_and_an_old_last_run(self, store, tmp_path):
         fake = tmp_path / "bin" / "claudron"

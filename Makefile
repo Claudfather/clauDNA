@@ -55,6 +55,7 @@ RUNTIME_TESTS = tests/test_delegation.py tests/test_session_store.py tests/test_
 	tests/test_session_store_activity.py tests/test_session_store_readers.py \
 	tests/test_session_store_export.py tests/test_session_store_digest.py \
 	tests/test_session_store_ops.py \
+	tests/test_session_store_health.py \
 	tests/test_redact.py tests/test_screen.py tests/test_runtime_layout.py tests/test_precompact_defer.py \
 	tests/test_session_start_hook.py
 

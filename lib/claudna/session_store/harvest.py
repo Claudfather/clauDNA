@@ -80,14 +80,14 @@ run_claudron_capture = claudron.capture  #: the default capture (tests replace i
 
 
 def _skip_reason(root: Path, env: Mapping[str, str], now: float) -> str | None:
-    """Why a harvest shouldn't run now, or ``None``: the opt-in, then the debounce.
+    """Why a harvest shouldn't run now, or ``None``: the opt-out, then the debounce.
 
-    Harvest is opt-in (``CLAUDNA_HARVEST=1``) until Claudron's own recall keeps
-    drafts apart (Claudron#200). A run that found nothing to take debounces
+    Harvest defaults on; ``CLAUDNA_HARVEST=0`` disables it. Each session's
+    recorded choice still controls eligibility. A run that found nothing to take debounces
     for :data:`IDLE_INTERVAL_H` only, so an early empty run can't hold off the
     first real one for the whole interval.
     """
-    if env.get(ENABLE_ENV) != "1":
+    if env.get(ENABLE_ENV) == "0":
         return "disabled"
     try:
         interval_h = float(env.get(INTERVAL_ENV) or DEFAULT_INTERVAL_H)
@@ -319,7 +319,7 @@ def harvest(store: SessionStore, *, env: Mapping[str, str] = os.environ,
     capture = capture or run_claudron_capture
     resummarize = resummarize or _resummarize
     report = RunReport(started_epoch=time.time())
-    if env.get(ENABLE_ENV) != "1" and not force:
+    if env.get(ENABLE_ENV) == "0" and not force:
         report.status, report.reason = "skipped", "disabled"
         return report
     home = ensure_dir(store.root / "harvest")

@@ -171,7 +171,7 @@ class TestBoundaries:
         fire(store, "SessionEnd", transcript, reason="other")
         assert spawned == [(SID, 1), (SID, 2)]
 
-    @pytest.mark.parametrize("env,reason", [({"CLAUDE_CODE_ENTRYPOINT": "sdk-cli"}, "headless"),
+    @pytest.mark.parametrize("env,reason", [({"CLAUDE_CODE_ENTRYPOINT": "sdk-cli", "CLAUDNA_HARVEST": "0"}, "disabled"),
                                             ({**CLI_ENV, "CLAUDNA_SESSION_SUMMARY": "0"}, "disabled")])
     def test_a_closed_summary_gate_is_recorded_by_the_hook_and_spawns_nothing(self, store, transcript, spawned,
                                                                              env, reason):
@@ -626,12 +626,38 @@ class TestSpend:
     def test_the_interactive_entrypoints(self, entrypoint):
         assert boundaries.actor_from_env({"CLAUDE_CODE_ENTRYPOINT": entrypoint})["kind"] == "interactive"
 
-    def test_no_reader_no_summary(self, store, transcript, spawned):
-        env = {"CLAUDE_CODE_ENTRYPOINT": "cli"}  # harvest not opted in, summaries not asked for
+    @pytest.mark.parametrize("entrypoint", ["cli", "sdk-cli", "claude-in-slack"])
+    def test_new_sessions_summarize_without_an_opt_in(self, store, transcript, spawned, entrypoint):
+        env = {"CLAUDE_CODE_ENTRYPOINT": entrypoint}
         fire(store, "SessionStart", transcript, env=env, source="startup")
         fire(store, "SessionEnd", transcript, env=env, reason="other")
-        last = json.loads(store.session(SID).paths.lifecycle.read_text().splitlines()[-1])
-        assert spawned == [] and (last["kind"], last["data"]["reason"]) == ("summary.skipped", "disabled")
+        assert spawned == [(SID, 1)]
+        opened = json.loads(store.session(SID).paths.lifecycle.read_text().splitlines()[0])["data"]
+        assert opened["harvest"]["enabled"] and opened["summary_enabled"] and opened["capture_prompts"]
+
+    def test_recorded_opt_out_survives_resume_and_another_workers_environment(self, store, transcript, spawned):
+        from claudna.session_store.project import session_facts, load_lifecycle, summary_gate
+
+        env = {"CLAUDNA_HARVEST": "0", "CLAUDNA_SESSION_SUMMARY": "0", "CLAUDNA_CAPTURE_PROMPTS": "0"}
+        fire(store, "SessionStart", transcript, env=env, source="startup")
+        fire(store, "SessionEnd", transcript, env={}, reason="other")
+        fire(store, "SessionStart", transcript, env={}, source="resume")
+        facts = session_facts(load_lifecycle(store.session(SID).paths).events)
+        assert facts.harvest["enabled"] is False and facts.capture_prompts is False
+        assert summary_gate(facts, {"CLAUDNA_SESSION_SUMMARY": "1"}) == "disabled"
+        assert spawned == []
+
+    def test_upgrade_and_resume_does_not_opt_a_historical_session_in(self, store, transcript, spawned):
+        from conftest import ACTOR, ORIGIN
+        from claudna.session_store.project import session_facts, load_lifecycle
+
+        handle = store.session(SID)
+        handle.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path=str(transcript),
+                            harvest={"enabled": False, "vault": None})
+        handle.open_segment("session_open", 0)
+        fire(store, "SessionStart", transcript, env={}, source="resume")
+        facts = session_facts(load_lifecycle(handle.paths).events)
+        assert facts.harvest["enabled"] is False and facts.summary_enabled is False and spawned == []
 
     def test_a_failed_spawn_still_closes_the_session_and_is_recorded(self, store, transcript, monkeypatch):
         def broken(handle, index, env):
