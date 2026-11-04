@@ -2,7 +2,7 @@
 
 ## What this project is
 
-clauDNA is the canonical set of skills, hooks, and agents for Claude Code, distributed as a marketplace plugin; another agent host receives the surfaces its plugin model can carry, each by an approval-gated decision — Cursor: skills and agents, no hooks (#315); Codex: 36 selected engineering skills, session-store and startup hooks, and bundled role prompts dispatched only through supported same-host controls (#404; no native agent registration). Install it and any Claude Code instance gains a curated set of well-tested capabilities.
+clauDNA is the canonical set of skills, hooks, and agents for Claude Code, distributed as a marketplace plugin; another agent host receives the surfaces its plugin model can carry, each by an approval-gated decision — Cursor: skills and agents, no hooks (#315); Codex: manifest-selected engineering skills, session-store and startup hooks, and bundled role prompts dispatched only through supported same-host controls (#404; no native agent registration). The [generated support table](documentation/guides/PACKAGE_SUPPORT.md#declared-support) derives current per-host selections and counts. Install it and any Claude Code instance gains a curated set of well-tested capabilities.
 
 It's the "genome" of the Claudfather ecosystem — what every bot inherits at startup. Skills here are procedural (how to do X), not referential (what we know about X). Reference knowledge lives in Claudron, evaluation happens in Claudosseum, runtime is Claudlobby. clauDNA's job is just: ship the canonical capabilities, predictably, with version discipline.
 

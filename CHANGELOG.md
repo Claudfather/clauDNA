@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- A source-bound package support catalog and generated host/skill table, derived from the existing manifests and validated skill frontmatter. `make check-package-support` checks drift without writing; runtime consumers need no YAML dependency. Host selection and hook configuration are unchanged.
+- Consumer installation, update, pin/rollback limits, removal, retained-data and privacy guidance for Claude Code, Cursor and Codex, with native certification explicitly separate from declared packaging.
+
 ## [0.34.8] - 2026-11-04
 ### Changed
 - **New sessions capture automatically:** redacted prompt text (bounded to 500 characters), structured summaries and draft harvesting now default on for Claude Code and Codex, including headless sessions and bots. Claude's existing local compatibility telemetry file also defaults on. Summaries make background Claude model calls; artifacts remain local and no analytics uploader is added. Recorded opt-outs survive resumes and other sessions' background workers; historical summary/harvest choices are preserved. Private sessions suppress subsequent activity and telemetry. Existing redaction, retention, child suppression, draft review and Cursor's hook-free packaging remain in place.

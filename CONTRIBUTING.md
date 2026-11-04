@@ -135,7 +135,7 @@ Maintainers use `scripts/release.sh` to cut releases:
 ./scripts/release.sh major   # 0.3.0 → 1.0.0
 ```
 
-The script bumps all three `plugin.json` manifests together, rewrites the CHANGELOG's `[Unreleased]` section under the new version, commits, and tags. It refuses to start if the three manifests already disagree on the version, so reconcile them first.
+The script preflights the package support generator and its pinned development dependencies, bumps all three `plugin.json` manifests together, regenerates the support catalog/table, rewrites the CHANGELOG's `[Unreleased]` section under the new version, then commits all release outputs and tags. It refuses to start if manifest versions disagree or the support projection is stale; run `make deps`, regenerate and commit as needed before releasing. `--dry-run` validates without changing files, commits or tags.
 
 **What a marketplace user receives.** The Claude Code marketplace entry (`.claude-plugin/marketplace.json`) names `{"source": "github", "repo": "Claudfather/clauDNA"}` with no `ref` or `sha`, so it **tracks the default branch**: on a version bump a user fetches the head of the default branch at fetch time, not necessarily the exact commit that bumped the version. Nothing binds a release to the reviewed commit. To bind them, set `sha` (a full commit) or a release-tag `ref` on the entry as part of the release change, and protect that tag separately — a pin is only a gate when the ref it names cannot be rewritten by whoever can write the default branch.
 
@@ -143,19 +143,24 @@ Contributors don't need to run this — just add your CHANGELOG entry and bump t
 
 ## Distribution
 
-clauDNA ships to three hosts from one tree, and the manifests are not interchangeable:
+clauDNA ships to three hosts from one tree, and the manifests are not interchangeable.
+The [generated support table and consumer lifecycle guide](documentation/guides/PACKAGE_SUPPORT.md)
+derive inventory from these manifests and skill frontmatter. After changing those
+inputs or a package version, run `python3 scripts/generate_package_support.py` and
+commit its catalog/table updates. `make check-package-support` checks drift and is
+part of `make check`; the generator's YAML dependency remains development-only.
 
 | | Claude Code | Cursor | Codex |
 |---|---|---|---|
 | Manifest | `.claude-plugin/plugin.json` | `.cursor-plugin/plugin.json` | `.codex-plugin/plugin.json` |
 | Marketplace manifest | `.claude-plugin/marketplace.json` (name `Claudfather`) | `.cursor-plugin/marketplace.json` (name `claudfather`) | `.agents/plugins/marketplace.json` (name `Claudfather`) |
-| Components | `skills/`, `agents/`, `plugin-hooks/` | `skills/`, `agents/` — no hooks | 36 explicit skills; store hooks + startup briefing; inert native agents |
+| Components | `skills/`, `agents/`, `plugin-hooks/` | `skills/`, `agents/` — no hooks | Explicit skill list; store hooks + startup briefing; inert native agents |
 
 These asymmetries are deliberate and gated by `scripts/validate-manifest.py`:
 
 - **The marketplace names differ in case.** Claude Code's stays `Claudfather` because the documented install command is `/plugin install claudna@Claudfather`. Cursor's must be `claudfather` because Cursor's marketplace identifier grammar allows only lowercase alphanumerics and hyphens.
 - **The Cursor manifest declares no hooks**, so the Claude Code shell hooks never fire in a Cursor-based environment. This is enforced two ways: the validator rejects a `hooks` field in the Cursor manifest, and it rejects a `hooks/hooks.json` at the repo root, which is where Cursor's folder discovery would find hooks with no manifest change to notice.
-- **The Codex manifest explicitly selects 36 skills**, preserving the Claude-only and source-checkout exclusions. All eight bundled role prompts map to a read-and-dispatch procedure. A route is supported only on execution hosts where actual same-host availability and its required fixture proof pass; unsupported routes remain explicit. No native agent registrations. Five store handlers plus the startup briefing are distinct from hook trust/execution. Cursor still ships 35 skills; Claude Code ships 39. Installing does not grant hook trust.
+- **The Codex manifest explicitly selects its skill catalog**, preserving the Claude-only and source-checkout exclusions. All eight bundled role prompts map to a read-and-dispatch procedure. A route is supported only on execution hosts where actual same-host availability and its required fixture proof pass; unsupported routes remain explicit. No native agent registrations. Five store handlers plus the startup briefing are distinct from hook trust/execution. The generated support table owns the current per-host counts. Installing does not grant hook trust.
 
 ### Submitting to the Cursor marketplace
 
