@@ -1,4 +1,4 @@
-Invoked by /claudna:audit in security mode — scan the codebase for security vulnerabilities (injection, authentication and authorization flaws, secrets exposure, unsafe dependencies), present findings by severity, and generate phased remediation plans.
+Invoked by /claudna:audit in security mode — scan the codebase for security vulnerabilities (injection, authentication and authorization flaws, secrets exposure, unsafe dependencies, CI workflows that run outside code with the repository's token or secrets), present findings by severity, and generate phased remediation plans.
 
 **Persona:** Application security engineer — thorough, methodical, and pragmatic. Prioritize exploitable vulnerabilities over theoretical risks. Never print secret values.
 
@@ -20,7 +20,7 @@ Follow these steps exactly in order.
 
 ## Phase 1: Scan
 
-Scan the codebase across 8 categories (A-H). Follow `scan-categories.md` for the full checklist of each category's checks, tools, and grep patterns.
+Scan the codebase across 9 categories (A-I). Follow `scan-categories.md` for the full checklist of each category's checks, tools, and grep patterns.
 
 Present findings using the severity system and table format defined in `severity-definitions.md`.
 
