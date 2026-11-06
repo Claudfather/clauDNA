@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **The `audit security` lens checks CI triggers (category I).** It now reads each workflow's triggers, permissions, checkouts, event text, artifacts and caches, deployments and their creators, secrets, the default token and runners for code or text from outside the project that runs with the repository's token or secrets. It covers three shapes: `deployment` and `deployment_status` workflows run the deployed commit's workflow file, so a deployed pull request can bring its own; `pull_request_target`, `workflow_run`, `issue_comment` and similar events run the default branch's workflow on input anyone can send; and fork pull requests can reach self-hosted runners. Findings are graded by what the outsider's code gets, with a secret or a write token at CRITICAL, and the category lists the usual fixes.
+
 ## [0.34.8] - 2026-11-04
 ### Changed
 - **New sessions capture automatically:** redacted prompt text (bounded to 500 characters), structured summaries and draft harvesting now default on for Claude Code and Codex, including headless sessions and bots. Claude's existing local compatibility telemetry file also defaults on. Summaries make background Claude model calls; artifacts remain local and no analytics uploader is added. Recorded opt-outs survive resumes and other sessions' background workers; historical summary/harvest choices are preserved. Private sessions suppress subsequent activity and telemetry. Existing redaction, retention, child suppression, draft review and Cursor's hook-free packaging remain in place.
