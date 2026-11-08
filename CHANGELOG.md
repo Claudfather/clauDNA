@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **The `audit security` lens checks CI triggers (category I).** It now reads each workflow's triggers, permissions, checkouts, event text, artifacts and caches, deployments and their creators, secrets, the default token and runners for code or text from outside the project that runs with the repository's token or secrets. It covers three shapes: `deployment` and `deployment_status` workflows run the deployed commit's workflow file, so a deployed pull request can bring its own; `pull_request_target`, `workflow_run`, `issue_comment` and similar events run the default branch's workflow on input anyone can send; and fork pull requests can reach self-hosted runners. Findings are graded by what the outsider's code gets, with a secret or a write token at CRITICAL, and the category lists the usual fixes.
+### Changed
+- **Moves to Claudron v0.10.1.** `contracts/claudron.json` and `contracts/claudron.ref` now come from v0.10.1, and output-guide §3's status table is re-rendered from it. Made by the `claudron-release` workflow.
 
 ## [0.34.8] - 2026-11-04
 ### Changed
