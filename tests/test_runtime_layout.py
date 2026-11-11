@@ -44,6 +44,7 @@ SESSION_STORE_LAYERS = {
     "ops": 3,
     "store": 5,
     "rollup": 5,
+    "continuity": 6,
     "activity": 1,
     "telemetry": 3,
     "summarize": 6,

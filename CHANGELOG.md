@@ -9,7 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Native-session path/scratch allocation and exclusive standalone operation directories under the effective clauDNA root. Artifact-only ownership is distinct from captured, partial and corrupt lifecycle state; manual allocation creates no capture events. This is the held storage-migration foundation, not a release or native-host qualification.
+- Session-owned continuity at `R/sessions/<native-sid>/handoff.md`, with scoped reference resolution, immutable predecessors, and fingerprinted copy-only legacy import. The old per-cwd handoff contract is breaking; downstream reader and native-host acceptance remain pending on the held, unreleased stack.
 - **The `audit security` lens checks CI triggers (category I).** It now reads each workflow's triggers, permissions, checkouts, event text, artifacts and caches, deployments and their creators, secrets, the default token and runners for code or text from outside the project that runs with the repository's token or secrets. It covers three shapes: `deployment` and `deployment_status` workflows run the deployed commit's workflow file, so a deployed pull request can bring its own; `pull_request_target`, `workflow_run`, `issue_comment` and similar events run the default branch's workflow on input anyone can send; and fork pull requests can reach self-hosted runners. Findings are graded by what the outsider's code gets, with a secret or a write token at CRITICAL, and the category lists the usual fixes.
+
+### Breaking Changes
+
+- Session handoffs are owned by verified native sessions, not a shared per-cwd `.claude/session.md`. Resume uses scoped references; legacy sources are read-only and require a source hash plus explicit reimport for changed content. This staged source change is not a release or proof of consumer acceptance.
+
 ### Fixed
 - Keep summary-only capture remnants visible as partial or corrupt sessions, including retained segment summaries, without treating manual artifacts as captured data.
 - Session resume now preserves legacy personal handoffs during both automatic and interactive imports. Timestamp conversion and reaping apply only to the project copy; existing project handoffs skip the fallback.

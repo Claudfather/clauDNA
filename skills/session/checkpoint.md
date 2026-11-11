@@ -8,7 +8,7 @@ Target: under 20 seconds.
 
 ### 1. Read existing handoff (if any)
 
-Read `<cwd>/.claude/session.md` if it exists. If absent, this becomes a first-write — the checkpoint creates the file with only this session's items.
+Read only the current native session's `handoff.md` through the session-store CLI. Use the actual verified SID and host; missing/conflicting identity stops the write. If `CLAUDNA_SESSION_STORE=0`, skip background checkpointing; an explicit user-requested manual checkpoint may proceed with verified identity without initializing lifecycle state. If the handoff is absent, this becomes a first-write — the checkpoint creates the file with only this session's items.
 
 ### 2. Capture new items since the last write
 
@@ -22,7 +22,7 @@ Run `git status --porcelain` and `git branch --show-current` (parallel, separate
 
 ### 4. Write atomically
 
-Ensure `<cwd>/.claude/` exists (`mkdir -p <cwd>/.claude`). Use the format in [`templates.md`](./templates.md) in this skill directory. Write to `<cwd>/.claude/session.md.tmp`, then `mv` into place.
+Use the v2 format in [`templates.md`](./templates.md) and submit the complete content to `session-store handoff-write --session <native-sid> --host <host> [--background] --json`. Let the runtime atomically write the current session's handoff. Do not create shell temp files or use `mv`. If an existing scoped pointer belongs to the current owner, retain it; do not advance or replace a predecessor pointer during checkpoint. Publish a current-owner pointer only when this workflow explicitly continues that scope and supplies the existing ref hash for compare-and-swap.
 
 ### 5. Confirm
 
@@ -35,7 +35,8 @@ Ensure `<cwd>/.claude/` exists (`mkdir -p <cwd>/.claude`). Use the format in [`t
   "outcome": "completed",
   "artifacts": {
     "mode": "checkpoint",
-    "handoff_path": "<absolute path to <cwd>/.claude/session.md>",
+    "handoff_path": "<absolute path returned by the session-store writer, or null>",
+    "source_sid": "<verified current native SID, or null>",
     "branch": "<current branch>",
     "items_added": <N>
   },
@@ -46,10 +47,10 @@ Ensure `<cwd>/.claude/` exists (`mkdir -p <cwd>/.claude`). Use the format in [`t
 }
 ```
 
-Outcomes: `completed` (written) · `blocked` (could not write — filesystem error; set `blocker_description`). There is no `partial` — checkpoint has no optional steps.
+Outcomes: `completed` (write and any explicitly required pointer action succeeded) · `partial` (identity/path/write unavailable; use `handoff_path: null`) · `blocked` (required interaction cannot proceed; set `blocker_description`).
 
 ## Rules
 
 - **Checkpoint never reaps.** A checkpoint must never make the file smaller — it only adds and refreshes `branch`/`working_tree`.
 - **Not a substitute for handoff.** The reaper and full scan run at session end; a session that only checkpoints accumulates until the next `handoff` or `resume` reaps it.
-- **Atomic write, no `~/.claude/` writes** — engine conventions apply.
+- **Atomic helper only.** No shell temp files, `mv`, `.gitignore` updates, or lifecycle initialization.

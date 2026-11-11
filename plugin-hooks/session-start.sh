@@ -2,8 +2,8 @@
 # SessionStart briefing hook for clauDNA (on by default).
 #
 # Renders a short warm-start briefing from purely local + gh state — current
-# branch/tree, the per-cwd handoff (<cwd>/.claude/session.md, written by
-# /claudna:session), and open PRs — then an opener directive so the agent
+# branch/tree, a scoped session-owned handoff (or read-only legacy project
+# fallback), and open PRs — then an opener directive so the agent
 # starts the session oriented instead of cold. Stdout lands in the agent's
 # context (the SessionStart channel), never in the user's terminal.
 #
@@ -81,8 +81,21 @@ if git -c core.fsmonitor= rev-parse --is-inside-work-tree > /dev/null 2>&1; then
     if [ "${DIRTY:-0}" = "0" ]; then TREE="clean"; else TREE="dirty (${DIRTY} paths)"; fi
 fi
 
-# --- Handoff summary (the /claudna:session substrate)
-HANDOFF="${CWD}/.claude/session.md"
+# --- Handoff summary. Resolve canonical ownership before any legacy read.
+HANDOFF=""
+if [ -n "$SESSION_DIR" ] && [ -n "$HOST" ] && command -v python3 >/dev/null 2>&1; then
+    RESOLVE_ARGS=(continuity resolve --session "$SESSION_ID" --host "$HOST"
+        --scope "workspace:$CWD" --kind handoff --root "$STATE_DIR")
+    if [ -f "$SESSION_DIR/handoff.md" ]; then RESOLVE_ARGS+=(--from-session "$SESSION_ID"); fi
+    HANDOFF=$(python3 -B "${BASH_SOURCE[0]%/*}/../lib/claudna/session_store" \
+        "${RESOLVE_ARGS[@]}" 2>/dev/null)
+    RESOLVED=$?
+    case "$RESOLVED" in
+        0) ;; # one validated canonical path, never a latest-session guess
+        1) HANDOFF="${CWD}/.claude/session.md" ;; # absent canonical pointer: read-only compatibility
+        *) HANDOFF="" ;; # ambiguous, stale, private or invalid evidence blocks fallback
+    esac
+fi
 HANDOFF_AGE=""
 NEXT_STEPS=""
 OPEN_QS=""

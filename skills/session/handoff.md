@@ -6,7 +6,7 @@ Target: under 60 seconds with `--auto`, under 2 minutes interactive. With `--aut
 
 ### 1. Read existing handoff (if any)
 
-Read `<cwd>/.claude/session.md` if it exists. If absent, this is a first-write — skip to step 3.
+Read the current native session's `handoff.md` through the session-store CLI. Never edit a predecessor. If absent, this is a first-write — skip to step 3. Use only the qualified native SID/host; missing, conflicting, or unverified identity stops persistence. A manual user-requested handoff remains allowed with capture off; background capture is suppressed.
 
 ### 2. Live scan (parallel)
 
@@ -62,31 +62,16 @@ in_flight_branches: [<non-main feature branches>]
 
 Combine reaped survivors (from step 3) + new items (from step 4). Dedupe by content (case-insensitive substring match — if a new Activity entry is a substring of an existing one, keep the existing). Preserve original timestamps on survivors.
 
-### 7. Write `<cwd>/.claude/session.md`
+### 7. Write and publish current continuity
 
-Ensure `<cwd>/.claude/` exists first (`mkdir -p <cwd>/.claude`). Use the format in [`templates.md`](./templates.md) in this skill directory. Write atomically: write to `<cwd>/.claude/session.md.tmp` then `mv` to `<cwd>/.claude/session.md`.
+Use the v2 content format in [`templates.md`](./templates.md). Send the complete document on stdin to `session-store handoff-write --session <native-sid> --host <host> [--background] --json`. The runtime validates it and performs the atomic write. Do not use shell temp files, `mv`, or `.gitignore` management. After a verified write, publish the current owner's handoff reference with `continuity publish --session <native-sid> --host <host> --scope <scope> --kind handoff --workflow session --path handoff.md [--expect <existing-ref-hash>] --json` only when a public scoped reference is authorized. For captured sessions, recorded lifecycle privacy is authoritative: a non-private captured session may publish for its bound scope; a private session writes only locally and skips global publication. Artifact-only/capture-off writes also remain local unless the user explicitly opts into that scope with `continuity context --privacy public --scope <scope>`. Never set public context automatically or override private lifecycle privacy. Compare-and-swap applies when replacing an existing reference. A failed write must not publish a pointer.
 
-### 8. Manage `.gitignore`
+### 8. Confirm
 
-First, verify we are inside a git working tree (`git rev-parse --is-inside-work-tree`). If not, skip this entire step — there is no gitignore to manage.
+- **With `--auto`:** Skip this confirmation — proceed to step 9.
+- **Without `--auto`:** "Handoff written to `<handoff_path returned by the runtime>`. Use `/claudna:session resume` next session." If the session produced durable, cross-session knowledge (a gotcha, a decision, a hard-won fix), add a one-line nudge: "worth persisting beyond this handoff? `/claudna:capture` distills it into the vault so the next session *recalls* it." The handoff is ephemeral session continuity; the vault is durable knowledge — different stores, so this is a genuine second step, not a duplicate.
 
-Detect:
-1. Run `git check-ignore <cwd>/.claude/session.md` — if exit 0, the file is already ignored (by any rule, anywhere). Skip.
-2. Else if `<cwd>/.gitignore` exists, append `\n.claude/session.md\n` to it.
-3. Else create `<cwd>/.claude/.gitignore` with a single line:
-
-   ```
-   session.md
-   ```
-
-This is idempotent — step 1 catches both "already there" and "ignored by parent dir" (e.g., a runtime tree ignored at its root needs no further action).
-
-### 9. Confirm
-
-- **With `--auto`:** Skip this confirmation — proceed to step 10.
-- **Without `--auto`:** "Handoff written to `<cwd>/.claude/session.md`. Use `/claudna:session resume` next session." If the session produced durable, cross-session knowledge (a gotcha, a decision, a hard-won fix), add a one-line nudge: "worth persisting beyond this handoff? `/claudna:capture` distills it into the vault so the next session *recalls* it." The handoff is ephemeral session continuity; the vault is durable knowledge — different stores, so this is a genuine second step, not a duplicate.
-
-### 10. Structured-result emission (`--auto` only)
+### 9. Structured-result emission (`--auto` only)
 
 When invoked with `--auto`, emit the §10.C structured result from `../_shared/orchestration-guide.md §10.C` as the **final** output — nothing after it. Orchestrators (and `/restart`'s pre-stop check) key off this to confirm the handoff landed instead of inferring it from file mtime.
 
@@ -96,7 +81,8 @@ When invoked with `--auto`, emit the §10.C structured result from `../_shared/o
   "outcome": "completed",
   "artifacts": {
     "mode": "handoff",
-    "handoff_path": "<absolute path to <cwd>/.claude/session.md>",
+    "handoff_path": "<absolute path returned by the session-store writer, or null>",
+    "source_sid": "<verified current native SID, or null>",
     "branch": "<current branch>",
     "items_reaped": <N>,
     "items_added": <N>
@@ -109,9 +95,8 @@ When invoked with `--auto`, emit the §10.C structured result from `../_shared/o
 ```
 
 Outcomes:
-- `completed` — file written successfully.
-- `partial` — file written but a non-fatal step failed (e.g., `.gitignore` step skipped because not in a git tree). Add a one-line note to `errors`.
-- `blocked` — could not write the file (filesystem error, permission denied). Include the error in `errors` and set `blocker_description`.
+- `completed` — local persistence succeeded, and any public scoped publication explicitly required and authorized for this workflow succeeded. Private or unconfigured artifact-only sessions can complete with a local handoff and no global pointer.
+- `partial` — write failed, identity was unavailable, an authorized/required publication failed, or a non-fatal live-scan issue occurred; set `handoff_path: null` and explain in `errors`.
 
 Interactive mode (no `--auto`) skips this step entirely.
 

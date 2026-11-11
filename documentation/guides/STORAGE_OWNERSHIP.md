@@ -112,6 +112,46 @@ decision. An arbitrary old package is not a qualified rollback.
 
 ## Runtime writers
 
+### Session continuity (phase03 source contract)
+
+Continuity payloads belong to the verified native session at
+`R/sessions/<native-sid>/handoff.md`. The qualified host surface supplies the
+real native SID/provider; no cwd, timestamp, operation ID, or reconstructed
+identifier may fill a missing value. The CLI returns the absolute handoff path.
+That current artifact location is distinct from the source session identity in
+a resolved predecessor or artifact reference.
+
+`handoff-write --session <sid> --host <host> [--background] --json` accepts a
+complete v2 document on stdin. The runtime validates its v2 schema, absolute
+cwd, UTC timestamp, and 1 MiB bound, then persists it atomically. It does not
+create lifecycle records. Capture-off suppresses background writes; an explicit
+manual user request may still write when native identity is verified. No writer
+manages `.gitignore`.
+
+Scoped continuity pointers are indexed under
+`R/continuity/<sha256-canonical-scope>/index.json`. Scope is an absolute realpath
+workspace or an explicit stable runtime key. Resolution matches kind and scope;
+ambiguous matches require a workflow selector or explicit source SID. There is
+no latest selection or session-directory scan. Publishing uses compare-and-swap
+when replacing an existing reference. A stale, ambiguous, or corrupt pointer
+stops resolution and does not trigger legacy fallback. Payloads remain in their
+owning session and are not copied into the index. `continuity context --privacy
+public|private --scope <scope>` writes artifact-only discovery metadata under
+the current native session; public permits local cross-session discovery, while
+captured private lifecycle privacy remains authoritative. Context publication
+does not open a session or emit lifecycle events. `continuity artifact-path`
+resolves artifact references separately from handoff references.
+
+Legacy import reads only an explicitly selected source. The caller binds the
+selected bytes with `--source-sha256 <hex>`; import verifies that digest before
+mutating state. The source remains read-only. The importer converts a copy to
+v2, writes an immutable receipt under the destination session's
+`artifacts/imports/<source-key-hash>/<source-sha256>.json`, durably writes the
+handoff, then publishes the pointer. The same fingerprint is idempotent across
+targets; changed content needs an explicit `reimport`. A failed import does not
+publish a pointer. These are staged source contracts; native-host and external
+consumer acceptance remain pending.
+
 The compatibility feed is global at `R/telemetry/skill-events.jsonl`, with its
 prune lock/marker and sanitized file-level diagnostic sidecars. An override must
 be absolute and inside R; invalid configured destinations produce a bounded

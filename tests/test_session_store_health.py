@@ -139,3 +139,16 @@ def test_hook_diagnostics_count_public_owner_without_payload_or_private_identity
                                           "worker_stderr_files": 1}
     assert "PRIVATE" not in json.dumps(report) and "private-secret" not in json.dumps(report)
     assert {p: p.read_bytes() for p in store.root.rglob("*") if p.is_file()} == before
+
+
+def test_health_counts_canonical_public_handoffs_without_reading_private_payloads(store):
+    public = summarized_session(store, "public-handoff", [[BLOCK]])
+    private = summarized_session(store, "private-handoff", [[BLOCK]])
+    private.set_private(True)
+    public.paths.handoff.write_text("canonical public handoff")
+    private.paths.handoff.write_text("private-continuity-secret")
+    before = {p: p.read_bytes() for p in store.root.rglob("*") if p.is_file()}
+    result = health.report(store, env={})
+    assert result["continuity"]["public_captured_handoffs"] == 1
+    assert "private-continuity-secret" not in json.dumps(result)
+    assert {p: p.read_bytes() for p in store.root.rglob("*") if p.is_file()} == before

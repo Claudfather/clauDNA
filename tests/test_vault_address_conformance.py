@@ -340,32 +340,26 @@ class TestLiveRepo:
 
 
 class TestSessionMdStableSurface:
-    """F6: the handoff artifact is consumed outside clauDNA, so the promise is
-    declared and minimal. Asserted against the declaration block only — an
-    earlier revision searched the whole file and passed on the pre-fix version,
-    because `last_updated` was already in the frontmatter template."""
+    """Pin the source continuity contract, not native/consumer acceptance."""
 
     def _block(self) -> str:
         text = (REPO_ROOT / "skills/session/templates.md").read_text()
         assert "## Stable surface" in text, "the stable-surface declaration is gone"
         return text.split("## Stable surface", 1)[1].split("\n## ", 1)[0]
 
-    def test_declares_existence_and_timestamp(self):
+    def test_declares_session_owner_path_and_timestamp(self):
         block = self._block()
+        assert "handoff_path" in block
+        assert "verified native session" in block
         assert "last_updated" in block
-        assert "ISO-8601" in block
+        assert "ISO-8601 UTC" in block
 
     def test_states_what_is_not_promised(self):
         """An unbounded promise is what let a consumer parse whatever it liked."""
         block = self._block()
         assert "informal" in block.lower() or "may change" in block.lower()
 
-    #: A write site is any file instructing a write to the artifact. Detected by
-    #: the *instruction*, never by the atomicity phrasing — a detector keyed on
-    #: "files that mention tmp+mv" would be circular and would wave through a
-    #: newly added write path, which is the regression that actually matters.
-    #: Rewording "atomically" is not; the promise survives a synonym.
-    WRITE_INSTRUCTION = re.compile(r"(?=.*\bwrit)(?=.*\.claude/session\.md)", re.I)
+    WRITE_INSTRUCTION = re.compile(r"(?=.*\b(?:write|writes|writing|persist|send))(?=.*handoff-write)", re.I)
 
     def _write_sites(self) -> dict[str, str]:
         sites = {}
@@ -375,29 +369,21 @@ class TestSessionMdStableSurface:
                 sites[path.name] = text
         return sites
 
-    def test_every_write_site_mandates_the_atomic_write(self):
-        """"A reader sees a complete file or none" is the promise; `.tmp` + `mv`
-        (→ `rename(2)`) is the only thing implementing it. Nothing pinned the
-        two together, so a fourth write path could ship non-atomic and keep the
-        declaration honest-looking.
-        """
+    def test_every_write_site_uses_the_runtime_writer(self):
+        """Documented writes must pass through the validated helper."""
         sites = self._write_sites()
         assert sites, "no write sites detected — the detector has drifted"
-        missing = sorted(
-            name
-            for name, text in sites.items()
-            if "session.md.tmp" not in text and not ("tmp" in text and "mv" in text)
-        )
-        assert not missing, (
-            f"{missing} instruct writing session.md without the tmp+mv atomic "
-            "write. Claudlobby age-gates bot resume on this file, so a torn "
-            "read is a consumer-visible break of a declared promise "
-            "(templates.md, '## Stable surface')."
-        )
+        missing = sorted(name for name, text in sites.items() if "session-store handoff-write" not in text)
+        assert not missing, f"{missing} document a continuity write outside session-store handoff-write"
+
+    def test_source_contract_requires_identity_and_null_failure_path(self):
+        block = self._block()
+        assert "native session SID" in block
+        assert "handoff_path: null" in block
+        assert "do not establish native" in block
 
     def test_the_timestamp_stays_iso_8601(self):
-        """Epoch seconds would keep the field name and the word 'timestamp'
-        while silently breaking every consumer that parses it as a date."""
+        """The content example remains a UTC ISO timestamp."""
         text = (REPO_ROOT / "skills" / "session" / "templates.md").read_text()
         m = re.search(r"^last_updated:\s*(.+)$", text, re.M)
         assert m, "the templates' `last_updated:` line is gone"

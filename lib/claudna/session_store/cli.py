@@ -56,7 +56,7 @@ from .fsio import (allocate_operation, append_jsonl, cap_log, ensure_dir,
 from .paths import (InvalidSessionId, InvalidStateDir, SessionPaths, operation_path, owned_path, state_root,
                     validate_scratch_label, validate_sid)
 from .project import OLDER_PROJECTIONS, SUMMARY_ENV
-from .store import SessionHandle, SessionStore
+from .store import SessionHandle, SessionStore, owned_session
 
 # readers.SINCE_HELP, kept literal: the parser must not import readers (loaded lazily, per verb).
 _SINCE_HELP = "30m, 12h, 7d, 2w, or an ISO date/time"
@@ -88,35 +88,6 @@ def _handle(args: argparse.Namespace) -> SessionHandle | None:
     return handle
 
 
-def owned_session(store: SessionStore, sid: str, host: str) -> SessionHandle:
-    """Validate an explicit native owner before manual artifact access.
-
-    The caller obtains the native ID through its qualified host surface. A CLI
-    argument is not itself evidence of that delivery. Available native process
-    identity and retained lifecycle metadata must agree; neither cwd nor an
-    operation allocation is a substitute. This function performs no writes.
-    """
-    from .project import load_lifecycle, session_facts
-
-    handle = store.session(sid)  # exact component validation, never normalization
-    if host not in ("claude", "codex", "cursor"):
-        raise ValueError("unsupported artifact owner provider")
-    if sid in ("SID", "SESSION_ID", "native-sid", "native-session-id"):
-        raise ValueError("a verified native session ID is required")
-    variables = {"claude": ("CLAUDE_SESSION_ID",),
-                 "codex": ("CODEX_THREAD_ID", "CODEX_SESSION_ID"), "cursor": ()}[host]
-    if any(os.environ.get(key) and os.environ[key] != sid for key in variables):
-        raise ValueError("conflicting native session identity")
-    if handle.exists():
-        lifecycle = load_lifecycle(handle.paths)
-        opened = any(event["kind"] == "session.opened" for event in lifecycle.events)
-        if opened and session_facts(lifecycle.events).agent_cli != host:
-            raise ValueError("provider does not match recorded session owner")
-        if handle.capture_state() not in ("artifact-only", "captured"):
-            raise ValueError("session lifecycle is partial or corrupt; preserve it for inspection")
-    return handle
-
-
 def _owned_path_command(args) -> int:
     """Thin manual allocation door; never opens a captured session."""
     try:
@@ -140,6 +111,50 @@ def _owned_path_command(args) -> int:
         return 0
     except (ValueError, OSError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+
+def _continuity_command(args) -> int:
+    """Explicit owner-scoped persistence and pointer discovery; never starts capture."""
+    from . import continuity
+
+    try:
+        store = SessionStore(Path(args.root) if args.root else None)
+        owner = {"current_sid": args.session, "host": args.host}
+        if args.verb == "handoff-write":
+            if args.background and os.environ.get("CLAUDNA_SESSION_STORE") == "0":
+                raise ValueError("background checkpoint disabled with session capture")
+            target = continuity.write_handoff(store, **owner, content=sys.stdin.read(1048577))
+            result = {"status": "found", "source_sid": args.session, "handoff_path": str(target)}
+        elif args.action == "context":
+            target = continuity.write_context(store, **owner, scope=args.scope, privacy=args.privacy)
+            result = {"status": "found", "source_sid": args.session, "context_path": str(target)}
+        elif args.action == "import":
+            result = continuity.import_legacy(
+                store, **owner, scope=args.scope, workflow=args.workflow, source=Path(args.source),
+                source_sha256=args.source_sha256, decision=args.decision,
+                content=sys.stdin.read(1048577), expect=args.expect)
+        else:
+            selection = {**owner, "scope": args.scope, "kind": args.kind, "workflow": args.workflow}
+            if args.action == "publish":
+                selected = continuity.publish_reference(store, **selection,
+                                                        relative_path=args.path, expect=args.expect)
+            else:
+                selected = continuity.resolve_predecessor(store, **selection, from_session=args.from_session)
+            result = dataclasses.asdict(selected)
+        if args.json:
+            print(json.dumps(result, default=str))
+        elif result.get("status") == "found":
+            print(result.get("handoff_path") or result.get("artifact_path") or result.get("context_path"))
+        elif result.get("reason"):
+            print(result["reason"], file=sys.stderr)
+        return {"found": 0, "already_imported": 0, "none": 1}.get(result.get("status"), 3)
+    except (ValueError, OSError, RuntimeError) as exc:
+        if args.json:
+            print(json.dumps({"status": "unavailable", "handoff_path": None,
+                              "artifact_path": None, "reason": str(exc)}))
+        else:
+            print(f"continuity unavailable: {exc}", file=sys.stderr)
         return 2
 
 
@@ -445,6 +460,38 @@ def main(argv: list[str] | None = None) -> int:
     identity.add_argument("--label")
     identity.add_argument("--operation-id")
     operation.add_argument("--create", action="store_true")
+    handoff = sub.add_parser("handoff-write", help="atomically persist the current owner's v2 handoff",
+                             parents=[rooted])
+    handoff.add_argument("--session", required=True)
+    handoff.add_argument("--host", required=True, choices=("claude", "codex", "cursor"))
+    handoff.add_argument("--background", action="store_true", help="honor disabled capture for background checkpoints")
+    handoff.add_argument("--json", action="store_true")
+    continuity = sub.add_parser("continuity", help="explicit scoped handoff and artifact pointers")
+    actions = continuity.add_subparsers(dest="action", required=True)
+    for action in ("resolve", "artifact-path", "publish", "context", "import"):
+        entry = actions.add_parser(action, parents=[rooted])
+        entry.add_argument("--session", required=True)
+        entry.add_argument("--host", required=True, choices=("claude", "codex", "cursor"))
+        entry.add_argument("--scope", required=True)
+        entry.add_argument("--json", action="store_true")
+        if action == "context":
+            entry.add_argument("--privacy", choices=("public", "private"), required=True)
+            continue
+        entry.add_argument("--workflow", required=action in ("publish", "import"))
+        if action == "artifact-path":
+            entry.set_defaults(kind="artifact")
+        elif action != "import":
+            entry.add_argument("--kind", choices=("handoff", "artifact"), default="handoff")
+        if action in ("resolve", "artifact-path"):
+            entry.add_argument("--from-session")
+        if action in ("publish", "import"):
+            entry.add_argument("--expect", help="exact prior reference SHA-256, required for replacement")
+        if action == "publish":
+            entry.add_argument("--path", required=True, help="path relative to the producing session")
+        if action == "import":
+            entry.add_argument("--source", required=True, help="explicit absolute legacy file, read-only")
+            entry.add_argument("--source-sha256", required=True, help="fingerprint bound to the selected source read")
+            entry.add_argument("--decision", choices=("initial", "reimport"), required=True)
     skill = sub.add_parser("skill-start", help="best-effort Codex agent procedure entry; not task success",
                            parents=[rooted])
     skill.add_argument("skill", help="selected claudna skill slug; no task arguments")
@@ -520,6 +567,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.verb in ("paths", "scratch", "operation-dir"):
         return _owned_path_command(args)
+    if args.verb in ("continuity", "handoff-write"):
+        return _continuity_command(args)
     if args.verb == "skill-start":
         from .host_codex import record_skill_start
 

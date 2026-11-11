@@ -1,19 +1,18 @@
 Invoked by /claudna:session in resume mode — restore short-burst context fast at the start of a new session. Counterpart to the `handoff` mode.
 
-Target: under 30 seconds. With `--auto` (headless): skip step 7 (the user-focus question); copy any legacy handoff silently when the project handoff is absent, preserving the source.
+Target: under 30 seconds. With `--auto` (headless): skip step 7 (the user-focus question); import the selected legacy source silently on the first import, preserving the source. Use a verified native SID and host; if either is unavailable, stop continuity resolution and report `handoff_path: null`.
 
 ## Steps
 
 ### 1. Read handoff
 
-Read `<cwd>/.claude/session.md`.
+Resolve the current scope through the session-store CLI, using the verified current SID/host and a canonical `workspace:<absolute-realpath>` or explicit runtime scope. A current artifact path never supplies source identity. A unique matching handoff reference yields the predecessor SID and `handoff.md`; multiple matches require a workflow selector or explicit `--from-session`. Never scan session directories or select `latest`. `none` alone means there is no indexed handoff. `unavailable`, ambiguous, stale, or corrupt pointer/receipt stops resolution and must not fall back.
 
-If absent, check the legacy path: derive a slug from `git remote get-url origin` (extract `org/repo`, lowercase, replace `/` with `--`); fallback to lowercased dirname. Look for `~/.claude/notes/projects/<slug>/context-resume.md`. If found:
+Invoke the loaded package as `python3 -B "<loaded-package>/lib/claudna/session_store"`. Resolve with `continuity resolve --session <native-sid> --host <host> --scope <scope> --kind handoff [--workflow <selector>] [--from-session <sid>] --json`. The CLI returns the resolved source SID/path; do not replace those values with the current `artifact-path` result.
 
-- **With `--auto`:** Import silently. Copy content into `<cwd>/.claude/session.md` (assign the legacy file's `session_date` as the timestamp for every imported bullet — see the migration notes in [`templates.md`](./templates.md) in this skill directory). Preserve the legacy source unchanged: never delete, move or rewrite it. Continue.
-- **Without `--auto`:** Ask once: "Found a legacy handoff at `<path>` (last touched <date>). Import it? [y/N]". On `y`: import as above. On `n`: leave the legacy file alone and proceed without it.
+Only when there is no indexed handoff, use the bounded legacy selection order: the chosen project `<cwd>/.claude/session.md`; then, only when explicitly authorized by the user or invocation, the exact slug-based `~/.claude/notes/projects/<slug>/context-resume.md` source (the established slug rule). Do not scan other projects or derive a slug from unrelated signals. Treat either source as read-only. On initial automatic import, the selected legacy source may be copied silently as the existing policy permits; interactive mode asks once: "Found a legacy handoff at `<path>` (last touched <date>). Import it? [y/N]". A changed source fingerprint requires explicit `reimport`. The importer internally verifies the selected source digest before mutation and validates any existing receipt/reference; an existing indexed receipt that is missing/corrupt, changed content without explicit reimport, or stale pointer stops without fallback. Convert a copy to v2, assign legacy `session_date` timestamps as documented in [`templates.md`](./templates.md), and persist in the current native session. Invoke `continuity import --session <native-sid> --host <host> --scope <scope> --source <absolute-source> --source-sha256 <64-hex-digest> --decision initial|reimport --workflow <selector> [--expect <ref-hash>] --json` with the converted v2 document on stdin. The importer rechecks the source bytes before mutation and publishes a scoped reference only when effective privacy permits public discovery. Private captured sessions keep import provenance local; artifact-only sessions need explicit public context to publish. Never delete, move, or rewrite the source.
 
-If neither file exists, run step 2 (live scan), then skip to step 5. Present a brief greeting using the live-scan data only; there is no handoff history.
+If no selected source exists, run step 2 (live scan), then skip to step 5. Present a brief greeting using live-scan data only; there is no handoff history.
 
 ### 2. Live scan (parallel)
 
@@ -28,11 +27,11 @@ Run in parallel:
 
 ### 3. Reaper pass
 
-Apply the rules in `../_shared/reaper-rules.md` to the loaded content.
+Apply the rules in `../_shared/reaper-rules.md` to the loaded content in memory. The predecessor is immutable; any reaped/transferred content that is persisted must be written under the current native SID, then its current-owner scoped ref is published with compare-and-swap as applicable. Never write back to the predecessor.
 
 ### 4. Write back if reaped
 
-If the reaper changed anything, ensure `<cwd>/.claude/` exists first (`mkdir -p <cwd>/.claude`), then write the cleaned content back to `<cwd>/.claude/session.md` (atomic write: `tmp` + `mv`). This is the "read also reaps" half of the contract.
+If continuing work in the same scope, persist the transferred context to the current session through `session-store handoff-write`, even when reaping did not change it; never write back to the predecessor. Publish the current owner's pointer only after verified persistence and only when authorized by effective privacy: captured sessions follow recorded lifecycle privacy, private sessions skip global publication, and artifact-only/capture-off sessions require explicit public context for that scope. Use the existing reference hash for compare-and-swap. A read-only briefing need not create a current-session copy.
 
 ### 5. Present briefing
 
@@ -96,9 +95,11 @@ When invoked with `--auto`, emit the §10.C structured result from `../_shared/o
   "outcome": "completed",
   "artifacts": {
     "mode": "resume",
-    "handoff_path": "<absolute path to <cwd>/.claude/session.md, or null if none>",
+    "handoff_path": "<absolute resolved or current-owner path, or null>",
+    "source_sid": "<verified predecessor SID, or null>",
     "handoff_found": true,
     "legacy_imported": false,
+    "current_session_sid": "<verified current native SID, or null>",
     "branch": "<current branch>",
     "items_reaped": <N>
   },
@@ -111,7 +112,7 @@ When invoked with `--auto`, emit the §10.C structured result from `../_shared/o
 
 Outcomes:
 - `completed` — briefing produced from an existing handoff (with or without legacy import).
-- `partial` — no handoff existed, briefing produced from live scan only. Add a note to `errors`.
+- `partial` — no handoff existed, briefing produced from live scan only, or identity/resolution is unavailable. Set `handoff_path: null` when no valid path is established and add a note to `errors`.
 - `blocked` — couldn't read or scan (e.g., not in a git repo, cwd unreadable). Set `blocker_description`.
 
 Interactive mode (no `--auto`) skips this step entirely.
@@ -122,4 +123,4 @@ Interactive mode (no `--auto`) skips this step entirely.
 - **Speed over depth.** Scan, reap, summarize. No deep analysis.
 - **Reaper rules in `../_shared/`.** Do not duplicate them inline.
 - **`--auto` is silent on the prompt.** Briefing and focus suggestion still emit (they are the agent's context payload); only the explicit user-question is suppressed.
-- **Legacy import is copy-only.** An existing `<cwd>/.claude/session.md` skips the legacy fallback, even if the project handoff is empty. If that project file is later removed, the retained legacy source may be imported again. Both modes preserve the source; timestamp conversion and reaping affect only the project copy. Source cleanup is outside resume.
+- **Legacy import is copy-only.** The chosen project source has priority over the exact explicitly authorized slug source. Both remain unchanged; timestamp conversion affects only the current-session copy. A matching fingerprint receipt makes import idempotent across targets; changed content requires explicit `reimport`. Source cleanup is outside resume.

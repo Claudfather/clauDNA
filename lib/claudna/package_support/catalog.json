@@ -668,7 +668,7 @@
       "requires_context": null
     },
     "session": {
-      "description": "Use at session boundaries — resume at the start of a new session (read the per-cwd handoff and brief on where to pick up), handoff at the end of a session (write it), checkpoint for a mid-session save without the full ceremony, or name to label the session. Also use to look back at recorded sessions — list, show, timeline, or recurring tool failures. Replaces /session-handoff, /session-resume, /name-session.",
+      "description": "Use at session boundaries — resume at the start of a new session (resolve a scoped handoff and brief on where to pick up), handoff at the end of a session (write it), checkpoint for a mid-session save without the full ceremony, or name to label the session. Also use to look back at recorded sessions — list, show, timeline, or recurring tool failures. Replaces /session-handoff, /session-resume, /name-session.",
       "hosts": [
         "claude-code",
         "codex",
@@ -817,7 +817,7 @@
     "skills/railway/SKILL.md": "9385eacd65f4ae91cfa838aa5a60982a7acf21ce5042a5c4eaa5c7ed246494b9",
     "skills/recall/SKILL.md": "3b44ea8eff5d1d4636b8b6ef8a1a86604145260b75ecd0fdf3130827a3542275",
     "skills/review-work/SKILL.md": "920424d3c7b0a61281155cd2265e5c00770cc43693ab9843c17e399f3e8410a1",
-    "skills/session/SKILL.md": "8d2509473e8697044f3a50197c63c01bc35c04a2eb7611ab6100d368e230a5e5",
+    "skills/session/SKILL.md": "50ca9decc21e19c057477c8a6a502685e20916adb68361827df4c809891842a5",
     "skills/ship/SKILL.md": "efb9cedd2de8b5130ad8bb0ecdfc5182d44e027578ffd52d31cb503c190a66dd",
     "skills/skill-scaffold/SKILL.md": "202908b7c463c6eb7e85a9763a8b7c3139ac3bd37f23ddc7597962ae0c207e74",
     "skills/sync-branches/SKILL.md": "ee239925a37a71936497a6043b3c15e605037e9838baa37c319e25953f66aa04",

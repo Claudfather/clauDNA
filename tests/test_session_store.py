@@ -1211,3 +1211,35 @@ def test_check_writes_nothing(store):
     before = files()
     main(["check", "s1", "--root", str(store.root)])
     assert files() == before
+
+
+def test_manual_handoff_cli_capture_off_persists_v2_without_lifecycle(store, monkeypatch, capsys):
+    import io
+    import sys
+
+    content = "---\ncwd: /arbitrary/runtime\nlast_updated: 2026-11-11T12:00:00Z\nschema_version: 2\n---\n"
+    monkeypatch.setenv("CLAUDNA_SESSION_STORE", "0")
+    monkeypatch.setenv("CODEX_THREAD_ID", "manual-cli")
+    monkeypatch.setattr(sys, "stdin", io.StringIO(content))
+    args = ["handoff-write", "--session", "manual-cli", "--host", "codex", "--root", str(store.root), "--json"]
+    assert main(args) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["handoff_path"] == str(store.session("manual-cli").paths.handoff)
+    assert store.session("manual-cli").paths.handoff.read_text() == content
+    assert not store.session("manual-cli").paths.lifecycle.exists()
+    assert not (store.root / "continuity").exists()
+    before = store.session("manual-cli").paths.handoff.read_bytes()
+    monkeypatch.setattr(sys, "stdin", io.StringIO(content + "new text"))
+    assert main(args + ["--background"]) == 2
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "unavailable" and result["handoff_path"] is None
+    assert store.session("manual-cli").paths.handoff.read_bytes() == before
+
+
+def test_continuity_cli_rejects_conflicting_owner_before_read_or_write(store, monkeypatch, capsys):
+    monkeypatch.setenv("CODEX_THREAD_ID", "actual-cli")
+    assert main(["continuity", "resolve", "--session", "different-cli", "--host", "codex",
+                 "--scope", "runtime:bot-owned", "--root", str(store.root), "--json"]) == 3
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "unavailable" and result["handoff_path"] is None
+    assert not store.root.exists()

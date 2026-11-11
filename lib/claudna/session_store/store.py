@@ -563,3 +563,33 @@ class SessionStore:
         # captured sessions applies capture_state explicitly.
         return session_ids(self.root)
 
+
+
+def owned_session(store: SessionStore, sid: str, host: str) -> SessionHandle:
+    """Validate an explicit native owner before manual artifact access.
+
+    The caller obtains the native ID through its qualified host surface. A CLI
+    argument is not itself evidence of that delivery. Available native process
+    identity and retained lifecycle metadata must agree; neither cwd nor an
+    operation allocation is a substitute. This function performs no writes.
+    """
+    from .project import load_lifecycle, session_facts
+
+    handle = store.session(sid)  # exact component validation, never normalization
+    if host not in ("claude", "codex", "cursor"):
+        raise ValueError("unsupported artifact owner provider")
+    if sid in ("SID", "SESSION_ID", "native-sid", "native-session-id"):
+        raise ValueError("a verified native session ID is required")
+    variables = {"claude": ("CLAUDE_SESSION_ID",),
+                 "codex": ("CODEX_THREAD_ID", "CODEX_SESSION_ID"), "cursor": ()}[host]
+    if any(os.environ.get(key) and os.environ[key] != sid for key in variables):
+        raise ValueError("conflicting native session identity")
+    if handle.exists():
+        lifecycle = load_lifecycle(handle.paths)
+        opened = any(event["kind"] == "session.opened" for event in lifecycle.events)
+        if opened and session_facts(lifecycle.events).agent_cli != host:
+            raise ValueError("provider does not match recorded session owner")
+        if handle.capture_state() not in ("artifact-only", "captured"):
+            raise ValueError("session lifecycle is partial or corrupt; preserve it for inspection")
+    return handle
+

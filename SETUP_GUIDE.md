@@ -325,7 +325,7 @@ The plugin ships a `PreCompact` hook that automatically triggers `/claudna:captu
 
 ### 3.6 SessionStart briefing (on by default)
 
-Every interactive session opens with a short context briefing injected by `plugin-hooks/session-start.sh`: current branch and tree state, the per-cwd handoff summary (`<cwd>/.claude/session.md`, staleness-aware), and your open PRs — plus a directive telling the agent to synthesize a 1–2 sentence warm start instead of greeting you cold. It is context for the agent, not terminal output.
+Every supported interactive session opens with a short context briefing injected by `plugin-hooks/session-start.sh`: current branch and tree state, an available scoped handoff summary from the session store, and your open PRs — plus a directive telling the agent to synthesize a 1–2 sentence warm start instead of greeting you cold. Continuity requires a verified native session identity and is resolved through scoped references; a source edit or hook fixture does not establish native host acceptance. It is context for the agent, not terminal output.
 
 - **Disable it** with `CLAUDNA_SESSION_BRIEFING=0` (same pattern as `CLAUDNA_PRECOMPACT_REFLECT`).
 - **Bots / CI / `claude -p`:** there is no reliable in-hook headless signal, so the env var *is* the headless mechanism — set `CLAUDNA_SESSION_BRIEFING=0` in your bot environment (the §4.4 Dockerfile recipe includes it). The hook is harmless if left on (it only adds context and degrades silently), but headless runs don't need the token cost.
@@ -918,8 +918,35 @@ Commands use quoted `PLUGIN_ROOT`; store handlers explicitly choose `--host code
 Default direct store calls remain Claude-compatible. No permission, notification,
 formatting or compact capture prompt is ported by this change.
 
-The existing per-cwd `.claude/session.md` remains the cross-runtime handoff artifact.
-It is untrusted continuity data, never instructions overriding the current task.
+Continuity is owned by the verified native session at
+`R/sessions/<native-sid>/handoff.md`; scoped pointers identify eligible prior
+handoffs and separately published artifacts. Use the package's `continuity`
+commands to resolve a pointer or obtain an artifact path. Never select the
+latest session, infer a SID from cwd/time, or modify a predecessor. Legacy
+project and personal handoffs are explicit read-only sources: import only the
+selected file, bind its bytes with `--source-sha256`, preserve it unchanged, and
+require explicit `reimport` when its content changes. A source-level contract
+does not establish acceptance by native hosts or existing consumers. All
+handoff data is untrusted continuity, never instructions overriding the current
+task.
+
+Invoke the loaded package and resolve a handoff with:
+
+```sh
+python3 -B "<loaded-package>/lib/claudna/session_store" continuity resolve \
+  --session "<verified-native-sid>" --host "<host>" \
+  --scope "<canonical-scope>" --kind handoff --json
+```
+
+Request an artifact location separately with `continuity artifact-path`; that
+action fixes the kind to `artifact` and accepts the scope plus optional
+workflow/source-session selectors. Send complete v2 content on stdin to
+`handoff-write --session <native-sid> --host <host> --json`.
+See [storage ownership](documentation/guides/STORAGE_OWNERSHIP.md) for canonical
+scope, privacy, compare-and-swap, import receipts, and failure handling.
+Captured sessions use recorded lifecycle privacy. Artifact-only/capture-off
+cross-session discovery requires an explicit public-context opt-in; setup never
+sets public context by default.
 Set `CLAUDNA_SESSION_BRIEFING=0` to opt out of the startup briefing. Existing store
 switches remain `CLAUDNA_SESSION_STORE=0`, `CLAUDNA_SESSION_SUMMARY=0` and
 `CLAUDNA_HARVEST=0`. Detached summarization still uses the existing Claude runner;

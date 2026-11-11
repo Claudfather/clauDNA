@@ -245,7 +245,9 @@ retention contract is [SETUP_GUIDE §3.7](../../SETUP_GUIDE.md#37-session-store-
 
 Native uninstall removes the host installation, not clauDNA's separately stored
 history in `~/.claudna/`, Claude's compatibility telemetry in
-`~/.claude/telemetry/skill-events.jsonl`, or project `.claude/session.md` handoffs.
+`~/.claude/telemetry/skill-events.jsonl`, or legacy project handoff sources.
+New continuity is session-owned under `R/sessions/<native-sid>/handoff.md`;
+compatibility by existing external readers remains pending their acceptance.
 Overrides may place data elsewhere. Retained historical state from pre-0.22
 installs may also exist at `${XDG_STATE_HOME:-~/.local/state}/claudna/`. Review
 these locations before explicitly deleting personal history. Preserve unrelated

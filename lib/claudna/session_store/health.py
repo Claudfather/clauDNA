@@ -56,7 +56,7 @@ def report(store: SessionStore, *, env: Mapping[str, str] | None = None, now: fl
     hosts, summaries, excluded, policies = Counter(), Counter(), Counter(), Counter()
     public_sids: set[str] = set()
     warnings: list[str] = []
-    skipped_lines = unreadable = artifact_only = private = ready = unacked = at_risk = 0
+    skipped_lines = unreadable = artifact_only = private = ready = unacked = at_risk = handoffs = 0
     oldest_age = None
     for sid in store.session_ids():
         handle = store.session(sid)
@@ -77,6 +77,8 @@ def report(store: SessionStore, *, env: Mapping[str, str] | None = None, now: fl
             if state in ("partial", "corrupt"):
                 unreadable += 1
             public_sids.add(sid)
+            if handle.paths.handoff.is_file() and not handle.paths.handoff.is_symlink():
+                handoffs += 1
             hosts[facts.agent_cli] += 1
             for name, value in (("summary", facts.summary_enabled), ("prompts", facts.capture_prompts),
                                 ("harvest", (facts.harvest or {}).get("enabled"))):
@@ -169,6 +171,8 @@ def report(store: SessionStore, *, env: Mapping[str, str] | None = None, now: fl
             "status": "attention" if warnings else "observed" if public_sids else "no_evidence",
             "sessions_by_host": dict(hosts), "private_sessions_excluded": private,
             "artifact_only_sessions": artifact_only,
+            "continuity": {"public_captured_handoffs": handoffs,
+                           "discovery": "requires an explicit scope; not evaluated by aggregate health"},
             "recorded_policies": dict(policies), "final_segment_summaries": dict(summaries),
             "harvest": {"excluded_sessions": dict(excluded), "unacknowledged_segments": unacked,
                         "ready_segments": ready, "oldest_unacknowledged_days": oldest_age,

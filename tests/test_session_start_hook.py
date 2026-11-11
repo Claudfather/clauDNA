@@ -290,3 +290,54 @@ def test_git_reads_disable_fsmonitor():
         assert m.group(1) == "-c core.fsmonitor= ", f"unguarded git {m.group(2)} in session-start.sh"
     statusline = (REPO_ROOT / "plugin-hooks" / "statusline.sh").read_text()
     assert "-c core.fsmonitor=" in statusline, "statusline git read is unguarded"
+
+
+def _canonical_handoff(tmp_path, sid, workflow="default", *, private=False):
+    from claudna.session_store import continuity
+    from claudna.session_store.store import SessionStore
+
+    store = SessionStore(tmp_path / "claudna-state")
+    content = (f"---\ncwd: {tmp_path}\nlast_updated: 2026-11-11T12:00:00Z\nschema_version: 2\n---\n"
+               "## Next Steps\n- canonical next action\n")
+    continuity.write_handoff(store, current_sid=sid, host="claude", content=content)
+    continuity.write_context(store, current_sid=sid, host="claude", scope=f"workspace:{tmp_path}",
+                             privacy="public")
+    selected = continuity.publish_reference(store, current_sid=sid, host="claude", scope=f"workspace:{tmp_path}",
+                                            kind="handoff", workflow=workflow, relative_path="handoff.md")
+    if private:
+        continuity.write_context(store, current_sid=sid, host="claude", scope=f"workspace:{tmp_path}",
+                                 privacy="private")
+    return store, selected
+
+
+def test_startup_resolves_single_canonical_owner_before_legacy(tmp_path):
+    store, _ = _canonical_handoff(tmp_path, "previous")
+    legacy = tmp_path / ".claude" / "session.md"
+    legacy.parent.mkdir()
+    legacy.write_text("## Next Steps\n- obsolete legacy content\n")
+    original = legacy.read_bytes()
+    code, output, _ = run_hook(tmp_path)
+    assert code == 0 and "canonical next action" in output
+    assert "obsolete legacy content" not in output
+    assert legacy.read_bytes() == original
+    assert not store.session("start-session").paths.handoff.exists()
+    assert not store.session("start-session").paths.lifecycle.exists()
+
+
+@pytest.mark.parametrize("problem", ["ambiguous", "missing", "private", "missing_identity"])
+def test_startup_never_uses_legacy_to_bypass_unavailable_canonical_context(tmp_path, problem):
+    store, _ = _canonical_handoff(tmp_path, "previous")
+    if problem == "ambiguous":
+        _canonical_handoff(tmp_path, "parallel", "another-workflow")
+    elif problem == "missing":
+        store.session("previous").paths.handoff.unlink()
+    elif problem == "private":
+        from claudna.session_store import continuity
+        continuity.write_context(store, current_sid="previous", host="claude", scope=f"workspace:{tmp_path}",
+                                 privacy="private")
+    legacy = tmp_path / ".claude" / "session.md"
+    legacy.parent.mkdir()
+    legacy.write_text("## Next Steps\n- forbidden fallback\n")
+    code, output, _ = run_hook(tmp_path, session_id="" if problem == "missing_identity" else "start-session")
+    assert code == 0 and "forbidden fallback" not in output
+    assert "canonical next action" not in output
