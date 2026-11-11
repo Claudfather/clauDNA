@@ -622,11 +622,17 @@ def test_writable_runtime_and_delegate_entrypoints_create_no_bytecode(tmp_path):
     import shutil
 
     package = tmp_path / "package"
-    shutil.copytree(REPO_ROOT / "lib", package / "lib")
+    # Source collection may have left ignored bytecode behind. A package copies
+    # tracked source semantics, so exclude caches instead of treating them as
+    # output from the writable entrypoint processes below.
+    shutil.copytree(REPO_ROOT / "lib", package / "lib",
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     (package / "scripts").mkdir()
     for script in ("delegate.py", "skill-usefulness.py"):
         shutil.copyfile(REPO_ROOT / "scripts" / script, package / "scripts" / script)
     env = {"HOME": str(tmp_path / "private-home"), "TMPDIR": str(tmp_path), "PATH": os.environ["PATH"]}
+    assert not list(package.rglob("__pycache__"))
+    assert not list(package.rglob("*.pyc"))
     for entry in (package / "lib/claudna/session_store", package / "scripts/delegate.py",
                   package / "scripts/skill-usefulness.py"):
         # Directory execution caches __main__ before its code runs. Its public
