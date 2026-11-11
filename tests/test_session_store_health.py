@@ -20,6 +20,23 @@ def test_missing_store_is_unknown_and_read_only(store, capsys):
     assert not store.root.exists()
 
 
+def test_health_enumerates_artifact_only_separately_from_partial_capture(store):
+    from claudna.session_store.fsio import ensure_dir
+
+    artifact = store.session("artifact-owner")
+    ensure_dir(artifact.paths.dir / "artifacts")
+    (artifact.paths.dir / "artifacts" / "manual.md").write_text("manual artifact")
+    partial = store.session("partial")
+    ensure_dir(partial.paths.dir)
+    partial.paths.lifecycle.write_text("")
+
+    report = health.report(store, env={})
+    assert report["artifact_only_sessions"] == 1
+    assert report["status"] == "attention"
+    assert report["unreadable_inputs"] == 1
+    assert report["sessions_by_host"] == {}
+
+
 def test_backlog_uses_final_segments_ack_and_recorded_policy(store):
     h = summarized_session(store, "ready", [[BLOCK], [BLOCK]])
     h.ack("harvest", 1)

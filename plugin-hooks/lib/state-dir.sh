@@ -22,3 +22,17 @@ claudna_state_dir() {
         *) return 0 ;;
     esac
 }
+
+# Resolve one native session's directory without creating it. Keep this grammar
+# byte-for-byte aligned with paths.validate_sid: ASCII, 1–128 safe characters,
+# starting with an alphanumeric. No caller may substitute or guess an ID.
+claudna_session_dir() {
+    local sid="${1-}" root
+    local LC_ALL=C
+    if (( $# != 1 )) || [[ ! "$sid" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]; then
+        return 0
+    fi
+    root="$(claudna_state_dir)"
+    [[ "$root" == /* ]] || return 0
+    printf '%s/sessions/%s' "$root" "$sid"
+}

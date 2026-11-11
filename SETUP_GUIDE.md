@@ -4,6 +4,12 @@ For host-specific scope, install/update/removal, pin/rollback limits and retaine
 data, start with the [package support guide](documentation/guides/PACKAGE_SUPPORT.md).
 Its generated catalog derives counts and prerequisites from the package sources.
 
+The [storage ownership contract](documentation/guides/STORAGE_OWNERSHIP.md)
+defines native-session artifacts and scratch, explicit standalone operations,
+root relocation, privacy boundaries and the native capability gates. Allocation
+does not enable session capture; migration of existing writer defaults is staged
+and historical data is preserved.
+
 ## Cross-provider delegation
 
 `/claudna:delegate run` supports Claude-to-Codex and Codex-to-Claude. It requires Python 3.9+, the destination's installed/authenticated native CLI (measured with Codex 0.162.1 and Claude 2.1.304), and the actual parent session recorded by clauDNA. It reuses native account/model/permission policy; no API key is required to install the plugin. Claude uses its native `--permission-prompts none` flag: unanswered permission requests are denied without a permission broker or launcher retry. Denied calls remain visible separately from native completion; parent checks must establish the required result before acceptance. No permission is broadened.

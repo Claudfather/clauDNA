@@ -32,6 +32,7 @@ from .project import (
     by_segment,
     fold_boundary,
     load_lifecycle,
+    load_activity,
     next_segment_index,
     read_projection,
     rebuild,
@@ -50,6 +51,37 @@ class NotAppendable(StoreError):
     """The event has nowhere to go: no segment yet, or a closed session. Expected for async activity hooks."""
 
 
+def capture_state(paths: SessionPaths) -> str:
+    """Classify capture evidence without changing the physical ``exists`` predicate.
+
+    A valid opening in a parseable lifecycle is the capture authority. Before
+    that opening, store-shaped remnants remain partial/corrupt; directories
+    containing only owner artifacts are artifact-only. Captured sessions do
+    not scan activity logs or projections on metadata-only paths.
+    """
+    if not paths.dir.is_dir():
+        return "absent"
+    lifecycle = load_lifecycle(paths)
+    opened = any(event["kind"] == "session.opened" for event in lifecycle.events)
+    if opened and lifecycle.projected_from["skipped"] == 0:
+        return "captured"
+    malformed = lifecycle.projected_from["skipped"] > 0
+    remnants = paths.lifecycle.exists() or paths.session_json.exists()
+    for index in paths.segment_indices():
+        segment = paths.segment(index)
+        remnants |= segment.events.exists() or segment.segment_json.exists()
+        activity = load_activity(paths, index)
+        malformed |= activity.projected_from["skipped"] > 0
+    for path in (paths.session_json, *(paths.segment(i).segment_json for i in paths.segment_indices())):
+        if path.exists():
+            projection = read_json(path)
+            if not isinstance(projection, dict):
+                malformed = True
+    if malformed:
+        return "corrupt"
+    return "partial" if remnants else "artifact-only"
+
+
 class SessionHandle:
     """All reads and writes for one session id."""
 
@@ -62,6 +94,10 @@ class SessionHandle:
 
     def exists(self) -> bool:
         return self.paths.dir.is_dir()
+
+    def capture_state(self) -> str:
+        """Return the lifecycle evidence state; ``exists`` remains physical."""
+        return capture_state(self.paths)
 
     def current_segment(self) -> int | None:
         """The highest existing segment index — the only one that can be open.
@@ -519,5 +555,7 @@ class SessionStore:
         return SessionHandle(session_paths(sid, self.root))
 
     def session_ids(self) -> list[str]:
+        # Preserve the physical enumeration contract. Each caller that needs
+        # captured sessions applies capture_state explicitly.
         return session_ids(self.root)
 

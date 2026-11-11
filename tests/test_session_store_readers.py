@@ -365,3 +365,34 @@ def test_an_unreadable_session_is_skipped_not_fatal(store, monkeypatch):
     monkeypatch.setattr(readers, "session_doc", doc)
     unreadable = []
     assert [r["sid"] for r in readers.list_sessions(store, unreadable=unreadable)] == ["ok"] and unreadable == ["bad"]
+
+
+def test_artifact_only_and_pre_open_remnants_never_enter_global_readers(store):
+    from claudna.session_store.fsio import ensure_dir
+
+    owned = store.session("artifact-only")
+    artifacts = ensure_dir(owned.paths.dir / "artifacts")
+    (artifacts / "handoff.md").write_text("private working notes")
+    partial = store.session("partial-session")
+    ensure_dir(partial.paths.dir)
+    partial.paths.lifecycle.write_text("")
+
+    unreadable = []
+    assert readers.list_sessions(store, unreadable=unreadable) == []
+    assert unreadable == ["partial-session"]
+    with pytest.raises(LookupError):
+        readers.show(store, "artifact-only")
+    assert readers.failures(store) == []
+
+
+def test_private_malformed_session_identity_stays_out_of_global_diagnostics(store):
+    h = session_with(store, "private-damaged", [None])
+    h.set_private(True)
+    with h.paths.lifecycle.open("a") as log:
+        log.write("torn tail\n")
+
+    unreadable = []
+    assert readers.list_sessions(store, unreadable=unreadable) == []
+    assert unreadable == []
+    assert readers.failures(store, unreadable=unreadable) == []
+    assert unreadable == []

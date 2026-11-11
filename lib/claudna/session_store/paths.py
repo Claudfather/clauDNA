@@ -25,6 +25,8 @@ STATE_DIR_ENV = "CLAUDNA_STATE_DIR"
 #: Set in every process clauDNA spawns (summarizer, its claude -p): nothing under it records.
 CHILD_ENV = "CLAUDNA_SESSION_CHILD"
 DEFAULT_STATE_DIR = "~/.claudna"
+SCRATCH_LABEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", re.ASCII)
+OPERATION_ID_RE = re.compile(r"op-[0-9a-f]{32}", re.ASCII)
 
 #: Opaque, but safe as a single path component: no separators, no leading dot.
 #: Always ``fullmatch`` with ``re.ASCII``: ``$`` also matches before a trailing
@@ -56,7 +58,21 @@ def state_root(env: dict[str, str] | None = None) -> Path:
     repository where it can be committed.
     """
     env = os.environ if env is None else env
-    return validate_root(Path(env.get(STATE_DIR_ENV) or DEFAULT_STATE_DIR))
+    configured = env.get(STATE_DIR_ENV)
+    if configured:
+        root = Path(configured)
+        if configured.startswith("~") and configured != "~" and not configured.startswith("~/"):
+            raise InvalidStateDir("only '~' or '~/…' home expansion is supported for the state root")
+        if str(root) == "~" or str(root).startswith("~/"):
+            home = env.get("HOME")
+            if not home:
+                raise InvalidStateDir("HOME is required to expand the default state root")
+            root = Path(home) / str(root)[2:] if str(root).startswith("~/") else Path(home)
+        return validate_root(root)
+    home = env.get("HOME")
+    if not home:
+        raise InvalidStateDir("HOME is required when CLAUDNA_STATE_DIR is unset")
+    return validate_root(Path(home) / ".claudna")
 
 
 def validate_root(root: Path) -> Path:
@@ -70,6 +86,20 @@ def validate_root(root: Path) -> Path:
     if not root.is_absolute():
         raise InvalidStateDir(f"the session store root must be an absolute path, got {str(root)!r}")
     return root
+
+
+def validate_scratch_label(label: str) -> str:
+    """Return an ASCII scratch label suitable for a directory prefix."""
+    if not isinstance(label, str) or not SCRATCH_LABEL_RE.fullmatch(label):
+        raise ValueError(f"invalid scratch label: {label!r}")
+    return label
+
+
+def validate_operation_id(operation_id: str) -> str:
+    """Return a namespaced operation ID, or reject it before path construction."""
+    if not isinstance(operation_id, str) or not OPERATION_ID_RE.fullmatch(operation_id):
+        raise ValueError(f"invalid operation id: {operation_id!r}")
+    return operation_id
 
 
 def seg_dirname(index: int) -> str:
@@ -134,6 +164,32 @@ class SessionPaths:
     def session_json(self) -> Path:
         return self.dir / "session.json"
 
+    @property
+    def scratch(self) -> Path:
+        return self.dir / "scratch"
+
+    @property
+    def artifacts(self) -> Path:
+        return self.dir / "artifacts"
+
+    @property
+    def handoff(self) -> Path:
+        return self.dir / "handoff.md"
+
+    @property
+    def hooks(self) -> Path:
+        return self.dir / "hooks"
+
+    @property
+    def delegation(self) -> Path:
+        return self.dir / "delegation"
+
+    def delegation_record(self, job_id: str) -> Path:
+        """Return a delegation record path for a safe single-component job ID."""
+        if not isinstance(job_id, str) or not _SID_RE.fullmatch(job_id):
+            raise ValueError(f"invalid delegation job id: {job_id!r}")
+        return self.delegation / f"{job_id}.json"
+
     def archived_indices(self) -> list[int]:
         """The indices of retired segments whose summary was archived, ascending (a directory listing, no reads)."""
         archive = self.dir / "summaries"
@@ -184,4 +240,24 @@ def session_ids(root: Path) -> list[str]:
 def session_paths(sid: str, root: Path | None = None) -> SessionPaths:
     """Paths for ``sid`` under ``root`` (default: :func:`state_root`)."""
     return SessionPaths(root=state_root() if root is None else root, sid=validate_sid(sid))
+
+
+def owned_path(paths: SessionPaths, kind: str) -> Path:
+    """Pure lookup of a named path owned by a native session."""
+    members = {
+        "scratch": paths.scratch,
+        "artifacts": paths.artifacts,
+        "handoff": paths.handoff,
+        "hooks": paths.hooks,
+        "delegation": paths.delegation,
+    }
+    try:
+        return members[kind]
+    except (KeyError, TypeError):
+        raise ValueError(f"unknown session-owned path kind: {kind!r}") from None
+
+
+def operation_path(root: Path, operation_id: str) -> Path:
+    """Pure lookup of an explicitly namespaced standalone operation root."""
+    return validate_root(root) / "operations" / validate_operation_id(operation_id)
 

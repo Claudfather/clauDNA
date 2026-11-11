@@ -36,7 +36,7 @@ from . import rollup
 from .fsio import atomic_write_json, atomic_write_text, ensure_dir, env_number, epoch_of, read_json
 from .project import (HARVEST_CONSUMER, SegmentState, harvest_skip, load_lifecycle, retired_indices, segment_states,
                       session_facts, stale_projections)
-from .store import SessionHandle, SessionStore
+from .store import SessionHandle, SessionStore, capture_state
 
 CAP_ENV, FLOOR_ENV = "CLAUDNA_RETAIN_DAYS", "CLAUDNA_RETAIN_ACKED_DAYS"
 CAP_DAYS, ACKED_FLOOR_DAYS = 30.0, 7.0
@@ -177,6 +177,12 @@ def sweep(store: SessionStore, env: Mapping[str, str], *, now: float | None = No
             break
         handle = store.session(sid)
         try:
+            state = capture_state(handle.paths)
+            if state == "artifact-only":
+                continue
+            if state != "captured":
+                report.errors.append(f"{sid}: capture state {state}")
+                continue
             _sweep_husks(handle)
             if rollup.outdated(handle.paths):  # 0.23's unscreened rollup: before the fully-retired skip below
                 rollup.refresh(handle.paths)

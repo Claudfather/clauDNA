@@ -9,11 +9,30 @@ directory (orchestration guide §1). Each failure names the file and line.
 
 from __future__ import annotations
 
+import json
+import os
 import re
 import subprocess
+import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
+from claudna.session_store.fsio import (  # noqa: E402
+    OperationAllocationError,
+    allocate_operation,
+    make_scratch,
+)
+from claudna.session_store.paths import (  # noqa: E402
+    SessionPaths,
+    operation_path,
+    owned_path,
+    validate_operation_id,
+    validate_scratch_label,
+)
+from claudna.session_store.store import SessionStore  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 FILES = sorted(
@@ -177,3 +196,205 @@ def test_the_activity_crawl_needs_its_output_dir_named(tmp_path):
     }
     run = subprocess.run(["bash", str(crawl)], cwd=tmp_path, env=env, capture_output=True, text=True, timeout=30)
     assert run.returncode != 0 and "OUT" in run.stderr, run.stdout + run.stderr
+
+
+@pytest.mark.parametrize("label", ["a", "A0._-", "z" * 64])
+def test_scratch_labels_use_the_exact_ascii_grammar(label):
+    assert validate_scratch_label(label) == label
+
+
+@pytest.mark.parametrize("label", ["", ".hidden", "../escape", "a/b", "a\n", "é", "z" * 65])
+def test_scratch_labels_reject_traversal_unicode_and_newlines(label):
+    with pytest.raises(ValueError):
+        validate_scratch_label(label)
+
+
+def test_scratch_creation_is_unique_private_and_scoped_to_parent(tmp_path):
+    parent = tmp_path / "state" / "sessions" / "sid" / "scratch"
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        created = list(pool.map(lambda _: make_scratch(parent, "audit"), range(24)))
+    assert len(set(created)) == 24
+    assert all(path.parent == parent and path.name.startswith("audit.") for path in created)
+    assert parent.stat().st_mode & 0o777 == 0o700
+    assert all(path.stat().st_mode & 0o777 == 0o700 for path in created)
+
+
+def test_operation_lookup_is_pure_and_keeps_its_own_namespace(tmp_path):
+    operation_id = "op-" + "a" * 32
+    root = tmp_path / "state"
+    target = operation_path(root, operation_id)
+    assert target == root / "operations" / operation_id
+    assert not root.exists()
+    with pytest.raises(ValueError):
+        operation_path(root, "a" * 32)
+    with pytest.raises(ValueError):
+        validate_operation_id(operation_id + "\n")
+
+
+def test_session_owned_path_lookup_is_whitelisted_and_pure(tmp_path):
+    root = tmp_path / "state"
+    paths = SessionPaths(root=root, sid="native-session")
+    assert owned_path(paths, "handoff") == root / "sessions/native-session/handoff.md"
+    assert owned_path(paths, "artifacts") == root / "sessions/native-session/artifacts"
+    assert not root.exists()
+    with pytest.raises(ValueError):
+        owned_path(paths, "../../outside")
+
+
+def test_generated_operation_allocation_has_private_layout_and_owner_record(tmp_path):
+    import json
+
+    allocation = allocate_operation(tmp_path, label="review")
+    assert allocation.parent == tmp_path / "operations"
+    assert allocation.name.startswith("op-") and len(allocation.name) == 35
+    assert allocation.stat().st_mode & 0o777 == 0o700
+    for directory in (allocation / "scratch", allocation / "artifacts"):
+        assert directory.is_dir() and directory.stat().st_mode & 0o777 == 0o700
+    marker = allocation / "operation.json"
+    assert marker.stat().st_mode & 0o777 == 0o600
+    assert json.loads(marker.read_text()) == {"version": 1, "operation_id": allocation.name, "label": "review"}
+
+
+def test_explicit_operation_allocation_records_null_label(tmp_path):
+    import json
+
+    operation_id = "op-" + "e" * 32
+    allocation = allocate_operation(tmp_path / "state", operation_id=operation_id)
+    assert json.loads((allocation / "operation.json").read_text()) == {
+        "version": 1, "operation_id": operation_id, "label": None
+    }
+
+
+def test_explicit_operation_collision_fails_without_adopting_existing_data(tmp_path):
+    operation_id = "op-" + "b" * 32
+    existing = operation_path(tmp_path, operation_id)
+    existing.mkdir(parents=True)
+    sentinel = existing / "keep"
+    sentinel.write_text("untouched")
+    with pytest.raises(FileExistsError, match=str(existing)):
+        allocate_operation(tmp_path, operation_id=operation_id)
+    assert sentinel.read_text() == "untouched"
+    assert not (existing / "operation.json").exists()
+
+
+def test_generated_operation_retries_only_an_id_collision(tmp_path, monkeypatch):
+    from claudna.session_store import fsio
+
+    collision_id = "op-" + "f" * 32
+    occupied = operation_path(tmp_path, collision_id)
+    occupied.mkdir(parents=True)
+    generated_ids = iter((collision_id[3:], "1" * 32))
+    monkeypatch.setattr(fsio.uuid, "uuid4", lambda: type("UUID", (), {"hex": next(generated_ids)})())
+    allocation = allocate_operation(tmp_path, label="retry")
+    assert allocation.name == "op-" + "1" * 32
+    assert occupied.is_dir()
+
+
+def test_relative_operation_root_is_rejected_before_any_write(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValueError):
+        allocate_operation(Path("relative-state"), operation_id="op-" + "2" * 32)
+    assert not (tmp_path / "relative-state").exists()
+
+
+def test_operation_partial_failure_names_and_preserves_exact_allocation(tmp_path, monkeypatch):
+    from claudna.session_store import fsio
+
+    def fail(*args, **kwargs):
+        raise OSError("injected marker failure")
+
+    monkeypatch.setattr(fsio, "atomic_write_json", fail)
+    with pytest.raises(OperationAllocationError) as caught:
+        allocate_operation(tmp_path, operation_id="op-" + "c" * 32)
+    assert caught.value.path == tmp_path / "operations" / ("op-" + "c" * 32)
+    assert (caught.value.path / "scratch").is_dir()
+    assert (caught.value.path / "artifacts").is_dir()
+
+
+def _run_store_cli(root: Path, *arguments: str, extra_env: dict[str, str] | None = None):
+    env = {"PATH": os.environ["PATH"], "HOME": str(root.parent / "home")}
+    env.update(extra_env or {})
+    return subprocess.run(
+        [sys.executable, "-B", str(REPO / "lib/claudna/session_store"), *arguments, "--root", str(root)],
+        env=env, capture_output=True, text=True, timeout=10,
+    )
+
+
+def test_paths_cli_lookup_is_read_only_and_create_handoff_makes_only_session_parent(tmp_path):
+    root = tmp_path / "state"
+    sid = "native-cli-session"
+    lookup = _run_store_cli(root, "paths", "--session", sid, "--host", "cursor", "--kind", "handoff")
+    assert lookup.returncode == 0 and lookup.stdout.strip() == str(root / "sessions" / sid / "handoff.md")
+    assert not root.exists()
+
+    created = _run_store_cli(root, "paths", "--session", sid, "--host", "cursor", "--kind", "handoff", "--create")
+    session_dir = root / "sessions" / sid
+    assert created.returncode == 0, created.stderr
+    assert session_dir.is_dir() and not (session_dir / "handoff.md").exists()
+    assert sorted(path.name for path in session_dir.iterdir()) == []
+
+
+def test_paths_cli_rejects_missing_and_placeholder_session_ids(tmp_path):
+    root = tmp_path / "state"
+    missing = _run_store_cli(root, "paths", "--host", "claude", "--kind", "artifacts")
+    placeholder = _run_store_cli(
+        root, "paths", "--session", "SESSION_ID", "--host", "claude", "--kind", "artifacts"
+    )
+    assert missing.returncode == 2
+    assert placeholder.returncode == 2 and "verified native session ID" in placeholder.stderr
+    assert not root.exists()
+
+
+def test_paths_cli_rejects_conflicting_codex_environment_identity(tmp_path):
+    root = tmp_path / "state"
+    sid = "codex-thread-native-1"
+    result = _run_store_cli(
+        root, "paths", "--session", sid, "--host", "codex", "--kind", "artifacts",
+        extra_env={"CODEX_THREAD_ID": sid, "CODEX_SESSION_ID": "other-thread"},
+    )
+    assert result.returncode == 2 and "conflicting native session identity" in result.stderr
+    assert not root.exists()
+
+
+def test_paths_cli_rejects_a_provider_mismatch_in_recorded_session(tmp_path):
+    root = tmp_path / "state"
+    sid = "recorded-claude-session"
+    handle = SessionStore(root).session(sid)
+    handle.open_session(
+        "startup",
+        actor={"kind": "interactive", "fleet": None, "bot_id": None, "bot_name": None,
+               "model": None, "entrypoint": "cli"},
+        origin={"cwd": str(tmp_path), "repo": None, "branch": None, "head": None},
+        transcript_path=None,
+        agent_cli="claude",
+    )
+    result = _run_store_cli(root, "paths", "--session", sid, "--host", "codex", "--kind", "artifacts")
+    assert result.returncode == 2 and "provider does not match recorded session owner" in result.stderr
+
+
+def test_operation_dir_cli_lookup_is_read_only_and_create_records_generated_owner(tmp_path):
+    root = tmp_path / "state"
+    operation_id = "op-" + "d" * 32
+    lookup = _run_store_cli(root, "operation-dir", "--operation-id", operation_id)
+    assert lookup.returncode == 0 and lookup.stdout.strip() == str(root / "operations" / operation_id)
+    assert not root.exists()
+
+    created = _run_store_cli(root, "operation-dir", "--label", "manual-review", "--create")
+    assert created.returncode == 0, created.stderr
+    allocation = Path(created.stdout.strip())
+    assert allocation.parent == root / "operations" and allocation.name.startswith("op-")
+    assert (allocation / "scratch").is_dir() and (allocation / "artifacts").is_dir()
+    assert json.loads((allocation / "operation.json").read_text()) == {
+        "version": 1, "operation_id": allocation.name, "label": "manual-review"
+    }
+
+
+def test_native_id_spelling_does_not_alias_the_operation_namespace(tmp_path):
+    root = tmp_path / "state"
+    sid = "op-" + "e" * 32
+    result = _run_store_cli(root, "paths", "--session", sid, "--host", "codex", "--kind", "artifacts",
+                            extra_env={"CODEX_THREAD_ID": sid})
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == str(root / "sessions" / sid / "artifacts")
+    assert operation_path(root, sid) == root / "operations" / sid
+    assert not root.exists()

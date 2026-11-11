@@ -51,8 +51,10 @@ from typing import TYPE_CHECKING
 from . import boundaries
 from . import events as ev
 from . import schema
-from .fsio import append_jsonl, cap_log, ensure_dir, read_json, read_jsonl
-from .paths import InvalidSessionId, InvalidStateDir, state_root
+from .fsio import (allocate_operation, append_jsonl, cap_log, ensure_dir,
+                   make_scratch, read_json, read_jsonl)
+from .paths import (InvalidSessionId, InvalidStateDir, operation_path, owned_path, state_root,
+                    validate_scratch_label)
 from .project import OLDER_PROJECTIONS, SUMMARY_ENV
 from .store import SessionHandle, SessionStore
 
@@ -84,6 +86,61 @@ def _handle(args: argparse.Namespace) -> SessionHandle | None:
         print(f"error: no session {args.sid} under {store.root}", file=sys.stderr)
         return None
     return handle
+
+
+def owned_session(store: SessionStore, sid: str, host: str) -> SessionHandle:
+    """Validate an explicit native owner before manual artifact access.
+
+    The caller obtains the native ID through its qualified host surface. A CLI
+    argument is not itself evidence of that delivery. Available native process
+    identity and retained lifecycle metadata must agree; neither cwd nor an
+    operation allocation is a substitute. This function performs no writes.
+    """
+    from .project import load_lifecycle, session_facts
+
+    handle = store.session(sid)  # exact component validation, never normalization
+    if host not in ("claude", "codex", "cursor"):
+        raise ValueError("unsupported artifact owner provider")
+    if sid in ("SID", "SESSION_ID", "native-sid", "native-session-id"):
+        raise ValueError("a verified native session ID is required")
+    variables = {"claude": ("CLAUDE_SESSION_ID",),
+                 "codex": ("CODEX_THREAD_ID", "CODEX_SESSION_ID"), "cursor": ()}[host]
+    if any(os.environ.get(key) and os.environ[key] != sid for key in variables):
+        raise ValueError("conflicting native session identity")
+    if handle.exists():
+        lifecycle = load_lifecycle(handle.paths)
+        opened = any(event["kind"] == "session.opened" for event in lifecycle.events)
+        if opened and session_facts(lifecycle.events).agent_cli != host:
+            raise ValueError("provider does not match recorded session owner")
+        if handle.capture_state() not in ("artifact-only", "captured"):
+            raise ValueError("session lifecycle is partial or corrupt; preserve it for inspection")
+    return handle
+
+
+def _owned_path_command(args) -> int:
+    """Thin manual allocation door; never opens a captured session."""
+    try:
+        store = SessionStore(Path(args.root) if args.root else None)
+        if args.verb == "operation-dir":
+            if args.label is not None and not args.create:
+                raise ValueError("--label requires --create")
+            target = (allocate_operation(store.root, label=args.label, operation_id=args.operation_id)
+                      if args.create else operation_path(store.root, args.operation_id))
+        else:
+            if args.verb == "scratch":
+                validate_scratch_label(args.label)
+            handle = owned_session(store, args.session, args.host)
+            if args.verb == "scratch":
+                target = make_scratch(handle.paths.scratch, args.label)
+            else:
+                target = owned_path(handle.paths, args.kind)
+                if args.create:
+                    ensure_dir(target.parent if args.kind == "handoff" else target)
+        print(target)
+        return 0
+    except (ValueError, OSError, RuntimeError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
 
 
 @dataclasses.dataclass(frozen=True)
@@ -338,6 +395,21 @@ def main(argv: list[str] | None = None) -> int:
     rooted = argparse.ArgumentParser(add_help=False)
     rooted.add_argument("--root", help="store root (default: $CLAUDNA_STATE_DIR or ~/.claudna)")
     sub = parser.add_subparsers(dest="verb", required=True)
+    for verb in ("paths", "scratch"):
+        allocation = sub.add_parser(verb, help="explicit native-session artifact paths", parents=[rooted])
+        allocation.add_argument("--session", required=True)
+        allocation.add_argument("--host", required=True, choices=("claude", "codex", "cursor"))
+        if verb == "paths":
+            allocation.add_argument("--kind", required=True,
+                                    choices=("scratch", "artifacts", "handoff", "hooks", "delegation"))
+            allocation.add_argument("--create", action="store_true")
+        else:
+            allocation.add_argument("--label", required=True)
+    operation = sub.add_parser("operation-dir", help="explicit standalone maintainer allocation", parents=[rooted])
+    identity = operation.add_mutually_exclusive_group(required=True)
+    identity.add_argument("--label")
+    identity.add_argument("--operation-id")
+    operation.add_argument("--create", action="store_true")
     skill = sub.add_parser("skill-start", help="best-effort Codex agent procedure entry; not task success",
                            parents=[rooted])
     skill.add_argument("skill", help="selected claudna skill slug; no task arguments")
@@ -411,6 +483,8 @@ def main(argv: list[str] | None = None) -> int:
     hook.add_argument("--host", default="claude")
     hook.add_argument("event")
     args = parser.parse_args(argv)
+    if args.verb in ("paths", "scratch", "operation-dir"):
+        return _owned_path_command(args)
     if args.verb == "skill-start":
         from .host_codex import record_skill_start
 

@@ -15,7 +15,7 @@ from typing import Mapping
 from . import ops, retention
 from .fsio import env_number, epoch_of, read_json, read_jsonl, rotated, utc_seconds
 from .project import HARVEST_CONSUMER, harvest_skip, load_lifecycle, segment_states, session_facts
-from .store import SessionStore
+from .store import SessionStore, capture_state
 
 
 def _reviews(root, public_sids: set[str]) -> dict:
@@ -56,11 +56,15 @@ def report(store: SessionStore, *, env: Mapping[str, str] | None = None, now: fl
     hosts, summaries, excluded, policies = Counter(), Counter(), Counter(), Counter()
     public_sids: set[str] = set()
     warnings: list[str] = []
-    skipped_lines = unreadable = private = ready = unacked = at_risk = 0
+    skipped_lines = unreadable = artifact_only = private = ready = unacked = at_risk = 0
     oldest_age = None
     for sid in store.session_ids():
         handle = store.session(sid)
         try:
+            state = capture_state(handle.paths)
+            if state == "artifact-only":
+                artifact_only += 1
+                continue
             log = load_lifecycle(handle.paths)
             facts = session_facts(log.events)
             if facts.private:
@@ -70,6 +74,8 @@ def report(store: SessionStore, *, env: Mapping[str, str] | None = None, now: fl
             if not any(e["kind"] == "session.opened" for e in log.events):
                 unreadable += 1
                 continue
+            if state in ("partial", "corrupt"):
+                unreadable += 1
             public_sids.add(sid)
             hosts[facts.agent_cli] += 1
             for name, value in (("summary", facts.summary_enabled), ("prompts", facts.capture_prompts),
@@ -143,6 +149,7 @@ def report(store: SessionStore, *, env: Mapping[str, str] | None = None, now: fl
     return {"schema": "claudna.pipeline-health/1", "observed_at": utc_seconds(now),
             "status": "attention" if warnings else "observed" if public_sids else "no_evidence",
             "sessions_by_host": dict(hosts), "private_sessions_excluded": private,
+            "artifact_only_sessions": artifact_only,
             "recorded_policies": dict(policies), "final_segment_summaries": dict(summaries),
             "harvest": {"excluded_sessions": dict(excluded), "unacknowledged_segments": unacked,
                         "ready_segments": ready, "oldest_unacknowledged_days": oldest_age,

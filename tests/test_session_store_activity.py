@@ -215,7 +215,8 @@ class TestAdapter:
 
 class TestTelemetry:
     def env(self, tmp_path, **extra):
-        return {"CLAUDNA_TELEMETRY": "1", "CLAUDNA_TELEMETRY_PATH": str(tmp_path / "t.jsonl"), **extra}
+        return {"HOME": str(tmp_path), "CLAUDNA_TELEMETRY": "1",
+                "CLAUDNA_TELEMETRY_PATH": str(tmp_path / "t.jsonl"), **extra}
 
     def lines(self, tmp_path):
         return read_jsonl(tmp_path / "t.jsonl").records

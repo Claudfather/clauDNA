@@ -28,9 +28,12 @@ import math
 import os
 import time
 import tempfile
+import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
+
+from .paths import operation_path, validate_operation_id, validate_root, validate_scratch_label
 
 DIR_MODE = 0o700
 FILE_MODE = 0o600
@@ -79,6 +82,70 @@ def ensure_dir(path: Path) -> Path:
         except FileExistsError:
             pass  # created concurrently by another process
     return path
+
+
+def make_scratch(parent: Path, label: str) -> Path:
+    """Create a unique private scratch directory under ``parent``."""
+    label = validate_scratch_label(label)
+    ensure_dir(parent)
+    return Path(tempfile.mkdtemp(prefix=f"{label}.", dir=parent))
+
+
+class OperationAllocationError(OSError):
+    """An operation allocation failed after identifying its exact directory."""
+
+    def __init__(self, path: Path, cause: OSError):
+        self.path = path
+        super().__init__(f"operation allocation at {path} is incomplete: {cause}")
+
+
+def allocate_operation(
+    root: Path,
+    *,
+    label: str | None = None,
+    operation_id: str | None = None,
+) -> Path:
+    """Exclusively allocate a standalone operation directory beneath ``root``.
+
+    Exactly one form is accepted: a validated label asks for a generated ID,
+    while an explicit ID is allocated exactly as supplied. Partial allocations
+    are intentionally retained for inspection and are named in any error.
+    """
+    if (label is None) == (operation_id is None):
+        raise ValueError("provide exactly one of label or operation_id")
+    generated = operation_id is None
+    if generated:
+        label = validate_scratch_label(label)  # type: ignore[arg-type]
+    else:
+        operation_id = validate_operation_id(operation_id)  # type: ignore[arg-type]
+
+    root = validate_root(Path(root))
+    operations = root / "operations"
+    ensure_dir(operations)
+    while True:
+        selected_id = f"op-{uuid.uuid4().hex}" if generated else operation_id
+        allocation = operation_path(root, selected_id)  # type: ignore[arg-type]
+        try:
+            allocation.mkdir(mode=DIR_MODE)
+            break
+        except FileExistsError:
+            if generated:
+                continue
+            raise FileExistsError(f"operation allocation already exists: {allocation}") from None
+        except OSError as exc:
+            raise OperationAllocationError(allocation, exc) from exc
+
+    try:
+        (allocation / "scratch").mkdir(mode=DIR_MODE)
+        (allocation / "artifacts").mkdir(mode=DIR_MODE)
+        atomic_write_json(
+            allocation / "operation.json",
+            {"version": 1, "operation_id": selected_id, "label": label if generated else None},
+            durable=True,
+        )
+    except OSError as exc:
+        raise OperationAllocationError(allocation, exc) from exc
+    return allocation
 
 
 def atomic_write_text(path: Path, text: str, *, durable: bool = False) -> None:

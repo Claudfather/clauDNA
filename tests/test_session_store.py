@@ -54,7 +54,7 @@ from claudna.session_store.paths import (  # noqa: E402
 )
 from claudna.session_store import project as project_module  # noqa: E402
 from claudna.session_store.project import load_lifecycle, session_facts  # noqa: E402
-from claudna.session_store.store import NotAppendable, SessionStore, StoreError  # noqa: E402
+from claudna.session_store.store import NotAppendable, SessionStore, StoreError, capture_state  # noqa: E402
 
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "session-store" / "basic"
 FIXTURE_SID = "5f0c2d1e-0000-4000-8000-000000000001"
@@ -111,9 +111,63 @@ class TestPaths:
 
     def test_state_root_env_override_and_default(self, tmp_path):
         assert state_root({"CLAUDNA_STATE_DIR": str(tmp_path)}) == tmp_path
-        assert state_root({}) == Path("~/.claudna").expanduser()
+        home = tmp_path / "home"
+        assert state_root({"HOME": str(home)}) == home / ".claudna"
+        with pytest.raises(ValueError, match="HOME"):
+            state_root({})
         with pytest.raises(ValueError, match="absolute"):
             state_root({"CLAUDNA_STATE_DIR": "relative/store"})
+
+
+def test_capture_state_distinguishes_artifact_ownership_from_lifecycle(store):
+    handle = store.session("artifact-owner")
+    ensure_dir(handle.paths.dir)
+    (handle.paths.dir / "handoff.md").write_text("manual notes")
+    assert handle.exists() is True
+    assert capture_state(handle.paths) == "artifact-only"
+
+    handle.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path="/t.jsonl")
+    assert capture_state(handle.paths) == "captured"
+    assert (handle.paths.dir / "handoff.md").read_text() == "manual notes"
+
+
+@pytest.mark.parametrize("contents, expected", [(b"", "partial"), (b"{torn", "corrupt")])
+def test_capture_state_keeps_interrupted_lifecycle_allocations_visible(store, contents, expected):
+    handle = store.session("interrupted")
+    ensure_dir(handle.paths.dir)
+    handle.paths.lifecycle.write_bytes(contents)
+    assert handle.exists() is True
+    assert capture_state(handle.paths) == expected
+
+
+def test_capture_state_marks_event_or_projection_remnants_without_opening_partial(store):
+    handle = store.session("pre-open-remnant")
+    ensure_dir(handle.paths.segment(1).dir)
+    handle.paths.segment(1).events.write_text("")
+    assert capture_state(handle.paths) == "partial"
+    handle.paths.segment(1).segment_json.write_text("not json")
+    assert capture_state(handle.paths) == "corrupt"
+
+
+def test_valid_opening_remains_capture_authority_without_scanning_activity(store):
+    handle = opened(store, "captured-with-torn-activity")
+    ensure_dir(handle.paths.segment(1).dir)
+    handle.paths.segment(1).events.write_text("torn activity line\n")
+    assert capture_state(handle.paths) == "captured"
+
+
+def test_retention_preserves_artifact_only_content_and_consumer_bytes(store):
+    owner = store.session("artifact-owner")
+    artifact_dir = ensure_dir(owner.paths.dir / "artifacts")
+    (artifact_dir / "handoff.md").write_text("manual artifact")
+    captured = opened(store, "captured")
+    captured.ack("export", 1)
+    before = captured.paths.consumers.read_bytes()
+
+    retention.sweep(store, {"CLAUDNA_RETAIN_DAYS": "0"})
+
+    assert (artifact_dir / "handoff.md").read_text() == "manual artifact"
+    assert captured.paths.consumers.read_bytes() == before
 
 
 # ── fsio ─────────────────────────────────────────────────────────────────────

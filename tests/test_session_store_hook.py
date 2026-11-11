@@ -446,7 +446,7 @@ STATE_DIR_SH = REPO_ROOT / "plugin-hooks" / "lib" / "state-dir.sh"
 class TestStateRootParity:
     """plugin-hooks/lib/state-dir.sh and paths.state_root must agree on every input."""
 
-    @pytest.mark.parametrize("override", [None, "/abs/state", "~/state", "~", "relative/state", ""])
+    @pytest.mark.parametrize("override", [None, "/abs/state", "~/state", "~", "~someuser/state", "relative/state", ""])
     def test_bash_and_python_resolve_the_same_root(self, tmp_path, monkeypatch, override):
         monkeypatch.setenv("HOME", str(tmp_path))  # Path.expanduser reads the process's HOME
         env = {"HOME": str(tmp_path), "PATH": os.environ["PATH"]}
@@ -459,6 +459,36 @@ class TestStateRootParity:
         except ValueError:
             python = ""
         assert bash == python
+
+    @pytest.mark.parametrize("sid", [SID, "a" * 128, "../escape", "é", "sid\n", ""])
+    @pytest.mark.parametrize("override", [None, "/relocated/state"])
+    def test_bash_session_path_matches_python_validation(self, tmp_path, sid, override):
+        env = {"HOME": str(tmp_path), "PATH": os.environ["PATH"], "SID": sid}
+        if override is not None:
+            env["CLAUDNA_STATE_DIR"] = override
+        bash = subprocess.run(
+            ["bash", "-c", f". {STATE_DIR_SH}; claudna_session_dir \"$SID\""],
+            env=env, capture_output=True, text=True, check=True,
+        ).stdout
+        try:
+            python = str(paths.session_paths(sid, root=Path(override) if override else tmp_path / ".claudna").dir)
+        except ValueError:
+            python = ""
+        assert bash == python
+
+    def test_missing_home_produces_no_default_state_or_session_path(self):
+        env = {"PATH": os.environ["PATH"], "SID": SID}
+        root = subprocess.run(
+            ["bash", "-c", f". {STATE_DIR_SH}; claudna_state_dir"],
+            env=env, capture_output=True, text=True, check=True,
+        ).stdout
+        session_dir = subprocess.run(
+            ["bash", "-c", f". {STATE_DIR_SH}; claudna_session_dir \"$SID\""],
+            env=env, capture_output=True, text=True, check=True,
+        ).stdout
+        assert root == session_dir == ""
+        with pytest.raises(ValueError):
+            paths.state_root(env)
 
 
 class TestWiring:

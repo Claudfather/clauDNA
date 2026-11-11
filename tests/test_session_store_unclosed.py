@@ -230,3 +230,19 @@ def test_the_sweep_ignores_the_spawning_sessions_summary_override(store, tmp_pat
     assert main(["sweep", "--root", str(store.root)]) == 0
     assert json.loads(capsys.readouterr().out)["closed"] == ["s1"]
     assert seen and "CLAUDNA_SESSION_SUMMARY" not in seen[0]
+
+
+def test_sweep_skips_artifact_only_and_reports_partial_state(store):
+    from claudna.session_store.fsio import ensure_dir
+
+    artifact = store.session("artifact-owner")
+    artifact_dir = ensure_dir(artifact.paths.dir / "artifacts")
+    (artifact_dir / "handoff.md").write_text("manual artifact")
+    partial = store.session("partial")
+    ensure_dir(partial.paths.dir)
+    partial.paths.lifecycle.write_text("")
+
+    report = unclosed.sweep(store, {}, dry_run=True, alive=alive)
+    assert report.closed == []
+    assert report.errors == ["partial: capture state partial"]
+    assert (artifact_dir / "handoff.md").read_text() == "manual artifact"

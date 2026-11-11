@@ -1,0 +1,111 @@
+---
+title: clauDNA storage ownership
+type: knowledge
+status: current
+owner: claudna
+created: 2026-11-11
+updated: 2026-11-11
+---
+
+# Storage ownership
+
+`R` is the absolute effective clauDNA root: `CLAUDNA_STATE_DIR` when set,
+otherwise `$HOME/.claudna`. An explicit CLI `--root` selects the same contract
+for that invocation. A missing home without an absolute root is an error.
+Configuration chooses the root; it is not a promise of hostile-symlink isolation.
+Existing ancestor directories remain trusted and are never chmodded by allocation.
+
+## Owners and exceptions
+
+| Owner | Location |
+|---|---|
+| Native session | `R/sessions/<exact-native-id>/` |
+| Global preferences, coordination, compatibility observations | Named paths directly beneath `R` |
+| Explicit standalone maintainer/CI operation | `R/operations/op-<32 lowercase hex digits>/` |
+| Native host logs, transcripts, authentication, settings, memory and installations | Host-owned location, unchanged |
+| Intentional source/configuration edits and Git worktrees | Selected project/workspace |
+| Explicit artifact export/publication | Requested destination; preserve the canonical owned artifact |
+
+No timestamp, cwd, latest-session selection, invented ID, OS-temp fallback or
+operation-ID fallback supplies missing native ownership. Global coordination
+may point to a session but cannot become its full payload store. This contract
+extends the existing session store; it adds no analytics store or lifecycle kind.
+
+## Manual allocation
+
+Invoke the directory entry point from the actual loaded package, with `-B`:
+
+```sh
+python3 -B "<loaded-package>/lib/claudna/session_store" paths --host codex --session "<verified-native-id>" --kind artifacts --create
+python3 -B "<loaded-package>/lib/claudna/session_store" scratch --host codex --session "<verified-native-id>" --label review
+```
+
+The examples require actual resolved values. `paths` is a pure lookup unless
+`--create` is supplied. Kinds are `scratch`, `artifacts`, `handoff`, `hooks`, and
+`delegation`. Creating the handoff path creates only its parent, never an empty
+handoff. Scratch is uniquely allocated beneath the session's `scratch/` with
+an ASCII label `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`. New directories are 0700 and
+owned files are 0600. Allocation failure returns nonzero without a fallback.
+
+`--host` binds the provider. A caller must first obtain its real native session
+identity through the host surface. Known environment identities and retained
+lifecycle provider must agree with the supplied owner. CLI syntax validation
+alone does not establish that a host delivered its ID. Missing/conflicting or
+unresolved identity means no persistence; interactive workflows explain the
+limit and automatic writers fail open. Cursor remains hook-free.
+
+Explicit manual artifacts work with capture disabled and never enable capture
+or synthesize lifecycle records. Artifact-only directories (including interrupted
+empty allocations) differ from captured sessions. Existing lifecycle, event or
+projection remnants without a valid opening remain partial/corrupt and visible
+to diagnostics. A later genuine session opening can preserve and adopt the
+artifact directory. `exists()` and session enumeration retain their physical
+meaning; readers requiring lifecycle evidence use `capture_state` explicitly.
+Unknown privacy never authorizes cross-session artifact discovery. Captured
+lifecycle privacy remains authoritative, as do `consumers.json` acknowledgments.
+Segment retention does not delete arbitrary artifacts or handoffs.
+
+## Standalone maintainer operations
+
+```sh
+python3 -B "<loaded-package>/lib/claudna/session_store" operation-dir --label qualification --create
+python3 -B "<loaded-package>/lib/claudna/session_store" operation-dir --operation-id "<allocated-operation-id>"
+```
+
+The label form requires `--create` and generates an exclusive operation ID.
+The explicit-ID form is read-only unless `--create` is supplied; creation fails
+on an existing directory. Allocation returns the absolute root containing
+`scratch/`, `artifacts/` and `operation.json` with version, operation ID and label
+(null for explicit-ID allocation). Partial failures identify the exact retained
+allocation; a retry never adopts an existing directory. No session index or
+lifecycle event is created. This interface is only for explicitly invoked
+standalone work, never a host workflow missing its native identity.
+
+After the exact writer has been observed exited, its owner may remove only its
+exact scratch allocation. Unknown/running writers retain their scratch.
+Abrupt termination can leave private residue: no age sweep or broad deletion is
+authorized. Durable artifacts and operation markers survive scratch cleanup.
+
+## Capability and cutover gates
+
+| Surface | Native identity source to qualify | Evidence requirement |
+|---|---|---|
+| Claude hook | Native event `session_id`, provider claude | Actual hook plus ordinary scratch/artifact write receipt |
+| Claude local/plugin skill | Rendered `${CLAUDE_SESSION_ID}` | Actual invocation; a raw file read or shell variable is insufficient |
+| Codex hook | Native event `session_id`, provider codex | Actual hook receipt, separate from Desktop skill execution |
+| Codex skill | Surface-provided native thread/session ID; present aliases agree | Qualify each actual execution surface separately |
+| Cursor hook-free skill | Native identity transport remains to be established | Actual hook-free invocation and write receipt; no added hooks |
+
+Each receipt binds loaded revision, host version/surface, identity source,
+ordinary write outcome, capture-off behavior and observed filesystem effects.
+Missing evidence is unverified, not unsupported. A hook-only transport cannot
+qualify a hook-free workflow. No global grants or authentication changes are
+part of qualification. Broad workflow defaults wait for these prerequisites.
+
+This phase supplies the allocation/classification foundation only. Runtime
+writers, telemetry, delegation payloads, continuity, workflow defaults and
+maintainer callers remain pending their owning phases. Existing tests passing
+does not establish package-wide root compliance. The integration stack remains
+unmerged and unreleased pending native and consumer acceptance, a compatible
+recovery candidate or approved forward recovery, and the owner's breaking-release
+decision. An arbitrary old package is not a qualified rollback.

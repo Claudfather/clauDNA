@@ -43,7 +43,7 @@ from typing import Callable, Mapping
 from . import lineage
 from .fsio import ensure_dir, env_number, exclusive_lock, read_json
 from .project import load_lifecycle, session_facts, transcript_path_of
-from .store import SessionHandle, SessionStore, StoreError
+from .store import SessionHandle, SessionStore, StoreError, capture_state
 
 AFTER_ENV = "CLAUDNA_UNCLOSED_AFTER_H"
 DEFAULT_AFTER_H = 24.0
@@ -179,9 +179,23 @@ def sweep(store: SessionStore, env: Mapping[str, str], *,
         if not taken:
             return report
         threshold = after_s(env)
-        handles = (store.session(sid) for sid in store.session_ids())
-        aged = sorted(((idle, h.sid, h) for h in handles
-                       if (idle := idle_s(h, now)) is not None and idle >= threshold), reverse=True)
+        aged = []
+        for sid in store.session_ids():
+            handle = store.session(sid)
+            try:
+                state = capture_state(handle.paths)
+                idle = idle_s(handle, now) if state == "captured" else None
+            except (OSError, ValueError, TypeError) as exc:
+                report.errors.append(f"{sid}: {type(exc).__name__}: {exc}")
+                continue
+            if state == "artifact-only":
+                continue
+            if state != "captured":
+                report.errors.append(f"{sid}: capture state {state}")
+                continue
+            if idle is not None and idle >= threshold:
+                aged.append((idle, sid, handle))
+        aged.sort(reverse=True)
         for idle, sid, handle in aged:  # the longest idle first
             try:
                 owner = unclosed_owner(handle, env, now=now, alive=alive, idle=idle)
