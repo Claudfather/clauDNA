@@ -107,7 +107,7 @@ source equivalence is recorded; unrelated host mechanisms do not inherit a pass.
 
 The first three phases supply allocation/classification, runtime ownership and
 scoped continuity; phase04 supplies the broad workflow defaults on the held draft
-stack. Maintainer callers remain pending their owning phase. Existing tests passing
+stack. Maintainer callers use the explicit ownership contract below. Existing tests passing
 does not establish package-wide root compliance. The integration stack remains
 unmerged and unreleased pending native and consumer acceptance, a compatible
 recovery candidate or approved forward recovery, and the owner's breaking-release
@@ -225,3 +225,36 @@ latest session. Canonical plans become terminal in place, with original source
 and revision authority preserved. Frozen inputs use a separate adaptation record
 and the new run's ledger; repository archival applies only to explicitly selected
 project/legacy plans.
+
+
+## Maintainer qualification preparation
+
+The existing `scripts/release_toolchain.py` reuses runtime root, native owner
+validation and operation allocation. Its `owner-dir --label qualification`
+command selects coherent native context or an explicit `--session` / `--host`
+pair. Only callers outside host workflows may pass `--standalone`; malformed
+available identity never falls through to an operation. Make targets accept
+these flags through `STORAGE_OWNER_ARGS`, with no fallback default. Pure
+read-only floor/report operations allocate no owner.
+
+Internal work and canonical receipts stay beneath that owner's scratch and
+artifacts. Explicit package, release, routing and canary destinations remain
+fresh exports. Private HOME/TMP/profile controls cannot redirect the previously
+selected clauDNA root. The release script's same-directory temporary manifest
+and changelog replacements are intentional project edits. No release is part
+of this held implementation.
+
+Qualification extends the existing package fixture: snapshots record paths,
+types, modes and content digests before and after hooks; host settings, auth,
+transcripts, memory and project sentinels remain unchanged. A writable package
+exercises hooks, the actual detached sweep (observed exited), and directory CLI
+helpers with bytecode caching otherwise enabled. A candidate-as-mock-recovery
+fixture reads retained new-layout continuity and writes only under R. It does
+not qualify a rollback artifact or native/consumer recovery acceptance.
+
+Exported qualification reports explicitly distinguish fixture success from
+unknown native/consumer acceptance and blocked storage cutover. Canonical
+private receipts bind the source commit, archive hash, export digest and
+write-set evidence. Static Markdown checks remain separate from native skill
+and publication execution. Broad workflow defaults and complete write-set
+qualification remain blocked until the earlier prerequisites pass.

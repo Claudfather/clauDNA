@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -447,13 +448,24 @@ def test_release_bumps_all_three_manifests_together(tmp_path, qualification_pass
     original_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root)
     subprocess.run(["git", "update-ref", "refs/remotes/origin/main", original_head.decode().strip()],
                    cwd=root, check=True)
+    private_home = tmp_path / "release-home"
+    private_home.mkdir(mode=0o700)
+    env = os.environ.copy()
+    env["HOME"] = str(private_home.resolve())
+    state_root = (tmp_path / "release-state").resolve()
+    assert state_root.is_absolute() and state_root.is_relative_to(tmp_path.resolve())
+    env["CLAUDNA_STATE_DIR"] = str(state_root)
+    for key in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
+        env.pop(key, None)
     result = subprocess.run(["bash", "scripts/release.sh", "--dry-run", "patch"],
-                            cwd=root, text=True, capture_output=True)
+                            cwd=root, env=env, text=True, capture_output=True)
     assert result.returncode == 0, result.stdout + result.stderr
     assert subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root) == original_head
     assert subprocess.check_output(["git", "status", "--porcelain"], cwd=root) == b""
     assert subprocess.check_output(["git", "tag"], cwd=root) == b""
-    result = subprocess.run(["bash", "scripts/release.sh", "patch"], cwd=root, text=True, capture_output=True)
+    assert not state_root.exists()
+    result = subprocess.run(["bash", "scripts/release.sh", "--standalone", "patch"],
+                            cwd=root, env=env, text=True, capture_output=True)
     if qualification_passes:
         assert result.returncode == 0, result.stdout + result.stderr
     else:

@@ -28,18 +28,23 @@ SUPPORT_GUIDE="$REPO_ROOT/documentation/guides/PACKAGE_SUPPORT.md"
 
 DRY_RUN=false
 BUMP_TYPE=""
-
-for arg in "$@"; do
-    case "$arg" in
-        --dry-run) DRY_RUN=true ;;
-        major|minor|patch) BUMP_TYPE="$arg" ;;
+OWNER_SESSION=""
+OWNER_HOST=""
+OWNER_STANDALONE=false
+while (($#)); do
+    case "$1" in
+        --dry-run) DRY_RUN=true; shift ;;
+        --session) [[ $# -ge 2 ]] || { echo "error: --session requires an ID" >&2; exit 1; }; OWNER_SESSION="$2"; shift 2 ;;
+        --host) [[ $# -ge 2 ]] || { echo "error: --host requires a provider" >&2; exit 1; }; OWNER_HOST="$2"; shift 2 ;;
+        --standalone) OWNER_STANDALONE=true; shift ;;
+        major|minor|patch) BUMP_TYPE="$1"; shift ;;
         -h|--help)
-            echo "Usage: ./scripts/release.sh [--dry-run] <major|minor|patch>"
+            echo "Usage: ./scripts/release.sh [--dry-run] [--session SID --host HOST | --standalone] <major|minor|patch>"
             exit 0
             ;;
         *)
-            echo "error: unknown argument '$arg'" >&2
-            echo "Usage: ./scripts/release.sh [--dry-run] <major|minor|patch>" >&2
+            echo "error: unknown argument '$1'" >&2
+            echo "Usage: ./scripts/release.sh [--dry-run] [--session SID --host HOST | --standalone] <major|minor|patch>" >&2
             exit 1
             ;;
     esac
@@ -154,23 +159,89 @@ if [[ "$DRY_RUN" == "true" ]]; then
     exit 0
 fi
 
+if [[ -n "$OWNER_SESSION" && -z "$OWNER_HOST" || -z "$OWNER_SESSION" && -n "$OWNER_HOST" ]]; then
+    echo "error: --session and --host must be supplied together" >&2
+    exit 1
+fi
+if [[ "$OWNER_STANDALONE" == "true" && -n "$OWNER_SESSION" ]]; then
+    echo "error: choose native ownership or --standalone" >&2
+    exit 1
+fi
+
+# Resolve a typed owner before mutating release files. Child HOME/TMP overrides
+# cannot redirect CLAUDNA_STATE_DIR away from the user's effective R.
+OWNER_ARGS=(--label release --json)
+if [[ -n "$OWNER_SESSION" ]]; then
+    OWNER_ARGS+=(--session "$OWNER_SESSION" --host "$OWNER_HOST")
+elif [[ "$OWNER_STANDALONE" == "true" ]]; then
+    OWNER_ARGS+=(--standalone)
+fi
+OWNER_JSON="$(PYTHONDONTWRITEBYTECODE=1 "$RELEASE_PYTHON" -B "$REPO_ROOT/scripts/release_toolchain.py" owner-dir "${OWNER_ARGS[@]}")" || {
+    echo "error: release ownership unavailable; supply the actual native session or explicitly use --standalone outside a host workflow" >&2
+    exit 1
+}
+OWNER_KIND="$(jq -r '.kind' <<< "$OWNER_JSON")"
+OWNER_ID="$(jq -r '.owner_id' <<< "$OWNER_JSON")"
+OWNER_PROVIDER="$(jq -r '.provider // empty' <<< "$OWNER_JSON")"
+OWNER_SCRATCH="$(jq -r '.scratch' <<< "$OWNER_JSON")"
+OWNER_ARTIFACTS="$(jq -r '.artifacts' <<< "$OWNER_JSON")"
+if [[ "$OWNER_KIND" == "session" ]]; then
+    printf -v STORAGE_OWNER_ARGS '%q ' --session "$OWNER_ID" --host "$OWNER_PROVIDER"
+else
+    STORAGE_OWNER_ARGS="--standalone"
+fi
+
+if [[ -n "${RELEASE_OUTPUT:-}" ]]; then
+    if [[ "$RELEASE_OUTPUT" = /* ]]; then
+        RELEASE_OUTPUT_PATH="$RELEASE_OUTPUT"
+    else
+        RELEASE_OUTPUT_PATH="$REPO_ROOT/$RELEASE_OUTPUT"
+    fi
+else
+    RELEASE_OUTPUT_PATH="$OWNER_ARTIFACTS/release-v$NEW_VERSION"
+fi
+if [[ -e "$RELEASE_OUTPUT_PATH" || -L "$RELEASE_OUTPUT_PATH" ]]; then
+    echo "error: release output already exists: $RELEASE_OUTPUT_PATH" >&2
+    exit 1
+fi
+if [[ ! -d "$(dirname "$RELEASE_OUTPUT_PATH")" || ! -w "$(dirname "$RELEASE_OUTPUT_PATH")" ]]; then
+    echo "error: release output parent must already exist and be writable: $(dirname "$RELEASE_OUTPUT_PATH")" >&2
+    exit 1
+fi
+umask 077
+
 # --- Update all three plugin.json manifests ---
 
+STAGED_FILES=()
+stage_replace() {
+    local source="$1" temp
+    temp="$(mktemp "${source}.release.XXXXXX")"
+    cp -p "$source" "$temp"
+    STAGED_FILES+=("$source" "$temp")
+    STAGED_TEMP="$temp"
+}
+cleanup_staged() {
+    local temp
+    for ((i=1; i<${#STAGED_FILES[@]}; i+=2)); do
+        temp="${STAGED_FILES[$i]}"
+        [[ ! -e "$temp" ]] || rm -f -- "$temp"
+    done
+}
+trap cleanup_staged EXIT
+PLUGIN_TEMPS=()
 for manifest in "${VERSIONED_MANIFESTS[@]}"; do
-    TMP_PLUGIN="$(mktemp)"
-    jq --arg ver "$NEW_VERSION" '.version = $ver' "$manifest" > "$TMP_PLUGIN"
-    mv "$TMP_PLUGIN" "$manifest"
-    echo "updated $manifest → $NEW_VERSION"
+    stage_replace "$manifest"
+    temp="$STAGED_TEMP"
+    jq --arg ver "$NEW_VERSION" '.version = $ver' "$manifest" > "$temp"
+    PLUGIN_TEMPS+=("$temp")
 done
-
-# Source hashes and the displayed version must describe the bumped manifests.
-PYTHONDONTWRITEBYTECODE=1 "$RELEASE_PYTHON" "$REPO_ROOT/scripts/generate_package_support.py"
 
 # --- Update CHANGELOG.md ---
 
 # Replace the [Unreleased] section: keep the header, insert the new version
 # header with the unreleased content below it, then a fresh empty [Unreleased].
-TMP_CHANGELOG="$(mktemp)"
+stage_replace "$CHANGELOG"
+TMP_CHANGELOG="$STAGED_TEMP"
 
 awk -v new_ver="$NEW_VERSION" -v release_date="$RELEASE_DATE" '
     /^## \[Unreleased\]/ {
@@ -185,7 +256,16 @@ awk -v new_ver="$NEW_VERSION" -v release_date="$RELEASE_DATE" '
     skip_blanks { skip_blanks = 0 }
     { print }
 ' "$CHANGELOG" > "$TMP_CHANGELOG"
+
+# All transforms have succeeded before any source file is replaced.
+for i in "${!VERSIONED_MANIFESTS[@]}"; do
+    mv "${PLUGIN_TEMPS[$i]}" "${VERSIONED_MANIFESTS[$i]}"
+    echo "updated ${VERSIONED_MANIFESTS[$i]} → $NEW_VERSION"
+done
 mv "$TMP_CHANGELOG" "$CHANGELOG"
+
+# Source hashes and the displayed version must describe the bumped manifests.
+PYTHONDONTWRITEBYTECODE=1 "$RELEASE_PYTHON" "$REPO_ROOT/scripts/generate_package_support.py"
 
 echo "updated $CHANGELOG — moved unreleased entries under [$NEW_VERSION]"
 
@@ -194,16 +274,14 @@ echo "updated $CHANGELOG — moved unreleased entries under [$NEW_VERSION]"
 git -C "$REPO_ROOT" add "${VERSIONED_MANIFESTS[@]}" "$CHANGELOG" "$SUPPORT_CATALOG" "$SUPPORT_GUIDE"
 git -C "$REPO_ROOT" commit -m "release: v$NEW_VERSION"
 CANDIDATE="$(git -C "$REPO_ROOT" rev-parse HEAD)"
-# mktemp creates an owned parent; the package output itself must be new.
-RELEASE_PARENT="$(mktemp -d "${TMPDIR:-/tmp}/claudna-release.XXXXXX")"
-if ! make -C "$REPO_ROOT" tag-release RELEASE_REF="$CANDIDATE" RELEASE_OUTPUT="$RELEASE_PARENT/artifacts"; then
+if ! make -C "$REPO_ROOT" tag-release RELEASE_REF="$CANDIDATE" RELEASE_OUTPUT="$RELEASE_OUTPUT_PATH" STORAGE_OWNER_ARGS="$STORAGE_OWNER_ARGS"; then
     echo "error: release commit $CANDIDATE was retained; qualification failed and no tag was authorized" >&2
     exit 1
 fi
 
 echo ""
 echo "qualified and locally tagged $TAG at $CANDIDATE"
-echo "artifacts: $RELEASE_PARENT/artifacts"
+echo "artifacts: $RELEASE_OUTPUT_PATH"
 echo ""
 echo "Ready to push. Review the commit, then:"
 echo "  git push origin main --follow-tags"

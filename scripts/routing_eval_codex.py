@@ -9,22 +9,29 @@ copied or modified by this script. Reports omit raw prompt, tool and auth conten
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
+from uuid import uuid4
 
 import yaml
 
-from check_codex_scope import run_check, selected_names
-from routing_eval import load_cases
-from skill_checks import parse_frontmatter
+sys.dont_write_bytecode = True
+
+from check_codex_scope import run_check, selected_names  # noqa: E402
+from routing_eval import load_cases  # noqa: E402
+from release_toolchain import MaintainerPaths, maintainer_paths  # noqa: E402
+from skill_checks import parse_frontmatter  # noqa: E402
+from claudna.session_store.fsio import atomic_write_json, ensure_dir  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 COVERAGE = ROOT / 'tests/fixtures/routing-codex.yaml'
@@ -164,21 +171,28 @@ def evaluate(rows: list[ChoiceCase], selected: set[str], runner: Callable,
             'stop_reason': stop, 'results': results, 'native_automatic_routing': 'not measured'}
 
 
-def live_runner(args, descriptions: list[dict]):
+def live_runner(args, descriptions: list[dict], *, owner: MaintainerPaths | None = None,
+                session: str | None = None, host: str | None = None, standalone: bool = False):
+    if owner is None:
+        owner = maintainer_paths("routing-eval-codex", session=session, host=host, standalone=standalone)
     raw_paths = (args.home, args.codex_home, args.workdir, args.tmpdir)
     home, codex_home, work, temporary = (p.resolve() for p in raw_paths)
-    private_root = temporary.parent
+    profile_root = temporary.parent
     for raw, path in zip(raw_paths, (home, codex_home, work, temporary)):
-        if (raw.is_symlink() or not path.is_dir() or path == private_root
-                or not path.is_relative_to(private_root) or path.stat().st_mode & 0o077):
+        if (raw.is_symlink() or not path.is_dir() or path == profile_root
+                or not path.is_relative_to(profile_root) or path.stat().st_mode & 0o077):
             raise ValueError('live evaluation requires private directories within the isolated tmp parent')
-    env = {'HOME': str(home), 'CODEX_HOME': str(codex_home), 'TMPDIR': str(args.tmpdir.resolve()),
+    effective_root = owner.directory.parents[1].resolve()
+    env = {'CLAUDNA_STATE_DIR': str(effective_root), 'HOME': str(home),
+           'CODEX_HOME': str(codex_home), 'TMPDIR': str(args.tmpdir.resolve()),
            'PATH': os.environ.get('PATH', '/usr/bin:/bin'), 'CLAUDNA_SESSION_BRIEFING': '0',
            'CLAUDNA_SESSION_SUMMARY': '0', 'CLAUDNA_HARVEST': '0'}
     schema = choice_schema()
     observed_models = set()
-    receipts = private_root / 'private-selection-receipts'
+    receipt_root = ensure_dir(owner.artifacts / 'private-selection-receipts')
+    receipts = receipt_root / f'run-{uuid4().hex}'
     receipts.mkdir(mode=0o700)
+    receipts.chmod(0o700)
     sequence = 0
 
     def run(case):
@@ -186,15 +200,17 @@ def live_runner(args, descriptions: list[dict]):
         sequence += 1
         receipt = receipts / f'attempt-{sequence:02}'
         receipt.mkdir(mode=0o700)
+        receipt.chmod(0o700)
 
         def retain(name: str, text: str):
             path = receipt / name
             path.write_text(text)
             path.chmod(0o600)
-        with tempfile.TemporaryDirectory(dir=args.tmpdir) as directory:
+        with tempfile.TemporaryDirectory(prefix='codex-choice-', dir=owner.scratch) as directory:
             scratch = Path(directory)
             schema_path, output = scratch / 'schema.json', scratch / 'result.json'
             schema_path.write_text(json.dumps(schema))
+            schema_path.chmod(0o600)
             argv = [args.codex_bin, '--no-daemon', 'exec', '--ignore-user-config', '--ignore-rules', '--ephemeral',
                     '--sandbox', 'read-only', '--skip-git-repo-check', '--json', '--color', 'never',
                     '--disable', 'apps', '--disable', 'recommended_plugins', '--disable', 'chronicle',
@@ -230,7 +246,21 @@ def live_runner(args, descriptions: list[dict]):
     return run, observed_models
 
 
-def main():
+def _fresh_report(path: Path) -> None:
+    """Reject existing report paths, including dangling symlinks, before live evaluation."""
+    if path.exists() or path.is_symlink():
+        raise FileExistsError(f'report export already exists: {path}')
+    if not path.parent.is_dir():
+        raise FileNotFoundError(f'report parent directory does not exist: {path.parent}')
+
+
+def _open_exclusive_report(path: Path):
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    os.fchmod(fd, 0o600)
+    return os.fdopen(fd, 'w', encoding='utf-8')
+
+
+def main(argv: list[str] | None = None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--plugin-root', type=Path, default=ROOT)
     parser.add_argument('--live', action='store_true')
@@ -243,15 +273,33 @@ def main():
     parser.add_argument('--timeout', type=int, default=90)
     parser.add_argument('--max-attempts', type=int, default=18)
     parser.add_argument('--report', type=Path)
-    args = parser.parse_args()
+    parser.add_argument('--session', help='verified native session ID')
+    parser.add_argument('--host', choices=('claude', 'codex', 'cursor'), help='native session provider')
+    parser.add_argument('--standalone', action='store_true', help='explicitly allocate a standalone operation')
+    args = parser.parse_args(argv)
+    if args.report:
+        try:
+            _fresh_report(args.report)
+        except OSError as exc:
+            print(f'report export unavailable: {exc}', file=sys.stderr)
+            return 2
     report = floor(args.plugin_root)
     if args.live:
         if report['errors'] or not args.codex_bin or not all((args.home, args.codex_home, args.workdir, args.tmpdir)):
             parser.error('live mode requires a clean floor, Codex executable and isolated home/work/tmp paths')
         if not 1 <= args.max_attempts <= 18 or not 1 <= args.timeout <= 120:
             parser.error('live limits: 1..18 attempts and 1..120 seconds per attempt')
+    owner = None
+    if args.live or args.report:
+        try:
+            owner = maintainer_paths('routing-eval-codex', session=args.session, host=args.host,
+                                     standalone=args.standalone)
+        except (OSError, ValueError, RuntimeError) as exc:
+            print(f'maintainer storage unavailable: {exc}', file=sys.stderr)
+            return 2
+    if args.live:
         descriptions = catalog(args.plugin_root)
-        runner, models = live_runner(args, descriptions)
+        runner, models = live_runner(args, descriptions, owner=owner)
         version_env = {'HOME': str(args.home.resolve()), 'CODEX_HOME': str(args.codex_home.resolve()),
                        'TMPDIR': str(args.tmpdir.resolve()), 'PATH': os.environ.get('PATH', '/usr/bin:/bin')}
         version = subprocess.run([args.codex_bin, '--version'], capture_output=True, text=True,
@@ -264,7 +312,21 @@ def main():
                   'version': version.stdout.strip() if version.returncode == 0 else 'unavailable'}
     text = json.dumps(report, indent=2, sort_keys=True) + '\n'
     if args.report:
-        args.report.write_text(text)
+        try:
+            with _open_exclusive_report(args.report) as report_file:
+                report_file.write(text)
+        except OSError as exc:
+            print(f'report export unavailable: {exc}', file=sys.stderr)
+            return 2
+    if owner is not None:
+        receipt = {'schema_version': 1, 'tool': 'routing-eval-codex', 'owner': {
+            'kind': owner.kind, 'owner_id': owner.owner_id, 'provider': owner.provider},
+            'export_path': str(args.report.resolve()) if args.report else None,
+            'report_sha256': hashlib.sha256(text.encode()).hexdigest(),
+            'source_script_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            'outcome': {'live': args.live, 'attempts': report.get('attempts', 0),
+                        'complete': report.get('complete', True)}}
+        atomic_write_json(owner.artifacts / f'routing-eval-codex-{uuid4().hex}.json', receipt, durable=True)
     print(text, end='')
     failed_live = args.live and (not report['complete'] or not all(r['passed'] for r in report['results']))
     return int(bool(report['errors']) or failed_live)

@@ -13,12 +13,16 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
+import uuid
 
 sys.dont_write_bytecode = True
-from release_toolchain import ensure_toolchain, isolated_python_env  # noqa: E402
+from release_toolchain import ensure_toolchain, isolated_python_env, maintainer_paths  # noqa: E402
+from claudna.session_store.fsio import atomic_write_json  # noqa: E402
 
 
 class ReleaseError(Exception):
@@ -143,14 +147,21 @@ def verify_github_tag(root, repo, tag, candidate):
     raise ReleaseError(f"GitHub tag {repo}:{tag} exceeds the annotated-tag depth limit")
 
 
-def publish_assets(root, repo, tag, candidate, notes, assets):
+def owner_make_arg(owner):
+    args = (['--session', owner.owner_id, '--host', owner.provider]
+            if owner.kind == 'session' else ['--standalone'])
+    return 'STORAGE_OWNER_ARGS=' + shlex.join(args)
+
+
+def publish_assets(root, repo, tag, candidate, notes, assets, owner):
     verify_github_tag(root, repo, tag, candidate)
-    with tempfile.TemporaryDirectory(prefix="claudna-release-assets-") as temporary:
-        work = Path(temporary)
+    work = Path(tempfile.mkdtemp(prefix="release-assets.", dir=owner.scratch))
+    os.chmod(work, 0o700)
+    try:
         info = release_info(root, repo, tag)
         if info is None:
             notes_file = work / "notes.md"
-            notes_file.write_text(notes + "\n")
+            write_private_file(notes_file, (notes + "\n").encode("utf-8"))
             verify_github_tag(root, repo, tag, candidate)
             result = run(["gh", "release", "create", tag, "--repo", repo, "--verify-tag",
                           "--target", candidate, "--title", tag, "--notes-file", str(notes_file)],
@@ -185,9 +196,27 @@ def publish_assets(root, repo, tag, candidate, notes, assets):
                     # An upload race is acceptable only when bytes now agree.
                     verify_asset(asset)
         verify_github_tag(root, repo, tag, candidate)
+    except Exception:
+        # Retain the exact private work directory as failure evidence.
+        raise
+    else:
+        shutil.rmtree(work)
 
 
-def qualify(root, candidate, output):
+def write_private_file(path, content):
+    """Create a private file exclusively, independent of the caller's umask."""
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "wb") as stream:
+            descriptor = -1
+            stream.write(content)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+def qualify(root, candidate, output, owner):
     ensure_toolchain()
     if output.exists():
         raise ReleaseError(f"output already exists: {output}")
@@ -198,28 +227,38 @@ def qualify(root, candidate, output):
     baseline = git(root, "rev-parse", "--verify", "origin/main", check=False)
     if not baseline:
         raise ReleaseError("origin/main is required for candidate source checks")
-    with tempfile.TemporaryDirectory(prefix="claudna-candidate-") as temporary:
-        work = Path(temporary)
-        home, temp, checkout = work / "home", work / "tmp", work / "source"
-        home.mkdir()
-        temp.mkdir()
-        env = dict(os.environ, HOME=str(home), TMPDIR=str(temp), TMP=str(temp), TEMP=str(temp),
-                   XDG_CACHE_HOME=str(home / ".cache"), PYTHONDONTWRITEBYTECODE="1",
-                   GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
-        for key in ("PYTHONPATH", "PYTHONHOME", "CLAUDNA_ROOT", "CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT"):
-            env.pop(key, None)
-        env = isolated_python_env(work, env)
-        run(["git", "clone", "--no-hardlinks", "--no-checkout", str(root), str(checkout)], root, env=env)
-        run(["git", "checkout", "--detach", candidate], checkout, env=env)
-        run(["git", "update-ref", "refs/remotes/origin/main", baseline], checkout, env=env)
-        checked = run(["make", "check"], checkout, env=env)
-        print(checked.stdout, end="", flush=True)
-        print(checked.stderr, end="", flush=True)
-        if (git(checkout, "rev-parse", "HEAD") != candidate
-                or git(checkout, "status", "--porcelain", "--untracked-files=all")):
-            raise ReleaseError("source checks modified the exact candidate checkout")
-        run(["make", "qualify-package", f"PACKAGE_REF={candidate}", f"PACKAGE_OUTPUT={output}"],
-            checkout, env=env)
+    work = Path(tempfile.mkdtemp(prefix="release-candidate.", dir=owner.scratch))
+    os.chmod(work, 0o700)
+    try:
+        return _qualify_in_work(root, candidate, output, owner, version, notes, baseline, work)
+    except Exception as error:
+        raise ReleaseError(f"{error}; retained private qualification work at {work}") from error
+
+
+def _qualify_in_work(root, candidate, output, owner, version, notes, baseline, work):
+    home, temp, checkout = work / "home", work / "tmp", work / "source"
+    home.mkdir(mode=0o700)
+    temp.mkdir(mode=0o700)
+    os.chmod(home, 0o700)
+    os.chmod(temp, 0o700)
+    env = dict(os.environ, HOME=str(home), TMPDIR=str(temp), TMP=str(temp), TEMP=str(temp),
+               XDG_CACHE_HOME=str(home / ".cache"), PYTHONDONTWRITEBYTECODE="1",
+               GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1",
+               CLAUDNA_STATE_DIR=str(owner.directory.parent.parent.resolve()))
+    for key in ("PYTHONPATH", "PYTHONHOME", "CLAUDNA_ROOT", "CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT"):
+        env.pop(key, None)
+    env = isolated_python_env(work, env)
+    run(["git", "clone", "--no-hardlinks", "--no-checkout", str(root), str(checkout)], root, env=env)
+    run(["git", "checkout", "--detach", candidate], checkout, env=env)
+    run(["git", "update-ref", "refs/remotes/origin/main", baseline], checkout, env=env)
+    checked = run(["make", "check", owner_make_arg(owner)], checkout, env=env)
+    print(checked.stdout, end="", flush=True)
+    print(checked.stderr, end="", flush=True)
+    if (git(checkout, "rev-parse", "HEAD") != candidate
+            or git(checkout, "status", "--porcelain", "--untracked-files=all")):
+        raise ReleaseError("source checks modified the exact candidate checkout")
+    run(["make", "qualify-package", f"PACKAGE_REF={candidate}", f"PACKAGE_OUTPUT={output}",
+         owner_make_arg(owner)], checkout, env=env)
     receipt = json.loads((output / "receipt.json").read_text())
     qualification = json.loads((output / "qualification.json").read_text())
     digest = hashlib.sha256((output / "package.tar.gz").read_bytes()).hexdigest()
@@ -230,11 +269,28 @@ def qualify(root, candidate, output):
         raise ReleaseError("package qualification does not bind to this candidate and archive")
     evidence = {"schema": "claudna.release-source-check/1", "commit": candidate, "version": version,
                 "source_check": "pass", "command": "make check", "archive_sha256": digest}
-    (output / "source-check.json").write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
+    evidence_bytes = (json.dumps(evidence, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    write_private_file(output / "source-check.json", evidence_bytes)
+    source_check_sha256 = hashlib.sha256(evidence_bytes).hexdigest()
     assets = [output / name for name in ("package.tar.gz", "package.sha256", "receipt.json",
               "qualification.json", "claude-marketplace.json", "source-check.json")]
     if not all(asset.is_file() for asset in assets):
         raise ReleaseError("required release assets are missing")
+    receipt = {
+        "schema": "claudna.release-source-check-receipt/1",
+        "owner": {"kind": owner.kind, "id": owner.owner_id, "provider": owner.provider},
+        "status": "pass",
+        "commit": candidate,
+        "version": version,
+        "archive_sha256": digest,
+        "source_check_sha256": source_check_sha256,
+        "export_path": str(output.resolve()),
+        "evidence": ("isolated source check and package qualification; "
+                     "no native, consumer, publication, or recovery acceptance"),
+    }
+    receipt_path = owner.artifacts / f"release-source-check-{candidate}-{uuid.uuid4().hex}.json"
+    atomic_write_json(receipt_path, receipt, durable=True)
+    shutil.rmtree(work)
     return version, notes, assets
 
 
@@ -250,6 +306,10 @@ def main():
     action.add_argument("--preflight", action="store_true")
     parser.add_argument("--remote", default="origin")
     parser.add_argument("--repo")
+    owner_group = parser.add_mutually_exclusive_group()
+    owner_group.add_argument("--session")
+    owner_group.add_argument("--standalone", action="store_true")
+    parser.add_argument("--host", choices=("claude", "codex", "cursor"))
     args = parser.parse_args()
     try:
         if args.preflight:
@@ -271,11 +331,17 @@ def main():
             parser.error("--publish requires --repo OWNER/REPO")
         candidate = git(root, "rev-parse", "--verify", "--end-of-options", f"{args.ref}^{{commit}}")
         output = args.output.resolve()
-        version, notes, assets = qualify(root, candidate, output)
+        ensure_toolchain()
+        try:
+            owner = maintainer_paths("release-candidate", session=args.session, host=args.host,
+                                     standalone=args.standalone)
+        except (OSError, ValueError, RuntimeError) as error:
+            raise ReleaseError(f"maintainer ownership unavailable: {error}") from error
+        version, notes, assets = qualify(root, candidate, output, owner)
         tag = f"v{version}"
         if args.publish:
             publish_tag(root, args.remote, tag, candidate)
-            publish_assets(root, args.repo, tag, candidate, notes, assets)
+            publish_assets(root, args.repo, tag, candidate, notes, assets, owner)
             actual = remote_tag(root, args.remote, tag)
             require_tag_identity(actual, candidate, tag)
             if actual is None:

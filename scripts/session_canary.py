@@ -31,18 +31,24 @@ A maintainer tool: nothing here ships in the plugin or runs in a user's session.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shlex
 import sys
 import time
 from pathlib import Path
+from uuid import uuid4
+
+sys.dont_write_bytecode = True
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
 sys.path.insert(0, str(REPO_ROOT / "lib"))
 
+from release_toolchain import MaintainerPaths, maintainer_paths  # noqa: E402
 from claudna.session_store.boundaries import claude_pid_of, inherited  # noqa: E402
-from claudna.session_store.fsio import append_jsonl, file_size, read_jsonl  # noqa: E402
+from claudna.session_store.fsio import append_jsonl, atomic_write_json, file_size, read_jsonl  # noqa: E402
 from claudna.session_store.lineage import claude_pid  # noqa: E402
 from claudna.session_store.project import SessionFacts  # noqa: E402
 
@@ -90,13 +96,51 @@ def hooks_config(script: Path, log: Path) -> dict:
 
 def write_plugin(target: Path, script: Path) -> Path:
     """The canary plugin under ``target``; returns its log path."""
-    (target / ".claude-plugin").mkdir(parents=True, exist_ok=True)
+    if target.is_symlink() or target.exists():
+        raise FileExistsError(f"canary output directory is not fresh: {target}")
+    if not target.parent.is_dir():
+        raise FileNotFoundError(f"canary output parent does not exist: {target.parent}")
+    target.mkdir(mode=0o700)
+    target.chmod(0o700)
+    plugin_dir = target / ".claude-plugin"
+    plugin_dir.mkdir(mode=0o700)
+    plugin_dir.chmod(0o700)
     log = target / LOG_NAME
     manifest = {"name": "claudna-canary", "version": "0.0.0", "description": "Logs hook payloads for the "
                 "session-store canaries (scripts/session_canary.py).", "hooks": "./hooks.json"}
-    (target / ".claude-plugin" / "plugin.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    (target / "hooks.json").write_text(json.dumps(hooks_config(script, log), indent=2) + "\n")
+    manifest_path = plugin_dir / "plugin.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+    manifest_path.chmod(0o600)
+    hooks_path = target / "hooks.json"
+    hooks_path.write_text(json.dumps(hooks_config(script, log), indent=2) + "\n")
+    hooks_path.chmod(0o600)
     return log
+
+
+def _tree_sha256(directory: Path) -> str:
+    """Hash the immutable plugin export, excluding the subsequently appended hook log."""
+    digest = hashlib.sha256()
+    for path in sorted(item for item in directory.rglob("*") if item.is_file() and item.name != LOG_NAME):
+        relative = path.relative_to(directory).as_posix().encode("utf-8")
+        digest.update(len(relative).to_bytes(4, "big"))
+        digest.update(relative)
+        data = path.read_bytes()
+        digest.update(len(data).to_bytes(8, "big"))
+        digest.update(data)
+    return digest.hexdigest()
+
+
+def _record_setup(owner: MaintainerPaths, target: Path) -> None:
+    atomic_write_json(owner.artifacts / f"session-canary-{uuid4().hex}.json", {
+        "schema_version": 1,
+        "tool": "session-canary",
+        "owner": {"kind": owner.kind, "owner_id": owner.owner_id, "provider": owner.provider},
+        "export_path": str(target.resolve()),
+        "export_sha256": _tree_sha256(target),
+        "source_script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "outcome": "setup_written",
+        "native_acceptance": "not measured by this fixture",
+    }, durable=True)
 
 
 STEPS = """\
@@ -283,7 +327,10 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="verb", required=True)
     setup = sub.add_parser("setup", help="write the canary plugin and print the steps")
-    setup.add_argument("--dir", type=Path, help="where to write it (default: a new temp dir)")
+    setup.add_argument("--dir", type=Path, help="explicit fresh export directory (default: owned artifacts)")
+    setup.add_argument("--session", help="verified native session ID")
+    setup.add_argument("--host", choices=("claude", "codex", "cursor"), help="native session provider")
+    setup.add_argument("--standalone", action="store_true", help="explicitly allocate a standalone operation")
     hook = sub.add_parser("hook", help="called by the plugin's hooks")
     hook.add_argument("--log", type=Path, required=True)
     rep = sub.add_parser("report", help="print the verdicts")
@@ -294,14 +341,29 @@ def main(argv: list[str] | None = None) -> int:
         run_hook(args.log)
         return 0
     if args.verb == "setup":
-        import tempfile
-
-        target = (args.dir or Path(tempfile.mkdtemp(prefix="claudna-canary-"))).resolve()
-        if (target / LOG_NAME).exists():  # a second run's rows would be read as the first run's children
-            print(f"{target / LOG_NAME} is from an earlier run: delete it or pick another --dir", file=sys.stderr)
+        try:
+            if args.dir is not None:
+                target = args.dir.expanduser().absolute()
+                if target.is_symlink():
+                    print(f"canary export must be a fresh directory: {target}", file=sys.stderr)
+                    return 1
+                if target.exists():
+                    if (target / LOG_NAME).exists():  # a second run's rows would be read as the first run's children
+                        print(f"{target / LOG_NAME} is from an earlier run: delete it or pick another --dir",
+                              file=sys.stderr)
+                    else:
+                        print(f"canary export must be a fresh directory: {target}", file=sys.stderr)
+                    return 1
+            owner = maintainer_paths("session-canary", session=args.session, host=args.host,
+                                     standalone=args.standalone)
+            if args.dir is None:
+                target = owner.artifacts / f"canary-{uuid4().hex}"
+            script = Path(__file__).resolve()
+            write_plugin(target, script)
+            _record_setup(owner, target)
+        except (OSError, ValueError, RuntimeError) as exc:
+            print(f"canary setup unavailable: {exc}", file=sys.stderr)
             return 1
-        script = Path(__file__).resolve()
-        write_plugin(target, script)
         print(STEPS.format(dir=shlex.quote(str(target)), script=shlex.quote(str(script))))
         return 0
     log = args.dir / LOG_NAME

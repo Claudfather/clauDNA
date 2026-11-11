@@ -47,7 +47,7 @@ jobs:
         run: make deps
 
       - name: Qualify the exact candidate package
-        run: make qualify-package PACKAGE_REF="$GITHUB_SHA" PACKAGE_OUTPUT="$RUNNER_TEMP/claudna-package"
+        run: CLAUDNA_STATE_DIR="$RUNNER_TEMP/claudna-state" make qualify-package STORAGE_OWNER_ARGS=--standalone PACKAGE_REF="$GITHUB_SHA" PACKAGE_OUTPUT="$RUNNER_TEMP/claudna-package"
 
   runtime-floor:
     # Hooks and lib/claudna run under the user's python3: 3.9 on stock macOS.

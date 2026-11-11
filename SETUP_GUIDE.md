@@ -1021,3 +1021,36 @@ Descriptions should put their most distinctive trigger first. Hosts can shorten
 descriptions when many skills compete for context; discovery, an instruction
 read, procedure entry, and completed work are different observations. Keep local
 integration reports and their native receipts outside published release artifacts.
+
+
+## Held storage ownership qualification
+
+Internal output uses `CLAUDNA_STATE_DIR` (absolute), default `~/.claudna`.
+Maintainer scripts reuse the session-store resolver and allocator through
+`scripts/release_toolchain.py`. A coherent real native context owns its scratch
+and receipts; otherwise pass the actual `--session` and `--host` supplied by the
+host. Outside all native workflows, explicitly opt into `--standalone` or
+`STORAGE_OWNER_ARGS=--standalone` for Make targets. Missing/conflicting native
+identity must never be repaired with an operation ID. Standalone operations are
+typed separately under `R/operations/op-<32 hex>/` and create no session lifecycle.
+
+Package/release output paths, routing report paths and canary `--dir` are explicit
+exports. Canonical private receipts remain under the selected owner and bind the
+export to its exact commit/archive or report digest. Private host fixture
+`--home`, `--codex-home` and `--tmpdir` options do not redirect canonical output.
+Owned checks disable Ruff/pytest/bytecode caches; dependency installation and
+native host/tool cache policy remain unchanged. Use the pinned toolchain through
+`python3 -m`; run fresh checks in isolated exports with private HOME/TMP and state.
+
+The five-PR storage stack remains held outside main and the release path. Phase04
+currently supplies explicit artifact opt-in only; broad defaults await native
+identity/write receipts. Static Markdown checks, executable fixtures, actual
+native skill/publication execution and named external-consumer acceptance are
+separate evidence. A fixture pass is not a complete package storage or cutover
+verdict. Keep historical data in place. Readers must accept the new handoff/feed
+protocol before writer cutover. A specific recovery artifact must read retained
+new layout and write only under R, with native/consumer acceptance; otherwise an
+approved forward-recovery plan is required. An arbitrary older package is not
+qualified rollback. D6 requires a major release or an owner-approved exception,
+and release/installation still need their own authorization. No intermediate
+version bump or release is permitted.

@@ -18,10 +18,12 @@ import re
 import subprocess
 import sys
 import tarfile
+import uuid
 
 sys.dont_write_bytecode = True
 
 import release_toolchain  # noqa: E402
+from claudna.session_store.fsio import atomic_write_json  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 ARCHIVE = "package.tar.gz"
@@ -42,7 +44,7 @@ def digest(data: bytes) -> str:
 
 
 def write_json(path: Path, value: dict) -> None:
-    with path.open("x", encoding="utf-8") as stream:
+    with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w", encoding="utf-8") as stream:
         stream.write(json.dumps(value, indent=2, sort_keys=True) + "\n")
 
 
@@ -128,7 +130,9 @@ def pinned_descriptor(files: dict[str, tuple[str, bytes]], commit: str) -> dict:
     return descriptor
 
 
-def build(root: Path, ref: str, output: Path, *, qualify: bool = False) -> dict:
+def build(root: Path, ref: str, output: Path, *, qualify: bool = False,
+          owner: release_toolchain.MaintainerPaths | None = None, session: str | None = None,
+          host: str | None = None, standalone: bool = False) -> dict:
     require(bool(ref), "an explicit Git ref is required")
     # Resolve once; every subsequent Git object read uses this immutable value.
     commit = git(root, "rev-parse", "--verify", "--end-of-options", ref + "^{commit}").decode().strip()
@@ -138,8 +142,10 @@ def build(root: Path, ref: str, output: Path, *, qualify: bool = False) -> dict:
     descriptor = pinned_descriptor(files, commit)
     if qualify:
         release_toolchain.ensure_toolchain()
-    # mkdir is the ownership boundary: existing directories and links fail closed.
-    output.mkdir(parents=False)
+    owner = owner or release_toolchain.maintainer_paths(
+        "package-release", session=session, host=host, standalone=standalone)
+    # mkdir is the explicit export boundary: existing directories and links fail closed.
+    output.mkdir(parents=False, mode=0o700)
     stage = output / "package"
     stage.mkdir()
     for name, (mode, data) in files.items():
@@ -151,17 +157,23 @@ def build(root: Path, ref: str, output: Path, *, qualify: bool = False) -> dict:
     for directory, _, _ in os.walk(stage, topdown=False):
         Path(directory).chmod(0o555)
     archive = archive_bytes(files)
-    (output / ARCHIVE).write_bytes(archive)
-    (output / "package.sha256").write_text(f"{digest(archive)}  {ARCHIVE}\n", encoding="ascii")
+    for name, data in ((ARCHIVE, archive), ("package.sha256", f"{digest(archive)}  {ARCHIVE}\n".encode("ascii"))):
+        with os.fdopen(os.open(output / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as stream:
+            stream.write(data)
     write_json(output / "claude-marketplace.json", descriptor)
     receipt = {"schema": "claudna.package-release/1", "commit": commit, "version": version,
                "archive": {"name": ARCHIVE, "sha256": digest(archive)}, "files": file_receipt(files),
                "descriptor": {"name": "claude-marketplace.json",
                               "sha256": digest((output / "claude-marketplace.json").read_bytes())}}
     write_json(output / "receipt.json", receipt)
+    atomic_write_json(owner.artifacts / f"package-{uuid.uuid4().hex}.json",
+                      {"schema": "claudna.maintainer-export/1", "kind": "package", "status": "built",
+                       "owner_kind": owner.kind, "owner_id": owner.owner_id, "provider": owner.provider,
+                       "export": str(output.resolve()), "commit": commit, "archive_sha256": digest(archive),
+                       "receipt_sha256": digest((output / "receipt.json").read_bytes())}, durable=True)
     if qualify:
         from qualify_package import qualify as qualify_output
-        qualify_output(output)
+        qualify_output(output, owner=owner)
     return receipt
 
 
@@ -170,9 +182,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ref", required=True, help="Explicit ref, resolved once to a commit")
     parser.add_argument("--output", type=Path, required=True, help="New directory in an existing parent")
     parser.add_argument("--qualify", action="store_true", help="Run staged local fixture qualification")
+    parser.add_argument("--session")
+    parser.add_argument("--host", choices=("claude", "codex", "cursor"))
+    parser.add_argument("--standalone", action="store_true")
     args = parser.parse_args(argv)
     try:
-        receipt = build(ROOT, args.ref, args.output.absolute(), qualify=args.qualify)
+        receipt = build(ROOT, args.ref, args.output.absolute(), qualify=args.qualify,
+                        session=args.session, host=args.host, standalone=args.standalone)
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as exc:
         parser.exit(1, f"package release: {exc}\n")
     print(f"package release: {receipt['commit']} {receipt['archive']['sha256']}")

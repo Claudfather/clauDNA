@@ -30,4 +30,4 @@ jobs:
       - name: Qualify and publish this exact candidate
         env:
           GH_TOKEN: ${{ github.token }}
-        run: make publish-release RELEASE_REF="$GITHUB_SHA" RELEASE_OUTPUT="$RUNNER_TEMP/claudna-release" RELEASE_REPO="$GITHUB_REPOSITORY"
+        run: CLAUDNA_STATE_DIR="$RUNNER_TEMP/claudna-state" make publish-release STORAGE_OWNER_ARGS=--standalone RELEASE_REF="$GITHUB_SHA" RELEASE_OUTPUT="$RUNNER_TEMP/claudna-release" RELEASE_REPO="$GITHUB_REPOSITORY"

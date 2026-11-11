@@ -53,7 +53,7 @@ jobs:
         run: make deps deps-eval
 
       - name: Run the routing evals
-        run: make routing-eval ROUTING_EVAL_ARGS="--out routing-eval.jsonl"
+        run: CLAUDNA_STATE_DIR="$RUNNER_TEMP/claudna-state" make routing-eval STORAGE_OWNER_ARGS=--standalone ROUTING_EVAL_ARGS="--out routing-eval.jsonl"
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 

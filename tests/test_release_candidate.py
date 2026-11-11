@@ -1,6 +1,7 @@
 """Release boundaries exercised with real Git repositories and fixture remotes."""
 
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -13,6 +14,7 @@ import pytest
 pytestmark = pytest.mark.usefixtures("maintainer_toolchain")
 
 ROOT = Path(__file__).resolve().parents[1]
+FIXTURE_SID = "fixture-codex-session-01"
 sys.path.insert(0, str(ROOT / "scripts"))
 SPEC = importlib.util.spec_from_file_location("release_candidate", ROOT / "scripts/release_candidate.py")
 release = importlib.util.module_from_spec(SPEC)
@@ -39,15 +41,19 @@ def fixture_targets(root):
     (root / "scripts").mkdir(exist_ok=True)
     for name in ("release_candidate.py", "release_toolchain.py", "check-changelog.sh"):
         shutil.copy2(ROOT / "scripts" / name, root / "scripts" / name)
+    shutil.copytree(ROOT / "lib" / "claudna", root / "lib" / "claudna")
     (root / "Makefile").write_text(
         "check:\n\tpython3 scripts/fixture_check.py\n\tbash scripts/check-changelog.sh\n"
         "qualify-package:\n\tpython3 scripts/fixture_package.py '$(PACKAGE_REF)' '$(PACKAGE_OUTPUT)'\n"
-        "tag-release:\n\tpython3 scripts/release_candidate.py --tag --ref '$(RELEASE_REF)' --output '$(RELEASE_OUTPUT)'\n"
+        "tag-release:\n\tpython3 scripts/release_candidate.py --tag --ref '$(RELEASE_REF)' "
+        "--output '$(RELEASE_OUTPUT)' $(STORAGE_OWNER_ARGS)\n"
     )
     (root / "scripts/fixture_check.py").write_text(
         "from pathlib import Path\nimport os\n"
         "assert Path.home().name == 'home'\n"
         "assert Path(os.environ['TMPDIR']).name == 'tmp'\n"
+        "assert Path.home().stat().st_mode & 0o777 == 0o700\n"
+        "assert Path(os.environ['TMPDIR']).stat().st_mode & 0o777 == 0o700\n"
         "assert Path('payload').read_text() == 'committed'\n"
         "(Path.home() / 'source-passed').write_text('yes')\n"
     )
@@ -77,7 +83,7 @@ digest = hashlib.sha256(archive).hexdigest()
 
 @pytest.fixture
 def repo(tmp_path):
-    root = tmp_path / "repo"
+    root = tmp_path / "repo with spaces"
     root.mkdir()
     git(root, "init", "-q")
     git(root, "config", "user.name", "Fixture")
@@ -100,9 +106,77 @@ def repo(tmp_path):
     return root
 
 
-def controller(root, output, *args):
+def controller(root, output, *args, native_sid=None):
+    env = {key: value for key, value in os.environ.items()
+           if key not in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID")}
+    env["CLAUDNA_STATE_DIR"] = str(output.parent / "state")
+    if native_sid:
+        env["CODEX_THREAD_ID"] = native_sid
+        owner_args = ("--session", native_sid, "--host", "codex")
+    else:
+        owner_args = ("--standalone",)
     return subprocess.run([sys.executable, "scripts/release_candidate.py", "--ref", "HEAD",
-                           "--output", str(output), *args], cwd=root, capture_output=True, text=True)
+                           "--output", str(output), *owner_args, *args], cwd=root,
+                          env=env, capture_output=True, text=True)
+
+
+def test_maintainer_owner_requires_identity_or_explicit_standalone(tmp_path, monkeypatch):
+    for key in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("CLAUDNA_STATE_DIR", str(tmp_path / "state root with spaces"))
+    with pytest.raises(ValueError, match="native identity required"):
+        release.maintainer_paths("release-candidate")
+    owner = release.maintainer_paths("release-candidate", standalone=True)
+    assert owner.kind == "operation" and owner.owner_id
+    assert owner.directory.parent == Path(tmp_path / "state root with spaces" / "operations")
+    assert owner.scratch.is_dir() and owner.artifacts.is_dir()
+
+
+def test_maintainer_owner_rejects_blank_or_conflicting_native_aliases(tmp_path, monkeypatch):
+    monkeypatch.setenv("CLAUDNA_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CODEX_THREAD_ID", " ")
+    with pytest.raises(ValueError):
+        release.maintainer_paths("release-candidate", standalone=True)
+    monkeypatch.setenv("CODEX_THREAD_ID", "fixture-thread-one")
+    monkeypatch.setenv("CODEX_SESSION_ID", "fixture-thread-two")
+    with pytest.raises(ValueError, match="conflicting native session aliases"):
+        release.maintainer_paths("release-candidate", standalone=True)
+    assert not (tmp_path / "state" / "operations").exists()
+
+
+def test_maintainer_owner_uses_matching_native_codex_identity(tmp_path, monkeypatch):
+    sid = FIXTURE_SID
+    for key in ("CLAUDE_SESSION_ID", "CODEX_SESSION_ID"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("CODEX_THREAD_ID", sid)
+    monkeypatch.setenv("CLAUDNA_STATE_DIR", str(tmp_path / "native-state"))
+    owner = release.maintainer_paths("release-candidate")
+    assert (owner.kind, owner.owner_id, owner.provider) == ("session", sid, "codex")
+    assert owner.directory == tmp_path / "native-state/sessions" / sid
+    assert owner.scratch.is_dir() and owner.artifacts.is_dir()
+
+
+def test_native_identity_is_used_by_qualifier_subprocess(repo, tmp_path):
+    output = tmp_path / "native-artifacts"
+    result = controller(repo, output, native_sid=FIXTURE_SID)
+    assert result.returncode == 0, result.stdout + result.stderr
+    receipts = list((tmp_path / "state/sessions" / FIXTURE_SID / "artifacts").glob(
+        "release-source-check-*.json"))
+    assert len(receipts) == 1
+    receipt = json.loads(receipts[0].read_text())
+    assert receipt["owner"] == {"kind": "session", "id": FIXTURE_SID, "provider": "codex"}
+
+
+def test_missing_owner_identity_has_clean_diagnostic_before_output_or_allocation(repo, tmp_path):
+    output = tmp_path / "unowned-output"
+    env = {key: value for key, value in os.environ.items()
+           if key not in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID")}
+    env["CLAUDNA_STATE_DIR"] = str(tmp_path / "unowned-state")
+    result = subprocess.run([sys.executable, "scripts/release_candidate.py", "--ref", "HEAD",
+                             "--output", str(output)], cwd=repo, env=env, capture_output=True, text=True)
+    assert result.returncode != 0
+    assert result.stderr.startswith("error: maintainer ownership unavailable: native identity required")
+    assert not output.exists() and not (tmp_path / "unowned-state" / "operations").exists()
 
 
 def test_exact_committed_candidate_checked_before_package_and_default_does_not_tag(repo, tmp_path):
@@ -112,6 +186,16 @@ def test_exact_committed_candidate_checked_before_package_and_default_does_not_t
     assert result.returncode == 0, result.stdout + result.stderr
     evidence = json.loads((tmp_path / "artifacts/source-check.json").read_text())
     assert evidence["commit"] == candidate and evidence["source_check"] == "pass"
+    receipts = list((tmp_path / "state/operations").glob("*/artifacts/release-source-check-*.json"))
+    assert len(receipts) == 1
+    owner_receipt = json.loads(receipts[0].read_text())
+    assert owner_receipt["owner"] == {"kind": "operation", "id": receipts[0].parents[1].name,
+                                      "provider": None}
+    assert owner_receipt["source_check_sha256"] == hashlib.sha256(
+        (tmp_path / "artifacts/source-check.json").read_bytes()).hexdigest()
+    assert owner_receipt["export_path"] == str((tmp_path / "artifacts").resolve())
+    assert (tmp_path / "artifacts/source-check.json").stat().st_mode & 0o777 == 0o600
+    assert receipts[0].stat().st_mode & 0o777 == 0o600
     assert git(repo, "tag") == ""
     assert (repo / "payload").read_text() == "dirty source must not leak"
 
@@ -194,6 +278,12 @@ def test_qualification_failure_prevents_local_tag(repo, tmp_path, failure):
     result = controller(repo, tmp_path / "artifacts", "--tag")
     assert result.returncode != 0
     assert git(repo, "tag") == ""
+    assert not list((tmp_path / "state/operations").glob("*/artifacts/release-source-check-*.json"))
+    if failure == "source":
+        retained = list((tmp_path / "state/operations").glob("*/scratch/release-candidate.*"))
+        assert len(retained) == 1 and (retained[0] / "source").is_dir()
+        assert retained[0].stat().st_mode & 0o777 == 0o700
+        assert str(retained[0]) in result.stderr
 
 
 def test_local_tag_is_only_created_after_successful_qualification(repo, tmp_path):
@@ -289,6 +379,8 @@ if args[0] == 'api':
         print(json.dumps({'tag_name': 'v1.0.1', 'assets': [{'name': p.name} for p in assets.iterdir()]}))
 elif args[:2] == ['release', 'create']:
     assert '--verify-tag' in args
+    notes = Path(args[args.index('--notes-file') + 1])
+    (root / 'notes_mode').write_text(oct(notes.stat().st_mode & 0o777))
     assets.mkdir()
 elif args[:2] == ['release', 'download']:
     name = args[args.index('--pattern') + 1]
@@ -321,6 +413,7 @@ def test_publish_attaches_all_evidence_and_accepts_only_identical_existing_asset
     expected = {"package.tar.gz", "package.sha256", "receipt.json", "qualification.json",
                 "claude-marketplace.json", "source-check.json"}
     assert {path.name for path in (fake_gh / "assets").iterdir()} == expected
+    assert (fake_gh / "notes_mode").read_text() == "0o600"
     second = controller(repo, tmp_path / "second", "--publish", "--remote", "publish", "--repo", "fixture/repo")
     assert second.returncode == 0, second.stdout + second.stderr
     commands = [json.loads(line) for line in (fake_gh / "commands").read_text().splitlines()]
@@ -364,11 +457,15 @@ def test_correct_push_remote_cannot_authorize_wrong_publication_repository(
         assert not (fake_gh / "assets").exists()
 
 
-def test_publication_tag_must_peel_to_a_commit(repo, fake_gh):
+def test_publication_tag_must_peel_to_a_commit(repo, fake_gh, tmp_path, monkeypatch):
+    for key in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("CLAUDNA_STATE_DIR", str(tmp_path / "state"))
+    owner = release.maintainer_paths("release-fixture", standalone=True)
     git(repo, "tag", "v1.0.1", "HEAD^{tree}")
     git(repo, "push", "publish", "refs/tags/v1.0.1")
     with pytest.raises(release.ReleaseError, match="does not peel to a commit"):
-        release.publish_assets(repo, "fixture/repo", "v1.0.1", git(repo, "rev-parse", "HEAD"), "notes", [])
+        release.publish_assets(repo, "fixture/repo", "v1.0.1", git(repo, "rev-parse", "HEAD"), "notes", [], owner)
     assert not (fake_gh / "assets").exists()
 
 
@@ -380,6 +477,10 @@ def test_nested_annotated_publication_tag_is_peeled(repo, fake_gh):
 
 
 def test_publication_tag_changed_during_final_upload_is_not_reported_successful(repo, tmp_path, fake_gh, monkeypatch):
+    for key in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("CLAUDNA_STATE_DIR", str(tmp_path / "state"))
+    owner = release.maintainer_paths("release-fixture", standalone=True)
     candidate = git(repo, "rev-parse", "HEAD")
     release.publish_tag(repo, "publish", "v1.0.1", candidate)
     remote = Path(git(repo, "remote", "get-url", "publish"))
@@ -395,7 +496,7 @@ def test_publication_tag_changed_during_final_upload_is_not_reported_successful(
 
     monkeypatch.setattr(release, "run", raced_run)
     with pytest.raises(release.ReleaseError, match="fixture/repo:v1.0.1 resolves to"):
-        release.publish_assets(repo, "fixture/repo", "v1.0.1", candidate, "notes", [asset])
+        release.publish_assets(repo, "fixture/repo", "v1.0.1", candidate, "notes", [asset], owner)
 
 
 def test_release_lookup_error_is_not_treated_as_absent(repo, monkeypatch):

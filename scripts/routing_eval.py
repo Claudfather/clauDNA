@@ -17,6 +17,7 @@ stopped early (budget, or repeated setup errors), 2 when ``claude`` can't be run
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -26,13 +27,19 @@ import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Callable, Mapping
+from uuid import uuid4
 
 import yaml
 
+sys.dont_write_bytecode = True
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
+sys.path.insert(0, str(REPO_ROOT / "lib"))
 
 from skill_discovery import skill_dirs  # noqa: E402
+from release_toolchain import MaintainerPaths, maintainer_paths  # noqa: E402
+from claudna.session_store.fsio import atomic_write_json  # noqa: E402
 
 MATRIX = REPO_ROOT / "tests" / "fixtures" / "routing-matrix.yaml"
 PREFIX = "claudna:"
@@ -194,7 +201,9 @@ def subprocess_runner(argv: list, env: Mapping[str, str], cwd: Path) -> tuple[st
 def evaluate(cases: list[Case], *, runs: int, need: int, model: str, claude_bin: str, budget_usd: float,
              runner: Runner = subprocess_runner, base_env: Mapping[str, str] | None = None,
              log: Callable[[str], None] = print,
-             on_verdict: Callable[[Verdict], None] = lambda _v: None) -> tuple[list[Verdict], float, bool]:
+             on_verdict: Callable[[Verdict], None] = lambda _v: None,
+             owner: MaintainerPaths | None = None, session: str | None = None, host: str | None = None,
+             standalone: bool = False) -> tuple[list[Verdict], float, bool]:
     """Run every case ``runs`` times; ``(verdicts, spent, stopped early)``.
 
     Each attempt runs in an empty scratch git repo, so where the script is
@@ -204,10 +213,12 @@ def evaluate(cases: list[Case], *, runs: int, need: int, model: str, claude_bin:
     result record, so its spend isn't counted. ``on_verdict`` gets each case as
     it finishes, so a run killed part way keeps what it had.
     """
+    if owner is None:
+        owner = maintainer_paths("routing-eval", session=session, host=host, standalone=standalone)
     verdicts, spent, errors_in_a_row, ours = [], 0.0, 0, skill_names()
-    with tempfile.TemporaryDirectory(prefix="claudna-routing-eval-") as scratch:
+    with tempfile.TemporaryDirectory(prefix="routing-eval-", dir=owner.scratch) as scratch:
         state, work = Path(scratch) / "state", Path(scratch) / "work"
-        work.mkdir()
+        work.mkdir(mode=0o700)
         scratch_repo(work)
         env = child_env(os.environ if base_env is None else base_env, state)
         for case in cases:
@@ -248,6 +259,21 @@ def claude_version(claude_bin: str) -> str | None:
     return out.stdout.strip() or None
 
 
+def _fresh_output(path: Path) -> None:
+    """Reject existing exports (including dangling symlinks) before any provider probe."""
+    if path.exists() or path.is_symlink():
+        raise FileExistsError(f"report export already exists: {path}")
+    if not path.parent.is_dir():
+        raise FileNotFoundError(f"report parent directory does not exist: {path.parent}")
+
+
+def _open_exclusive_output(path: Path):
+    """Create a private report export without following or truncating a path."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    os.fchmod(fd, 0o600)
+    return os.fdopen(fd, "w", encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--runs", type=int, default=3)
@@ -258,6 +284,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", type=Path, help="write one JSON line per case here")
     ap.add_argument("--budget-usd", type=float, default=2.0, help="stop once the runs have cost this much")
     ap.add_argument("--claude-bin", default="claude")
+    ap.add_argument("--session", help="verified native session ID")
+    ap.add_argument("--host", choices=("claude", "codex", "cursor"), help="native session provider")
+    ap.add_argument("--standalone", action="store_true", help="explicitly allocate a standalone operation")
     args = ap.parse_args(argv)
     if not 1 <= args.need <= args.runs:
         ap.error("--pass must be between 1 and --runs")
@@ -265,20 +294,52 @@ def main(argv: list[str] | None = None) -> int:
              if not args.match or args.match in c.utterance or args.match in (c.expect or "")]
     if not cases:
         ap.error(f"no case matches -k {args.match!r}")
+    if args.out:
+        try:
+            _fresh_output(args.out)
+        except OSError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
 
     claude_bin = shutil.which(args.claude_bin)
     version = claude_version(claude_bin) if claude_bin else None
     if version is None:
         print(f"error: can't run {args.claude_bin!r}: install Claude Code, or pass --claude-bin", file=sys.stderr)
         return 2
+    try:
+        owner = maintainer_paths("routing-eval", session=args.session, host=args.host,
+                                 standalone=args.standalone)
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(f"error: maintainer storage unavailable: {exc}", file=sys.stderr)
+        return 2
     print(f"{len(cases)} cases x {args.runs} runs on {args.model}, {version}")
-    with (args.out.open("w", encoding="utf-8") if args.out else open(os.devnull, "w")) as fh:
+    try:
+        output = _open_exclusive_output(args.out) if args.out else open(os.devnull, "w")
+    except OSError as exc:
+        print(f"error: can't create report export: {exc}", file=sys.stderr)
+        return 2
+    with output as fh:
         def record(v: Verdict) -> None:
             fh.write(json.dumps({"claude": version, "model": args.model, "status": v.status, **asdict(v)}) + "\n")
             fh.flush()
 
         verdicts, spent, stopped = evaluate(cases, runs=args.runs, need=args.need, model=args.model,
-                                            claude_bin=claude_bin, budget_usd=args.budget_usd, on_verdict=record)
+                                            claude_bin=claude_bin, budget_usd=args.budget_usd, on_verdict=record,
+                                            owner=owner)
+    if args.out:
+        report_sha = hashlib.sha256(args.out.read_bytes()).hexdigest()
+        export_path = str(args.out.resolve())
+    else:
+        report_sha = hashlib.sha256(json.dumps(
+            {"statuses": [v.status for v in verdicts], "spent_usd": spent, "stopped_early": stopped},
+            sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        export_path = None
+    receipt = {"schema_version": 1, "tool": "routing-eval", "owner": {
+        "kind": owner.kind, "owner_id": owner.owner_id, "provider": owner.provider},
+        "export_path": export_path, "report_sha256": report_sha,
+        "source_script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "outcome": {"verdicts": len(verdicts), "spent_usd": spent, "stopped_early": stopped}}
+    atomic_write_json(owner.artifacts / f"routing-eval-{uuid4().hex}.json", receipt, durable=True)
     counts = {s: sum(v.status == s for v in verdicts) for s in ("PASS", "FAIL", "XFAIL", "XPASS")}
     print(", ".join(f"{n} {s}" for s, n in counts.items() if n) + f"; ${spent:.2f} spent")
     if counts["XPASS"]:

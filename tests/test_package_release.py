@@ -18,6 +18,13 @@ from package_release import PackageError, build, safe_path  # noqa: E402
 from qualify_package import fixture_environment, qualify, verify_package  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def isolated_maintainer_owner(tmp_path, monkeypatch):
+    for key in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("CLAUDNA_STATE_DIR", str(tmp_path / "owned state"))
+
+
 def git(root, *args):
     env = {"PATH": os.defpath, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
            "GIT_AUTHOR_NAME": "Package fixture", "GIT_AUTHOR_EMAIL": "fixture@localhost",
@@ -48,8 +55,8 @@ def test_reproducible_full_tracked_export_ignores_dirty_files_and_export_attribu
     (repo / "README.md").write_text("dirty secret excluded")
     (repo / "untracked-secret").write_text("excluded")
     first, second = tmp_path / "first output", tmp_path / "second"
-    receipt = build(repo, ref, first)
-    build(repo, ref, second)
+    receipt = build(repo, ref, first, standalone=True)
+    build(repo, ref, second, standalone=True)
     for name in ("package.tar.gz", "receipt.json", "package.sha256", "claude-marketplace.json"):
         assert (first / name).read_bytes() == (second / name).read_bytes()
     assert receipt == verify_package(first)
@@ -86,7 +93,7 @@ def test_explicit_ref_resolved_once_even_when_branch_moves(repo, tmp_path, monke
         return original(root, resolved)
 
     monkeypatch.setattr(package_release, "tracked_files", move_branch)
-    result = build(repo, "HEAD", tmp_path / "output")
+    result = build(repo, "HEAD", tmp_path / "output", standalone=True)
     assert result["commit"] == before and "late-file" not in result["files"]
 
 
@@ -109,7 +116,7 @@ def test_git_links_and_submodules_are_rejected(repo, tmp_path, mode):
         git(repo, "commit", "--quiet", "-m", "package gitlink fixture")
         ref = git(repo, "rev-parse", "HEAD")
     with pytest.raises(PackageError, match="unsupported tracked mode"):
-        build(repo, ref, tmp_path / "output")
+        build(repo, ref, tmp_path / "output", standalone=True)
     assert not (tmp_path / "output").exists()
 
 
@@ -122,7 +129,7 @@ def test_existing_output_is_never_clobbered(repo, tmp_path, kind):
     else:
         output.symlink_to(tmp_path / "missing")
     with pytest.raises(FileExistsError):
-        build(repo, "HEAD", output)
+        build(repo, "HEAD", output, standalone=True)
     assert output.is_symlink() if kind == "symlink" else (output / "keep").read_text() == "retained"
 
 
@@ -135,15 +142,15 @@ def test_qualification_toolchain_failure_precedes_output_writes(repo, tmp_path, 
     monkeypatch.setattr(release_toolchain, "ensure_toolchain", unavailable)
     rejected = tmp_path / "rejected"
     with pytest.raises(release_toolchain.ToolchainError, match="toolchain unavailable"):
-        build(repo, "HEAD", rejected, qualify=True)
+        build(repo, "HEAD", rejected, qualify=True, standalone=True)
     assert not rejected.exists()
 
     # Pure packaging still needs only stdlib; standalone qualification also
     # fails without allocating fixture state or recording passing evidence.
     output = tmp_path / "stdlib-package"
-    receipt = build(repo, "HEAD", output)
+    receipt = build(repo, "HEAD", output, standalone=True)
     with pytest.raises(release_toolchain.ToolchainError, match="toolchain unavailable"):
-        qualify(output)
+        qualify(output, standalone=True)
     assert verify_package(output) == receipt
     assert not (output / "qualification.json").exists() and not list(output.glob("fixture-*"))
 
@@ -163,11 +170,15 @@ def test_fixture_environment_does_not_inherit_secrets_or_provider_config(tmp_pat
 
 def test_staged_lifecycle_and_doctor_are_deterministic_fixture_only_evidence(repo, tmp_path, maintainer_toolchain):
     first, second = tmp_path / "first", tmp_path / "second"
-    receipt = build(repo, "HEAD", first, qualify=True)
-    build(repo, "HEAD", second, qualify=True)
+    receipt = build(repo, "HEAD", first, qualify=True, standalone=True)
+    build(repo, "HEAD", second, qualify=True, standalone=True)
     result = json.loads((first / "qualification.json").read_text())
     assert (first / "qualification.json").read_bytes() == (second / "qualification.json").read_bytes()
     assert result["commit"] == receipt["commit"] and result["archive_sha256"] == receipt["archive"]["sha256"]
+    assert "observed exited" in result["filesystem"]["detached_worker"]
+    assert result["filesystem"]["writable_package"] == "unchanged"
+    assert result["filesystem"]["native_recovery_acceptance"] == "unknown"
+    assert result["storage_cutover"].startswith("blocked:")
     assert result["status"] == "pass" and result["native_acceptance"] == "unknown"
     assert result["full_source_check"] == "not_run"
     assert set(result["fixtures"]) == {"claude-code", "codex"}
@@ -176,7 +187,7 @@ def test_staged_lifecycle_and_doctor_are_deterministic_fixture_only_evidence(rep
     assert not list(first.glob("fixture-*"))
     assert verify_package(first) == receipt
     with pytest.raises(PackageError, match="already exists"):
-        qualify(first)
+        qualify(first, standalone=True)
 
 
 @pytest.mark.parametrize("relative", ["plugin-hooks/lib/state-dir.sh", "lib/claudna/session_store/schema.py",
@@ -185,7 +196,7 @@ def test_missing_tracked_runtime_or_catalog_closure_fails(repo, tmp_path, relati
     (repo / relative).unlink()
     ref = commit(repo)
     with pytest.raises((PackageError, OSError)):
-        build(repo, ref, tmp_path / "output", qualify=True)
+        build(repo, ref, tmp_path / "output", qualify=True, standalone=True)
     assert not (tmp_path / "output/qualification.json").exists()
 
 
@@ -201,11 +212,11 @@ def test_missing_ancillary_skill_resource_fails_even_with_ambient_ci_scoping(
     (repo / relative).unlink()
     ref = commit(repo)
     output = tmp_path / "output"
-    receipt = build(repo, ref, output)
+    receipt = build(repo, ref, output, standalone=True)
     assert relative not in receipt["files"]
     assert verify_package(output) == receipt
     with pytest.raises(PackageError, match="packaged command failed"):
-        qualify(output)
+        qualify(output, standalone=True)
     assert not (output / "qualification.json").exists()
 
 
@@ -216,7 +227,7 @@ def test_fail_open_hook_is_not_passing_evidence(repo, tmp_path, body, maintainer
     (repo / "plugin-hooks/session-store.sh").write_text(body)
     ref = commit(repo)
     with pytest.raises((PackageError, OSError)):
-        build(repo, ref, tmp_path / "output", qualify=True)
+        build(repo, ref, tmp_path / "output", qualify=True, standalone=True)
     assert not (tmp_path / "output/qualification.json").exists()
 
 
@@ -225,7 +236,7 @@ def test_ignored_optout_is_detected(repo, tmp_path, maintainer_toolchain):
     hook.write_text(hook.read_text().replace('[ "${CLAUDNA_SESSION_STORE:-1}" = "0" ] && exit 0', ""))
     ref = commit(repo)
     with pytest.raises(PackageError, match="opt-out"):
-        build(repo, ref, tmp_path / "output", qualify=True)
+        build(repo, ref, tmp_path / "output", qualify=True, standalone=True)
 
 
 def test_unexpected_provider_attempt_is_rejected_locally(repo, tmp_path, maintainer_toolchain):
@@ -233,14 +244,14 @@ def test_unexpected_provider_attempt_is_rejected_locally(repo, tmp_path, maintai
     hook.write_text(hook.read_text().replace("#!/bin/bash", "#!/bin/bash\nclaude >/dev/null 2>&1 || true", 1))
     ref = commit(repo)
     with pytest.raises(PackageError, match="provider command"):
-        build(repo, ref, tmp_path / "output", qualify=True)
+        build(repo, ref, tmp_path / "output", qualify=True, standalone=True)
     assert not (tmp_path / "output/qualification.json").exists()
 
 
 @pytest.mark.parametrize("change", ["checksum", "receipt", "tree_mode", "descriptor"])
 def test_tampering_fails_binding_before_execution(repo, tmp_path, change):
     output = tmp_path / "output"
-    build(repo, "HEAD", output)
+    build(repo, "HEAD", output, standalone=True)
     if change == "tree_mode":
         (output / "package/README.md").chmod(0o644)
     elif change == "checksum":
@@ -256,5 +267,104 @@ def test_tampering_fails_binding_before_execution(repo, tmp_path, change):
         document["archive"]["sha256"] = "0" * 64
         path.write_text(json.dumps(document))
     with pytest.raises(PackageError):
-        qualify(output)
+        qualify(output, standalone=True)
     assert not (output / "qualification.json").exists()
+
+
+def test_package_requires_owner_and_retains_native_export_receipt(repo, tmp_path, monkeypatch):
+    output = tmp_path / "explicit export"
+    with pytest.raises(ValueError, match="native identity required"):
+        build(repo, "HEAD", output)
+    assert not output.exists() and not (tmp_path / "owned state").exists()
+    monkeypatch.setenv("CODEX_THREAD_ID", "package-native-fixture")
+    receipt = build(repo, "HEAD", output)
+    owner = tmp_path / "owned state/sessions/package-native-fixture"
+    records = list((owner / "artifacts").glob("package-*.json"))
+    assert len(records) == 1 and records[0].stat().st_mode & 0o777 == 0o600
+    canonical = json.loads(records[0].read_text())
+    assert canonical["owner_kind"] == "session" and canonical["owner_id"] == "package-native-fixture"
+    assert canonical["commit"] == receipt["commit"]
+    assert canonical["archive_sha256"] == receipt["archive"]["sha256"]
+    assert canonical["export"] == str(output)
+    assert not (owner / "lifecycle.jsonl").exists()
+    assert not (tmp_path / "owned state/operations").exists()
+
+
+def test_qualification_detects_actual_host_sentinel_mutation(repo, tmp_path, maintainer_toolchain):
+    hook = repo / "plugin-hooks/session-store.sh"
+    hook.write_text(hook.read_text().replace("#!/bin/bash", "#!/bin/bash\nprintf changed > \"$HOME/.claude/settings.json\"", 1))
+    ref = commit(repo)
+    with pytest.raises(PackageError, match="protected host/project"):
+        build(repo, ref, tmp_path / "output", qualify=True, standalone=True)
+    assert not (tmp_path / "output/qualification.json").exists()
+    assert list((tmp_path / "owned state/operations").glob("*/artifacts/package-*.json"))
+    assert list((tmp_path / "owned state/operations").glob("*/scratch/fixture-*"))
+    assert not list((tmp_path / "owned state/operations").glob("*/artifacts/qualification-*.json"))
+
+
+def test_qualification_detects_writable_only_package_mutation(repo, tmp_path, maintainer_toolchain):
+    hook = repo / "plugin-hooks/session-store.sh"
+    injection = '#!/bin/bash\nif [ -w "$(dirname "$0")" ]; then touch "$(dirname "$0")/unexpected-cache"; fi'
+    hook.write_text(hook.read_text().replace("#!/bin/bash", injection, 1))
+    ref = commit(repo)
+    with pytest.raises(PackageError, match="writable package changed"):
+        build(repo, ref, tmp_path / "output", qualify=True, standalone=True)
+    assert not (tmp_path / "output/qualification.json").exists()
+
+
+def test_snapshot_records_content_modes_creation_and_deletion(tmp_path):
+    from qualify_package import filesystem_snapshot
+
+    directory = tmp_path / "observed"
+    assert filesystem_snapshot(directory) == {}
+    directory.mkdir(mode=0o700)
+    target = directory / "sentinel"
+    target.write_text("before")
+    target.chmod(0o600)
+    before = filesystem_snapshot(directory)
+    target.write_text("after")
+    target.chmod(0o400)
+    changed = filesystem_snapshot(directory)
+    assert changed["sentinel"]["sha256"] != before["sentinel"]["sha256"]
+    assert changed["sentinel"]["mode"] == 0o400
+    target.unlink()
+    assert "sentinel" not in filesystem_snapshot(directory)
+    target.symlink_to(directory / "absent")
+    assert filesystem_snapshot(directory)["sentinel"]["type"] == "link"
+    assert filesystem_snapshot(target)["."]["type"] == "link"
+
+
+@pytest.mark.parametrize("relative", ["hooks/errors.log", "sessions/fixture/hooks/session-store.stderr",
+                                     "sessions/fixture/hooks/errors.log.old"])
+def test_qualification_checks_relocated_and_rotated_error_payloads(tmp_path, relative):
+    from qualify_package import no_hook_errors
+
+    target = tmp_path / relative
+    target.parent.mkdir(parents=True)
+    target.write_text("")
+    no_hook_errors(tmp_path)
+    target.write_text("synthetic fail-open error")
+    with pytest.raises(PackageError, match="recorded errors"):
+        no_hook_errors(tmp_path)
+
+
+def test_denied_fixture_cleanup_retains_exact_work_and_no_passing_receipt(
+        repo, tmp_path, maintainer_toolchain, monkeypatch):
+    import qualify_package
+
+    original = qualify_package.shutil.rmtree
+    denied = []
+
+    def remove(path, *args, **kwargs):
+        if Path(path).name.startswith("fixture-"):
+            denied.append(Path(path))
+            raise PermissionError("fixture cleanup denied")
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(qualify_package.shutil, "rmtree", remove)
+    with pytest.raises(PermissionError, match="cleanup denied"):
+        build(repo, "HEAD", tmp_path / "output", qualify=True, standalone=True)
+    assert len(denied) == 1 and denied[0].is_dir()
+    assert denied[0].is_relative_to(tmp_path / "owned state/operations")
+    assert not (tmp_path / "output/qualification.json").exists()
+    assert not list((tmp_path / "owned state/operations").glob("*/artifacts/qualification-*.json"))
