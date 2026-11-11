@@ -593,7 +593,7 @@
       "requires_context": "repo-clone"
     },
     "publish": {
-      "description": "Use when a finished markdown document — plan, audit or review findings, retro, decision, or knowledge page — needs to reach its destination: the shared-docs vault, the repo's documentation/ tree, a GitHub issue, a PR description, the chat session, or a Notion page. The single output sink: skills author content, publish delivers it. For a quick vault note rather than a finished document, use /claudna:claudron.",
+      "description": "Use when a finished markdown document — plan, audit or review findings, retro, decision, or knowledge page — needs to reach its destination: the shared-docs vault, the repo's documentation/ tree, a GitHub issue, a PR description, the chat session, a Notion page, or an explicitly selected private session artifact area. The single output sink: skills author content, publish delivers it. For a quick vault note rather than a finished document, use /claudna:claudron.",
       "hosts": [
         "claude-code",
         "codex",
@@ -788,8 +788,8 @@
     "plugin-hooks/hooks.json": "d64bf123e5c8a8faab67f8f7d2061b7c8a81d94e842d018f921b35a35d961a4e",
     "skills/adversarial-review/SKILL.md": "315dd88ae18d18d04c125d5fca7eaa5fe5f514f35203b2bbf6ec51d4906806a7",
     "skills/audit/SKILL.md": "30dc321f18c1ede87b8e78150b151ef256debe43da1b11b13feab7bafd48f3d9",
-    "skills/build-all/SKILL.md": "06062151e0e45c78ea9e4c5509024960832317f015bd5e866ebc50c01598f0a0",
-    "skills/build/SKILL.md": "dbae581283b634c2027e4822bba8370eb7534d38868ae853e9773e075ba827de",
+    "skills/build-all/SKILL.md": "1722186e9426ebcd582e4a475d8963b6ba3648ca7ef544fdd325706bd1e63976",
+    "skills/build/SKILL.md": "6911ac99af09467d4a6f403d096d8c0f73499bbdd50428648022af4e78f9d40c",
     "skills/capture/SKILL.md": "143b7700debabc6c50664c8b062302134448308e654be3007dc064280a902bb4",
     "skills/claudron/SKILL.md": "c71d9523af39e2a71a58f86e4e711aa44d9c2742091b825fa413a1df5752a5ae",
     "skills/cleanup-legacy-install/SKILL.md": "a65f292d370a895903dfb35526aa3e3cce6a03d55df605f86a1ab119744bf541",
@@ -799,7 +799,7 @@
     "skills/extract-system-spec/SKILL.md": "111f25784a0f1a26a2819cf6df193a1380ea143d11fa156da04616e3c60fcc82",
     "skills/file-github-issue/SKILL.md": "515e6920514ae59835554623cf531b036be1c53005a0247d2afd18fbda892260",
     "skills/find-skills/SKILL.md": "ad38f603f99e6ca0dac405bd6a636b05811723851f3f4dbcde014111664b7b01",
-    "skills/forge/SKILL.md": "06c76f21a1a0d4d5a80ac080a14174b843dde67b872742179386971d3e33d24f",
+    "skills/forge/SKILL.md": "11474eaf87c7b7a650be6f7948aeb0dd445a953043327a3785cea46f52823038",
     "skills/github-activity-report/SKILL.md": "0011418e1723fce9b9a8a78871f6b3c197dd5bc37a9063b476e329f49b4e16ab",
     "skills/heist/SKILL.md": "c6b8093c89b21c3d5a1751c1e2e217a7deb768eefeb8c58825d54fabdfef3eb5",
     "skills/index/SKILL.md": "11bf70464a32d1a4b946131c0fc652f120aacbeeeb58cc853b35a52d178e9610",
@@ -812,7 +812,7 @@
     "skills/product-enhance/SKILL.md": "9fe3ed0c1778d014a00e14b95562436f67089b94b7d6b6d60c82c481e3a80596",
     "skills/product-vision/SKILL.md": "aa3f0a56b7f5efd18245e45c3df5cedd8dbb1be72542a42bf3958926019c1934",
     "skills/promotion-intake/SKILL.md": "1832cb7fd6b9adec0b059f41ff8adf205a8ba0a129b265cb7137d6f84f0cdb01",
-    "skills/publish/SKILL.md": "99167a5a4869d8cf7488a8a7adbe29281fdd1b3a23db702cec91bd1a569ffff2",
+    "skills/publish/SKILL.md": "f74eaed18cdda3d0fa7ae0a370b5917579d0f64fb70c612f046115c8c10f4ab3",
     "skills/qa/SKILL.md": "2f4a4b37433dee2559fbe849c2952dbe19b0ad6d0544fdca7b7a71bd88870b81",
     "skills/railway/SKILL.md": "9385eacd65f4ae91cfa838aa5a60982a7acf21ce5042a5c4eaa5c7ed246494b9",
     "skills/recall/SKILL.md": "3b44ea8eff5d1d4636b8b6ef8a1a86604145260b75ecd0fdf3130827a3542275",

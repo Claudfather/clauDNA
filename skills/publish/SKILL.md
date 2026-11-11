@@ -1,8 +1,8 @@
 ---
 name: publish
 user-invocable: true
-description: "Use when a finished markdown document — plan, audit or review findings, retro, decision, or knowledge page — needs to reach its destination: the shared-docs vault, the repo's documentation/ tree, a GitHub issue, a PR description, the chat session, or a Notion page. The single output sink: skills author content, publish delivers it. For a quick vault note rather than a finished document, use /claudna:claudron."
-argument-hint: "<source-file-or-dir> [--to vault|docs|github-issue|github-pr|session|notion] [--dir <path>] [--update <issue#|url>] [--repo <name>] [--dry-run]"
+description: "Use when a finished markdown document — plan, audit or review findings, retro, decision, or knowledge page — needs to reach its destination: the shared-docs vault, the repo's documentation/ tree, a GitHub issue, a PR description, the chat session, a Notion page, or an explicitly selected private session artifact area. The single output sink: skills author content, publish delivers it. For a quick vault note rather than a finished document, use /claudna:claudron."
+argument-hint: "<source-file-or-dir> [--to vault|docs|github-issue|github-pr|session|notion|artifacts] [--dir <path>] [--update <issue#|url>] [--repo <name>] [--dry-run]"
 requires:
   - cli: claudron
     reason: "Optional — `--to vault` routes the doc through `claudron capture` when the engine is present; without it, that one adapter degrades per the standard notice in ../_shared/claudron-engine.md §3.1 and writes the frozen raw tree. Every other adapter is unaffected"
@@ -14,13 +14,15 @@ requires:
 
 Markdown-first, output-last. Takes a doc with frontmatter and publishes it to the right destination. The doc is always the source of truth — /claudna:publish is just the adapter.
 
+The `artifacts` destination below is explicit opt-in and source-prepared only. Existing workflow defaults remain unchanged while broad migration awaits native receipts and consumer acceptance. Resolve the loaded package root through [`../_shared/claudna-root.md`](../_shared/claudna-root.md); examples use the actual `python3 -B <claudna-root>/lib/claudna/session_store` entrypoint.
+
 **This skill is the single output sink.** Analysis/planning skills are *authors*: they produce a markdown doc with valid frontmatter and the house-style body skeleton, then hand it to /claudna:publish. /claudna:publish is the *publisher*: it enforces house style, dedups per-medium, and routes the one manuscript to whichever edition the caller asked for. Skills must never call `gh issue create` / `gh pr create` themselves — they delegate here. The canonical house-style spec (frontmatter schema, per-type body skeleton, label taxonomy) lives in `../_shared/output-guide.md`; this skill enforces it.
 
 ## Arguments
 
 Parse `$ARGUMENTS` at invocation:
 - **First positional arg:** Path to the source markdown file — or, for the docs adapter's family mode, a directory holding one `00_*.md` master plus `NN_*.md` phase docs. Required.
-- `--to <dest>`: Destination adapter. One of: `vault` (default), `docs`, `github-issue`, `github-pr`, `session`, `notion`.
+- `--to <dest>`: Destination adapter. One of: `vault` (default), `docs`, `github-issue`, `github-pr`, `session`, `notion`, or explicitly opted-in `artifacts`.
 - `--dir <path>`: docs adapter only — the target directory under `documentation/` (the calling skill knows its category; registry in `../_shared/documentation-standard.md` §2). Required with `--to docs`.
 - `--update <issue#|url>`: Replace the named GitHub issue's body instead of creating anything. Implies `--to github-issue` — the only adapter with an update path — so `--to` may be omitted. See "In-place update" under the github-issue adapter.
 - `--repo <name>`: Target repository (for github adapters).
@@ -30,7 +32,9 @@ Parse `$ARGUMENTS` at invocation:
 
 ## Step 1: Read and Validate Source (house style)
 
-Read the source markdown file. Parse YAML frontmatter. Validation is **deep** — a malformed manuscript is never published. If any check below fails, report the specific errors and stop. (Directory source: this step runs per doc via the docs adapter's family loop.)
+**Before reading any source content**, resolve each explicitly selected source file or asset path (including symlink aliases) and determine whether it is a canonical artifact under the effective root. If it is, validate that exact absolute path and owner with the existing `continuity artifact-path` explicit-path form shown under the artifacts adapter below. Apply this gate to every canonical source for every destination adapter, including files individually selected from a family; never blanket-read a directory or read a canonical payload before its path is authorized. Validate current-session and other-session canonical paths. A current-owner private/manual artifact is permitted; another owner's source requires a public, bounded scope. Missing, private, denied, stale, or otherwise uncertain validation means stop before content read, preserve the source, and report partial/unavailable. Noncanonical scratch/user sources follow the existing Step 1 reads and validation below.
+
+After the gate, read the allowed source markdown file. Parse YAML frontmatter. Validation is **deep** — a malformed manuscript is never published. If any check below fails, report the specific errors and stop. (Directory source: this step runs per doc via the docs adapter's family loop.)
 
 ### 1a. Frontmatter schema
 
@@ -44,7 +48,9 @@ Validate required fields exist and are well-formed:
 | `owner` | non-empty string |
 | `created` | valid `YYYY-MM-DD` |
 
-Optional fields: `tags` (→ issue labels), `repos` (→ vault dir + repo inference), `links` (publish writes the destination URL back here), `updated`, `expires`, `description`.
+Optional fields: `tags` (→ issue labels), `repos` (→ vault dir + repo inference), `links` (publish writes the destination URL back here for editable noncanonical sources), `updated`, `expires`, `description`.
+
+**Canonical artifact source rule:** once a file is a canonical artifact, its content and frontmatter remain unchanged during later exports. In particular, do not add an issue, Notion, or other destination URL to that canonical source. For an actual returned non-chat outcome, record the destination in a private receipt under the current session's artifact area; this applies to every destination adapter and never copies the canonical source. A failed or uncertain destination may be recorded only with its actual failed/unknown status, never as success. Session/chat output and dry-run remain mutation-free and create no receipt. Existing write-back behavior remains available for noncanonical scratch/user sources where the adapter below specifies it.
 
 Pass-through fields (accepted, never rejected, never required — output-guide §3): `maturity`, `schema_version`, and any `x-*`-prefixed field. Publish carries them through untouched and never validates their values.
 
@@ -63,10 +69,44 @@ The body must match the house-style skeleton for its `type:`. This is keyed off 
 
 ## Step 2: Route to Adapter
 
-Two disk-backed adapters serve two different planes — the plane doctrine and which-door table live in `../_shared/documentation-standard.md`:
+The disk-backed adapters serve distinct planes — the plane doctrine and which-door table live in `../_shared/documentation-standard.md`:
 
 - **`vault`** → the shared-docs vault (cross-project referential knowledge; INDEX-discovered)
 - **`docs`** → the current repo's `documentation/` tree (work-in-flight + repo-coupled records; git/PR-discovered)
+- **`artifacts`** → the explicitly selected finished output in the current native session's private artifact area; opt-in only, with broad default migration held
+
+### Adapter: artifacts (explicit opt-in)
+
+This adapter is available only when the caller explicitly chooses `--to artifacts` (or a workflow explicitly selects `--output artifacts`). It stores the selected finished output in the current session's private artifact area. It does not change any workflow default, publish a global pointer, or make artifacts broadly discoverable.
+
+**Identity and allocation.** Obtain the current session ID and host from the qualified native runtime source. Never infer identity from cwd, time, an operation ID, a filename, or a guessed value. Resolve the loaded plugin root via `../_shared/claudna-root.md`, then call the existing CLI:
+
+```bash
+python3 -B "<claudna-root>/lib/claudna/session_store" scratch \
+  --session "<verified-native-sid>" --host "<provider>" --label "publish-artifacts"
+python3 -B "<claudna-root>/lib/claudna/session_store" paths \
+  --session "<verified-native-sid>" --host "<provider>" --kind artifacts --create
+```
+
+Use only the exact returned scratch and artifact paths. `scratch` allocates private temporary work; `paths --kind artifacts --create` resolves/creates the private durable area. A missing, conflicting, or unverified identity, or an ordinary permission failure, makes this route partial/unavailable: stop the artifact write and report the reason. Do not fall back to an OS temp path or claim the host is unsupported. A dry run does neither allocation nor writes. The `session` adapter remains chat-only and does not persist files.
+
+**Input and validation.** Accept a single finished markdown file or a family with exactly one `00_*.md` master and one or more `NN_*.md` phases. Preserve Step 1 validation, including the master-doc presence-only exception, and the docs adapter's all-or-nothing family validation. Non-markdown assets may be included only when explicitly selected as finished output. Never copy the surrounding scratch tree, credentials, or unrelated private files.
+
+If the selected input is already a canonical artifact, validate its exact known path before reading its content, whether it belongs to the current session or another session. Pass the current session/host, an explicit scope, the source session ID, and that absolute path to the existing CLI; the explicit-path form does not use `--workflow`:
+
+```bash
+python3 -B "<claudna-root>/lib/claudna/session_store" continuity artifact-path \
+  --session "<current-sid>" --host "<provider>" --scope "<scope>" \
+  --from-session "<source-sid>" --path "<absolute-source-path>" --json
+```
+
+Proceed only if the result validates that same path and ownership. A current-owner private/manual artifact is permitted. Another owner's artifact requires a public, bounded scope. Missing, private, denied, or unverifiable ownership is denied before content read. This validation is for the explicitly selected path; it does not require or mutate a global pointer. For a same-session source, use its exact canonical path and do not create a replacement merely to republish it. Apply the same gate to canonical inputs routed to vault, docs, GitHub, Notion, or any other adapter. Do not copy a canonical source into a new artifact location merely to export it; store only the current-owner private publication receipt described above.
+
+**Promotion of scratch output.** Leave a selected source that is already canonical in place. For a new output, promote only the validated selected file/family and explicitly selected finished assets. Do not overwrite an existing canonical target: if it already contains identical bytes, report it as already canonical; if content differs, stop and surface the conflict. Stage within the private artifact directory on the same filesystem, retain ordinary private permissions (directories `0700`, files `0600`), hash each source, copy to staging, verify hashes, then atomically install into an absent canonical destination without replacement and verify final hashes. A concurrent destination collision is a conflict: retain staging and the existing canonical bytes. A pre-check followed by an overwriting rename is insufficient. Remove the exact allocated scratch only after all writer children have actually exited and verification succeeds. On failure or an uncertain writer, preserve scratch and report partial; never clean by glob or age.
+
+**Canonical export receipts.** For an actual (non-dry-run) invocation of any adapter other than `session`, preserve each canonical source and send only the explicitly selected finished docs/assets through the selected adapter. Before reading, publishing, or exporting the canonical source, resolve the current session's private receipt destination with `paths --kind artifacts --create` using the verified current SID/host; if that identity or ordinary permission check fails, stop before destination mutation and report partial/unavailable. After an actual returned result, write a private receipt owned by the current session under that artifact area, recording each source path and content hash, destination, and actual returned result (URL/path/status). Use a unique receipt file with ordinary private permissions; do not create a shared ledger. If receipt storage fails after an external result, preserve the source and report that the result occurred but receipt persistence failed; do not claim the receipt exists. Do not write a receipt during dry-run, session/chat output, or for a result that did not occur. A genuine failed/uncertain destination may be recorded only with its actual failed/unknown status. The github-pr adapter formats a body only, so its returned result is formatting output unless the caller separately creates a PR and returns its URL.
+
+Native host receipts and consumer acceptance remain pending. This source documentation does not itself establish native acceptance or authorize switching existing workflow defaults.
 
 ### Adapter: vault (default)
 
@@ -188,7 +228,7 @@ Write the title, the markdown body after the frontmatter, and the comma-separate
 Labels come from `tags:` — skills express severity/priority as tags (`priority:critical`, `security`, `auto-audit`, …); publish maps `tags` → `--label` and creates any missing labels. The `--repo` flag is required; if `repos:` is set in frontmatter with exactly one repo, infer from that.
 
 After creating:
-1. Add the issue URL to the source doc's `links:` frontmatter field.
+1. Add the issue URL to the source doc's `links:` frontmatter field only when the source is not a canonical artifact. For a canonical artifact, preserve it and record the URL in the current-owner private publication receipt.
 2. Report the issue URL.
 
 **In-place update (`--update <issue#|url>`).** When the caller names an existing issue — a re-forged plan body, an epic gaining its phase-issues table, a corrected audit — replace that issue's body instead of creating anything:
@@ -234,13 +274,13 @@ Create a Notion page via the MCP Notion tool:
    - `tags:` → multi-select property
    - `created:` → date property
 2. Set page body to the markdown content after frontmatter.
-3. After creating, add the Notion page URL to the source doc's `links:` frontmatter field.
+3. After creating, add the Notion page URL to the source doc's `links:` frontmatter field only when the source is not a canonical artifact. For a canonical artifact, preserve it and record the URL in the current-owner private publication receipt.
 
 Requires the Notion MCP server to be configured. If not available, report the error clearly.
 
 ## Step 3: Dry Run
 
-When `--dry-run` is set, show exactly what would happen without doing it (including the result of Step 1 validation, the resolved adapter/plane — with any plane-fit advisory — and, in family mode, the per-doc validation verdicts):
+When `--dry-run` is set, show exactly what would happen without doing it (including the result of Step 1 validation, the resolved adapter/plane — with any plane-fit advisory — and, in family mode, the per-doc validation verdicts). For `--to artifacts`, do not allocate scratch/artifact paths, copy, promote, write a receipt, or mutate a destination during dry-run:
 
 ```
 Dry run: /claudna:publish doc.md --to github-issue --repo example-repo
@@ -260,7 +300,7 @@ No changes made.
 
 ## Rules
 
-- **Never modify the doc body.** Only frontmatter updates are allowed (adding links, updating status).
+- **Never modify the doc body.** Only the documented frontmatter updates are allowed for noncanonical sources. Canonical artifacts remain immutable during publication; record returned links in the private receipt.
 - **Validate before publishing.** Invalid frontmatter or a missing body skeleton = no publish.
 - **One source of truth.** The markdown file is authoritative. Published outputs (issues, Notion pages) are copies — they may go stale.
 - **Report what you did.** After every publish, output: destination, URL/path, and any frontmatter updates made.

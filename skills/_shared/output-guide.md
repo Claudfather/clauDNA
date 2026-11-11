@@ -8,13 +8,14 @@ Shared reference for planning skills that support `--output <target>`. Skills re
 
 ## 1. Overview
 
-Planning skills support three output targets. The target controls **where** the doc lands, not **what** is produced — all targets receive the same doc at the same level of detail.
+Planning skills support four output targets. The target controls **where** the doc lands, not **what** is produced — all targets receive the same doc at the same level of detail. `artifacts` is an explicit opt-in prepared in source; broad migration of existing workflows and defaults remains held pending native receipts and consumer acceptance.
 
 | Target | Flag | Routing | Behavior |
 |---|---|---|---|
 | `docs` | (default, no flag needed) | `/claudna:publish --to docs --dir <category>/<session>_<date>/` | Author writes the doc (or `00_*` + `NN_*` family) to `<scratch>` (`../_shared/orchestration-guide.md` §1); publish validates and places it at exactly the `--dir` it receives (registry: documentation-standard §2) |
 | `github` | `--output github` | `/claudna:publish --to github-issue` | Create a GitHub issue from the doc |
 | `session` | `--output session` | `/claudna:publish --to session` | Print the doc body back into the chat, no persistence |
+| `artifacts` | `--output artifacts` | `/claudna:publish <file-or-family> --to artifacts` | Store only the selected finished output in the current native session's private artifact area; explicit opt-in only |
 
 **Every target routes through `/claudna:publish` — the docs plane included.** Publish serves two disk planes with two adapters: `--to docs` writes the current repo's `documentation/` tree (work-in-flight, repo-coupled, git/PR-discovered), and `--to vault` (the default adapter; formerly `disk`) writes the shared-docs vault (`shared/…`, cross-project, INDEX-discovered). The plane doctrine — what belongs where, and which door each writing skill is — lives in `../_shared/documentation-standard.md`. For a multi-doc session directory, the docs adapter's **family mode** validates phase docs in full and the `00_*` master under the presence-only exemption (see `skills/publish/SKILL.md` Step 1b).
 
@@ -23,13 +24,14 @@ Planning skills support three output targets. The target controls **where** the 
 ### Activation
 
 The user activates a non-default target by:
-1. Passing `--output github` or `--output session` as an argument
+1. Passing `--output github`, `--output session`, or `--output artifacts` as an argument. The `artifacts` route is explicit opt-in and does not change existing workflow defaults.
 2. Saying "create issues" or "file issues" during the skill flow (implies `--output github`)
 3. Automated/rolling audit workflows with `--auto` (implies `--output github`)
 
 ### Compatibility
 
 - `--auto` implies `--output github`. Skills that support `--auto` do NOT support `--output session` (contradictory — auto is non-interactive, session is interactive).
+- An explicit user-provided `--output artifacts` takes precedence over the `--auto` implied GitHub target and routes to `/claudna:publish --to artifacts`. This is an explicit opt-in only; the broad migration and all existing workflow defaults remain held.
 - `--output session` is always available for interactive use. It produces the same analysis quality as other targets.
 
 ---
@@ -40,7 +42,7 @@ Regardless of output target, every skill must:
 
 1. **Run the full analysis pipeline.** No phases are skipped based on output target. The scan, analysis, and plan generation phases all execute identically.
 2. **Produce a publishable doc.** Each unit of output is a markdown file with the frontmatter (Section 3) and the body skeleton (Section 4) below. Every finding includes before/after code examples, step-by-step instructions, a verification checklist, and "What NOT To Do" guidance.
-3. **Delegate ALL output to `/claudna:publish`.** Never run `gh issue create` / `gh pr create` directly, and never write into `documentation/` directly. For `--output github` or `--output session`, invoke `/claudna:publish <file> --to <edition>` (mapping in Section 1). For the default `docs` target, write the doc(s) to `<scratch>` (`../_shared/orchestration-guide.md` §1) and invoke `/claudna:publish <scratch-file-or-dir> --to docs --dir <category-dir>` — publish handles validation (family mode for `00_*` + `NN_*` directories), dedup, and placement.
+3. **Delegate ALL output to `/claudna:publish`.** Never run `gh issue create` / `gh pr create` directly, and never write into `documentation/` directly. For `--output github`, `--output session`, or the explicit `--output artifacts` opt-in, invoke `/claudna:publish <file-or-family> --to <edition>` (mapping in Section 1). For the default `docs` target, write the doc(s) to `<scratch>` (`../_shared/orchestration-guide.md` §1) and invoke `/claudna:publish <scratch-file-or-dir> --to docs --dir <category-dir>` — publish handles validation (family mode for `00_*` + `NN_*` directories), dedup, and placement.
 4. **Use Plan Mode for deliberation.** Enter Plan Mode before analysis begins. Exit before the orchestrator writes or publishes a persisted output. Session-only printing may remain in Plan Mode when subagents authored the scratch docs (Section 5); honor the skill's mode-specific transition.
 
 The output target is a persistence decision, not a quality decision.
@@ -284,12 +286,13 @@ In the skill's output section:
 ```
 ## Output Targets
 
-This skill supports `--output github` and `--output session` in addition to the default `docs` target.
+This skill supports `--output github`, `--output session`, and the explicit opt-in `--output artifacts` in addition to the default `docs` target. Existing workflows remain on their current defaults until the broader migration gate passes.
 
 Produce each unit of output as a markdown doc with frontmatter + the body skeleton in
 `../_shared/output-guide.md` (written to `<scratch>`, per `../_shared/orchestration-guide.md` §1), then delegate to `/claudna:publish`:
 - `--output github` → `/claudna:publish <file> --to github-issue --repo <repo>` (Section 4)
 - `--output session` → `/claudna:publish <file> --to session` (Section 5)
+- `--output artifacts` → `/claudna:publish <file-or-family> --to artifacts` (explicit opt-in; use the native allocation in orchestration-guide §1)
 - `docs` (default) → `/claudna:publish <scratch-file-or-dir> --to docs --dir documentation/planning/<skill-category>/<session>_<date>/` (family mode for 00_ + NN_ directories; Section 1)
 
 Route output mutations through `/claudna:publish` and never write into `documentation/` directly — publish owns validation, dedup, labels, and routing on every plane. Required read-only tracker/repo-health queries may use `gh` directly under existing permissions.

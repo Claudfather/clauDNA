@@ -102,9 +102,9 @@ Missing evidence is unverified, not unsupported. A hook-only transport cannot
 qualify a hook-free workflow. No global grants or authentication changes are
 part of qualification. Broad workflow defaults wait for these prerequisites.
 
-The first two phases supply allocation/classification and runtime ownership.
-Continuity, broad workflow defaults and maintainer callers remain pending their
-owning phases. Existing tests passing
+The first three phases supply allocation/classification, runtime ownership and
+scoped continuity. Broad workflow defaults remain held by the native prerequisite;
+maintainer callers remain pending their owning phase. Existing tests passing
 does not establish package-wide root compliance. The integration stack remains
 unmerged and unreleased pending native and consumer acceptance, a compatible
 recovery candidate or approved forward recovery, and the owner's breaking-release
@@ -183,3 +183,41 @@ Runtime entrypoints suppress bytecode; existing caches are not deleted. Authoriz
 repo-list saves use `R/repo-health-repos.txt`; authorized legacy-install cleanup
 backs up under `R/backups/legacy-install/<run>/`. Old saved lists/backups are
 read-only inputs for explicit discovery/restore, never silently migrated.
+
+
+## Explicit workflow artifacts (partial phase04 preparation)
+
+`--output artifacts` and `/claudna:publish --to artifacts` explicitly select
+session-owned durable material. Existing workflow defaults remain unchanged
+until the native identity/write prerequisites above pass. `session` remains a
+chat-only alias. These Markdown contracts and static assertions do not establish
+native execution or publication acceptance.
+
+Use the shared allocator with the actual current native owner. Promotion from
+scratch validates the selected document/family, atomically installs finished
+files into artifacts, and verifies content before exact scratch cleanup. An
+already canonical source stays in place. Publication exports only the selected
+finished revision/assets and retains its canonical source on success, failure,
+cancellation and uncertainty. A private receipt in current-session artifacts
+binds source path/content hash, destination and actual returned result; no
+export-link rewrite changes the canonical source. Unknown/running writers keep
+their scratch; observed exit authorizes only the exact owned allocation's cleanup.
+
+An explicit prior canonical plan need not have been published into the pointer
+index. Validate the selected file before reading it:
+
+```sh
+python3 -B "<loaded-package>/lib/claudna/session_store" continuity artifact-path --session "<current-native-id>" --host codex --scope "runtime:<selected-key>" --from-session "<source-native-id>" --path "<absolute-canonical-plan>" --json
+```
+
+The explicit-path form requires `--from-session` and excludes `--workflow`.
+The source must be a regular artifact file confined to its owning session;
+other-session material additionally requires valid public scope metadata or
+public captured lifecycle scope. Private/unknown/corrupt/unbound sources return
+unavailable. The same owner may read its own private/manual artifact without
+capture events. Validate every selected phase in a family, not just its master.
+Pointer selection remains available without `--path`; neither mode selects the
+latest session. Canonical plans become terminal in place, with original source
+and revision authority preserved. Frozen inputs use a separate adaptation record
+and the new run's ledger; repository archival applies only to explicitly selected
+project/legacy plans.

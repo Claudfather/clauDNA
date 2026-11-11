@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -23,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
 from claudna.session_store.fsio import (  # noqa: E402
     OperationAllocationError,
     allocate_operation,
+    ensure_dir,
     make_scratch,
 )
 from claudna.session_store.paths import (  # noqa: E402
@@ -398,3 +400,74 @@ def test_native_id_spelling_does_not_alias_the_operation_namespace(tmp_path):
     assert result.stdout.strip() == str(root / "sessions" / sid / "artifacts")
     assert operation_path(root, sid) == root / "operations" / sid
     assert not root.exists()
+
+
+def test_observed_child_exit_allows_only_its_exact_scratch_cleanup(tmp_path):
+    root = tmp_path / "state"
+    home = tmp_path / "home"
+    temp = tmp_path / "tmp"
+    home.mkdir()
+    temp.mkdir()
+    env = {"PATH": os.environ["PATH"], "HOME": str(home), "TMPDIR": str(temp),
+           "PYTHONPATH": str(REPO / "lib")}
+    owner = SessionStore(root).session("native-child-owner")
+    sibling = SessionStore(root).session("sibling-owner")
+    ensure_dir(owner.paths.artifacts)
+    ensure_dir(sibling.paths.artifacts)
+    canonical = owner.paths.artifacts / "keep.md"
+    canonical.write_text("canonical deliverable survives cleanup")
+    canonical.chmod(0o600)
+    sibling_artifact = sibling.paths.artifacts / "keep.md"
+    sibling_artifact.write_text("sibling deliverable survives cleanup")
+    sibling_artifact.chmod(0o600)
+    sibling_scratch = make_scratch(sibling.paths.scratch, "sibling")
+    (sibling_scratch / "keep.txt").write_text("sibling private scratch")
+    (sibling_scratch / "keep.txt").chmod(0o600)
+
+    dead_child = subprocess.Popen(
+        [sys.executable, "-B", "-c", (
+            "import os, sys; from pathlib import Path; os.umask(0o077); "
+            "from claudna.session_store.fsio import make_scratch; "
+            "from claudna.session_store.paths import session_paths; "
+            "paths = session_paths(sys.argv[2], Path(sys.argv[1])); "
+            "scratch = make_scratch(paths.scratch, 'abrupt'); "
+            "(scratch / 'private.txt').write_text('private interrupted work'); "
+            "print(scratch, flush=True); os._exit(23)"
+        ), str(root), "native-child-owner"],
+        env=env, cwd=tmp_path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    stdout, stderr = dead_child.communicate(timeout=10)
+    assert dead_child.returncode == 23, stderr
+    dead_scratch = Path(stdout.strip())
+    assert dead_scratch.parent == owner.paths.scratch and dead_scratch.is_dir()
+    assert dead_scratch.stat().st_mode & 0o777 == 0o700
+    assert (dead_scratch / "private.txt").stat().st_mode & 0o777 == 0o600
+
+    live_child = subprocess.Popen(
+        [sys.executable, "-B", "-c", (
+            "import os, sys, time; from pathlib import Path; os.umask(0o077); "
+            "from claudna.session_store.fsio import make_scratch; "
+            "scratch = make_scratch(Path(sys.argv[1]), 'live'); "
+            "(scratch / 'private.txt').write_text('running child work'); "
+            "print(scratch, flush=True); time.sleep(30)"
+        ), str(owner.paths.scratch)],
+        env=env, cwd=tmp_path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    try:
+        live_scratch = Path(live_child.stdout.readline().strip())
+        assert live_scratch.parent == owner.paths.scratch and live_child.poll() is None
+        assert (live_scratch / "private.txt").stat().st_mode & 0o777 == 0o600
+        # Observe the abrupt child exit above before removing only its exact allocation.
+        shutil.rmtree(dead_scratch)
+        assert not dead_scratch.exists()
+        assert live_scratch.is_dir()
+        assert canonical.read_text() == "canonical deliverable survives cleanup"
+        assert sibling_artifact.read_text() == "sibling deliverable survives cleanup"
+        assert (sibling_scratch / "keep.txt").read_text() == "sibling private scratch"
+    finally:
+        if live_child.poll() is None:
+            live_child.terminate()
+        live_child.communicate(timeout=10)
+        if "live_scratch" in locals() and live_scratch.exists():
+            # The owner observes this second child's exit before its own exact cleanup.
+            shutil.rmtree(live_scratch)

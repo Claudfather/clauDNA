@@ -2,7 +2,7 @@
 name: forge
 user-invocable: true
 description: "Use when planning a workstream that spans multiple PRs, involves decision forks, or needs structured phasing before implementation — a technical spec, design document, initiative roadmap, or pre-implementation proposal. Not for single-PR changes with an obvious path; plain plan mode covers those."
-argument-hint: "[topic-or-issue-url] [--output github|docs|session] [--auto]"
+argument-hint: "[topic-or-issue-url] [--output artifacts|github|docs|session] [--auto]"
 ---
 
 # Forge
@@ -22,6 +22,7 @@ Parse `$ARGUMENTS` at invocation:
 - `--auto`: Non-interactive mode. Suppresses Plan Mode and all interactive gates. Requires topic in `$ARGUMENTS`. Emits structured-result JSON and stops.
 - `--output github`: Publish the plan as a §4.1 GitHub Issue via `/claudna:publish --to github-issue` — the shared, build-ready contract. The Issue body is the canonical, iterable plan.
 - `--output docs`: Publish to the repo's `documentation/` tree via `/claudna:publish --to docs` — a PR-reviewable plan directory; choose this when git diffs matter (large or contentious plans).
+- `--output artifacts`: Explicit opt-in to current-native-session canonical artifacts via `/claudna:publish --to artifacts`. Use the ownership and permission contract in orchestration guide §1; no operation-ID or OS-temp fallback. Broad default migration remains held for native qualification.
 - `--output session`: Present the plan in chat only (default).
 
 Default (no flag): Interactive mode, session output.
@@ -57,6 +58,7 @@ Read everything relevant:
 - **Topic input** — the user's description, issue body, or rough plan
 - **PROJECT_MISSION.md** — if it exists in the repo, read it. The plan must align with the north star.
 - **Existing plans** — search for related plans in `documentation/planning/`, `shared/planning/active/`, or `planning/`. Don't duplicate or contradict.
+- **Opt-in artifact inputs** — when explicitly working with session artifacts, inspect the current owner's selected plans or an explicit prior-session artifact validated through `../_shared/source-guide.md`. Use a selected scoped artifact pointer for cross-session discovery; never select latest or scan other session trees.
 - **Codebase state** — read the actual code in the target area. Plans based on assumed architecture drift on contact with reality.
 - **Prior art** — write the keywords to `<keywords-file>`, a file in `<scratch>` (`../_shared/orchestration-guide.md` §1), with the Write tool, then `git log --all --oneline --grep="$(cat <keywords-file>)"` for past attempts. Check closed issues and merged PRs for context on what was tried before.
 
@@ -197,13 +199,14 @@ Present the plan in chat with a summary:
 - Key risks (top 3)
 - Recommended next step (usually: "publish with `--output github`, then run `/ironclad <issue> --loops N` for multi-lens hardening")
 
-### --output github (and --output docs)
+### --output github, --output docs, and explicit --output artifacts
 
 Forge is an *author*, not a publisher: it produces a §4.1 publishable doc and hands it to `/claudna:publish` — the same shared adapter every other planning skill uses (`../_shared/output-guide.md` §7). Forge never calls `gh` directly and never writes a bespoke planning PR.
 
 1. Write the plan as a publishable doc: house-style frontmatter (output-guide §3) + the §4.1 body skeleton (§4.1 — `## Summary`, `## Evidence`, `## Implementation Plan` with `### Dependencies`/`### Blocks`/`### Steps`, `## Test Plan`, `## Verification Checklist`, `## What NOT To Do`, `## Context`), plus a `## Decision Forks` section.
 2. **Multi-phase → epic + per-phase docs.** §4.1 is "one phase per issue," so a multi-phase plan becomes an epic/overview doc plus one §4.1 doc per phase (mirrors the docs-plane `00_overview` + phase-docs pattern). A single-phase plan may be one doc.
 3. Route to the requested target:
+   - `--output artifacts` → author the selected finished document/family under `<artifacts>` and `/claudna:publish <artifact-file-or-dir> --to artifacts`; the canonical source stays there. An optional explicit export makes a revision-bound edition and retains the local source/receipt. Cross-session build uses its explicit validated canonical path or a deliberately published scoped artifact reference, never a latest-session guess.
    - `--output github` → `/claudna:publish <doc> --to github-issue --repo <repo>`
    - `--output docs` → write the doc(s) to `<scratch>` (`../_shared/orchestration-guide.md` §1) — multi-phase named `00_OVERVIEW.md` + `NN_<slug>.md` (family mode's required shape) — then `/claudna:publish <scratch-file-or-dir> --to docs --dir documentation/planning/<topic-slug>/<session>_<date>/` (the PR-reviewable plan directory)
 4. **Issue generation** — with `--output github` and a multi-phase plan, forge publishes the *whole family*, epic first, then cross-links:

@@ -134,6 +134,11 @@ def _continuity_command(args) -> int:
                 store, **owner, scope=args.scope, workflow=args.workflow, source=Path(args.source),
                 source_sha256=args.source_sha256, decision=args.decision,
                 content=sys.stdin.read(1048577), expect=args.expect)
+        elif args.action == "artifact-path" and args.path:
+            if not args.from_session or args.workflow:
+                raise ValueError("explicit artifact path requires from-session and cannot select a workflow")
+            result = dataclasses.asdict(continuity.selected_artifact(
+                store, **owner, scope=args.scope, from_session=args.from_session, path=Path(args.path)))
         else:
             selection = {**owner, "scope": args.scope, "kind": args.kind, "workflow": args.workflow}
             if args.action == "publish":
@@ -480,6 +485,7 @@ def main(argv: list[str] | None = None) -> int:
         entry.add_argument("--workflow", required=action in ("publish", "import"))
         if action == "artifact-path":
             entry.set_defaults(kind="artifact")
+            entry.add_argument("--path", help="explicit absolute artifact; requires from-session, no workflow")
         elif action != "import":
             entry.add_argument("--kind", choices=("handoff", "artifact"), default="handoff")
         if action in ("resolve", "artifact-path"):

@@ -37,6 +37,40 @@ Read a planning document from the local filesystem. This is the current default 
 - **File path**: Direct path to a single phase document (e.g., `documentation/planning/tech_debt/session_2026-04-07/01_datetime_migration.md`)
 - **Session directory**: Path to a session directory containing `00_OVERVIEW.md` and phase files. The skill reads the overview, lists phases, and asks which to start.
 
+### Explicit canonical plan artifacts
+
+An explicit canonical plan under the effective clauDNA root is a supported local
+source. This opt-in reader does not change the default repository browser; broad
+workflow defaults remain held until native identity/write receipts are qualified.
+Use the actual current native SID/host and an explicit workspace or runtime scope.
+A pathname, cwd or operation ID never supplies native identity.
+
+Before reading a selected session artifact, validate its source owner and privacy:
+
+```sh
+python3 -B "<loaded-package>/lib/claudna/session_store" continuity artifact-path --session "<current-native-sid>" --host "<provider>" --scope "<scope>" --from-session "<source-native-sid>" --path "<absolute-plan-path>" --json
+```
+
+Alternatively, select an already published artifact pointer with `artifact-path
+--scope <scope> --workflow <workflow>`, including the same current session/host
+arguments. The explicit `--path` form requires `--from-session` and cannot combine
+with `--workflow`. Use only the verified returned path. Same-session private/manual
+artifacts remain readable by their owner; another session needs public, scoped
+lifecycle/context evidence. Missing, private, ambiguous or unverifiable evidence
+stops selection. Never select latest or scan other sessions. A selected family
+uses its validated master and separately validates each selected phase path before
+reading it; a directory is not a blanket read grant.
+
+Record the selected source and revision/hash. Authorized challenge/status/PR edits
+update that source; a frozen plan remains unchanged, with adaptations in current
+session artifacts. A GitHub edition retains the existing provenance/revision gate
+and declared authority; never reconcile two edited editions silently. Canonical
+session artifacts become terminal in place: update authorized status fields but
+do not `git mv`, move into a repository, or delete the family. Repository archival
+below applies only to explicitly selected project/legacy plans. New run ledgers
+and reports belong to the current session even when the selected plan has an
+earlier owner.
+
 ### Lifecycle
 
 | Step | Action |
@@ -45,7 +79,7 @@ Read a planning document from the local filesystem. This is the current default 
 | Challenge round updates | Edit the file directly |
 | Mark in progress | Set the `IN PROGRESS` marker in the body; roll frontmatter `status:` up per `../_shared/documentation-standard.md` §5 |
 | Mark complete | Set the `✅ COMPLETE` marker in the body; roll frontmatter `status:` up per `../_shared/documentation-standard.md` §5 |
-| Archive | `git mv` to `documentation/archive/` and a terminal frontmatter `status:`, per `../_shared/documentation-standard.md` §6 |
+| Archive | Explicit project/legacy plan: `git mv` to `documentation/archive/` per `../_shared/documentation-standard.md` §6. Session artifact: terminal in place, preserve its canonical path. |
 
 ---
 

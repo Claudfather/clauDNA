@@ -741,3 +741,80 @@ def test_private_legacy_import_stays_local_and_concurrent_import_has_one_winner(
         statuses = list(pool.map(attempt, ("race-one", "race-two")))
     assert sorted(statuses) == ["already_imported", "found"]
     assert sum(store.session(sid).paths.handoff.exists() for sid in ("race-one", "race-two")) == 1
+
+
+def test_explicit_artifact_owner_can_read_unpublished_private_manual_plan(store, monkeypatch):
+    identity(monkeypatch, "manual")
+    artifact = store.session("manual").paths.artifacts / "plan.md"
+    ensure_dir(artifact.parent)
+    artifact.write_text("private canonical plan")
+    write_context(store, current_sid="manual", host="claude", scope="runtime:task", privacy="private")
+    before = {p.relative_to(store.root): p.read_bytes() for p in store.root.rglob("*") if p.is_file()}
+    selected = continuity.selected_artifact(store, current_sid="manual", host="claude",
+                                           scope="runtime:task", from_session="manual", path=artifact)
+    assert selected.status == "found" and selected.artifact_path == artifact
+    assert not store.session("manual").paths.lifecycle.exists()
+    assert not (store.root / "continuity").exists()
+    assert before == {p.relative_to(store.root): p.read_bytes() for p in store.root.rglob("*") if p.is_file()}
+
+
+@pytest.mark.parametrize("privacy", ["public", "private", "unknown", "wrong-scope", "corrupt", "partial"])
+def test_explicit_prior_artifact_requires_public_scope_without_pointer(store, monkeypatch, privacy):
+    scope = "runtime:task"
+    artifact = store.session("prior").paths.artifacts / "plan.md"
+    ensure_dir(artifact.parent)
+    artifact.write_text("selected plan")
+    if privacy != "unknown":
+        identity(monkeypatch, "prior")
+        write_context(store, current_sid="prior", host="claude",
+                      scope="runtime:other" if privacy == "wrong-scope" else scope,
+                      privacy="private" if privacy == "private" else "public")
+    if privacy == "corrupt":
+        (store.session("prior").paths.dir / CONTEXT_PATH).write_text("broken")
+    if privacy == "partial":
+        store.session("prior").paths.lifecycle.write_text("{broken\n")
+    identity(monkeypatch, "current")
+    selected = continuity.selected_artifact(store, current_sid="current", host="claude", scope=scope,
+                                           from_session="prior", path=artifact)
+    assert selected.status == ("found" if privacy == "public" else "unavailable")
+    assert selected.artifact_path == (artifact if privacy == "public" else None)
+    assert not (store.root / "continuity").exists()
+    assert not store.session("current").paths.dir.exists()
+
+
+def test_explicit_artifact_rejects_escape_conflicting_owner_and_loop(store, tmp_path, monkeypatch):
+    identity(monkeypatch, "owner")
+    artifacts = store.session("owner").paths.artifacts
+    ensure_dir(artifacts)
+    external = tmp_path / "external.md"
+    external.write_text("outside")
+    (artifacts / "escape.md").symlink_to(external)
+    (artifacts / "loop.md").symlink_to(artifacts / "loop.md")
+    (artifacts / "plan.md").write_text("canonical")
+    for path in (artifacts / "escape.md", artifacts / "loop.md", Path("relative.md"), artifacts):
+        result = continuity.selected_artifact(store, current_sid="owner", host="claude",
+                                             scope="runtime:task", from_session="owner", path=path)
+        assert result.status == "unavailable" and result.artifact_path is None
+    identity(monkeypatch, "other")
+    result = continuity.selected_artifact(store, current_sid="owner", host="claude",
+                                         scope="runtime:task", from_session="owner", path=artifacts / "plan.md")
+    assert result.status == "unavailable" and result.artifact_path is None
+
+
+def test_explicit_artifact_cli_requires_source_and_rejects_workflow(store, monkeypatch, capsys):
+    import json
+
+    from claudna.session_store.cli import main
+
+    identity(monkeypatch, "owner", "codex")
+    artifact = store.session("owner").paths.artifacts / "plan.md"
+    ensure_dir(artifact.parent)
+    artifact.write_text("selected plan")
+    args = ["continuity", "artifact-path", "--root", str(store.root), "--session", "owner",
+            "--host", "codex", "--scope", "runtime:task", "--path", str(artifact), "--json"]
+    assert main(args) == 2
+    assert json.loads(capsys.readouterr().out)["artifact_path"] is None
+    assert main(args + ["--from-session", "owner", "--workflow", "plan"]) == 2
+    assert json.loads(capsys.readouterr().out)["artifact_path"] is None
+    assert main(args + ["--from-session", "owner"]) == 0
+    assert json.loads(capsys.readouterr().out)["artifact_path"] == str(artifact)

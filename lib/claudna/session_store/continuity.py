@@ -486,6 +486,27 @@ def _owner_locked(store: SessionStore, sid: str, host: str) -> tuple[SessionHand
     return handle, state, facts, origin
 
 
+def selected_artifact(store: SessionStore, *, current_sid: str, host: str, scope: str,
+                      from_session: str, path: Path) -> ContinuitySelection:
+    """Validate an explicitly selected artifact, without publishing or scanning pointers."""
+    try:
+        _owner_locked(store, current_sid, host)
+        canonical = canonical_scope(scope)
+        source = store.session(from_session)
+        session_root = _validate_session_location(source)
+        if from_session != current_sid and _session_scope_privacy(source, canonical) != "public":
+            raise ContinuityError("selected artifact owner is private, unbound, or unverifiable")
+        if not path.is_absolute():
+            raise ContinuityError("selected artifact path must be absolute")
+        relative = path.resolve(strict=True).relative_to(session_root).as_posix()
+        _valid_relative_path("artifact", relative)
+        selected = _session_path(source, relative, must_exist=True)
+        return ContinuitySelection("found", source_sid=from_session, artifact_path=selected,
+                                   candidate_sids=(from_session,))
+    except (OSError, ValueError, RuntimeError) as exc:
+        return _selection("unavailable", reason=str(exc))
+
+
 def write_context(store: SessionStore, *, current_sid: str, host: str, scope: str | dict,
                   privacy: str) -> Path:
     """Record explicit owner scope/privacy metadata without creating lifecycle events."""

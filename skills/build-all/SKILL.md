@@ -48,6 +48,15 @@ digraph when_to_use {
 
 One markdown run log, created before phase 1, updated after every phase and every review round. Location: wherever the epic's docs live (e.g. `documentation/planning/<epic>/RUN_LOG.md`), with frontmatter linking the epic issue.
 
+For an explicitly selected canonical session-artifact plan, validate the source
+through `../_shared/source-guide.md` before reading it. The new run's ledger and
+reports use its actual current native session's artifacts directory, even when
+the selected plan was produced by an earlier session. Preserve frozen inputs and
+record adaptations separately. Authorized plan status edits stay terminal in
+place; repository archival applies only to explicitly selected project/legacy
+plans. Never select latest or derive the current identity from the input path.
+This opt-in route does not waive native qualification or change broad defaults.
+
 It carries, in order:
 
 1. **Kickoff gates** — every pre-flight gate from the epic and its disposition. A gate is *passed*, *waived by the owner in writing*, or *blocking*. A waiver records who granted it and the residual risk in plain words. **The runner never waives a gate.**
