@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **The `audit security` lens checks CI triggers (category I).** It now reads each workflow's triggers, permissions, checkouts, event text, artifacts and caches, deployments and their creators, secrets, the default token and runners for code or text from outside the project that runs with the repository's token or secrets. It covers three shapes: `deployment` and `deployment_status` workflows run the deployed commit's workflow file, so a deployed pull request can bring its own; `pull_request_target`, `workflow_run`, `issue_comment` and similar events run the default branch's workflow on input anyone can send; and fork pull requests can reach self-hosted runners. Findings are graded by what the outsider's code gets, with a secret or a write token at CRITICAL, and the category lists the usual fixes.
+### Fixed
+- Session resume now preserves legacy personal handoffs during both automatic and interactive imports. Timestamp conversion and reaping apply only to the project copy; existing project handoffs skip the fallback.
+
+### Changed
+- Unified CI owns skill and manifest validation on pull requests and main pushes; retired duplicate workflows and their unpinned dependency installation.
+- Separated skill discovery and frontmatter parsing from validation policy, preserving existing imports and parser error behavior.
+- Clarified packaged versus manually applied setup resources while keeping the shell integration, SnowSQL template and project templates in place. Moved the D2 placement ledger from active planning to a living guide.
+
+## [0.34.11] - 2026-11-04
+
+### Added
+- Exact-commit source packages with reproducible archives, file hashes, a reviewable SHA-pinned Claude marketplace descriptor and isolated packaged lifecycle receipts. Release qualification preflights an isolated development interpreter, checks the candidate before tagging, binds both Git and publication-repository tags, and preserves existing release assets. Native marketplace acceptance and promotion remain separate operator steps.
+- A read-only Python 3.9+ package doctor with stable text/JSON diagnostics for package consistency, host selection and workflow prerequisites. It defaults to its loaded package, never executes PATH tools, and reads existing pipeline health only with an explicit store root. Native discovery/trust/execution and unprobed binary versions remain unknown.
+- A source-bound package support catalog and generated host/skill table, derived from the existing manifests and validated skill frontmatter. `make check-package-support` checks drift without writing; runtime consumers need no YAML dependency. Host selection and hook configuration are unchanged.
+- Consumer installation, update, pin/rollback limits, removal, retained-data and privacy guidance for Claude Code, Cursor and Codex, with native certification explicitly separate from declared packaging.
 
 ## [0.34.8] - 2026-11-04
 ### Changed

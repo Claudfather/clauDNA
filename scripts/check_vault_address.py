@@ -146,7 +146,7 @@ GATE_EXCLUDE_FILES = {"CHANGELOG.md", "scripts/removed-skills.txt"}
 def _candidates(repo_root: Path) -> list[Path]:
     """Living surfaces that could carry or execute the variable.
 
-    Shares the gates' walk with ``skill_checks.walk_gate_files`` — same
+    Shares the gates' walk through ``skill_discovery.walk_gate_files`` — same
     extensions, same pruning. That matters beyond tidiness: it brings in ``.sh``
     files and the templates shipped into user projects, which are the only
     surfaces that could *actually read* an env var, and which a
@@ -157,10 +157,10 @@ def _candidates(repo_root: Path) -> list[Path]:
     skill directory from an env-var gate on the strength of a rationale about
     retired skill names.
     """
-    import skill_checks
+    from skill_discovery import walk_gate_files
 
     out: list[Path] = []
-    for path in skill_checks.walk_gate_files(repo_root):
+    for path in walk_gate_files(repo_root):
         rel = path.relative_to(repo_root).as_posix()
         if rel in GATE_EXCLUDE_FILES or rel.startswith(GATE_EXCLUDE_PREFIXES):
             continue

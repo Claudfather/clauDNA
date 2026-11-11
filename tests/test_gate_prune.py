@@ -34,6 +34,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import skill_checks  # noqa: E402
+import skill_discovery  # noqa: E402
 
 # The vault-address gate flags a literal assignment of the retired variable, so
 # the fixture text below is assembled rather than written out: spelled whole, it
@@ -137,7 +138,7 @@ class TestTheSharedWalk:
                 visited.append(dirpath)
                 yield dirpath, dirnames, filenames
 
-        monkeypatch.setattr(skill_checks.os, "walk", recording_walk)
+        monkeypatch.setattr(skill_discovery.os, "walk", recording_walk)
         skill_checks.walk_gate_files(tmp_path)
 
         assert visited, "positive control: the recording wrapper must have seen the real walk"

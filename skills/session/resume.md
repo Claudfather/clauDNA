@@ -1,6 +1,6 @@
 Invoked by /claudna:session in resume mode — restore short-burst context fast at the start of a new session. Counterpart to the `handoff` mode.
 
-Target: under 30 seconds. With `--auto` (headless): skip step 7 (the user-focus question); auto-import any legacy file silently.
+Target: under 30 seconds. With `--auto` (headless): skip step 7 (the user-focus question); copy any legacy handoff silently when the project handoff is absent, preserving the source.
 
 ## Steps
 
@@ -10,7 +10,7 @@ Read `<cwd>/.claude/session.md`.
 
 If absent, check the legacy path: derive a slug from `git remote get-url origin` (extract `org/repo`, lowercase, replace `/` with `--`); fallback to lowercased dirname. Look for `~/.claude/notes/projects/<slug>/context-resume.md`. If found:
 
-- **With `--auto`:** Import silently. Copy content into `<cwd>/.claude/session.md` (assign the legacy file's `session_date` as the timestamp for every imported bullet — see the migration notes in [`templates.md`](./templates.md) in this skill directory). Delete the legacy file. Continue.
+- **With `--auto`:** Import silently. Copy content into `<cwd>/.claude/session.md` (assign the legacy file's `session_date` as the timestamp for every imported bullet — see the migration notes in [`templates.md`](./templates.md) in this skill directory). Preserve the legacy source unchanged: never delete, move or rewrite it. Continue.
 - **Without `--auto`:** Ask once: "Found a legacy handoff at `<path>` (last touched <date>). Import it? [y/N]". On `y`: import as above. On `n`: leave the legacy file alone and proceed without it.
 
 If neither file exists, run step 2 (live scan), then skip to step 5. Present a brief greeting using the live-scan data only; there is no handoff history.
@@ -122,4 +122,4 @@ Interactive mode (no `--auto`) skips this step entirely.
 - **Speed over depth.** Scan, reap, summarize. No deep analysis.
 - **Reaper rules in `../_shared/`.** Do not duplicate them inline.
 - **`--auto` is silent on the prompt.** Briefing and focus suggestion still emit (they are the agent's context payload); only the explicit user-question is suppressed.
-- **Legacy import is one-shot per cwd.** Once imported, the legacy file is deleted, so this branch only fires once per project.
+- **Legacy import is copy-only.** An existing `<cwd>/.claude/session.md` skips the legacy fallback, even if the project handoff is empty. If that project file is later removed, the retained legacy source may be imported again. Both modes preserve the source; timestamp conversion and reaping affect only the project copy. Source cleanup is outside resume.

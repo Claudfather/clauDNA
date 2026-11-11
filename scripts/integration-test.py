@@ -18,9 +18,8 @@ import re
 import sys
 from pathlib import Path
 
-import yaml
-
-from skill_checks import SKIP_DIRS
+from skill_discovery import SKIP_DIRS
+from skill_frontmatter import FrontmatterError, parse_frontmatter as parse_strict_frontmatter
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SKILLS_DIR = REPO_ROOT / "skills"
@@ -58,27 +57,11 @@ KNOWN_TOOLS = {
 
 
 def parse_frontmatter(path: Path) -> tuple[dict, str] | None:
-    """Return (frontmatter_dict, body) or None if no frontmatter."""
-    text = path.read_text()
-    if not text.startswith("---"):
-        return None
-    lines = text.splitlines(keepends=True)
-    end = None
-    for i, line in enumerate(lines[1:], start=1):
-        if line.strip() == "---":
-            end = i
-            break
-    if end is None:
-        return None
-    frontmatter_text = "".join(lines[1:end])
-    body = "".join(lines[end + 1 :])
+    """Return (frontmatter, body), treating absent or invalid YAML as missing."""
     try:
-        data = yaml.safe_load(frontmatter_text) or {}
-    except yaml.YAMLError:
+        return parse_strict_frontmatter(path)
+    except FrontmatterError:
         return None
-    if not isinstance(data, dict):
-        return None
-    return data, body
 
 
 def get_agent_names() -> set[str]:

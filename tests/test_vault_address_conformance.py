@@ -146,7 +146,7 @@ class TestGateRejectsTheRegressions:
 
     def test_empty_scan_is_an_error_not_a_pass(self, tmp_path: Path):
         """A gate that silently scans nothing is worse than no gate."""
-        # _candidates sources its extension set from skill_checks, so a zero-file
+        # _candidates sources its extension set from skill_discovery, so a zero-file
         # scan is produced by a repo whose only file is a non-gated extension.
         # Exercises the `if not candidates` guard.
         (tmp_path / "notes.rst").write_text("nothing the gate scans\n")

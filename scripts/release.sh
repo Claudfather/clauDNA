@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# release.sh — bump version, update CHANGELOG, commit, tag.
+# release.sh — bump, regenerate, commit, qualify the exact commit, then tag.
 #
 # Usage:
 #   ./scripts/release.sh patch          # 0.3.0 → 0.3.1
@@ -21,6 +21,8 @@ PLUGIN_JSON="$REPO_ROOT/.claude-plugin/plugin.json"
 CURSOR_PLUGIN_JSON="$REPO_ROOT/.cursor-plugin/plugin.json"
 CODEX_PLUGIN_JSON="$REPO_ROOT/.codex-plugin/plugin.json"
 VERSIONED_MANIFESTS=("$PLUGIN_JSON" "$CURSOR_PLUGIN_JSON" "$CODEX_PLUGIN_JSON")
+SUPPORT_CATALOG="$REPO_ROOT/lib/claudna/package_support/catalog.json"
+SUPPORT_GUIDE="$REPO_ROOT/documentation/guides/PACKAGE_SUPPORT.md"
 
 # --- Arg parsing ---
 
@@ -110,21 +112,19 @@ case "$BUMP_TYPE" in
     patch) NEW_VERSION="$V_MAJOR.$V_MINOR.$((V_PATCH + 1))" ;;
 esac
 
-# --- Check CHANGELOG has unreleased entries ---
-
-# Extract content between ## [Unreleased] and the next ## [x.y.z] header
-UNRELEASED_CONTENT="$(awk '
-    /^## \[Unreleased\]/ { found=1; next }
-    found && /^## \[/ { exit }
-    found { print }
-' "$CHANGELOG")"
-
-# Strip blank lines and check if anything substantive remains
-UNRELEASED_TRIMMED="$(printf '%s' "$UNRELEASED_CONTENT" | sed '/^[[:space:]]*$/d')"
-
-if [[ -z "$UNRELEASED_TRIMMED" ]]; then
-    echo "error: CHANGELOG has no entries under [Unreleased] — nothing to release" >&2
-    echo "hint: add entries under '## [Unreleased]' before running release" >&2
+# Verify the same isolated toolchain qualification will use before changing
+# any release files. Suppress bytecode so preflight and dry-run stay read-only.
+if ! command -v python3 &>/dev/null; then
+    echo "error: python3 and the pinned development toolchain in a virtual environment are required — run make deps" >&2
+    exit 1
+fi
+RELEASE_PYTHON="$(PYTHONDONTWRITEBYTECODE=1 python3 "$REPO_ROOT/scripts/release_candidate.py" --preflight)"
+export PYTHONNOUSERSITE=1
+unset PYTHONPATH PYTHONHOME
+UNRELEASED_TRIMMED="$(cd "$REPO_ROOT" && PYTHONDONTWRITEBYTECODE=1 \
+    "$RELEASE_PYTHON" scripts/release_candidate.py --unreleased-notes)"
+if ! PYTHONDONTWRITEBYTECODE=1 "$RELEASE_PYTHON" "$REPO_ROOT/scripts/generate_package_support.py" --check; then
+    echo "error: package support preflight failed; run make deps, regenerate support, and commit before releasing" >&2
     exit 1
 fi
 
@@ -149,7 +149,8 @@ echo ""
 
 if [[ "$DRY_RUN" == "true" ]]; then
     echo "[dry-run] would update all three plugin.json manifests (.claude-plugin/," \
-         ".cursor-plugin/, .codex-plugin/), CHANGELOG.md, commit, and tag $TAG"
+         ".cursor-plugin/, .codex-plugin/), regenerate package support, update CHANGELOG.md," \
+         "commit, run exact-candidate source/package qualification, and tag $TAG locally"
     exit 0
 fi
 
@@ -161,6 +162,9 @@ for manifest in "${VERSIONED_MANIFESTS[@]}"; do
     mv "$TMP_PLUGIN" "$manifest"
     echo "updated $manifest → $NEW_VERSION"
 done
+
+# Source hashes and the displayed version must describe the bumped manifests.
+PYTHONDONTWRITEBYTECODE=1 "$RELEASE_PYTHON" "$REPO_ROOT/scripts/generate_package_support.py"
 
 # --- Update CHANGELOG.md ---
 
@@ -185,19 +189,24 @@ mv "$TMP_CHANGELOG" "$CHANGELOG"
 
 echo "updated $CHANGELOG — moved unreleased entries under [$NEW_VERSION]"
 
-# --- Git commit + tag ---
+# --- Git commit, exact-candidate qualification, then local tag ---
 
-git -C "$REPO_ROOT" add "${VERSIONED_MANIFESTS[@]}" "$CHANGELOG"
+git -C "$REPO_ROOT" add "${VERSIONED_MANIFESTS[@]}" "$CHANGELOG" "$SUPPORT_CATALOG" "$SUPPORT_GUIDE"
 git -C "$REPO_ROOT" commit -m "release: v$NEW_VERSION"
-git -C "$REPO_ROOT" tag -a "$TAG" -m "Release $TAG"
+CANDIDATE="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+# mktemp creates an owned parent; the package output itself must be new.
+RELEASE_PARENT="$(mktemp -d "${TMPDIR:-/tmp}/claudna-release.XXXXXX")"
+if ! make -C "$REPO_ROOT" tag-release RELEASE_REF="$CANDIDATE" RELEASE_OUTPUT="$RELEASE_PARENT/artifacts"; then
+    echo "error: release commit $CANDIDATE was retained; qualification failed and no tag was authorized" >&2
+    exit 1
+fi
 
 echo ""
-echo "committed and tagged $TAG"
+echo "qualified and locally tagged $TAG at $CANDIDATE"
+echo "artifacts: $RELEASE_PARENT/artifacts"
 echo ""
 echo "Ready to push. Review the commit, then:"
 echo "  git push origin main --follow-tags"
 echo ""
-echo "Note: once the version bump lands on main, the release-tag workflow"
-echo "(.github/workflows/release-tag.yml) creates the v$NEW_VERSION tag and the"
-echo "GitHub release automatically if they don't already exist — the tag made"
-echo "here is honored as-is (the workflow is idempotent)."
+echo "The main release workflow independently qualifies its exact candidate."
+echo "Existing remote tags must resolve to that same commit; assets cannot be overwritten."

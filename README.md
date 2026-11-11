@@ -1,6 +1,6 @@
 # clauDNA
 
-Curated skills, agents, and hooks for shipping software — codebase audits, plan review, build workflows, and infrastructure operations. Packaged for **Claude Code** (via the `Claudfather` marketplace) for **Cursor** (as a Cursor plugin), and for **Codex** (37 curated skills plus measured store/startup hooks).
+Curated skills, agents, and hooks for shipping software — codebase audits, plan review, build workflows, and infrastructure operations. Packaged for **Claude Code** (via the `Claudfather` marketplace), **Cursor**, and **Codex**. See the [generated support table and lifecycle guide](documentation/guides/PACKAGE_SUPPORT.md) for each host's selected skills, prerequisites, update/removal paths and evidence limits. The [local package doctor](documentation/guides/PACKAGE_SUPPORT.md#local-package-doctor) checks the loaded package without launching tools or changing settings.
 
 ## Quick Start
 
@@ -19,7 +19,7 @@ That's it. Skills become available as `/claudna:<skill-name>` (namespaced under 
 
 ### Cursor
 
-The Cursor manifest is [`.cursor-plugin/plugin.json`](./.cursor-plugin/plugin.json). It ships `skills/` (minus a few host-/context-restricted skills, #340) and `agents/`, and **deliberately no hooks** — the shell hooks in `plugin-hooks/` are wired only from `.claude-plugin/plugin.json`, so nothing from this pack fires in a Cursor-based environment. Skills appear under *Agent Decides* and are invocable as `/<skill-name>` in chat.
+The Cursor manifest is [`.cursor-plugin/plugin.json`](./.cursor-plugin/plugin.json). It ships `skills/` (minus a few host-/context-restricted skills, #340) and `agents/`, and **deliberately no hooks**. The shell hooks in `plugin-hooks/` are wired through the respective Claude Code and Codex manifests; Cursor remains hook-free. Skills appear under *Agent Decides* and are invocable as `/<skill-name>` in chat.
 
 Three install paths, depending on what you have:
 
@@ -30,7 +30,7 @@ Three install paths, depending on what you have:
 ### Codex
 
 Use the supported Codex plugin marketplace interface to add `Claudfather/clauDNA`
-and install `claudna@Claudfather`. The manifest explicitly selects 37 skills:
+and install `claudna@Claudfather`. The manifest explicitly selects its workflow skills:
 Claude-only cleanup and the two source-checkout contribution skills are excluded.
 Use skill mentions or read the installed skill file; all selected entrypoints link
 the [Codex tool mapping](skills/_shared/codex-tools.md). All eight role prompts map to a read-and-dispatch procedure, with no native agent
@@ -61,11 +61,11 @@ For bots, CI runners, and Docker images, drop a `settings.json` with `enabledPlu
 
 | Directory | Count | Contents |
 |-----------|-------|----------|
-| `skills/` | 40 | User-invocable slash commands |
+| `skills/` | [Derived by host](documentation/guides/PACKAGE_SUPPORT.md#declared-support) | User-invocable slash commands |
 | `agents/` | 8 | `snowflake-analyst`, `dbt-engineer`, `neon-analyst`, `modal-ops`, `railway-ops`, `vercel-ops`, `code-reviewer`, `spec-reviewer` |
 | `plugin-hooks/` | 6 wired + 1 opt-in | SessionStart briefing (opt-out `CLAUDNA_SESSION_BRIEFING=0`), auto-format on Write/Edit, PreToolUse permission expansion, PreCompact capture gate, macOS notifications, and the session store (boundaries, activity, summaries, draft harvest and local skill telemetry, all on by default; SETUP_GUIDE §3.7). (`statusline.sh` is opt-in — see [SETUP_GUIDE §3.2](./SETUP_GUIDE.md#32-statusline-optional).) Named `plugin-hooks/` to avoid a Claude Code bug that deletes any project-root `hooks/` directory between tool calls. |
 
-Codex receives the curated 37-skill set and six store/startup handlers; role prompts are read-and-dispatch only. Claude Code gets all three. Cursor gets `skills/` (minus a few host-/context-restricted skills, #340) and `agents/` only — see [Cursor](#cursor) above. The `plugin-hooks/` name does double duty: besides dodging the Claude Code bug, it keeps the hooks out of `hooks/`, which is where Cursor's folder discovery would otherwise find and wire them.
+Codex receives its manifest-selected skill set and store/startup handlers; role prompts are read-and-dispatch only. Claude Code gets all three component types. Cursor gets `skills/` (minus a few host-/context-restricted skills, #340) and `agents/` only — see [Cursor](#cursor) above. The `plugin-hooks/` name does double duty: besides dodging the Claude Code bug, it keeps the hooks out of `hooks/`, which is where Cursor's folder discovery would otherwise find and wire them.
 
 ## Design Philosophy
 
@@ -216,11 +216,11 @@ The marketplace install is managed by Claude Code: plugins live under `~/.claude
 
 **Never touched by claudna:**
 - `~/.claude/settings.json` — user-managed. claudna never writes here. Recommended snippets are documented in SETUP_GUIDE for you to merge manually.
-- `~/.claude/notes/` — your personal files. claudna never writes here; the session engine's resume mode reads legacy `notes/projects/<slug>/context-resume.md` handoffs as a one-shot migration fallback.
+- `~/.claude/notes/` — your personal files. claudna never writes here; the session engine's resume mode can copy a legacy `notes/projects/<slug>/context-resume.md` handoff into a project with no handoff yet. It preserves the source unchanged, and subsequent resumes use the project copy.
 
 ## Project Template
 
-`project-template/` provides a starter `.claude/` directory for individual projects. It's not shipped via the plugin — copy it manually or use `/claudna:init-project`:
+`project-template/` provides starter project instructions and `.claude/` settings. These are packaged setup resources; enabling the plugin does not apply them to your project. Copy them manually or use `/claudna:init-project`:
 
 | File | Purpose |
 |------|---------|
