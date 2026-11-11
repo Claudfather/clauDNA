@@ -45,9 +45,8 @@ set -eo pipefail
 # and every file the hook creates is readable by the user alone.
 # shellcheck source=lib/state-dir.sh
 . "${BASH_SOURCE[0]%/*}/lib/state-dir.sh"
-STATE_DIR="$(claudna_state_dir)"
-LOG_DIR="${STATE_DIR:+$STATE_DIR/hooks}"
-LOG="$LOG_DIR/permissions.log"
+LOG_DIR=""
+LOG=""
 MAX_LOG_SIZE=1048576  # 1MB
 umask 077
 
@@ -91,6 +90,16 @@ command -v jq &>/dev/null || exit 0
 # ─── Parse input + load patterns (single jq call) ────────────────────
 
 INPUT=$(cat)
+SESSION_ID=""
+if command -v jq &>/dev/null; then
+    SESSION_ID=$(printf '%s' "$INPUT" | claudna_event_session_id 2>/dev/null) || SESSION_ID=""
+fi
+case "$SESSION_ID" in SID|SESSION_ID|native-sid|native-session-id|CLAUDE_SESSION_ID) SESSION_ID="" ;; esac
+SESSION_DIR="$(claudna_session_dir "$SESSION_ID")"
+if [[ -n "$SESSION_DIR" ]]; then
+    LOG_DIR="$SESSION_DIR/hooks"
+    LOG="$LOG_DIR/permissions.log"
+fi
 
 JQ_RESULT="$(
   { printf '%s\n' "$INPUT"
@@ -145,7 +154,7 @@ case "$NOQ" in
                 if command -v python3 &>/dev/null; then
                     # errexit-safe: the decider exits 10 to deny, and an
                     # assignment that inherits that would end the hook here.
-                    if GH_GUARD_REASON="$(python3 "$HOOK_DIR/gh-guard-decide.py" "$COMMAND" 2>/dev/null)"; then
+                    if GH_GUARD_REASON="$(python3 -B "$HOOK_DIR/gh-guard-decide.py" "$COMMAND" 2>/dev/null)"; then
                         : # exit 0 → allow this shape; fall through to normal matching
                     elif [[ $? -eq 10 ]]; then
                         deny "$GH_GUARD_REASON"

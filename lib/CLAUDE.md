@@ -16,7 +16,7 @@
 
 ## How it's invoked
 
-- **Hooks use the directory form:** `python3 "${CLAUDE_PLUGIN_ROOT}/lib/claudna/session_store" <verb>`. Hooks run in the user's project, and `python3 -m` puts the current directory first on `sys.path`, so a project's `json.py` would shadow the stdlib. (`-P` fixes that only from Python 3.11; the floor is 3.9.)
+- **Hooks use the directory form:** `python3 -B "${CLAUDE_PLUGIN_ROOT}/lib/claudna/session_store" <verb>`. `-B` prevents the interpreter's pre-entry bytecode cache; entrypoints also suppress later package-import caches. Hooks run in the user's project, and `python3 -m` puts the current directory first on `sys.path`, so a project's `json.py` would shadow the stdlib. (`-P` fixes that only from Python 3.11; the floor is 3.9.)
 - `python3 -m claudna.session_store <verb>` with `PYTHONPATH=lib` is fine from this repo — tests and local debugging — never from a hook.
 - POSIX only: the store locks with `fcntl`, so it runs on macOS and Linux, not Windows. The stdlib-only gate can't see that.
 - The floor is **Python 3.9** (stock macOS): the `runtime-floor` CI leg runs the runtime suites on it (`make test-runtime`).

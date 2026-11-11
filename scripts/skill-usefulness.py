@@ -9,10 +9,17 @@ import datetime as dt
 import json
 import os
 import re
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(ROOT / "lib"))
+
+from claudna.session_store.paths import state_root  # noqa: E402
+from claudna.session_store.telemetry import telemetry_path  # noqa: E402
+
 # Historical attribution only, not executable aliases. Bare names remain ambiguous.
 ALIASES = {
     "review-changes": "review-work", "review-pr": "review-work",
@@ -295,13 +302,15 @@ def write_report(output, rows, coverage, manifests, notes):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--state-dir", type=Path,
-                        default=Path(os.environ.get("CLAUDNA_STATE_DIR") or Path.home() / ".claudna"))
-    parser.add_argument("--telemetry", type=Path,
-                        default=Path(os.environ.get("CLAUDNA_TELEMETRY_PATH") or
-                                     Path.home() / ".claude/telemetry/skill-events.jsonl"))
+    parser.add_argument("--state-dir", type=Path)
+    parser.add_argument("--telemetry", type=Path, help="explicit read-only feed, including a legacy path")
     parser.add_argument("--notes", type=Path, help="reviewed local annotations and explicit session exclusions")
     args = parser.parse_args()
+    try:
+        args.state_dir = args.state_dir or state_root()
+        args.telemetry = args.telemetry or telemetry_path({**os.environ, "CLAUDNA_STATE_DIR": str(args.state_dir)})
+    except (OSError, ValueError) as exc:
+        parser.error(str(exc))
     if not args.state_dir.is_absolute():
         parser.error("--state-dir must be absolute")
     if not (args.state_dir / "sessions").is_dir():

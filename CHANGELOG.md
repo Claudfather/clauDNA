@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Session resume now preserves legacy personal handoffs during both automatic and interactive imports. Timestamp conversion and reaping apply only to the project copy; existing project handoffs skip the fallback.
 
 ### Changed
+- Held storage migration: move compatibility telemetry into the effective clauDNA root, session hook payloads/scratch and durable delegation records into their native-session owners, and keep global bootstrap diagnostics bounded and payload-free. Preserve opt-outs, null-SID observations, unknown delegation residue and historical files; external consumer/native/recovery acceptance still gates release. Runtime helpers suppress package bytecode, saved repo lists and authorized cleanup backups use clauDNA-owned state.
 - Unified CI owns skill and manifest validation on pull requests and main pushes; retired duplicate workflows and their unpinned dependency installation.
 - Separated skill discovery and frontmatter parsing from validation policy, preserving existing imports and parser error behavior.
 - Clarified packaged versus manually applied setup resources while keeping the shell integration, SnowSQL template and project templates in place. Moved the D2 placement ledger from active planning to a living guide.

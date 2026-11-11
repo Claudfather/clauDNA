@@ -40,12 +40,12 @@ HOOK = REPO_ROOT / "plugin-hooks" / "auto-format.sh"
 # resolution ladder, then `git` for the style check, then the before-and-after
 # comparison behind the change notice. `bash` is included because a hermetic
 # PATH is also the PATH the interpreter is looked up on.
-_BASE_TOOLS = ("bash", "cat", "grep", "head", "cut", "git", "mktemp", "rm", "cp", "diff", "awk")
+_BASE_TOOLS = ("bash", "cat", "grep", "head", "cut", "git", "mktemp", "rm", "cp", "diff", "awk", "python3")
 
 _RECORD_SEP = "\x1e"
 
 
-def _payload(file_path: str, *, tool: str = "Write", content: str = "x = 1\n") -> dict:
+def _payload(file_path: str, *, tool: str = "Write", content: str = "x = 1\n", session_id: str = "s-1") -> dict:
     """A PostToolUse payload with the top-level keys the real one carries.
 
     Key set captured from `claude 2.1.240`. The extra keys are not decoration:
@@ -57,7 +57,7 @@ def _payload(file_path: str, *, tool: str = "Write", content: str = "x = 1\n") -
     else:
         tool_input.update({"old_string": "a", "new_string": content, "replace_all": False})
     return {
-        "session_id": "s-1",
+        "session_id": session_id,
         "transcript_path": "/tmp/t.jsonl",
         "cwd": "/tmp",
         "permission_mode": "acceptEdits",
@@ -130,7 +130,8 @@ def _run(tmp_path: Path, d: Path, stdin: str, **env: str) -> subprocess.Complete
         capture_output=True,
         text=True,
         cwd=tmp_path,
-        env={"PATH": str(d), **env},
+        env={"PATH": str(d), "HOME": str(tmp_path / "home"), "TMPDIR": str(tmp_path / "tmp-sentinel"),
+             "CLAUDNA_STATE_DIR": str(tmp_path / "claudna-state"), "CLAUDE_SESSION_ID": "", **env},
         timeout=30,
     )
 
@@ -329,6 +330,7 @@ class TestJqResolvesToolInputRegardlessOfKeyOrder:
         real, echoed = _committed(tmp_path, "real.py", "echoed.py")
         # tool_response BEFORE tool_input — a key order no contract forbids.
         payload = {
+            "session_id": "reordered-session",
             "tool_name": "Write",
             "tool_response": {"file_path": echoed},
             "tool_input": {"file_path": real, "content": "x = 1\n"},
@@ -516,6 +518,64 @@ class TestTheSessionIsToldWhatTheHookChanged:
         assert proc.returncode == 0, proc.stderr
         assert target.read_text() == edited
         assert proc.stdout == ""
+
+    def test_formatter_scratch_is_session_owned_and_removed_after_completion(self, tmp_path):
+        repo = _repo(tmp_path, {"fixtures_mod.py": _FIXTURES_MOD, "test_example.py": _TEST_FORMATTED})
+        target = repo / "test_example.py"
+        edited = _TEST_FORMATTED + "    assert profile\n"
+        target.write_text(edited)
+        proc = run_real_hook(tmp_path, compact(_payload(str(target), tool="Edit")))
+        assert proc.returncode == 0, proc.stderr
+        scratch = tmp_path / "claudna-state" / "sessions" / "s-1" / "scratch"
+        assert scratch.is_dir() and list(scratch.iterdir()) == []
+        assert not (tmp_path / "tmp-sentinel").exists()
+
+    @pytest.mark.parametrize("session_id", ["", "SESSION_ID", "native-session-id", "sid\n", "sid\0"])
+    def test_missing_or_placeholder_event_owner_skips_formatting_without_tmp_fallback(self, tmp_path, session_id):
+        repo = _repo(tmp_path, {"fixtures_mod.py": _FIXTURES_MOD, "test_example.py": _TEST_FORMATTED})
+        target = repo / "test_example.py"
+        edited = _TEST_FORMATTED + "    assert profile\n"
+        target.write_text(edited)
+        rc, err, calls = run_hook(
+            tmp_path, compact(_payload(str(target), tool="Edit", session_id=session_id)), with_jq=False
+        )
+        assert rc == 0, err
+        assert calls == [] and target.read_text() == edited
+        assert not (tmp_path / "claudna-state" / "sessions").exists()
+        assert not (tmp_path / "tmp-sentinel").exists()
+
+    @pytest.mark.parametrize("session_id", ["sid\n", "sid\0"])
+    def test_jq_rejects_control_characters_before_shell_strips_them(self, tmp_path, session_id):
+        repo = _repo(tmp_path, {"fixtures_mod.py": _FIXTURES_MOD, "test_example.py": _TEST_FORMATTED})
+        target = repo / "test_example.py"
+        edited = _TEST_FORMATTED + "    assert profile\n"
+        target.write_text(edited)
+        rc, err, calls = run_hook(
+            tmp_path, compact(_payload(str(target), tool="Edit", session_id=session_id)), with_jq=True
+        )
+        assert rc == 0, err
+        assert calls == [] and target.read_text() == edited
+        assert not (tmp_path / "claudna-state" / "sessions").exists()
+        assert not (tmp_path / "tmp-sentinel").exists()
+
+    def test_no_jq_identity_fallback_does_not_import_cwd_json_module(self, tmp_path):
+        marker = tmp_path / "json-shadow-imported"
+        (tmp_path / "json.py").write_text(
+            "from pathlib import Path\n"
+            f"Path({str(marker)!r}).write_text('executed')\n"
+        )
+        repo = _repo(tmp_path, {"fixtures_mod.py": _FIXTURES_MOD, "test_example.py": _TEST_FORMATTED})
+        target = repo / "test_example.py"
+        target.write_text(_TEST_FORMATTED + "    assert profile\n")
+
+        rc, err, calls = run_hook(
+            tmp_path, compact(_payload(str(target), tool="Edit", session_id="no-jq-session")), with_jq=False
+        )
+
+        assert rc == 0, err
+        assert not marker.exists()
+        assert (tmp_path / "claudna-state" / "sessions" / "no-jq-session" / "scratch").is_dir()
+        assert not (tmp_path / "tmp-sentinel").exists()
 
     @pytest.mark.parametrize(("name", "rel"), [("prettier", "notes.md"), ("sqlfluff", "query.sql")])
     def test_every_formatters_change_is_reported(self, tmp_path, name, rel):

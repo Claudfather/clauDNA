@@ -365,7 +365,7 @@ def validate_codex_behavior_scope() -> None:
         expected_entries = [entry]
         if event == "SessionStart":
             expected_entries.append({"matcher": "startup", "hooks": [{
-                "type": "command", "command": '\"${PLUGIN_ROOT}/plugin-hooks/session-start.sh\"',
+                "type": "command", "command": '\"${PLUGIN_ROOT}/plugin-hooks/session-start.sh\" --host codex',
                 "timeout": 5}]})
         if entries != expected_entries:
             error(f"Codex {event} must preserve its store command and the startup-only briefing contract")

@@ -107,7 +107,7 @@ Run the mechanical gate — exit 0 means trusted (resolve `<claudna-root>` per
 [`./claudna-root.md`](./claudna-root.md), SKILL_CONTRACT §1.1):
 
 ```
-python3 <claudna-root>/scripts/check_provenance.py <owner> <repo> issue <number>
+python3 -B <claudna-root>/scripts/check_provenance.py <owner> <repo> issue <number>
 ```
 
 - The issue author is **trusted** when the gate exits 0 (`author_association` is

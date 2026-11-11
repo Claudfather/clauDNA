@@ -252,10 +252,12 @@ def qualify(output: Path) -> dict:
                 require(len(startup) == 1, "missing startup briefing handler")
                 prefix = "${PLUGIN_ROOT}/" if host == "codex" else "${CLAUDE_PLUGIN_ROOT}/"
                 words = shlex.split(startup[0])
-                require(words == [prefix + "plugin-hooks/session-start.sh"], "unexpected startup handler")
+                host_args = ["--host", "codex"] if host == "codex" else []
+                require(words == [prefix + "plugin-hooks/session-start.sh", *host_args],
+                        "unexpected startup handler")
                 startup_root = root / ("startup-" + host)
                 startup_root.mkdir()
-                result = run([str(stage / words[0][len(prefix):])], startup_root / "cwd",
+                result = run([str(stage / words[0][len(prefix):]), *host_args], startup_root / "cwd",
                              fixture_environment(startup_root))
                 require(not result.stdout, "briefing opt-out ignored")
                 no_hook_errors(startup_root / "state")

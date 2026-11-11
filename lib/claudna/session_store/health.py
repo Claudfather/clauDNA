@@ -138,6 +138,25 @@ def report(store: SessionStore, *, env: Mapping[str, str] | None = None, now: fl
     except (OSError, TypeError):
         unreadable += 1
         reviews = {"decisions": {}, "decided_revisions": 0, "acceptance_fraction": None}
+    # Count diagnostics, never expose their payloads or private/unknown owners.
+    diagnostics = {"bootstrap_records": 0, "public_session_records": 0, "worker_stderr_files": 0}
+    for directory, key in [(store.root / "hooks", "bootstrap_records"),
+                           *((store.session(sid).paths.hooks, "public_session_records") for sid in public_sids)]:
+        try:
+            for name in ("errors.log", "bootstrap.log"):
+                for path in (directory / name, rotated(directory / name)):
+                    records = read_jsonl(path)
+                    diagnostics[key] += len(records.records)
+                    skipped_lines += records.skipped
+            for name in ("session-store.stderr", "session-start.stderr", "summarizer.stderr",
+                         "harvest.stderr", "sweep.stderr"):
+                path = directory / name
+                if path.is_file() and path.stat().st_size:
+                    diagnostics["worker_stderr_files"] += 1
+        except OSError:
+            unreadable += 1
+    if any(diagnostics.values()):
+        warnings.append("Retained hook/worker diagnostics exist; inspect their owning directories locally.")
     if unreadable or skipped_lines:
         warnings.append("Incomplete evidence: unreadable inputs or malformed records; inspect check/runs.")
     if summaries["failed"] or summaries["unreadable"] or summaries["stale"]:
@@ -154,7 +173,7 @@ def report(store: SessionStore, *, env: Mapping[str, str] | None = None, now: fl
             "harvest": {"excluded_sessions": dict(excluded), "unacknowledged_segments": unacked,
                         "ready_segments": ready, "oldest_unacknowledged_days": oldest_age,
                         "near_age_cap_segments": at_risk, "age_cap_days": cap_days},
-            "workers": workers, "draft_reviews": reviews,
+            "workers": workers, "draft_reviews": reviews, "hook_diagnostics": diagnostics,
             "unreadable_inputs": unreadable, "skipped_lines": skipped_lines, "warnings": warnings,
             "limits": ["Retained records only; no record is not proof of non-use or healthy workers.",
                        "Recorded policies are historical choices, not installed-default or authentication checks.",

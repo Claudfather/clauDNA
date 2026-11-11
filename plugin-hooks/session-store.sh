@@ -11,34 +11,33 @@
 #   - Silent in clauDNA's own children (CLAUDNA_SESSION_CHILD=1), and off when
 #     CLAUDNA_SESSION_STORE=0.
 #   - Never touches the vault or git beyond one read of the branch; never blocks.
-#   - Failures are logged to <state>/hooks/errors.log, one JSON line each (the
-#     Python side). Anything Python can't log itself — an ImportError, an
-#     interpreter that won't start — lands in <state>/hooks/session-store.stderr,
-#     never swallowed silently.
-#
-# The store runs in the directory form, not `python3 -m`: hooks run in the
-# user's project, and -m would let a project's json.py shadow the stdlib.
+#   - Attributable diagnostics stay in sessions/<sid>/hooks/. Without native
+#     identity/import availability, only fixed bootstrap codes are retained.
+# Directory invocation prevents project modules from shadowing the stdlib.
 
 [ "${CLAUDNA_SESSION_CHILD:-}" = "1" ] && exit 0
 [ "${CLAUDNA_SESSION_STORE:-1}" = "0" ] && exit 0
-command -v python3 > /dev/null 2>&1 || exit 0
-
-# shellcheck source=lib/state-dir.sh
 . "${BASH_SOURCE[0]%/*}/lib/state-dir.sh"
 STATE_DIR="$(claudna_state_dir)"
 [ -n "$STATE_DIR" ] || exit 0
+command -v python3 >/dev/null 2>&1 || { claudna_bootstrap_error session_store_runtime; exit 0; }
 umask 077
-[ -d "$STATE_DIR/hooks" ] || mkdir -p -m 700 "$STATE_DIR/hooks" 2> /dev/null || exit 0
-
-# Rotate the stderr capture here, not in Python: the case it exists for (the
-# store failing to import) is exactly when Python can't rotate it. Same 1 MiB
-# limit as fsio.LOG_LIMIT.
-ERR="$STATE_DIR/hooks/session-store.stderr"
-if [ -f "$ERR" ] && [ "$(wc -c < "$ERR" 2> /dev/null || echo 0)" -gt 1048576 ]; then
-  mv -f "$ERR" "$ERR.old" 2> /dev/null || :
+EVENT=$(cat)
+SID=""
+if command -v jq >/dev/null 2>&1; then
+  SID=$(printf '%s' "$EVENT" | claudna_event_session_id 2>/dev/null) || SID=""
 fi
-
-# -S: the store is stdlib-only, so skip site-packages setup (a few ms per call).
+OWNER="$(claudna_session_dir "$SID")"
+ERR=/dev/null
+if [ -n "$OWNER" ] && { [ -d "$OWNER/hooks" ] || mkdir -p -m 700 "$OWNER/hooks" 2>/dev/null; }; then
+  ERR="$OWNER/hooks/session-store.stderr"
+  if [ -f "$ERR" ] && [ "$(wc -c < "$ERR" 2>/dev/null || echo 0)" -gt 1048576 ]; then
+    mv -f "$ERR" "$ERR.old" 2>/dev/null || :
+  fi
+  { : >> "$ERR"; } 2>/dev/null || ERR=/dev/null
+fi
 PKG="${BASH_SOURCE[0]%/*}/../lib/claudna/session_store"
-python3 -S "$PKG" hook "$@" > /dev/null 2>> "$ERR"
+if ! printf '%s' "$EVENT" | python3 -B -S "$PKG" hook "$@" >/dev/null 2>> "$ERR"; then
+  claudna_bootstrap_error session_store_runtime
+fi
 exit 0

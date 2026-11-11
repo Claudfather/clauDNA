@@ -102,10 +102,44 @@ Missing evidence is unverified, not unsupported. A hook-only transport cannot
 qualify a hook-free workflow. No global grants or authentication changes are
 part of qualification. Broad workflow defaults wait for these prerequisites.
 
-This phase supplies the allocation/classification foundation only. Runtime
-writers, telemetry, delegation payloads, continuity, workflow defaults and
-maintainer callers remain pending their owning phases. Existing tests passing
+The first two phases supply allocation/classification and runtime ownership.
+Continuity, broad workflow defaults and maintainer callers remain pending their
+owning phases. Existing tests passing
 does not establish package-wide root compliance. The integration stack remains
 unmerged and unreleased pending native and consumer acceptance, a compatible
 recovery candidate or approved forward recovery, and the owner's breaking-release
 decision. An arbitrary old package is not a qualified rollback.
+
+## Runtime writers
+
+The compatibility feed is global at `R/telemetry/skill-events.jsonl`, with its
+prune lock/marker and sanitized file-level diagnostic sidecars. An override must
+be absolute and inside R; invalid configured destinations produce a bounded
+notice without feed writes or silent redirection. Existing schema, population,
+null-SID rows, privacy locks, child suppression and opt-outs are preserved.
+Explicit telemetry-on with capture off is a standalone observation. A canonical
+skill event and its compatibility row describe the same invocation, not two uses.
+
+Automatic startup/formatter scratch uses the native event owner. Missing identity
+or allocation skips the scratch-dependent part and never falls back to OS temp.
+Only the invocation's allocated directory is removed after its writers exit.
+Permissions/reflection/attributable diagnostics and summary stderr live in the
+session's `hooks/`; global bootstrap/whole-store diagnostics retain fixed codes
+and counts. Health exposes aggregate counts without payload/private identity.
+
+Delegation keeps one global lock and a version-1 `active.json` containing only
+`version`, `job_id`, `parent_sid`, `parent_provider`. It derives the durable 32 KiB
+payload path from those validated identities under the parent session, writes it
+before publishing the pointer, and preserves the payload after terminal cleanup.
+Legacy full records are recognized read-only without migration. Unresolved or
+unknown legacy slots are retained; known-terminal legacy coordination keeps its
+existing exact-match cleanup, including absent parent history. Unknown execution,
+missing payload, identity/provider mismatch, corrupt parent history and orphans
+retain evidence and never cause a relaunch. An older reader treats a
+new pointer as unknown. A known-terminal payload permits pointer cleanup without
+recreating absent parent lifecycle history; payload/artifacts remain.
+
+Runtime entrypoints suppress bytecode; existing caches are not deleted. Authorized
+repo-list saves use `R/repo-health-repos.txt`; authorized legacy-install cleanup
+backs up under `R/backups/legacy-install/<run>/`. Old saved lists/backups are
+read-only inputs for explicit discovery/restore, never silently migrated.

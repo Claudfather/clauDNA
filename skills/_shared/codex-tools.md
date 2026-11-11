@@ -10,7 +10,7 @@ When you **begin executing** a selected clauDNA skill's procedure, resolve its
 actual loaded root per `claudna-root.md` and run this once with the canonical slug:
 
 ```sh
-python3 "<claudna-root>/lib/claudna/session_store" skill-start <skill-slug>
+python3 -B "<claudna-root>/lib/claudna/session_store" skill-start <skill-slug>
 ```
 
 This is part of the installed workflow, on by default; no separate telemetry

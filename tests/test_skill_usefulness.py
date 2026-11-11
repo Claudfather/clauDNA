@@ -76,3 +76,28 @@ def test_procedure_attestation_and_failure_do_not_become_success(tmp_path):
     row = next(r for r in rows if r["skill"] == "audit")
     assert row["agent_procedure_starts"] == row["failed_attempts"] == 1
     assert row["native_invocations"] == row["tool_ok_true"] == 0
+
+
+def test_report_default_uses_writer_root_and_legacy_input_is_explicit(tmp_path, monkeypatch):
+    import sys
+
+    state = tmp_path / "relocated"
+    session(state).write_text(json.dumps(event()) + "\n")
+    canonical = state / "telemetry/skill-events.jsonl"
+    canonical.parent.mkdir()
+    canonical.write_text("")
+    legacy = tmp_path / "host-owned/old-feed.jsonl"
+    legacy.parent.mkdir()
+    legacy.write_text("legacy sentinel\n")
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("CLAUDNA_STATE_DIR", str(state))
+    monkeypatch.delenv("CLAUDNA_TELEMETRY_PATH", raising=False)
+    before = {p: p.read_bytes() for p in state.rglob("*") if p.is_file()}
+    for name, args, expected in (("canonical", [], canonical), ("legacy", ["--telemetry", str(legacy)], legacy)):
+        output = tmp_path / name
+        monkeypatch.setattr(sys, "argv", ["skill-usefulness.py", "--output", str(output), *args])
+        report.main()
+        coverage = json.loads((output / "coverage.json").read_text())["coverage"]
+        assert coverage["telemetry_path"] == str(expected)
+    assert legacy.read_text() == "legacy sentinel\n"
+    assert {p: p.read_bytes() for p in state.rglob("*") if p.is_file()} == before

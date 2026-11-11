@@ -491,11 +491,15 @@ def test_codex_marketplace_uses_native_source_grammar(tmp_path):
     assert "measured local source grammar" in output
 
 
-def test_codex_startup_timeout_and_matcher_are_exact(tmp_path):
+@pytest.mark.parametrize("field,value", [
+    ("timeout", 600),
+    ("command", '\"${PLUGIN_ROOT}/plugin-hooks/session-start.sh\" --host claude'),
+])
+def test_codex_startup_timeout_and_host_are_exact(tmp_path, field, value):
     root = build_repo(tmp_path)
     path = root / "plugin-hooks/codex-hooks.json"
     doc = json.loads(path.read_text())
-    doc["hooks"]["SessionStart"][1]["hooks"][0]["timeout"] = 600
+    doc["hooks"]["SessionStart"][1]["hooks"][0][field] = value
     path.write_text(json.dumps(doc))
     code, output = run_gate(root)
     assert code != 0

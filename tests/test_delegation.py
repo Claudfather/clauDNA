@@ -10,7 +10,8 @@ from conftest import ACTOR, ORIGIN
 
 from claudna import delegation as d
 from claudna.session_store import readers
-from claudna.session_store.fsio import exclusive_lock
+from claudna.session_store.fsio import atomic_write_json, ensure_dir, exclusive_lock
+from claudna.session_store.project import load_lifecycle
 
 
 @pytest.fixture
@@ -50,6 +51,8 @@ def test_run_records_child_cleans_bookkeeping_and_settles(store, job, monkeypatc
     assert (result.outcome, result.cleanup, result.child_sid) == ("completed", "complete", "native-child")
     assert (work / "code.txt").read_text() == "after"
     assert {p.name for p in (store.root / "delegation").iterdir()} == {".lock"}
+    payload_path = store.session("parent").paths.delegation_record(result.job_id)
+    assert json.loads(payload_path.read_text())["coordination_cleared"] is True
     payload = {"parent_sid": "parent", "job_id": result.job_id,
                "decision": "accepted", "evidence": "behavior check passed"}
     monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(json.dumps(payload).encode())))
@@ -160,12 +163,19 @@ def test_terminal_history_failure_preserves_retry_without_rerun(store, job, monk
         result = d.run_job(job[0], store)
     assert result.cleanup == "pending"
     if retired_parent:
-        shutil.rmtree(store.session("parent").paths.dir)
+        session_dir = store.session("parent").paths.dir
+        for child in session_dir.iterdir():
+            if child.name == "delegation":
+                continue
+            shutil.rmtree(child) if child.is_dir() else child.unlink()
     monkeypatch.setattr(d, "native_command", lambda req: pytest.fail("must not relaunch"))
     recovery = d.reconcile(store)
     assert recovery["outcome"] == "cleaned"
     if retired_parent:
-        assert recovery["warning"] and not store.session("parent").exists()
+        assert recovery["warning"] and store.session("parent").exists()
+        assert not store.session("parent").paths.lifecycle.exists()
+        payload = store.session("parent").paths.delegation_record(result.job_id)
+        assert payload.exists()
     assert not (store.root / "delegation/active.json").exists()
 
 
@@ -326,3 +336,314 @@ def test_prelaunch_encoding_failure_does_not_protect_a_nonexistent_worker(store,
     result = d.run_job(req, store)
     assert result.outcome == "failed" and result.cleanup == "complete" and result.exit_code is None
     assert d.reconcile(store)["outcome"] == "idle"
+
+
+def _write_active_payload(store, state, pointer=None):
+    payload = store.session(state["parent_sid"]).paths.delegation_record(state["job_id"])
+    ensure_dir(payload.parent)
+    atomic_write_json(payload, state, durable=True)
+    active = ensure_dir(store.root / "delegation") / "active.json"
+    atomic_write_json(active, d._pointer(state) if pointer is None else pointer, durable=True)
+    return active, payload
+
+
+def test_payload_written_before_pointer_and_orphan_blocks_relaunch(store, job, monkeypatch):
+    req, _ = job
+    monkeypatch.setattr(d, "native_command", lambda request: [sys.executable, "-c", "pass"])
+    monkeypatch.setattr(d, "_observe", lambda *args: pytest.fail("pointer crash must happen before launch"))
+    monkeypatch.setattr(d, "_save_pointer", lambda *args: (_ for _ in ()).throw(OSError("pointer crash")))
+    with pytest.raises(OSError, match="pointer crash"):
+        d.run_job(req, store)
+    payloads = list(store.session("parent").paths.delegation.glob("*.json"))
+    assert len(payloads) == 1
+    assert not (store.root / "delegation" / "active.json").exists()
+    assert d.reconcile(store)["outcome"] == "needs_attention"
+    assert d.run_job(req, store).outcome == "needs_attention"
+
+
+def test_uncleaned_terminal_payload_recovers_cleaned_event_without_relaunch(store, job, monkeypatch):
+    worker(monkeypatch)
+    record = d.record_delegation
+
+    def fail_cleaned(parent, job_id, phase, data):
+        if phase == "cleaned":
+            raise OSError("simulated crash after pointer removal")
+        return record(parent, job_id, phase, data)
+
+    monkeypatch.setattr(d, "record_delegation", fail_cleaned)
+    result = d.run_job(job[0], store)
+    assert result.cleanup == "pending"
+    active = store.root / "delegation" / "active.json"
+    payload = store.session("parent").paths.delegation_record(result.job_id)
+    assert not active.exists() and payload.exists()
+
+    monkeypatch.setattr(d, "record_delegation", record)
+    assert d.reconcile(store) == {"outcome": "recovered", "job_ids": [result.job_id]}
+    events = [event for event in load_lifecycle(store.session("parent").paths).events
+              if event["kind"] == "delegation.updated" and event["data"]["job_id"] == result.job_id]
+    assert [event["data"]["phase"] for event in events].count("finished") == 1
+    assert [event["data"]["phase"] for event in events].count("cleaned") == 1
+    assert payload.exists() and json.loads(payload.read_text())["coordination_cleared"] is True
+    assert d.reconcile(store)["outcome"] == "idle"
+
+
+def test_cleared_but_nonterminal_orphan_payload_still_blocks_relaunch(store, job, monkeypatch):
+    state = {"version": 1, "job_id": "job-cleared-running", "parent_sid": "parent",
+             "parent_provider": "claude", "provider": "codex", "cwd": "/work", "base": "0" * 40,
+             "phase": "running", "outcome": "incomplete", "child_sid": None, "exit_code": None,
+             "coordination_cleared": True}
+    payload = store.session("parent").paths.delegation_record(state["job_id"])
+    ensure_dir(payload.parent)
+    atomic_write_json(payload, state, durable=True)
+    before = payload.read_bytes()
+    monkeypatch.setattr(d, "native_command", lambda request: pytest.fail("must not launch"))
+
+    assert d.reconcile(store)["outcome"] == "needs_attention"
+    assert d.run_job(job[0], store).outcome == "needs_attention"
+    assert payload.read_bytes() == before
+
+
+def test_no_coordination_or_payload_is_read_only_idle(store):
+    root = store.root / "delegation"
+    assert not root.exists()
+
+    assert d.reconcile(store)["outcome"] == "idle"
+    assert not root.exists()
+
+
+def test_active_coordination_file_is_a_minimal_pointer_to_durable_payload(store, job, monkeypatch):
+    worker(monkeypatch)
+    observe = d._observe
+    seen = {}
+
+    def inspect_before_launch(command, request):
+        active = json.loads((store.root / "delegation" / "active.json").read_text())
+        payload = store.session(request.parent_sid).paths.delegation_record(active["job_id"])
+        state = json.loads(payload.read_text())
+        seen.update(active=active, state=state)
+        return observe(command, request)
+
+    monkeypatch.setattr(d, "_observe", inspect_before_launch)
+    result = d.run_job(job[0], store)
+    assert result.cleanup == "complete"
+    assert set(seen["active"]) == {"version", "job_id", "parent_sid", "parent_provider"}
+    assert seen["active"] == d._pointer(seen["state"])
+    assert seen["state"]["phase"] == "running"
+
+
+def test_missing_payload_and_pointer_payload_mismatch_are_preserved(store, job):
+    req, _ = job
+    root = ensure_dir(store.root / "delegation")
+    pointer = {"version": 1, "job_id": "job-a", "parent_sid": req.parent_sid,
+               "parent_provider": req.parent_provider}
+    atomic_write_json(root / "active.json", pointer)
+    assert d.reconcile(store)["outcome"] == "needs_attention"
+    assert (root / "active.json").exists()
+
+    malformed_payload = store.session(req.parent_sid).paths.delegation_record("job-a")
+    ensure_dir(malformed_payload.parent)
+    malformed_payload.write_text('{"version": 1}')
+    before = malformed_payload.read_bytes()
+    assert d.reconcile(store)["outcome"] == "needs_attention"
+    assert malformed_payload.read_bytes() == before
+
+    state = {**pointer, "version": 1, "provider": "codex", "cwd": str(job[1]), "base": "0" * 40,
+             "phase": "finished", "outcome": "completed", "child_sid": "child", "exit_code": 0,
+             "coordination_cleared": False}
+    active, payload = _write_active_payload(store, state)
+    mismatched = {**pointer, "parent_provider": "codex"}
+    atomic_write_json(active, mismatched)
+    assert d.reconcile(store)["outcome"] == "needs_attention"
+    assert active.exists() and payload.exists()
+
+
+@pytest.mark.parametrize("field,value", [
+    ("parent_provider", []), ("parent_provider", {}), ("parent_provider", None),
+    ("provider", []), ("provider", {}), ("provider", None),
+    ("phase", []), ("phase", {}), ("phase", None),
+    ("outcome", []), ("outcome", {}), ("outcome", None),
+])
+def test_malformed_payload_values_are_retained_byte_for_byte(store, field, value):
+    state = {"version": 1, "job_id": "job-malformed", "parent_sid": "parent",
+             "parent_provider": "claude", "provider": "codex", "cwd": "/work", "base": "0" * 40,
+             "phase": "finished", "outcome": "completed", "child_sid": None, "exit_code": 0,
+             "coordination_cleared": False}
+    active, payload = _write_active_payload(store, state)
+    malformed = {**state, field: value}
+    atomic_write_json(payload, malformed, durable=True)
+    before = payload.read_bytes()
+
+    assert d.reconcile(store)["outcome"] == "needs_attention"
+    assert active.exists() and payload.read_bytes() == before
+
+
+@pytest.mark.parametrize("value", [[], {}, None])
+def test_malformed_pointer_provider_is_retained_byte_for_byte(store, value):
+    state = {"version": 1, "job_id": "job-pointer-malformed", "parent_sid": "parent",
+             "parent_provider": "claude", "provider": "codex", "cwd": "/work", "base": "0" * 40,
+             "phase": "finished", "outcome": "completed", "child_sid": None, "exit_code": 0,
+             "coordination_cleared": False}
+    active, payload = _write_active_payload(store, state)
+    pointer = {**d._pointer(state), "parent_provider": value}
+    atomic_write_json(active, pointer, durable=True)
+    before = active.read_bytes()
+
+    assert d.reconcile(store)["outcome"] == "needs_attention"
+    assert active.read_bytes() == before and payload.exists()
+
+
+def test_terminal_payload_with_missing_parent_clears_only_pointer(store):
+    state = {"version": 1, "job_id": "job-terminal", "parent_sid": "retired-parent",
+             "parent_provider": "claude", "provider": "codex", "cwd": "/work", "base": "0" * 40,
+             "phase": "finished", "outcome": "completed", "child_sid": None, "exit_code": 0,
+             "coordination_cleared": False}
+    active, payload = _write_active_payload(store, state)
+    report = d.reconcile(store)
+    assert report["outcome"] == "cleaned" and report["warning"]
+    assert not active.exists() and payload.exists()
+    assert json.loads(payload.read_text())["coordination_cleared"] is True
+
+
+def test_terminal_provider_mismatch_keeps_pointer_and_payload(store):
+    store.session("parent").open_session("startup", actor=ACTOR, origin=ORIGIN,
+                                         transcript_path=None, agent_cli="claude")
+    state = {"version": 1, "job_id": "job-provider", "parent_sid": "parent",
+             "parent_provider": "codex", "provider": "claude", "cwd": "/work", "base": "0" * 40,
+             "phase": "finished", "outcome": "completed", "child_sid": None, "exit_code": 0,
+             "coordination_cleared": False}
+    active, payload = _write_active_payload(store, state)
+    report = d.reconcile(store)
+    assert report["outcome"] == "needs_attention"
+    assert active.exists() and payload.exists()
+
+
+def test_corrupt_parent_lifecycle_keeps_terminal_evidence(store):
+    state = {"version": 1, "job_id": "job-corrupt-parent", "parent_sid": "parent",
+             "parent_provider": "claude", "provider": "codex", "cwd": "/work", "base": "0" * 40,
+             "phase": "finished", "outcome": "completed", "child_sid": None, "exit_code": 0,
+             "coordination_cleared": False}
+    active, payload = _write_active_payload(store, state)
+    with store.session("parent").paths.lifecycle.open("a") as lifecycle:
+        lifecycle.write("torn lifecycle record\n")
+    assert d.reconcile(store)["outcome"] == "needs_attention"
+    assert active.exists() and payload.exists()
+
+
+def test_legacy_full_and_unknown_records_are_read_only_and_never_relaunched(store, job, monkeypatch):
+    root = ensure_dir(store.root / "delegation")
+    legacy = {"job_id": "legacy", "parent_sid": "parent", "parent_provider": "claude",
+              "provider": "codex", "phase": "running", "outcome": "incomplete"}
+    atomic_write_json(root / "active.json", legacy)
+    before = (root / "active.json").read_bytes()
+    monkeypatch.setattr(d, "native_command", lambda request: pytest.fail("must not launch"))
+    assert d.reconcile(store)["outcome"] == "needs_attention"
+    assert (root / "active.json").read_bytes() == before
+    assert d.run_job(job[0], store).outcome == "needs_attention"
+
+
+def test_known_terminal_legacy_record_cleans_against_captured_history_once(store, job):
+    legacy = {"job_id": "00000000-0000-4000-8000-000000000001", "parent_sid": "parent",
+              "parent_provider": "claude", "provider": "codex", "cwd": str(job[1]), "base": "0" * 40,
+              "phase": "finished", "outcome": "completed", "child_sid": None, "exit_code": 0,
+              "permission_denials": 0}
+    active = ensure_dir(store.root / "delegation") / "active.json"
+    atomic_write_json(active, legacy, durable=True)
+
+    assert d.reconcile(store)["outcome"] == "cleaned"
+    assert not active.exists()
+    events = [event for event in load_lifecycle(store.session("parent").paths).events
+              if event["kind"] == "delegation.updated" and event["data"]["job_id"] == legacy["job_id"]]
+    assert [event["data"]["phase"] for event in events] == ["finished", "cleaned"]
+    assert d.reconcile(store)["outcome"] == "idle"
+    assert len([event for event in load_lifecycle(store.session("parent").paths).events
+                if event["kind"] == "delegation.updated" and event["data"]["job_id"] == legacy["job_id"]]) == 2
+
+
+def test_legacy_cleaned_write_failure_retains_terminal_retry_authority(store, job, monkeypatch):
+    legacy = {"job_id": "00000000-0000-4000-8000-000000000004", "parent_sid": "parent",
+              "parent_provider": "claude", "provider": "codex", "cwd": str(job[1]), "base": "0" * 40,
+              "phase": "finished", "outcome": "completed", "child_sid": None, "exit_code": 0,
+              "permission_denials": 0}
+    active = ensure_dir(store.root / "delegation") / "active.json"
+    atomic_write_json(active, legacy, durable=True)
+    before = active.read_bytes()
+    record = d.record_delegation
+
+    def fail_cleaned(parent, job_id, phase, data):
+        if phase == "cleaned":
+            raise OSError("injected cleaned write failure")
+        return record(parent, job_id, phase, data)
+
+    monkeypatch.setattr(d, "record_delegation", fail_cleaned)
+    assert d.reconcile(store)["outcome"] == "cleanup_pending"
+    assert active.read_bytes() == before
+    events = [event for event in load_lifecycle(store.session("parent").paths).events
+              if event["kind"] == "delegation.updated" and event["data"]["job_id"] == legacy["job_id"]]
+    assert [event["data"]["phase"] for event in events] == ["finished"]
+
+    monkeypatch.setattr(d, "record_delegation", record)
+    assert d.reconcile(store)["outcome"] == "cleaned"
+    assert not active.exists()
+    events = [event for event in load_lifecycle(store.session("parent").paths).events
+              if event["kind"] == "delegation.updated" and event["data"]["job_id"] == legacy["job_id"]]
+    assert [event["data"]["phase"] for event in events] == ["finished", "cleaned"]
+    assert d.reconcile(store)["outcome"] == "idle"
+
+
+def test_legacy_unlink_failure_keeps_record_and_does_not_launch(store, job, monkeypatch):
+    from pathlib import Path
+
+    legacy = {"job_id": "00000000-0000-4000-8000-000000000005", "parent_sid": "parent",
+              "parent_provider": "claude", "provider": "codex", "cwd": str(job[1]), "base": "0" * 40,
+              "phase": "finished", "outcome": "completed", "child_sid": None, "exit_code": 0,
+              "permission_denials": 0}
+    active = ensure_dir(store.root / "delegation") / "active.json"
+    atomic_write_json(active, legacy, durable=True)
+    before = active.read_bytes()
+    original_unlink = Path.unlink
+
+    def fail_active(path, *args, **kwargs):
+        if path == active:
+            raise OSError("injected active unlink failure")
+        return original_unlink(path, *args, **kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "unlink", fail_active)
+        patch.setattr(d, "native_command", lambda request: pytest.fail("must not relaunch"))
+        assert d.reconcile(store)["outcome"] == "cleanup_pending"
+        assert d.run_job(job[0], store).outcome == "cleanup_pending"
+    assert active.read_bytes() == before
+    monkeypatch.setattr(d, "native_command", lambda request: pytest.fail("must not relaunch"))
+    assert d.reconcile(store)["outcome"] == "cleaned"
+    events = [event for event in load_lifecycle(store.session("parent").paths).events
+              if event["kind"] == "delegation.updated" and event["data"]["job_id"] == legacy["job_id"]]
+    assert [event["data"]["phase"] for event in events] == ["finished", "cleaned"]
+    assert d.reconcile(store)["outcome"] == "idle"
+
+
+def test_known_terminal_legacy_record_with_absent_parent_clears_without_history(store):
+    legacy = {"job_id": "00000000-0000-4000-8000-000000000002", "parent_sid": "retired-parent",
+              "parent_provider": "claude", "provider": "codex", "cwd": "/work", "base": "0" * 40,
+              "phase": "finished", "outcome": "failed", "child_sid": None, "exit_code": 1,
+              "permission_denials": 0}
+    active = ensure_dir(store.root / "delegation") / "active.json"
+    atomic_write_json(active, legacy, durable=True)
+
+    report = d.reconcile(store)
+    assert report["outcome"] == "cleaned" and report["warning"]
+    assert not active.exists()
+    assert not store.session("retired-parent").exists()
+    assert d.reconcile(store)["outcome"] == "idle"
+
+
+def test_known_terminal_legacy_provider_mismatch_is_preserved(store, job):
+    legacy = {"job_id": "00000000-0000-4000-8000-000000000003", "parent_sid": "parent",
+              "parent_provider": "codex", "provider": "claude", "cwd": str(job[1]), "base": "0" * 40,
+              "phase": "finished", "outcome": "completed", "child_sid": None, "exit_code": 0,
+              "permission_denials": 0}
+    active = ensure_dir(store.root / "delegation") / "active.json"
+    atomic_write_json(active, legacy, durable=True)
+    before = active.read_bytes()
+
+    assert d.reconcile(store)["outcome"] == "needs_attention"
+    assert active.read_bytes() == before

@@ -14,7 +14,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${PLUGIN_ROOT}/plugin-hooks/session-start.sh\"",
+            "command": "\"${PLUGIN_ROOT}/plugin-hooks/session-start.sh\" --host codex",
             "timeout": 5
           }
         ]

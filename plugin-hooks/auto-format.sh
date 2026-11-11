@@ -26,6 +26,26 @@ if [ -z "$EVENT" ]; then
     exit 0
 fi
 
+# Scratch belongs to the native session from this event. The shell helper is
+# the fast ASCII path check; Python's allocator then creates it exclusively.
+. "${BASH_SOURCE[0]%/*}/lib/state-dir.sh"
+STATE_DIR="$(claudna_state_dir)"
+SESSION_ID=""
+if command -v jq &>/dev/null; then
+    SESSION_ID=$(printf '%s' "$EVENT" | claudna_event_session_id 2>/dev/null) || SESSION_ID=""
+elif command -v python3 &>/dev/null; then
+    SESSION_ID=$(printf '%s' "$EVENT" | python3 -B "${BASH_SOURCE[0]%/*}/../lib/claudna/session_store" \
+        native-session-id 2>/dev/null || true)
+fi
+case "$SESSION_ID" in SID|SESSION_ID|native-sid|native-session-id|CLAUDE_SESSION_ID) SESSION_ID="" ;; esac
+SESSION_DIR="$(claudna_session_dir "$SESSION_ID")"
+WORK=""
+cleanup_scratch() {
+    wait 2>/dev/null || true
+    if [ -n "$WORK" ]; then rm -rf -- "$WORK" 2>/dev/null || true; fi
+}
+trap cleanup_scratch EXIT
+
 # Extract the target path from the event.
 #
 # The payload's whitespace is not part of any published contract, so parse it as
@@ -67,11 +87,14 @@ if [ -z "$FILE_PATH" ]; then
 fi
 
 # Scratch space for the style check and the change notice, made on first use.
-WORK=""
-trap '[ -z "$WORK" ] || rm -rf -- "$WORK"' EXIT
-
 make_work() {
-    [ -n "$WORK" ] || WORK=$(mktemp -d 2>/dev/null)
+    [ -n "$WORK" ] && return 0
+    [ -n "$SESSION_DIR" ] && [ -n "$STATE_DIR" ] || return 1
+    command -v python3 &>/dev/null || return 1
+    WORK=$(python3 -B "${BASH_SOURCE[0]%/*}/../lib/claudna/session_store" scratch \
+        --session "$SESSION_ID" --host claude --label auto-format --root "$STATE_DIR" 2>/dev/null) || return 1
+    case "$WORK" in "$SESSION_DIR"/scratch/*) ;; *) WORK=""; return 1 ;; esac
+    [ -d "$WORK" ] || { WORK=""; return 1; }
 }
 
 # committed_in_ruff_style: true only when HEAD holds a non-empty version of the

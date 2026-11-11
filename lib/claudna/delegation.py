@@ -1,4 +1,4 @@
-"""One foreground native worker, existing session history, disposable bookkeeping."""
+"""One foreground native worker, durable session payloads, and a global coordination pointer."""
 from __future__ import annotations
 
 import json
@@ -21,6 +21,8 @@ from claudna.session_store.project import load_lifecycle, session_facts
 from claudna.session_store.store import SessionHandle, SessionStore, StoreError, record_delegation
 
 RECORD_LIMIT, RESPONSE_LIMIT, TAIL_LIMIT = 1048576, 65536, 16384
+PAYLOAD_LIMIT = 32768
+COORDINATION_VERSION = 1
 
 
 class DelegationError(ValueError):
@@ -127,7 +129,7 @@ def _git(cwd: str, *args: str) -> str:
 
 def _parent(store: SessionStore, sid: str, provider: str):
     parent = store.session(sid)
-    if not parent.exists():
+    if not parent.exists() or parent.capture_state() != "captured":
         raise DelegationError("parent session is not recorded")
     facts = session_facts(load_lifecycle(parent.paths).events)
     if facts.status == "unknown" or facts.agent_cli != provider:
@@ -170,46 +172,279 @@ def _data(state: dict, *, cleanup: str = "pending", summary: str = "") -> dict:
             **({"permission_denials": state["permission_denials"]} if "permission_denials" in state else {})}
 
 
-def _save(path: Path, state: dict) -> None:
-    if len(json.dumps(state).encode()) > 32768:
+def _save_payload(path: Path, state: dict) -> None:
+    if len(json.dumps(state).encode()) > PAYLOAD_LIMIT:
         raise DelegationError("operational record exceeds 32 KiB")
     atomic_write_json(path, state, durable=True)
 
 
-def _finalize(store: SessionStore, path: Path, state: dict) -> str:
-    if not store.session(state["parent_sid"]).exists():
-        path.unlink(missing_ok=True)
+def _pointer(state: dict) -> dict:
+    return {"version": COORDINATION_VERSION, "job_id": state["job_id"],
+            "parent_sid": state["parent_sid"], "parent_provider": state["parent_provider"]}
+
+
+def _matches_pointer(pointer: object, state: dict) -> bool:
+    if not isinstance(pointer, dict) or not isinstance(state, dict):
+        return False
+    try:
+        return pointer == _pointer(state)
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def _clear_pointer(path: Path, expected: dict) -> bool:
+    current = read_json(path)
+    if current != expected:
+        return False
+    path.unlink(missing_ok=True)
+    return True
+
+
+def _save_pointer(path: Path, state: dict) -> None:
+    atomic_write_json(path, _pointer(state), durable=True)
+
+
+def _terminal(state: dict) -> bool:
+    if not isinstance(state, dict):
+        return False
+    outcome = state.get("outcome")
+    return (state.get("phase") == "finished" and isinstance(outcome, str) and
+            outcome in {"completed", "failed", "timeout", "cancelled", "protocol_error"})
+
+
+def _valid_payload(store: SessionStore, state: dict) -> bool:
+    if not isinstance(state, dict):
+        return False
+    required = {"version", "job_id", "parent_sid", "parent_provider", "provider", "cwd", "base",
+                "phase", "outcome", "child_sid", "exit_code", "coordination_cleared"}
+    if not required <= state.keys():
+        return False
+    if (type(state["version"]) is not int or state["version"] != 1
+            or not isinstance(state["job_id"], str) or not isinstance(state["parent_sid"], str)
+            or not isinstance(state["parent_provider"], str) or state["parent_provider"] not in AGENT_CLIS
+            or not isinstance(state["provider"], str) or state["provider"] not in AGENT_CLIS
+            or state["parent_provider"] == state["provider"]
+            or not isinstance(state["cwd"], str) or not isinstance(state["base"], str)
+            or not isinstance(state["phase"], str) or not isinstance(state["outcome"], str)
+            or (state["child_sid"] is not None and not isinstance(state["child_sid"], str))
+            or (state["exit_code"] is not None and type(state["exit_code"]) is not int)
+            or type(state["coordination_cleared"]) is not bool):
+        return False
+    try:
+        validate_sid(state["parent_sid"])
+        if state["child_sid"] is not None:
+            validate_sid(state["child_sid"])
+        store.session(state["parent_sid"]).paths.delegation_record(state["job_id"])
+    except (ValueError, TypeError):
+        return False
+    return True
+
+
+def _valid_legacy_record(state: dict) -> bool:
+    """Validate the exact full-record schema written before v1 pointers."""
+    if not isinstance(state, dict):
+        return False
+    required = {"job_id", "parent_sid", "parent_provider", "provider", "cwd", "base", "phase",
+                "outcome", "child_sid", "exit_code"}
+    if set(state) not in (required, required | {"permission_denials"}):
+        return False
+    if (not isinstance(state["job_id"], str) or len(state["job_id"]) > 64
+            or not isinstance(state["parent_sid"], str)
+            or not isinstance(state["parent_provider"], str) or state["parent_provider"] not in AGENT_CLIS
+            or not isinstance(state["provider"], str) or state["provider"] not in AGENT_CLIS
+            or state["parent_provider"] == state["provider"]
+            or not isinstance(state["cwd"], str) or len(state["cwd"]) > 4096
+            or not isinstance(state["base"], str) or len(state["base"]) != 40
+            or any(char not in "0123456789abcdef" for char in state["base"])
+            or not isinstance(state["phase"], str) or not isinstance(state["outcome"], str)
+            or (state["child_sid"] is not None and not isinstance(state["child_sid"], str))
+            or (state["exit_code"] is not None and type(state["exit_code"]) is not int)
+            or ("permission_denials" in state and
+                (type(state["permission_denials"]) is not int or state["permission_denials"] < 0))):
+        return False
+    try:
+        uuid.UUID(state["job_id"])
+        validate_sid(state["parent_sid"])
+        if state["child_sid"] is not None:
+            validate_sid(state["child_sid"])
+    except (ValueError, TypeError, AttributeError):
+        return False
+    return True
+
+
+def _finalize(store: SessionStore, pointer_path: Path, payload_path: Path, state: dict) -> str:
+    if not _terminal(state):
+        raise DelegationError("worker exit was not observed; do not clean or relaunch")
+    parent_handle = store.session(state["parent_sid"])
+    parent_state = parent_handle.capture_state()
+    if parent_state == "absent" or parent_state == "artifact-only":
+        state["coordination_cleared"] = True
+        _save_payload(payload_path, state)
+        if not _clear_pointer(pointer_path, _pointer(state)):
+            raise DelegationError("active delegation pointer changed during cleanup")
         return "Parent history is absent; removed known-terminal bookkeeping without recreating it."
+    if parent_state != "captured":
+        raise DelegationError("parent lifecycle is incomplete or corrupt; preserve delegation evidence")
     parent = _parent(store, state["parent_sid"], state["parent_provider"])
     if state.get("child_sid"):
         parent.link_child(state["child_sid"], relation="delegation", child_agent_cli=state["provider"],
                           job_id=state["job_id"])
     record_delegation(parent, state["job_id"], "finished", _data(state))
-    path.unlink(missing_ok=True)
+    state["coordination_cleared"] = True
+    _save_payload(payload_path, state)
+    if not _clear_pointer(pointer_path, _pointer(state)):
+        raise DelegationError("active delegation pointer changed during cleanup")
     record_delegation(parent, state["job_id"], "cleaned", _data(state, cleanup="complete"))
     return ""
 
 
-def _reconcile_locked(store: SessionStore, path: Path) -> dict:
-    if not path.exists() and not path.is_symlink():
-        return {"outcome": "idle"}
-    if path.is_symlink():
+def _finalize_legacy(store: SessionStore, active_path: Path, state: dict) -> str:
+    """Clear only an observed terminal record, retaining it until history is durable."""
+    if read_json(active_path) != state:
+        raise DelegationError("legacy active record changed before cleanup")
+    parent_handle = store.session(state["parent_sid"])
+    parent_state = parent_handle.capture_state()
+    if parent_state in ("absent", "artifact-only"):
+        if not _clear_pointer(active_path, state):
+            raise DelegationError("legacy active record changed during cleanup")
+        return "Parent history is absent; removed known-terminal bookkeeping without recreating it."
+    if parent_state != "captured":
+        raise DelegationError("parent lifecycle is incomplete or corrupt; preserve delegation evidence")
+    parent = _parent(store, state["parent_sid"], state["parent_provider"])
+    if state.get("child_sid"):
+        parent.link_child(state["child_sid"], relation="delegation", child_agent_cli=state["provider"],
+                          job_id=state["job_id"])
+    record_delegation(parent, state["job_id"], "finished", _data(state))
+    # The legacy record remains the retry authority until both lifecycle events
+    # are durable. A failed unlink is safe: the exact terminal state is retried
+    # idempotently under the same global slot lock.
+    record_delegation(parent, state["job_id"], "cleaned", _data(state, cleanup="complete"))
+    if not _clear_pointer(active_path, state):
+        raise DelegationError("legacy active record changed during cleanup")
+    return ""
+
+
+def _recover_cleared_payloads(store: SessionStore, *, allow_recovery: bool = True) -> dict | None:
+    """Recover terminal lifecycle cleanup after a durable pointer was removed."""
+    recovered = []
+    for sid in store.session_ids():
+        directory = store.session(sid).paths.delegation
+        if not directory.is_dir():
+            continue
+        for path in directory.glob("*.json"):
+            try:
+                oversized = path.stat().st_size > PAYLOAD_LIMIT
+            except OSError:
+                return {"outcome": "needs_attention", "reason": "durable delegation payload is unreadable"}
+            if path.is_symlink() or oversized:
+                return {"outcome": "needs_attention", "reason": "durable delegation payload is unsafe"}
+            state = read_json(path)
+            if (not _valid_payload(store, state) or not _terminal(state)
+                    or state["coordination_cleared"] is not True
+                    or path != store.session(state["parent_sid"]).paths.delegation_record(state["job_id"])):
+                return {"outcome": "needs_attention", "reason": "orphaned or malformed delegation payload"}
+            parent_handle = store.session(state["parent_sid"])
+            parent_state = parent_handle.capture_state()
+            if parent_state in ("absent", "artifact-only"):
+                continue
+            if parent_state != "captured":
+                return {"outcome": "needs_attention", "reason": "parent lifecycle is incomplete or corrupt"}
+            try:
+                parent = _parent(store, state["parent_sid"], state["parent_provider"])
+            except (ValueError, KeyError, StoreError) as exc:
+                return {"outcome": "needs_attention", "reason": redact_text(str(exc))[:1000]}
+            lifecycle = load_lifecycle(parent.paths).events
+            job_events = [event for event in lifecycle if event["kind"] == "delegation.updated"
+                          and event["data"].get("job_id") == state["job_id"]]
+            expected_finished = {**_data(state), "job_id": state["job_id"], "phase": "finished"}
+            expected_cleaned = {**_data(state, cleanup="complete"),
+                                "job_id": state["job_id"], "phase": "cleaned"}
+            for phase, expected in (("finished", expected_finished), ("cleaned", expected_cleaned)):
+                phase_events = [event["data"] for event in job_events if event["data"].get("phase") == phase]
+                if len(phase_events) > 1 or any(any(data.get(key) != value for key, value in expected.items())
+                                                for data in phase_events):
+                    return {"outcome": "needs_attention", "reason": "parent delegation history disagrees with payload"}
+            finished = any(event["data"].get("phase") == "finished" for event in job_events)
+            cleaned = any(event["data"].get("phase") == "cleaned" for event in job_events)
+            if not finished:
+                return {"outcome": "needs_attention", "reason": "cleared payload has no matching finished history"}
+            if not cleaned:
+                if not allow_recovery:
+                    return {"outcome": "needs_attention",
+                            "reason": "coordination lock is unavailable for cleanup recovery"}
+                try:
+                    record_delegation(parent, state["job_id"], "cleaned", _data(state, cleanup="complete"))
+                except OSError as exc:
+                    return {"outcome": "cleanup_pending", "reason": redact_text(str(exc))[:1000]}
+                except (ValueError, KeyError, StoreError) as exc:
+                    return {"outcome": "needs_attention", "reason": redact_text(str(exc))[:1000]}
+                recovered.append(state["job_id"])
+    if recovered:
+        return {"outcome": "recovered", "job_ids": recovered}
+    return None
+
+
+def _reconcile_locked(store: SessionStore, pointer_path: Path) -> dict:
+    if not pointer_path.exists() and not pointer_path.is_symlink():
+        return _recover_cleared_payloads(store) or {"outcome": "idle"}
+    if pointer_path.is_symlink():
         return {"outcome": "needs_attention", "reason": "operational record is a symlink"}
-    state = read_json(path)
-    if not isinstance(state, dict) or state.get("phase") != "finished":
+    try:
+        if pointer_path.stat().st_size > PAYLOAD_LIMIT:
+            return {"outcome": "needs_attention", "reason": "coordination pointer exceeds the record limit"}
+    except OSError:
+        return {"outcome": "needs_attention", "reason": "coordination pointer is unreadable"}
+    pointer = read_json(pointer_path)
+    if not isinstance(pointer, dict):
+        return {"outcome": "needs_attention", "reason": "coordination pointer is unreadable"}
+    if set(pointer) != {"version", "job_id", "parent_sid", "parent_provider"}:
+        if not _valid_legacy_record(pointer):
+            return {"outcome": "needs_attention", "reason": "legacy or unknown delegation state; do not relaunch"}
+        if not _terminal(pointer):
+            return {"outcome": "needs_attention", "reason": "worker exit was not observed; do not relaunch"}
+        try:
+            warning = _finalize_legacy(store, pointer_path, pointer)
+        except OSError as exc:
+            return {"outcome": "cleanup_pending", "reason": redact_text(str(exc))[:1000]}
+        except (ValueError, KeyError, StoreError) as exc:
+            return {"outcome": "needs_attention", "reason": redact_text(str(exc))[:1000]}
+        return {"outcome": "cleaned", "job_id": pointer["job_id"],
+                **({"warning": warning} if warning else {})}
+    pointer_provider = pointer.get("parent_provider")
+    if (type(pointer.get("version")) is not int or pointer.get("version") != COORDINATION_VERSION or
+            not isinstance(pointer_provider, str) or pointer_provider not in AGENT_CLIS):
+        return {"outcome": "needs_attention", "reason": "unknown coordination pointer version or provider"}
+    try:
+        payload_path = store.session(pointer["parent_sid"]).paths.delegation_record(pointer["job_id"])
+    except (ValueError, TypeError):
+        return {"outcome": "needs_attention", "reason": "invalid coordination pointer identity"}
+    if payload_path.is_symlink():
+        return {"outcome": "needs_attention", "reason": "durable delegation payload is a symlink"}
+    try:
+        if payload_path.stat().st_size > PAYLOAD_LIMIT:
+            return {"outcome": "needs_attention", "reason": "durable delegation payload exceeds the record limit"}
+    except OSError:
+        return {"outcome": "needs_attention", "reason": "durable delegation payload is missing or unreadable"}
+    state = read_json(payload_path)
+    if not isinstance(state, dict):
+        return {"outcome": "needs_attention", "reason": "durable delegation payload is missing or unreadable"}
+    if not _valid_payload(store, state) or not _matches_pointer(pointer, state):
+        return {"outcome": "needs_attention", "reason": "coordination pointer and durable payload disagree"}
+    if not _terminal(state):
         return {"outcome": "needs_attention", "reason": "worker exit was not observed; do not relaunch"}
     try:
-        warning = _finalize(store, path, state)
-    except (OSError, ValueError, KeyError, StoreError) as exc:
-        _save(path, state)
+        warning = _finalize(store, pointer_path, payload_path, state)
+    except OSError as exc:
         return {"outcome": "cleanup_pending", "reason": redact_text(str(exc))[:1000]}
+    except (ValueError, KeyError, StoreError) as exc:
+        return {"outcome": "needs_attention", "reason": redact_text(str(exc))[:1000]}
     return {"outcome": "cleaned", "job_id": state["job_id"], **({"warning": warning} if warning else {})}
 
 
 def reconcile(store: SessionStore) -> dict:
     root = store.root / "delegation"
     if not root.exists():
-        return {"outcome": "idle"}
+        return _recover_cleared_payloads(store, allow_recovery=False) or {"outcome": "idle"}
     with exclusive_lock(root / ".lock", blocking=False) as taken:
         return _reconcile_locked(store, root / "active.json") if taken else {"outcome": "busy"}
 
@@ -305,11 +540,16 @@ def run_job(request: Request, store: SessionStore) -> Result:
         parent, base = _validate(request, store)
         command = native_command(request)
         job_id = str(uuid.uuid4())
-        state = {"job_id": job_id, "parent_sid": request.parent_sid, "parent_provider": request.parent_provider,
+        state = {"version": 1, "job_id": job_id, "parent_sid": request.parent_sid,
+                 "parent_provider": request.parent_provider,
                  "provider": request.provider, "cwd": request.cwd, "base": base,
-                 "phase": "running", "outcome": "incomplete", "child_sid": None, "exit_code": None}
+                 "phase": "running", "outcome": "incomplete", "child_sid": None, "exit_code": None,
+                 "coordination_cleared": False}
+        payload_path = parent.paths.delegation_record(job_id)
+        ensure_dir(payload_path.parent)
+        _save_payload(payload_path, state)
         record_delegation(parent, job_id, "started", _data(state))
-        _save(path, state)
+        _save_pointer(path, state)
         exit_code, observed, timed_out, diagnostic = _observe(command, request)
         state.update(exit_code=exit_code, child_sid=observed.sid, phase="finished",
                      permission_denials=len(observed.permission_denials))
@@ -317,22 +557,26 @@ def run_job(request: Request, store: SessionStore) -> Result:
                             "protocol_error" if observed.invalid else
                             "completed" if exit_code == 0 and observed.sid and observed.completed
                             and not observed.failed else "failed")
-        _save(path, state)
+        _save_payload(payload_path, state)
         result = Result(job_id, state["outcome"], observed.sid, exit_code,
                         redact_text(observed.response or diagnostic)[:RESPONSE_LIMIT],
                         permission_denials=observed.permission_denials)
         try:
-            warning = _finalize(store, path, state)
+            warning = _finalize(store, path, payload_path, state)
             result.cleanup = "complete"
             if warning:
                 result.summary = (warning + "\n" + result.summary)[:RESPONSE_LIMIT]
-        except (OSError, ValueError, StoreError):
-            _save(path, state)
+        except OSError:
+            _save_payload(payload_path, state)
             try:
                 record_delegation(parent, job_id, "cleanup_pending", _data(state))
             except (OSError, ValueError, StoreError):
                 pass  # The durable operational record is the retry authority, not a success claim.
             result.cleanup = "pending"
+        except (ValueError, StoreError) as exc:
+            _save_payload(payload_path, state)
+            result.cleanup = "needs_attention"
+            result.summary = (redact_text(str(exc)) + "\n" + result.summary)[:RESPONSE_LIMIT]
         return result
 
 

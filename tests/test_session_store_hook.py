@@ -141,7 +141,7 @@ class TestEntrypoint:
                    "source": "startup"}
         result = run_hook("SessionStart", json.dumps(payload), env={**CLI_ENV, "CLAUDNA_STATE_DIR": str(store.root)})
         assert result.startswith("error:")
-        assert "entrypoint write failed" in (store.root / "hooks/errors.log").read_text()
+        assert "entrypoint write failed" in (store.session(SID).paths.hooks / "errors.log").read_text()
         assert session(store)["status"] == "open" and store.session(SID).paths.segment(1).dir.is_dir()
 
 
@@ -331,6 +331,30 @@ class TestDurability:
 
 
 class TestRunHook:
+    def test_attributable_failure_stays_with_native_owner(self, store, monkeypatch):
+        def fail(*args, **kwargs):
+            raise OSError("PRIVATE-COMMAND")
+
+        monkeypatch.setattr(boundaries, "handle", fail)
+        run_hook("PostToolUse", json.dumps({"session_id": SID}), env={"CLAUDNA_STATE_DIR": str(store.root)})
+        owned = store.session(SID).paths.hooks / "errors.log"
+        assert "PRIVATE-COMMAND" in owned.read_text()
+        assert owned.stat().st_mode & 0o077 == 0
+        assert not (store.root / "hooks").exists()
+        assert not store.session(SID).paths.lifecycle.exists()
+
+    def test_unattributed_failure_retains_only_fixed_classes(self, store, monkeypatch):
+        def fail(*args, **kwargs):
+            raise OSError("PRIVATE-COMMAND")
+
+        monkeypatch.setattr(boundaries, "handle", fail)
+        run_hook("PostToolUse", "{}", env={"CLAUDNA_STATE_DIR": str(store.root)})
+        record = json.loads((store.root / "hooks/errors.log").read_text())
+        assert record["code"] == "io" and record["count"] == 1
+        assert "PRIVATE" not in json.dumps(record)
+        assert "error" not in record and "where" not in record
+        assert not (store.root / "sessions").exists()
+
     def test_a_store_failure_is_logged_and_never_raised(self, tmp_path, transcript):
         root = tmp_path / "state"
         root.mkdir()
@@ -359,9 +383,9 @@ class TestRunHook:
         root = tmp_path / "state"
         out = run_hook("SessionStart", b'{"session_id": "\xff"}', env={"CLAUDNA_STATE_DIR": str(root)})
         assert out.startswith("error: UnicodeDecodeError")
-        assert "UnicodeDecodeError" in (root / "hooks" / "errors.log").read_text()
+        assert json.loads((root / "hooks" / "errors.log").read_text())["code"] == "decode"
 
-    def test_logging_an_error_rotates_both_hook_logs(self, tmp_path):
+    def test_bootstrap_error_rotates_only_its_log_and_preserves_old_payload(self, tmp_path):
         from claudna.session_store.fsio import LOG_LIMIT
 
         root = tmp_path / "state"
@@ -372,7 +396,8 @@ class TestRunHook:
         run_hook("SessionStart", "{not json", env={"CLAUDNA_STATE_DIR": str(root)})
         assert (hooks / "errors.log.old").stat().st_size == LOG_LIMIT + 1
         assert (hooks / "errors.log").stat().st_size < 1024
-        assert (hooks / "session-store.stderr.old").is_file() and not (hooks / "session-store.stderr").exists()
+        assert (hooks / "session-store.stderr").read_text() == "x" * (LOG_LIMIT + 1)
+        assert not (hooks / "session-store.stderr.old").exists()
 
 
 def run_wrapper(tmp_path: Path, event: str, payload: dict, extra_env: dict | None = None, cwd: Path | None = None):
@@ -383,6 +408,26 @@ def run_wrapper(tmp_path: Path, event: str, payload: dict, extra_env: dict | Non
 
 
 class TestWrapper:
+    @pytest.mark.parametrize("sid", ["truncated\n", "truncated\x00", "é", "a" * 129])
+    def test_invalid_event_identity_cannot_be_trimmed_into_an_owner(self, tmp_path, transcript, sid):
+        payload = {**self.payload(transcript), "session_id": sid}
+        proc = run_wrapper(tmp_path, "SessionStart", payload)
+        assert (proc.returncode, proc.stdout, proc.stderr) == (0, "", "")
+        assert not (tmp_path / "home/.claudna/sessions").exists()
+
+    def test_unowned_interpreter_failure_has_only_a_fixed_bootstrap_code(self, tmp_path):
+        fake = tmp_path / "bin"
+        fake.mkdir()
+        (fake / "python3").write_text("#!/bin/sh\necho 'PRIVATE-BOOTSTRAP-PAYLOAD' >&2\nexit 1\n")
+        (fake / "python3").chmod(0o755)
+        proc = run_wrapper(tmp_path, "SessionStart", {}, {"PATH": f"{fake}:{os.environ['PATH']}"})
+        assert (proc.returncode, proc.stdout, proc.stderr) == (0, "", "")
+        root = tmp_path / "home/.claudna"
+        assert json.loads((root / "hooks/bootstrap.log").read_text()) == {
+            "code": "session_store_runtime", "count": 1}
+        assert not (root / "hooks/session-store.stderr").exists()
+        assert not (root / "sessions").exists()
+
     def payload(self, transcript: Path) -> dict:
         return {"session_id": SID, "transcript_path": str(transcript), "cwd": str(transcript.parent),
                 "source": "startup"}
@@ -420,14 +465,14 @@ class TestWrapper:
         proc = run_wrapper(tmp_path, "SessionStart", self.payload(transcript),
                            {"PATH": f"{fake}:{os.environ['PATH']}"})
         assert (proc.returncode, proc.stdout) == (0, "")
-        assert "ImportError" in (tmp_path / "home" / ".claudna" / "hooks" / "session-store.stderr").read_text()
+        assert "ImportError" in (tmp_path / "home" / ".claudna" / "sessions" / SID / "hooks" / "session-store.stderr").read_text()
 
     def test_the_wrapper_rotates_its_stderr_capture_even_when_python_cannot_start(self, tmp_path, transcript):
         fake = tmp_path / "bin"
         fake.mkdir()
         (fake / "python3").write_text("#!/bin/sh\necho 'ImportError: again' >&2\nexit 1\n")
         (fake / "python3").chmod(0o755)
-        hooks = tmp_path / "home" / ".claudna" / "hooks"
+        hooks = tmp_path / "home" / ".claudna" / "sessions" / SID / "hooks"
         hooks.mkdir(parents=True)
         (hooks / "session-store.stderr").write_text("x" * (1024 * 1024 + 1))
         run_wrapper(tmp_path, "SessionStart", self.payload(transcript), {"PATH": f"{fake}:{os.environ['PATH']}"})
@@ -543,10 +588,55 @@ class TestLogsAreCapped:
         from claudna.session_store.fsio import LOG_LIMIT
 
         monkeypatch.setattr(sp, "Popen", lambda *a, **k: None)
-        (tmp_path / "hooks").mkdir()
-        (tmp_path / "hooks" / "summarizer.stderr").write_text("x" * (LOG_LIMIT + 1))
-        boundaries.spawn_worker(tmp_path, ["summarize", SID, "1"], {}, log="summarizer.stderr")
-        assert (tmp_path / "hooks" / "summarizer.stderr.old").stat().st_size == LOG_LIMIT + 1
+        hooks = tmp_path / "sessions" / SID / "hooks"
+        hooks.mkdir(parents=True)
+        (hooks / "summarizer.stderr").write_text("x" * (LOG_LIMIT + 1))
+        boundaries.spawn_worker(tmp_path, ["summarize", SID, "1"], {}, log="summarizer.stderr", sid=SID)
+        assert (hooks / "summarizer.stderr.old").stat().st_size == LOG_LIMIT + 1
+        assert (hooks / "summarizer.stderr").stat().st_mode & 0o077 == 0
+        assert not (tmp_path / "hooks").exists()
+
+    def test_global_worker_failure_is_observed_without_captured_stderr(self, tmp_path, monkeypatch):
+        import subprocess as sp
+
+        script = tmp_path / "failed-worker.py"
+        script.write_text("import sys\nprint('PRIVATE-WORKER-CONTENT', file=sys.stderr)\nsys.exit(1)\n")
+        monkeypatch.setattr(boundaries, "ENTRYPOINT", script)
+        original, children = sp.Popen, []
+
+        def start(*args, **kwargs):
+            proc = original(*args, **kwargs)
+            children.append(proc)
+            return proc
+
+        monkeypatch.setattr(sp, "Popen", start)
+        boundaries.spawn_worker(tmp_path / "state", ["harvest"], {}, log="harvest.stderr")
+        children[0].wait(timeout=10)
+        log = tmp_path / "state/hooks/harvest.stderr"
+        assert json.loads(log.read_text()) == {"code": "worker_runtime", "count": 1}
+        assert log.stat().st_mode & 0o077 == 0
+        assert not (tmp_path / "state/sessions").exists()
+
+
+def test_writable_runtime_and_delegate_entrypoints_create_no_bytecode(tmp_path):
+    import shutil
+
+    package = tmp_path / "package"
+    shutil.copytree(REPO_ROOT / "lib", package / "lib")
+    (package / "scripts").mkdir()
+    for script in ("delegate.py", "skill-usefulness.py"):
+        shutil.copyfile(REPO_ROOT / "scripts" / script, package / "scripts" / script)
+    env = {"HOME": str(tmp_path / "private-home"), "TMPDIR": str(tmp_path), "PATH": os.environ["PATH"]}
+    for entry in (package / "lib/claudna/session_store", package / "scripts/delegate.py",
+                  package / "scripts/skill-usefulness.py"):
+        # Directory execution caches __main__ before its code runs. Its public
+        # launch contract requires -B; script entrypoints also protect imports.
+        flags = ["-B"] if entry.is_dir() else []
+        proc = subprocess.run([sys.executable, *flags, str(entry), "--help"],
+                              env=env, capture_output=True, timeout=20)
+        assert proc.returncode == 0, proc.stderr
+    assert not list(package.rglob("__pycache__"))
+    assert not list(package.rglob("*.pyc"))
 
 
 # ── #373 review: M3 (nested children), M5 (spend), M2 (a closed end) ──────────

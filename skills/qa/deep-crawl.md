@@ -44,7 +44,7 @@ For each route and viewport, write a job:
 then run it, one per Bash call:
 
 ```bash
-python3 "<claudna-root>/scripts/crawl_page.py" shot "<scratch>/jobs/job-001.json"
+python3 -B "<claudna-root>/scripts/crawl_page.py" shot "<scratch>/jobs/job-001.json"
 ```
 
 **Parallelism:** Capture all three viewports of a single route in parallel (3 Bash calls). Process routes sequentially to avoid overloading the browser.
@@ -58,7 +58,7 @@ For each route, write a job and run the `console` verb. It writes the page's con
 ```
 
 ```bash
-python3 "<claudna-root>/scripts/crawl_page.py" console "<scratch>/jobs/job-002.json"
+python3 -B "<claudna-root>/scripts/crawl_page.py" console "<scratch>/jobs/job-002.json"
 ```
 
 ---
@@ -108,7 +108,7 @@ Enumerates interactive elements, clicks up to 30 buttons/links with a before/aft
 ```
 
 ```bash
-python3 "<claudna-root>/scripts/crawl_page.py" deep "<scratch>/jobs/job-003.json"
+python3 -B "<claudna-root>/scripts/crawl_page.py" deep "<scratch>/jobs/job-003.json"
 ```
 
 It writes `<page_name>_results.json` and the before, after, click and form screenshots into `output_dir`.
@@ -122,7 +122,7 @@ If the app has a chat or console interface, run the `chat` verb. It drives the c
 ```
 
 ```bash
-python3 "<claudna-root>/scripts/crawl_page.py" chat "<scratch>/jobs/job-004.json"
+python3 -B "<claudna-root>/scripts/crawl_page.py" chat "<scratch>/jobs/job-004.json"
 ```
 
 ### After deep testing

@@ -65,7 +65,7 @@ The `capture` `action` value drives the capture flow — its five values and the
 | `suggest_supersede` | the near-duplicate is **stale** | vault-relative |
 | `rejected` | validation failed; nothing written (exit 1) | — |
 
-The engine always stamps a new note `draft`; **consumers never set or promote `maturity`** — promotion is Claudron curation. One exception: in `/claudna:capture --review`, a person picks a harvested draft to promote, and `python3 "<claudna-root>/lib/claudna/session_store" digest --promote` runs `claudron promote … --to verified --by user` for it and checks the envelope (`<claudna-root>` per [`../_shared/claudna-root.md`](../_shared/claudna-root.md)). Nothing promotes without that pick, and no skill builds the `promote` call itself.
+The engine always stamps a new note `draft`; **consumers never set or promote `maturity`** — promotion is Claudron curation. One exception: in `/claudna:capture --review`, a person picks a harvested draft to promote, and `python3 -B "<claudna-root>/lib/claudna/session_store" digest --promote` runs `claudron promote … --to verified --by user` for it and checks the envelope (`<claudna-root>` per [`../_shared/claudna-root.md`](../_shared/claudna-root.md)). Nothing promotes without that pick, and no skill builds the `promote` call itself.
 
 ## 3. Failure posture — branch on the exit code, then degrade loudly
 

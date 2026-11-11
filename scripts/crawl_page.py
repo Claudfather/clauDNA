@@ -31,6 +31,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+sys.dont_write_bytecode = True
+
 REQUIRED = {
     "shot": ("url", "width", "height", "output"),
     "console": ("url", "output"),

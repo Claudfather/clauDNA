@@ -123,3 +123,19 @@ def test_completed_summary_with_missing_artifact_is_not_ready(store):
     assert report["final_segment_summaries"] == {"unreadable": 1}
     assert report["harvest"]["ready_segments"] == 0
     assert report["status"] == "attention"
+
+
+def test_hook_diagnostics_count_public_owner_without_payload_or_private_identity(store):
+    public = summarized_session(store, "public", [[BLOCK]])
+    private = summarized_session(store, "private-secret", [[BLOCK]])
+    private.set_private(True)
+    for handle in (public, private):
+        ensure_dir(handle.paths.hooks)
+        append_jsonl(handle.paths.hooks / "errors.log", {"error": "PRIVATE-CONTENT"})
+        (handle.paths.hooks / "summarizer.stderr").write_text("PRIVATE-CONTENT")
+    before = {p: p.read_bytes() for p in store.root.rglob("*") if p.is_file()}
+    report = health.report(store, env={})
+    assert report["hook_diagnostics"] == {"bootstrap_records": 0, "public_session_records": 1,
+                                          "worker_stderr_files": 1}
+    assert "PRIVATE" not in json.dumps(report) and "private-secret" not in json.dumps(report)
+    assert {p: p.read_bytes() for p in store.root.rglob("*") if p.is_file()} == before

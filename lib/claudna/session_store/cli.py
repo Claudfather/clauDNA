@@ -53,8 +53,8 @@ from . import events as ev
 from . import schema
 from .fsio import (allocate_operation, append_jsonl, cap_log, ensure_dir,
                    make_scratch, read_json, read_jsonl)
-from .paths import (InvalidSessionId, InvalidStateDir, operation_path, owned_path, state_root,
-                    validate_scratch_label)
+from .paths import (InvalidSessionId, InvalidStateDir, SessionPaths, operation_path, owned_path, state_root,
+                    validate_scratch_label, validate_sid)
 from .project import OLDER_PROJECTIONS, SUMMARY_ENV
 from .store import SessionHandle, SessionStore
 
@@ -242,6 +242,7 @@ def run_hook(event: str, raw: str | bytes, env: dict[str, str] | None = None, *,
     """
     env = dict(os.environ) if env is None else env
     root = None
+    sid = None
     try:
         root = state_root(env)
         selected = boundaries.HOSTS.get(host)
@@ -251,29 +252,46 @@ def run_hook(event: str, raw: str | bytes, env: dict[str, str] | None = None, *,
         if isinstance(raw, bytes):
             raw = raw.decode("utf-8")
         payload = json.loads(raw) if raw.strip() else None
+        if isinstance(payload, dict):
+            try:
+                sid = validate_sid(payload.get("session_id"))
+            except ValueError:
+                pass
         return boundaries.handle(event, payload, store=SessionStore(root), env=env, host=selected)
     except Exception as exc:  # noqa: BLE001 — a hook must fail open, and say so
-        _log_hook_error(root, event, exc)
+        _log_hook_error(root, event, exc, sid=sid)
         return f"error: {type(exc).__name__}: {exc}"
 
 
-def _log_hook_error(root: Path | None, event: str, exc: BaseException) -> None:
-    """One JSON line in ``<root>/hooks/errors.log``; stderr when there is no root to log to."""
+def _log_hook_error(root: Path | None, event: str, exc: BaseException, *, sid: str | None = None) -> None:
+    """Payload diagnostics belong to a known session; bootstrap records carry only fixed codes."""
     import traceback
 
     frame = traceback.extract_tb(exc.__traceback__)[-1] if exc.__traceback__ else None
+    event = event if any(event in h.events for h in boundaries.HOSTS.values()) else "unknown"
+    if root is not None and sid is not None:
+        try:
+            hooks_dir = ensure_dir(SessionPaths(root, validate_sid(sid)).hooks)
+            cap_log(hooks_dir / "session-store.stderr")
+            append_jsonl(cap_log(hooks_dir / "errors.log"), {
+                "ts": ev.now_ts(), "component": "session_store", "event": event,
+                "error": f"{type(exc).__name__}: {exc}",
+                "where": f"{Path(frame.filename).name}:{frame.lineno} in {frame.name}" if frame else None,
+            }, durable=False)
+            return
+        except (OSError, ValueError):
+            pass  # a failed owned allocation must not send its payload to global state
+    code = "decode" if isinstance(exc, (UnicodeError, json.JSONDecodeError)) else (
+        "io" if isinstance(exc, OSError) else "runtime")
     try:
         if root is None:
-            raise exc
+            raise OSError("no root")
         hooks_dir = ensure_dir(root / "hooks")
-        cap_log(hooks_dir / "session-store.stderr")  # the wrapper's capture; the next call starts a fresh one
         append_jsonl(cap_log(hooks_dir / "errors.log"), {
-            "ts": ev.now_ts(), "component": "session_store", "event": event,
-            "error": f"{type(exc).__name__}: {exc}",
-            "where": f"{Path(frame.filename).name}:{frame.lineno} in {frame.name}" if frame else None,
+            "ts": ev.now_ts(), "component": "session_store", "event": event, "code": code, "count": 1,
         }, durable=False)
-    except Exception:  # noqa: BLE001 — nowhere to log to; the wrapper's stderr capture is the last resort
-        print(f"session_store hook {event}: {type(exc).__name__}: {exc}", file=sys.stderr)
+    except OSError:
+        print(f"session_store hook: {code}", file=sys.stderr)
 
 
 def _review(store, digest, item: str, vault: str | None, revision: int | None, *, outcome: str,
@@ -378,12 +396,29 @@ def _read(args) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
+    if argv == ["native-session-id"]:
+        try:
+            payload = json.loads(sys.stdin.buffer.read())
+            print(validate_sid(payload.get("session_id") if isinstance(payload, dict) else None))
+            return 0
+        except (ValueError, UnicodeError):
+            return 2
     if argv[:1] == ["hook"] and len(argv) in (2, 4):  # the hot path: no argparse
         if len(argv) == 2:
             run_hook(argv[1], sys.stdin.buffer.read())
         elif argv[1] == "--host":
             run_hook(argv[3], sys.stdin.buffer.read(), host=argv[2])
         return 0
+    if argv == ["telemetry-path"]:
+        from .telemetry import telemetry_path
+
+        try:
+            print(telemetry_path(os.environ))
+            return 0
+        except (OSError, ValueError):
+            print("telemetry configuration invalid: require an absolute destination inside the clauDNA root",
+                  file=sys.stderr)
+            return 2
     if argv == ["telemetry"]:  # telemetry-emit.sh: its own entry, so it works with the store off
         from . import telemetry
 

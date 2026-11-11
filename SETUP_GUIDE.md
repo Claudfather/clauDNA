@@ -14,9 +14,9 @@ and historical data is preserved.
 
 `/claudna:delegate run` supports Claude-to-Codex and Codex-to-Claude. It requires Python 3.9+, the destination's installed/authenticated native CLI (measured with Codex 0.162.1 and Claude 2.1.304), and the actual parent session recorded by clauDNA. It reuses native account/model/permission policy; no API key is required to install the plugin. Claude uses its native `--permission-prompts none` flag: unanswered permission requests are denied without a permission broker or launcher retry. Denied calls remain visible separately from native completion; parent checks must establish the required result before acceptance. No permission is broadened.
 
-Hand off a clean, task-owned workspace exclusively during execution. Provider-qualified child links and separate worker/acceptance/cleanup events appear through `/claudna:session show`/`timeline`, distinct from `/clear` continuity. No extra checkout or dependency copy. Code and native provider history remain; only `<state>/delegation/active.json` is temporary, with one stable empty lock retained.
+Hand off a clean, task-owned workspace exclusively during execution. Provider-qualified child links and separate worker/acceptance/cleanup events appear through `/claudna:session show`/`timeline`, distinct from `/clear` continuity. No extra checkout or dependency copy. Code and native provider history remain. The durable job record lives at `R/sessions/<parent-sid>/delegation/<job-id>.json`; `R/delegation/active.json` is only a versioned pointer (job ID, parent SID/provider), with one stable empty lock retained.
 
-Normal completion cleans bookkeeping automatically. SessionStart and the next invocation retry known-terminal cleanup even with capture/harvest off. Unknown execution stays protected and may need an ownership decision after a crash; it is never age-deleted or automatically replaced. No cleanup runs while the host is absent. V1 excludes native resume, concurrent workers, Git integration, recovery archives and direct Claudron publishing. Parent verification remains required.
+Normal completion clears only the matching coordination pointer; durable payload and lifecycle evidence remain. SessionStart and the next invocation retry known-terminal cleanup even with capture/harvest off. Unknown execution, unresolved legacy full records, missing/mismatched payloads and orphans stay protected for explicit reconciliation; nothing is relaunched or age-deleted. Legacy full records are recognized without migration: only their known-terminal coordination slot can receive the existing exact-match cleanup. Missing parent history permits cleanup only when the durable payload still establishes observed terminal status. No cleanup runs while the host is absent. V1 excludes native resume, concurrent workers, Git integration, recovery archives and direct Claudron publishing. Parent verification remains required.
 
 **Last Updated:** 2026-05-11
 
@@ -355,20 +355,20 @@ With summaries enabled, a detached worker summarizes each segment after it is se
 | `CLAUDNA_STATE_DIR` | `~/.claudna` | Where all clauDNA state lives: the store, hook markers, logs. It must be an absolute path. A relative one keeps no state instead of writing into your project. |
 
 - **What it never does:** it never writes to the vault except through `claudron`, never writes to git (it reads the branch and HEAD once, at SessionStart), never prints into your session, and never blocks. It always exits 0.
-- **Sessions that never ended:** a crash or a kill skips SessionEnd and leaves a session open. About every 6 hours, a SessionStart starts a detached sweep. It closes up to 5 sessions that have sat idle for `CLAUDNA_UNCLOSED_AFTER_H` and whose owning agent process is gone, and marks them `abandoned`. Their last segment is summarized if its recorded policy allows it. A session that recorded no process id is never closed automatically. `python3 "<plugin>/lib/claudna/session_store" sweep --dry-run` lists the candidates, and `seal <session-id>` closes one by hand. A worker or manual `seal` cannot override a recorded summary opt-out.
+- **Sessions that never ended:** a crash or a kill skips SessionEnd and leaves a session open. About every 6 hours, a SessionStart starts a detached sweep. It closes up to 5 sessions that have sat idle for `CLAUDNA_UNCLOSED_AFTER_H` and whose owning agent process is gone, and marks them `abandoned`. Their last segment is summarized if its recorded policy allows it. A session that recorded no process id is never closed automatically. `python3 -B "<plugin>/lib/claudna/session_store" sweep --dry-run` lists the candidates, and `seal <session-id>` closes one by hand. A worker or manual `seal` cannot override a recorded summary opt-out.
 - **For fleet tooling:** each opening SessionStart rewrites `<state root>/entrypoint.json` (`$CLAUDNA_STATE_DIR`, default `~/.claudna`), naming the store's entrypoint, plugin version and agent CLI. A consumer runs the store by contract instead of guessing a plugin-cache path (spec §8). `session export --include-skipped` includes status items for final segments without a summary; private segments and sessions never export.
 - **`/clear` lineage:** the session a `/clear` starts records the one it cleared (`parent_sid`), and every session in that chain shares one `chain_id`.
 - **Looking back:** `/claudna:session list`, `show <id>`, `timeline <id>` and `failures [--group]` read what the store recorded. `failures --group` shows which tool errors recur across sessions. Each session's rolled-up summary is `sessions/<id>/summary.json`.
-- **What the background work did:** `python3 "<plugin>/lib/claudna/session_store" runs` lists the summarizer, harvest and sweep runs, newest first, from `~/.claudna/runs/runs.jsonl`.
-- **Pipeline health:** `python3 "<plugin>/lib/claudna/session_store" health --json` reads the existing store, worker receipts and draft review decisions. It reports recorded capture choices (including unknown historical choices), final summary states, ready/unacknowledged harvest segments, their age relative to this process's retention settings, and failures in retained worker runs. It launches no worker and writes nothing. `observed` means evidence was read, not that every host or provider is healthy; `no_evidence` is not success. The command exits 0 when the read completes even if warnings need attention. Run `runs --kind summarize --json` or `runs --kind harvest --json` for causes. Harvest is triggered by later SessionStart events, not a continuously scheduled daemon. A backlog near the age cap needs investigation before the next sweep can retire its data.
+- **What the background work did:** `python3 -B "<plugin>/lib/claudna/session_store" runs` lists the summarizer, harvest and sweep runs, newest first, from `~/.claudna/runs/runs.jsonl`.
+- **Pipeline health:** `python3 -B "<plugin>/lib/claudna/session_store" health --json` reads the existing store, worker receipts and draft review decisions. It reports recorded capture choices (including unknown historical choices), final summary states, ready/unacknowledged harvest segments, their age relative to this process's retention settings, and failures in retained worker runs. It launches no worker and writes nothing. `observed` means evidence was read, not that every host or provider is healthy; `no_evidence` is not success. The command exits 0 when the read completes even if warnings need attention. Run `runs --kind summarize --json` or `runs --kind harvest --json` for causes. Harvest is triggered by later SessionStart events, not a continuously scheduled daemon. A backlog near the age cap needs investigation before the next sweep can retire its data.
 - **Draft quality:** health counts explicit review decisions per draft revision; repeated records for the same revision count once. Acceptance is promoted / (promoted + discarded), excluding kept/undecided revisions, and is null when there are no decisions. It is a selected review sample, not an automatic correctness measure or a skill score. Review source evidence for factual claims, distinguish durable learning from transient inventory, and discard unsupported generalizations. Successful summarization and harvesting prove transport, not truth.
 - **Reviewing drafts:** when harvest has written drafts, SessionStart shows a `Memory, to review:` line. `/claudna:capture --review` walks you through them, most-reinforced first: promote, discard or skip each one. Nothing is promoted without you.
 - **Retention:** once every consumer registered for a session has acked a segment (harvest, and any `session export --ack` caller), and the segment is a week old (`CLAUDNA_RETAIN_ACKED_DAYS`), or once it is 30 days old whatever happened to it (`CLAUDNA_RETAIN_DAYS`; `0` turns this age cap off, so only acked segments are retired), the background sweep deletes its directory. A session opened with `CLAUDNA_HARVEST=1` counts harvest as registered from its first segment, so nothing in it retires early just because harvest hasn't run yet. What it summarized stays in the session's rolled-up summary.
-- **Keeping one session out:** `python3 "<plugin>/lib/claudna/session_store" private <session-id>` marks a session private: subsequent activity/skill telemetry is suppressed, and it is never summarized or harvested. This does not erase earlier records. `--off` clears the mark.
+- **Keeping one session out:** `python3 -B "<plugin>/lib/claudna/session_store" private <session-id>` marks a session private: subsequent activity/skill telemetry is suppressed, and it is never summarized or harvested. This does not erase earlier records. `--off` clears the mark.
 - **Activity:** each segment also records what happened inside it, in `seg-NNN/events.jsonl`: one line per prompt, per Skill call, per failing tool call, and per tool call you stopped with Esc. Those hooks run in the background, so no prompt waits on them. Tool events store the tool, the exit code and a normalized, redacted one-line signature, plus a pointer to the call in Claude Code's own transcript. The command and its error output are never copied.
 - **Skill evidence:** Claude's native `Skill` result records an invocation automatically; `ok` means the tool result, not successful execution of the whole procedure or its task. Failed Skill calls retain their skill name on `tool.failed`. The default local store does not depend on `CLAUDNA_TELEMETRY=1`. A missing telemetry file does not mean local recording is off.
 - **Privacy:** prompt text is redacted and capped at 500 characters; `CLAUDNA_CAPTURE_PROMPTS=0` keeps only its length and identifiers. Free text the store keeps, and everything the summarizer sees, goes through the credential redactor first. Summaries also pass an instruction screen (`lib/claudna/screen.py`): text shaped like an injected instruction is kept out of what harvest drafts and the review digest offers. It catches attack shapes, not lies, so drafts stay unverified until you promote them. Directories are `0700` and files `0600`.
-- **When something breaks:** `~/.claudna/hooks/errors.log` holds one JSON line per failure. `session-store.stderr`, `summarizer.stderr` and `harvest.stderr` next to it catch anything Python couldn't log itself. `python3 "<plugin>/lib/claudna/session_store" check <session-id>` validates a session's files.
+- **When something breaks:** attributable errors, permissions logs, reflection markers and summarizer stderr live in `R/sessions/<native-sid>/hooks/`. Without a usable identity/import, `R/hooks/` retains fixed error classes and counts only. Whole-store harvest/sweep stderr is replaced by a bounded failure code. Health reports counts without copying payload or private identities; inspect the owning files locally. `python3 -B "<plugin>/lib/claudna/session_store" check <session-id>` validates a session's files. Existing old logs remain untouched by relocation.
 - **Removal:** uninstalling the plugin leaves `~/.claudna/` in place, so session history survives a reinstall. Delete that directory to remove it.
 - **Upgrading from 0.21.x:** earlier versions kept hook state in `${XDG_STATE_HOME:-~/.local/state}/claudna/`. Nothing reads it any more. Its `permissions.log` holds whole command lines, so delete that directory by hand.
 
@@ -724,7 +724,7 @@ Each `claudna:*` skill call appends one line, in Claudosseum's ingestion format:
 | `data.skill_slug` | the skill without its `claudna:` prefix |
 | `data.duration_ms` | how long the Skill call took, from Claude Code |
 | `data.success` | whether the Skill call succeeded, from Claude Code (a failed call is recorded too, with `false`) |
-| `data.session_id` | Claude Code's session id |
+| `data.session_id` | Claude Code's native session id, or null when absent from the source event |
 
 This compatibility file contains no prompts, tool arguments or file paths. Since 0.23, `telemetry-emit.sh` hands the payload to the session store's telemetry writer (§3.7). The shape is unchanged, but `duration_ms`, `success` and `session_id` are now the real values. Before, they were `null`, a guess from the skill's output text, and the hook shell's pid. It represents the same invocation as the session-store event: never add the two counts. It has no uploader. With `CLAUDNA_SESSION_STORE=0`, it runs only when explicitly requested with `CLAUDNA_TELEMETRY=1`.
 
@@ -733,10 +733,12 @@ This compatibility file contains no prompts, tool arguments or file paths. Since
 Events are appended as JSONL to:
 
 ```
-~/.claude/telemetry/skill-events.jsonl
+${CLAUDNA_STATE_DIR:-~/.claudna}/telemetry/skill-events.jsonl
 ```
 
-Override the path with `CLAUDNA_TELEMETRY_PATH`.
+An absolute `CLAUDNA_TELEMETRY_PATH` inside the effective clauDNA root overrides the destination. Relative/outside-root overrides produce a bounded configuration notice and no compatibility observation; they are never silently redirected. The writer, shell wrapper and report default use the same resolver. Use the report's explicit read-only `--telemetry <legacy-path>` to inspect an old feed, never sum old/new copies independently. Historical telemetry is not migrated or deleted.
+
+This source relocation is held unshipped until actual downstream telemetry readers accept the new path and recovery is qualified. Genuine host-owned logs, transcripts, authentication and settings keep their host ownership. Store-off plus explicit telemetry-on still records a standalone compatibility observation; null-SID rows need no session directory or fabricated lifecycle event.
 
 ### Enabling / disabling
 
@@ -927,7 +929,7 @@ Codex's `PostToolUse` matcher `Skill` is retained for compatibility, but the
 measured desktop read-and-execute workflow exposes no native `Skill` tool.
 Do not claim capture from its configured/trusted handler. Each selected skill
 already reads `skills/_shared/codex-tools.md`; that installed procedure now calls
-`python3 "<loaded-plugin>/lib/claudna/session_store" skill-start <slug>` once when
+`python3 -B "<loaded-plugin>/lib/claudna/session_store" skill-start <slug>` once when
 execution begins. This automatic workflow step writes an existing `skill.invoked`
 event with `observation: agent_procedure_start`. It is an agent attestation of
 procedure entry, not proof of native execution, completion or task success.
@@ -949,7 +951,7 @@ Cursor remains hook-free: automatic capture is unsupported there.
 Maintainers can refresh the metadata-only local inventory with:
 
 ```sh
-python3 scripts/skill-usefulness.py --output /absolute/private/report-directory
+python3 -B scripts/skill-usefulness.py --output /absolute/private/report-directory
 ```
 
 Run from the source checkout. The report includes all canonical skills and each

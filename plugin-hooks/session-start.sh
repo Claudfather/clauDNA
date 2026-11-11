@@ -23,26 +23,49 @@
 
 set -u
 
+HOST=claude
+if [ "${1:-}" = "--host" ]; then
+    HOST="${2:-}"
+    shift 2 || true
+fi
+case "$HOST" in claude|codex) ;; *) HOST="" ;; esac
+
 # Retry the single known-terminal delegation slot before the briefing opt-out.
 # This is independent of capture/harvest and never recursively runs in a worker.
 . "${BASH_SOURCE[0]%/*}/lib/state-dir.sh"
 STATE_DIR="$(claudna_state_dir)"
+EVENT=$(cat 2>/dev/null || true)
+SESSION_ID=""
+if command -v jq >/dev/null 2>&1; then
+    SESSION_ID=$(printf '%s' "$EVENT" | claudna_event_session_id 2>/dev/null) || SESSION_ID=""
+elif command -v python3 >/dev/null 2>&1; then
+    SESSION_ID=$(printf '%s' "$EVENT" | python3 -B "${BASH_SOURCE[0]%/*}/../lib/claudna/session_store" \
+        native-session-id 2>/dev/null || true)
+fi
+case "$SESSION_ID" in SID|SESSION_ID|native-sid|native-session-id|CLAUDE_SESSION_ID) SESSION_ID="" ;; esac
+SESSION_DIR="$(claudna_session_dir "$SESSION_ID")"
 DELEGATION=""
 if [ "${CLAUDNA_SESSION_CHILD:-}" != "1" ] && [ -n "$STATE_DIR" ] && \
    [ -f "$STATE_DIR/delegation/active.json" ] && command -v python3 >/dev/null 2>&1; then
     umask 077
-    mkdir -p -m 700 "$STATE_DIR/hooks" 2>/dev/null || true
-    DELEGATION=$(python3 -S "${BASH_SOURCE[0]%/*}/../scripts/delegate.py" reconcile --root "$STATE_DIR" \
-        2>> "$STATE_DIR/hooks/session-store.stderr" || true)
+    DELEGATION_LOG=/dev/null
+    if [ -n "$SESSION_DIR" ] && mkdir -p -m 700 "$SESSION_DIR/hooks" 2>/dev/null; then
+        DELEGATION_LOG="$SESSION_DIR/hooks/session-start.stderr"
+        if [ -f "$DELEGATION_LOG" ] && [ "$(wc -c < "$DELEGATION_LOG" 2>/dev/null || echo 0)" -gt 1048576 ]; then
+            mv -f "$DELEGATION_LOG" "$DELEGATION_LOG.old" 2>/dev/null || true
+        fi
+    fi
+    if ! DELEGATION=$(python3 -B -S "${BASH_SOURCE[0]%/*}/../scripts/delegate.py" reconcile --root "$STATE_DIR" \
+        2>> "$DELEGATION_LOG"); then
+        claudna_bootstrap_error delegation_runtime
+        DELEGATION=""
+    fi
 fi
 
 # Opt-out (default on)
 if [ "${CLAUDNA_SESSION_BRIEFING:-1}" = "0" ]; then
     exit 0
 fi
-
-# Consume stdin (hook input JSON) without depending on it.
-cat > /dev/null 2>&1 || true
 
 CWD="${PWD}"
 
@@ -81,20 +104,40 @@ fi
 # --- Open PRs (network — timeout-wrapped, silently skipped on any failure)
 PRS=""
 REVIEW_REQ=""
+SCRATCH=""
+cleanup_scratch() {
+    wait 2>/dev/null || true
+    if [ -n "$SCRATCH" ]; then rm -rf -- "$SCRATCH" 2>/dev/null || true; fi
+}
+trap cleanup_scratch EXIT
+allocate_scratch() {
+    [ -n "$SESSION_DIR" ] && [ -n "$STATE_DIR" ] && [ -n "$HOST" ] || return 1
+    command -v python3 >/dev/null 2>&1 || return 1
+    local allocated
+    allocated=$(python3 -B "${BASH_SOURCE[0]%/*}/../lib/claudna/session_store" scratch \
+        --session "$SESSION_ID" --host "$HOST" --label session-start --root "$STATE_DIR" 2>/dev/null) || return 1
+    case "$allocated" in "$SESSION_DIR"/scratch/*) ;; *) return 1 ;; esac
+    [ -d "$allocated" ] || return 1
+    SCRATCH="$allocated"
+}
 if [ -n "$BRANCH" ] && command -v gh > /dev/null 2>&1; then
     # timeout(1) is not a stock macOS binary — wrap only when present.
     TO=""
     command -v timeout > /dev/null 2>&1 && TO="timeout 3"
     # Parallel: two network reads must not serialize into a session-start stall.
-    PRS_F=$(mktemp); REVQ_F=$(mktemp)
-    ( $TO gh pr list --author @me --limit 3 --json number,title,state \
-        --template '{{range .}}#{{.number}} {{.title}} ({{.state}}){{"\n"}}{{end}}' > "$PRS_F" 2>/dev/null || true ) &
-    ( $TO gh pr list --search "review-requested:@me" --limit 3 --json number,title \
-        --template '{{range .}}#{{.number}} {{.title}}{{"\n"}}{{end}}' > "$REVQ_F" 2>/dev/null || true ) &
-    wait
-    PRS=$(cat "$PRS_F" 2>/dev/null || true)
-    REVIEW_REQ=$(cat "$REVQ_F" 2>/dev/null || true)
-    rm -f "$PRS_F" "$REVQ_F"
+    # No verified owner or private allocator means the scratch-dependent section
+    # is omitted; it never falls back to TMPDIR or an unowned path.
+    if allocate_scratch; then
+        PRS_F="$SCRATCH/pull-requests"
+        REVQ_F="$SCRATCH/review-requests"
+        ( $TO gh pr list --author @me --limit 3 --json number,title,state \
+            --template '{{range .}}#{{.number}} {{.title}} ({{.state}}){{"\n"}}{{end}}' > "$PRS_F" 2>/dev/null || true ) &
+        ( $TO gh pr list --search "review-requested:@me" --limit 3 --json number,title \
+            --template '{{range .}}#{{.number}} {{.title}}{{"\n"}}{{end}}' > "$REVQ_F" 2>/dev/null || true ) &
+        wait
+        PRS=$(cat "$PRS_F" 2>/dev/null || true)
+        REVIEW_REQ=$(cat "$REVQ_F" 2>/dev/null || true)
+    fi
 fi
 
 # --- Session store liveness: the last harvest run's one line (written by

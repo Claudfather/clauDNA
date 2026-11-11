@@ -60,7 +60,7 @@ Note: Point-in-time branching is limited by the project's history retention wind
 
 Then write the SQL to `<sql-file>`, a file in `<scratch>` (`../_shared/orchestration-guide.md` §1), with the Write tool and run it against the branch. The bundled reader turns the URL in the file into psql's environment (`<claudna-root>` per `../_shared/claudna-root.md`):
 ```bash
-python3 "<claudna-root>/scripts/env_from_file.py" --url-file <scratch>/branch.url -- psql -X -f <sql-file>
+python3 -B "<claudna-root>/scripts/env_from_file.py" --url-file <scratch>/branch.url -- psql -X -f <sql-file>
 ```
 
 Working on more than one branch: one URL file per branch (`<scratch>/<name>.url`). psql's own errors can echo parts of a connection; scrub output per the contract before quoting it.
@@ -108,7 +108,7 @@ jq '(.branch // .) | {id, name, parent_id, created_at}' <scratch>/create.json
 
 Write each statement to `<sql-file>` in `<scratch>` with the Write tool (for example `DELETE FROM <STAGING_TABLE> WHERE ...;`), then:
 ```bash
-python3 "<claudna-root>/scripts/env_from_file.py" --url-file <scratch>/branch.url -- psql -X -f <sql-file>
+python3 -B "<claudna-root>/scripts/env_from_file.py" --url-file <scratch>/branch.url -- psql -X -f <sql-file>
 ```
 
 **Step 4: Clean up when done**

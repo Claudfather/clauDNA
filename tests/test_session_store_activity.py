@@ -214,9 +214,52 @@ class TestAdapter:
 
 
 class TestTelemetry:
+    @pytest.mark.parametrize("relocated", [False, True])
+    def test_default_feed_is_global_but_claudna_owned_with_null_sid(self, tmp_path, relocated):
+        root = tmp_path / ("relocated state å" if relocated else ".claudna")
+        env = {"HOME": str(tmp_path), **({"CLAUDNA_STATE_DIR": str(root)} if relocated else {})}
+        assert telemetry.run_hook(json.dumps(SKILL_CALL), env) == "emitted"
+        feed = root / "telemetry" / "skill-events.jsonl"
+        assert json.loads(feed.read_text())["data"]["session_id"] is None
+        assert not (root / "sessions").exists()
+        assert not (tmp_path / ".claude").exists()
+        assert feed.stat().st_mode & 0o077 == 0
+
+    @pytest.mark.parametrize("override", ["relative.jsonl", "outside", "traversal"])
+    def test_invalid_override_never_writes_or_silently_redirects(self, tmp_path, override):
+        root = tmp_path / "state"
+        outside = tmp_path / "outside.jsonl"
+        outside.write_bytes(b"consumer sentinel\n")
+        choice = {"relative.jsonl": "relative.jsonl", "outside": str(outside),
+                  "traversal": str(root / ".." / outside.name)}[override]
+        env = {"HOME": str(tmp_path), "CLAUDNA_STATE_DIR": str(root), "CLAUDNA_TELEMETRY_PATH": choice}
+        assert telemetry.run_hook(json.dumps(SKILL_CALL), env) == "error: configuration"
+        assert outside.read_bytes() == b"consumer sentinel\n"
+        assert not root.exists()
+        assert not (tmp_path / ".claude").exists()
+
+    def test_inside_override_and_shell_share_the_resolver(self, tmp_path):
+        root = tmp_path / "state"
+        feed = root / "custom feed.jsonl"
+        env = {"HOME": str(tmp_path), "PATH": os.environ["PATH"], "CLAUDNA_STATE_DIR": str(root),
+               "CLAUDNA_TELEMETRY_PATH": str(feed), "CLAUDNA_TELEMETRY": "1", "CLAUDNA_SESSION_STORE": "0"}
+        proc = subprocess.run(["bash", str(TELEMETRY_HOOK)], input=json.dumps(SKILL_CALL),
+                              text=True, capture_output=True, env=env, cwd=tmp_path, timeout=20)
+        assert (proc.returncode, proc.stdout, proc.stderr) == (0, "", "")
+        assert len(feed.read_text().splitlines()) == 1
+        assert not (root / "sessions").exists()
+        assert not (root / "telemetry").exists()
+
+    def test_global_failure_diagnostic_contains_no_payload_or_exception_text(self, tmp_path):
+        env = self.env(tmp_path)
+        telemetry.run_hook('{"secret":"PRIVATE-CONTENT"', env)
+        assert json.loads((tmp_path / "t.jsonl.stderr").read_text()) == {"code": "decode", "count": 1}
+        assert not (tmp_path / "sessions").exists()
+
     def env(self, tmp_path, **extra):
-        return {"HOME": str(tmp_path), "CLAUDNA_TELEMETRY": "1",
-                "CLAUDNA_TELEMETRY_PATH": str(tmp_path / "t.jsonl"), **extra}
+        root = Path(extra.get("CLAUDNA_STATE_DIR", tmp_path))
+        return {"HOME": str(tmp_path), "CLAUDNA_STATE_DIR": str(tmp_path), "CLAUDNA_TELEMETRY": "1",
+                "CLAUDNA_TELEMETRY_PATH": str(root / "t.jsonl"), **extra}
 
     def lines(self, tmp_path):
         return read_jsonl(tmp_path / "t.jsonl").records
@@ -236,7 +279,8 @@ class TestTelemetry:
         assert self.lines(tmp_path) == []
 
     def test_default_on_respects_existing_capture_opt_outs(self, tmp_path):
-        env = {"CLAUDNA_TELEMETRY_PATH": str(tmp_path / "t.jsonl")}
+        env = {"HOME": str(tmp_path), "CLAUDNA_STATE_DIR": str(tmp_path),
+               "CLAUDNA_TELEMETRY_PATH": str(tmp_path / "t.jsonl")}
         assert telemetry.emit(SKILL_CALL, env)
         for switch in ("CLAUDNA_SESSION_STORE", "CLAUDNA_SKILL_LOG", "CLAUDNA_TELEMETRY"):
             assert not telemetry.emit(SKILL_CALL, {**env, switch: "0"})
@@ -290,7 +334,7 @@ class TestTelemetry:
         proc = subprocess.run(["bash", str(TELEMETRY_HOOK)], input="{not json", capture_output=True,
                               text=True, env=env, cwd=tmp_path, timeout=20)
         assert (proc.returncode, proc.stdout, proc.stderr) == (0, "", "")
-        assert "JSONDecodeError" in (tmp_path / "t.jsonl.stderr").read_text()
+        assert json.loads((tmp_path / "t.jsonl.stderr").read_text()) == {"code": "decode", "count": 1}
 
     def test_the_hook_prunes_at_most_daily_even_with_the_store_off(self, tmp_path):
         path = tmp_path / "t.jsonl"
