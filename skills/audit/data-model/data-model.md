@@ -78,13 +78,13 @@ Print structured report: scope summary, code-to-schema map, ranked findings tabl
 
 ## Output Targets
 
-This lens defaults to `--output artifacts` and supports explicit `session`, `github`, and `docs` targets. Save the final ranked report under `<artifacts>/data-model/` by default; discovery remains in `<scratch>`.
+This lens defaults to `--output artifacts` and supports explicit `session`, `github`, and `docs` targets. Save the final ranked report at `<artifacts>/data-model/00_DATA_MODEL_AUDIT.md` by default; discovery remains in `<scratch>`. Give the report `title`, `type: audit`, `status: completed`, `owner: /claudna:audit data-model`, and `created: <YYYY-MM-DD>` frontmatter, then start its body with a `## Summary` heading and a concise result summary before the ranked findings.
 
 Follow the output guide at `../../_shared/output-guide.md`:
-- For `artifacts` (default): retain `00_DATA_MODEL_AUDIT.md` with `/claudna:publish <artifacts>/data-model/ --to artifacts` and present its path and summary.
+- For `artifacts` (default): retain the report with `/claudna:publish <artifacts>/data-model/00_DATA_MODEL_AUDIT.md --to artifacts` and present its path and summary.
 - For `session`: present findings in chat only; create no report file.
 - For `github`: write selected issue docs under `<artifacts>/data-model/`, then explicitly export them with `/claudna:publish <artifact-file> --to github-issue --repo <repo>`; retain every source and report. Use frontmatter and the Section 4 body skeleton; publish validates, dedups and labels (`auto-audit` and the finding category). Create one issue per ranked finding.
-- For `docs`: explicitly export the selected canonical report with `/claudna:publish <artifacts>/data-model/ --to docs --dir documentation/planning/data-model/<session_name>_<YYYY-MM-DD>/`.
+- For `docs`: explicitly export the selected canonical report with `/claudna:publish <artifacts>/data-model/00_DATA_MODEL_AUDIT.md --to docs --dir documentation/planning/data-model/<session_name>_<YYYY-MM-DD>/`.
 
 ---
 

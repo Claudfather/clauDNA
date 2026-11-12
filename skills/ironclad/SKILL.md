@@ -52,7 +52,7 @@ If the target cannot be fetched, report the error verbatim and stop.
 
 ### Phase 2: Prepare the scratch directory
 
-Resolve the actual current native owner and exact absolute `<scratch>` and `<artifacts>` paths through `../_shared/orchestration-guide.md` §1; pass SID/provider and both paths into each delegated prompt. Use only the supplied `<scratch>` for working source/context and per-lens result files. Write the fetched target body and selected review context to private `<scratch>/source.md`; create `<scratch>/lenses/<lens>/` for each selected lens before dispatch. Do not copy credentials or unrelated transcripts into that source. Never create an OS-temp or guessed replacement. Select an unoccupied private family `<artifacts>/ironclad/<owner>-<repo>-<type>-<number>/<unused-run-label>/` (the label distinguishes reports within the same verified native owner; it is not a replacement session identity). Retain the sanitized final report there as `cycle-<cycle>.md`; if a destination already exists, preserve it and report the collision rather than overwriting it with `/claudna:publish <report-file> --to artifacts` before posting the aggregated comment; keep posting gated as defined below.
+Resolve the actual current native owner and exact absolute `<scratch>` and `<artifacts>` paths through `../_shared/orchestration-guide.md` §1; pass SID/provider and both paths into each delegated prompt. Use only the supplied `<scratch>` for working source/context and per-lens result files. Write the fetched target body and selected review context to private `<scratch>/source.md`; create `<scratch>/lenses/<lens>/` for each selected lens before dispatch. Do not copy credentials or unrelated transcripts into that source. Never create an OS-temp or guessed replacement. Select an unoccupied private family `<artifacts>/ironclad/<owner>-<repo>-<type>-<number>/<unused-run-label>/` (the label distinguishes reports within the same verified native owner; it is not a replacement session identity). Retain the sanitized final report there as `00_CYCLE_<cycle>_IRONCLAD_REVIEW.md`, with frontmatter `title`, `type: review`, `status: completed`, `owner: /claudna:ironclad`, and `created: <YYYY-MM-DD>`. Start the body with `## Summary` and a concise cycle verdict summary; follow it with the existing comment-format content unchanged. Validate the selected standalone canonical report with `/claudna:publish <exact-canonical-report-path> --to artifacts` before posting. If the destination already exists, preserve it and report the collision; do not overwrite it. Keep posting gated as defined below.
 
 **Cycle** starts at `1`. With `--loops N` on a plan Issue the procedure repeats (Phase 10) for up to `N` cycles; cross-cycle state lives in the **Issue's comments** (prior lens findings, `[FORK-LOCK]` markers) and the re-forged body — not `/tmp`, which stays ephemeral.
 
@@ -111,13 +111,13 @@ Read every `<scratch>/lenses/<lens>/result.md`. Deduplicate: findings sharing th
 
 ### Phase 8: Post the aggregated comment
 
-Retain and verify the sanitized canonical report first, then preflight a private current-owner publication receipt. Post a **single** aggregated comment to the target (Issue or PR). A PR comment is an issue comment in GitHub's API; use the canonical report under `<artifacts>` as the body file and post it with `-F body=@<file>` so multi-line markdown stays intact:
+Retain and verify the sanitized canonical report first, then preflight the existing private current-owner publication receipt. Validate the exact canonical report path and owner before reading it, record its hash, and render only its body (strip the YAML frontmatter without changing the body) to an exact private edition file under the caller's supplied `<scratch>`, such as `<scratch>/post/00_CYCLE_<cycle>_IRONCLAD_REVIEW.md`; record the edition hash. Post a **single** aggregated comment to the target (Issue or PR). A PR comment is an issue comment in GitHub's API; pass the rendered edition with `-F body=@<edition-file>` so multi-line markdown stays intact. Never pass the canonical YAML file as the comment body:
 
 ```
-gh api --method POST repos/<owner>/<repo>/issues/<pr-number>/comments -F body=@<body-file>
+gh api --method POST repos/<owner>/<repo>/issues/<pr-number>/comments -F body=@<edition-file>
 ```
 
-Record the canonical source hash, target, returned comment URL/ID and actual successful, failed or unknown result in the private receipt. Preserve the canonical report on every outcome; never infer acceptance from a command being issued.
+Record the canonical source hash, rendered edition hash, target, actual returned comment URL/ID, and successful, failed, or unknown status in the existing private current-owner receipt. Verify that the canonical source hash remains unchanged after rendering and posting. Preserve the canonical report on every outcome; never infer acceptance from a command being issued. The caller retains ownership of the supplied scratch and its existing exact-path cleanup; delegated lenses do not allocate or remove it.
 
 Comment format:
 

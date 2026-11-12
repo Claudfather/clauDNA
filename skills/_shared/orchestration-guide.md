@@ -37,7 +37,7 @@ Fill every delegated prompt with the actual absolute scratch/artifact paths, ver
 
 **Permissions note:** If the native allocation is refused, stop that write and say so. Do not broaden permissions or silently choose another location. File creation, private-mode setup, promotion and foreground finalization use the host's actual exposed tools under ordinary permissions.
 
-**Subagent type note:** Explore agents (`subagent_type: "Explore"`) do NOT have the Write tool — they are read-only. For the disk-write pattern, use `general-purpose` subagents (`subagent_type: "general-purpose"`) which have access to all tools including Write. Use Explore agents only when you need fast, read-only codebase searches that don't need to persist results to disk.
+**Disk-write capability:** Any delegated worker assigned to persist output must have an actual write capability; a read-only worker can research but cannot fulfill a disk-write assignment. In Claude Code, Explore agents (`subagent_type: "Explore"`) do NOT have the Write tool, while `general-purpose` subagents (`subagent_type: "general-purpose"`) have access to it. That role mapping is Claude Code-specific. Use Claude Code Explore only for fast, read-only searches; on Codex, follow the actual controls in `codex-tools.md` and verify the dispatched worker's available write capability instead of assuming Claude role names or tool mappings.
 
 ### 1.1. Finalize owned scratch before the terminal result
 

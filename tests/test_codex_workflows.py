@@ -189,6 +189,26 @@ def test_workflow_artifact_paths_fail_closed_without_verified_native_identity():
     assert '`--output session` remains chat-only and creates no files.' in allocation_contract
 
 
+def test_report_only_workflows_match_publish_validation_and_post_body_contract():
+    # Producer/consumer Markdown contract only; this does not execute a native publisher.
+    data_model = read('skills/audit/data-model/data-model.md')
+    for destination in ('artifacts', 'docs'):
+        assert ('/claudna:publish <artifacts>/data-model/00_DATA_MODEL_AUDIT.md '
+                f'--to {destination}') in data_model
+    for path, filename in (
+        ('skills/review-work/multi-pr.md', '00_PR_<number>_REVIEW.md'),
+        ('skills/ironclad/SKILL.md', '00_CYCLE_<cycle>_IRONCLAD_REVIEW.md'),
+    ):
+        text = read(path)
+        assert filename in text  # Explicit standalone 00_ report uses the existing presence-only tier.
+        assert all(field in text for field in ('`title`', '`type: review`', '`status: completed`',
+                                              '`owner:', '`created: <YYYY-MM-DD>`', '`## Summary`'))
+        assert 'Never pass the canonical YAML file' in text
+        assert 'without changing the body' in text
+        assert 'canonical source hash, rendered edition hash' in text
+        assert '<scratch>/post/' in text
+
+
 def test_plan_discovery_uses_explicit_sources_and_keeps_terminal_state_in_place():
     source = normalized(read('skills/_shared/source-guide.md'))
     explicit = normalized(source.split('### Explicit canonical plan artifacts', 1)[1].split(
