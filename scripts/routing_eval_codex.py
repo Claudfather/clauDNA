@@ -28,7 +28,7 @@ import yaml
 sys.dont_write_bytecode = True
 
 from check_codex_scope import run_check, selected_names  # noqa: E402
-from routing_eval import load_cases  # noqa: E402
+from routing_eval import _fresh_output, _open_exclusive_output, load_cases  # noqa: E402
 from release_toolchain import MaintainerPaths, maintainer_paths  # noqa: E402
 from skill_checks import parse_frontmatter  # noqa: E402
 from claudna.session_store.fsio import atomic_write_json, ensure_dir  # noqa: E402
@@ -246,20 +246,6 @@ def live_runner(args, descriptions: list[dict], *, owner: MaintainerPaths | None
     return run, observed_models
 
 
-def _fresh_report(path: Path) -> None:
-    """Reject existing report paths, including dangling symlinks, before live evaluation."""
-    if path.exists() or path.is_symlink():
-        raise FileExistsError(f'report export already exists: {path}')
-    if not path.parent.is_dir():
-        raise FileNotFoundError(f'report parent directory does not exist: {path.parent}')
-
-
-def _open_exclusive_report(path: Path):
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    os.fchmod(fd, 0o600)
-    return os.fdopen(fd, 'w', encoding='utf-8')
-
-
 def main(argv: list[str] | None = None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--plugin-root', type=Path, default=ROOT)
@@ -279,7 +265,7 @@ def main(argv: list[str] | None = None):
     args = parser.parse_args(argv)
     if args.report:
         try:
-            _fresh_report(args.report)
+            _fresh_output(args.report)
         except OSError as exc:
             print(f'report export unavailable: {exc}', file=sys.stderr)
             return 2
@@ -313,7 +299,7 @@ def main(argv: list[str] | None = None):
     text = json.dumps(report, indent=2, sort_keys=True) + '\n'
     if args.report:
         try:
-            with _open_exclusive_report(args.report) as report_file:
+            with _open_exclusive_output(args.report) as report_file:
                 report_file.write(text)
         except OSError as exc:
             print(f'report export unavailable: {exc}', file=sys.stderr)
