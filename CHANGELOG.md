@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Session handoffs are owned by verified native sessions, not a shared per-cwd `.claude/session.md`. Resume uses scoped references; legacy sources are read-only and require a source hash plus explicit reimport for changed content. This staged source change is not a release or proof of consumer acceptance.
 
 ### Fixed
+- Reject existing release output entries, including dangling symlinks, before resolving destinations or allocating qualification state.
 - Route report-only audits and retained reviews through standalone artifact validation, and post metadata-free review editions while preserving canonical reports and hashes.
 - Keep summary-only capture remnants visible as partial or corrupt sessions, including retained segment summaries, without treating manual artifacts as captured data.
 - Session resume now preserves legacy personal handoffs during both automatic and interactive imports. Timestamp conversion and reaping apply only to the project copy; existing project handoffs skip the fallback.

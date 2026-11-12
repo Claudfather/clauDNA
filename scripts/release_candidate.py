@@ -218,7 +218,7 @@ def write_private_file(path, content):
 
 def qualify(root, candidate, output, owner):
     ensure_toolchain()
-    if output.exists():
+    if output.exists() or output.is_symlink():
         raise ReleaseError(f"output already exists: {output}")
     version = version_at(root, candidate)
     notes = section(git(root, "show", f"{candidate}:CHANGELOG.md"), version)
@@ -330,6 +330,8 @@ def main():
         if args.publish and (not args.repo or not re.fullmatch(r"[\w.-]+/[\w.-]+", args.repo)):
             parser.error("--publish requires --repo OWNER/REPO")
         candidate = git(root, "rev-parse", "--verify", "--end-of-options", f"{args.ref}^{{commit}}")
+        if args.output.exists() or args.output.is_symlink():
+            raise ReleaseError(f"output already exists: {args.output}")
         output = args.output.resolve()
         ensure_toolchain()
         try:

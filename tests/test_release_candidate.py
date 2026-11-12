@@ -167,6 +167,22 @@ def test_native_identity_is_used_by_qualifier_subprocess(repo, tmp_path):
     assert receipt["owner"] == {"kind": "session", "id": FIXTURE_SID, "provider": "codex"}
 
 
+def test_dangling_output_link_is_rejected_before_allocation_or_tag(repo, tmp_path):
+    output = tmp_path / "selected-output"
+    target = tmp_path / "unselected-target"
+    output.symlink_to(target, target_is_directory=True)
+    tags = git(repo, "tag", "--list")
+
+    result = controller(repo, output, "--tag")
+
+    assert result.returncode != 0
+    assert "output already exists" in result.stderr
+    assert output.is_symlink() and output.readlink() == target
+    assert not target.exists()
+    assert not (tmp_path / "state").exists()
+    assert git(repo, "tag", "--list") == tags
+
+
 def test_missing_owner_identity_has_clean_diagnostic_before_output_or_allocation(repo, tmp_path):
     output = tmp_path / "unowned-output"
     env = {key: value for key, value in os.environ.items()
