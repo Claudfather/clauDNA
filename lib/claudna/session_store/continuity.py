@@ -107,7 +107,7 @@ def _workflow(value: object) -> str:
     return value
 
 
-def _index_location(store: SessionStore, scope: dict, *, create: bool = False) -> tuple[Path, Path, Path]:
+def _index_location(store: SessionStore, scope: dict, *, create: bool = False) -> tuple[Path, Path]:
     digest = scope_hash(scope)
     root = store.root / "continuity"
     directory = root / digest
@@ -115,7 +115,7 @@ def _index_location(store: SessionStore, scope: dict, *, create: bool = False) -
         raise ContinuityError("continuity index directory is a symlink")
     if create:
         ensure_dir(directory)
-    return directory, directory / "index.json", directory / ".lock"
+    return directory / "index.json", directory / ".lock"
 
 
 def _valid_relative_path(kind: str, relative: object) -> str:
@@ -189,7 +189,7 @@ def _index_bytes(index: dict) -> bytes:
 
 
 def _read_index(store: SessionStore, scope: dict) -> dict:
-    _, path, _ = _index_location(store, scope)
+    path, _ = _index_location(store, scope)
     if path.is_symlink():
         raise ContinuityError("continuity index is a symlink")
     try:
@@ -211,7 +211,7 @@ def _read_index(store: SessionStore, scope: dict) -> dict:
 
 
 def _index_transaction(store: SessionStore, scope: dict, mutate: Callable[[dict], object]) -> tuple[dict, object]:
-    directory, path, lock_path = _index_location(store, scope, create=True)
+    path, lock_path = _index_location(store, scope, create=True)
     if lock_path.is_symlink():
         raise ContinuityError("continuity lock is a symlink")
     with exclusive_lock(lock_path) as taken:
@@ -222,8 +222,6 @@ def _index_transaction(store: SessionStore, scope: dict, mutate: Callable[[dict]
         result = mutate(index)
         _valid_index(index, scope)
         data = _index_bytes(index)
-        if len(data) > INDEX_LIMIT:
-            raise ContinuityError("continuity index exceeds 64 KiB")
         if data != before:
             atomic_write_text(path, data.decode("utf-8"), durable=True)
         return index, result
@@ -298,7 +296,7 @@ def _scope_in_context(context: dict | None, scope: dict) -> bool:
     return bool(context and scope in context["scopes"])
 
 
-def _write_context_locked(handle: SessionHandle, host: str, scope: dict, privacy: str, *, captured: bool) -> Path:
+def _write_context_locked(handle: SessionHandle, host: str, scope: dict, privacy: str) -> Path:
     path = handle.paths.dir / CONTEXT_PATH
     if path.is_symlink():
         raise ContinuityError("artifact context is a symlink")
@@ -353,7 +351,7 @@ def _session_scope_privacy(handle: SessionHandle, scope: dict) -> str:
         if _scope_in_context(context, scope):
             return "public"
         return "unbound"
-    if state in ("captured", "artifact-only"):
+    if state == "artifact-only":
         context = _read_context(handle)
         if not context or context["native_sid"] != handle.sid or not _scope_in_context(context, scope):
             return "unavailable"
@@ -502,8 +500,7 @@ def write_context(store: SessionStore, *, current_sid: str, host: str, scope: st
         expected_privacy = "private" if state == "captured" and facts.private else "public"
         if state == "captured" and privacy != expected_privacy:
             raise ContinuityError("captured lifecycle privacy is authoritative")
-        path = _write_context_locked(handle, host, canonical, expected_privacy if state == "captured" else privacy,
-                                     captured=state == "captured")
+        path = _write_context_locked(handle, host, canonical, expected_privacy if state == "captured" else privacy)
     return path
 
 
@@ -576,7 +573,7 @@ def publish_reference(store: SessionStore, *, current_sid: str, host: str, scope
         if state == "captured" and not origin_bound and not _scope_in_context(context, canonical):
             # Publication is an explicit owner action; retain that scope binding
             # so later discovery does not infer it from cwd or timestamps.
-            _write_context_locked(handle, host, canonical, "public", captured=True)
+            _write_context_locked(handle, host, canonical, "public")
         elif state == "artifact-only" and (not _scope_in_context(context, canonical)
                                              or context["privacy"] != "public"):
             raise ContinuityError("capture-off publication requires explicit public artifact context")
@@ -618,20 +615,14 @@ def _legacy_source(source: Path, store: SessionStore, fingerprint: str) -> Path:
     return resolved
 
 
-def _import_receipt(handle: SessionHandle, relative: str, source: str) -> dict:
-    path = _session_path(handle, relative, must_exist=True)
-    if path.is_symlink():
-        raise ContinuityError("import receipt is a symlink")
-    with path.open("rb") as stream:
-        raw = stream.read(INDEX_LIMIT + 1)
-    try:
-        receipt = json.loads(raw) if len(raw) <= INDEX_LIMIT else None
-    except (ValueError, UnicodeError):
-        receipt = None
+def _validate_import_receipt(handle: SessionHandle, relative: str, source: str, receipt: object) -> dict:
+    """Validate a decoded receipt against its native owner and immutable path."""
     if (not isinstance(receipt, dict)
             or set(receipt) != {"version", "source_identity", "source_sha256", "imported_into", "decision"}
             or type(receipt["version"]) is not int or receipt["version"] != 1
             or receipt["source_identity"] != source
+            or not isinstance(receipt["source_identity"], str)
+            or not Path(receipt["source_identity"]).is_absolute()
             or not isinstance(receipt["source_sha256"], str)
             or not _SHA256_RE.fullmatch(receipt["source_sha256"])
             or not isinstance(receipt["imported_into"], dict)
@@ -652,6 +643,19 @@ def _import_receipt(handle: SessionHandle, relative: str, source: str) -> dict:
     return receipt
 
 
+def _import_receipt(handle: SessionHandle, relative: str, source: str) -> dict:
+    path = _session_path(handle, relative, must_exist=True)
+    if path.is_symlink():
+        raise ContinuityError("import receipt is a symlink")
+    with path.open("rb") as stream:
+        raw = stream.read(INDEX_LIMIT + 1)
+    try:
+        receipt = json.loads(raw) if len(raw) <= INDEX_LIMIT else None
+    except (ValueError, UnicodeError):
+        receipt = None
+    return _validate_import_receipt(handle, relative, source, receipt)
+
+
 def _indexed_receipt(store: SessionStore, scope: dict, ref: dict) -> tuple[SessionHandle, dict]:
     owner = store.session(ref["receipt_native_sid"])
     _validate_session_location(owner)
@@ -670,7 +674,7 @@ def _indexed_receipt(store: SessionStore, scope: dict, ref: dict) -> tuple[Sessi
     if (not isinstance(source, str) or not Path(source).is_absolute()
             or hashlib.sha256(source.encode("utf-8")).hexdigest() != ref["source_key_hash"]):
         raise ContinuityError("indexed receipt does not match its source key")
-    receipt = _import_receipt(owner, ref["receipt_relative_path"], source)
+    receipt = _validate_import_receipt(owner, ref["receipt_relative_path"], source, value)
     _session_path(owner, "handoff.md", must_exist=True)
     return owner, receipt
 
@@ -785,7 +789,7 @@ def import_legacy(store: SessionStore, *, current_sid: str, host: str, scope: st
             _valid_index(index, canonical)  # Reject full indexes before copying payloads.
             if (state == "captured" and not _origin_binds(origin, canonical)
                     and not _scope_in_context(context, canonical)):
-                _write_context_locked(handle, host, canonical, "public", captured=True)
+                _write_context_locked(handle, host, canonical, "public")
             persist()
             return result("found", handle, relative, ref)
 
