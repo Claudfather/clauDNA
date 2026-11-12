@@ -426,7 +426,7 @@ def qualify(output: Path, *, owner: release_toolchain.MaintainerPaths | None = N
               "filesystem": {key: value for key, value in filesystem_evidence.items()
                              if key not in {"state_write_set_sha256", "detached_write_set"}},
               "native_acceptance": "unknown", "consumer_acceptance": "unknown", "full_source_check": "not_run",
-              "storage_cutover": "blocked: broad workflow defaults and native/consumer/recovery/D6 gates pending",
+              "storage_cutover": "blocked: native/publication/consumer/recovery/D6 acceptance pending",
               "evidence_class": "executable fixtures; not native skill/publication acceptance"}
     write_json(output / "qualification.json", result)
     atomic_write_json(owner.artifacts / f"qualification-{uuid.uuid4().hex}.json",

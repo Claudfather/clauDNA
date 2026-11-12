@@ -227,7 +227,7 @@ and the new run's ledger; repository archival applies only to explicitly selecte
 project/legacy plans.
 
 
-## Maintainer qualification preparation
+## Maintainer qualification
 
 The existing `scripts/release_toolchain.py` reuses runtime root, native owner
 validation and operation allocation. Its `owner-dir --label qualification`
@@ -256,5 +256,6 @@ Exported qualification reports explicitly distinguish fixture success from
 unknown native/consumer acceptance and blocked storage cutover. Canonical
 private receipts bind the source commit, archive hash, export digest and
 write-set evidence. Static Markdown checks remain separate from native skill
-and publication execution. Broad workflow defaults and complete write-set
-qualification remain blocked until the earlier prerequisites pass.
+and publication execution. The held implementation includes broad workflow
+defaults and executable write-set qualification; native workflow/publication,
+consumer, recovery and release decisions remain pending before cutover.

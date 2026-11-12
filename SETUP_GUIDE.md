@@ -1043,8 +1043,9 @@ native host/tool cache policy remain unchanged. Use the pinned toolchain through
 `python3 -m`; run fresh checks in isolated exports with private HOME/TMP and state.
 
 The five-PR storage stack remains held outside main and the release path. Phase04
-currently supplies explicit artifact opt-in only; broad defaults await native
-identity/write receipts. Static Markdown checks, executable fixtures, actual
+supplies native-session artifact defaults on the held draft stack; native
+identity/write acceptance gates merge/release, with one smoke per materially
+different identity-delivery mechanism. Static Markdown checks, executable fixtures, actual
 native skill/publication execution and named external-consumer acceptance are
 separate evidence. A fixture pass is not a complete package storage or cutover
 verdict. Keep historical data in place. Readers must accept the new handoff/feed
