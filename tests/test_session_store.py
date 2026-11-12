@@ -149,6 +149,18 @@ def test_capture_state_marks_event_or_projection_remnants_without_opening_partia
     assert capture_state(handle.paths) == "corrupt"
 
 
+@pytest.mark.parametrize("relative", ["summary.json", "seg-001/summary.json", "summaries/seg-001.json"])
+@pytest.mark.parametrize("contents, expected", [(b"{}", "partial"), (b"{torn", "corrupt")])
+def test_capture_state_keeps_summary_only_remnants_visible(store, relative, contents, expected):
+    handle = store.session("summary-remnant")
+    path = handle.paths.dir / relative
+    ensure_dir(path.parent)
+    path.write_bytes(contents)
+    assert capture_state(handle.paths) == expected
+    assert path.read_bytes() == contents
+    assert not handle.paths.lifecycle.exists()
+
+
 def test_valid_opening_remains_capture_authority_without_scanning_activity(store):
     handle = opened(store, "captured-with-torn-activity")
     ensure_dir(handle.paths.segment(1).dir)

@@ -66,14 +66,18 @@ def capture_state(paths: SessionPaths) -> str:
     if opened and lifecycle.projected_from["skipped"] == 0:
         return "captured"
     malformed = lifecycle.projected_from["skipped"] > 0
-    remnants = paths.lifecycle.exists() or paths.session_json.exists()
+    remnants = paths.lifecycle.exists()
+    projections = [paths.session_json, paths.dir / "summary.json"]
     for index in paths.segment_indices():
         segment = paths.segment(index)
-        remnants |= segment.events.exists() or segment.segment_json.exists()
+        remnants |= segment.events.exists()
+        projections.extend((segment.segment_json, segment.summary))
         activity = load_activity(paths, index)
         malformed |= activity.projected_from["skipped"] > 0
-    for path in (paths.session_json, *(paths.segment(i).segment_json for i in paths.segment_indices())):
+    projections.extend(paths.archived_summary(i) for i in paths.archived_indices())
+    for path in projections:
         if path.exists():
+            remnants = True
             projection = read_json(path)
             if not isinstance(projection, dict):
                 malformed = True

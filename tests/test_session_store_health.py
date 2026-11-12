@@ -29,12 +29,18 @@ def test_health_enumerates_artifact_only_separately_from_partial_capture(store):
     partial = store.session("partial")
     ensure_dir(partial.paths.dir)
     partial.paths.lifecycle.write_text("")
+    for relative in ("summary.json", "seg-001/summary.json", "summaries/seg-001.json"):
+        remnant = store.session(relative.replace("/", "-")).paths.dir / relative
+        ensure_dir(remnant.parent)
+        remnant.write_text("{torn")
+    before = {p: p.read_bytes() for p in store.root.rglob("*") if p.is_file()}
 
     report = health.report(store, env={})
     assert report["artifact_only_sessions"] == 1
     assert report["status"] == "attention"
-    assert report["unreadable_inputs"] == 1
+    assert report["unreadable_inputs"] == 4
     assert report["sessions_by_host"] == {}
+    assert {p: p.read_bytes() for p in store.root.rglob("*") if p.is_file()} == before
 
 
 def test_backlog_uses_final_segments_ack_and_recorded_policy(store):
