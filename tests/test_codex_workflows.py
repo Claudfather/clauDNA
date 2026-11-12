@@ -117,25 +117,22 @@ def test_resource_cleanup_selects_recorded_task_ownership_not_prefixes():
     assert 'omit branch deletion' in worktree
 
 
-def test_artifact_routing_is_explicit_and_session_remains_chat_only():
-    publish = read('skills/publish/SKILL.md')
-    output = read('skills/_shared/output-guide.md')
-    artifacts = normalized(publish.split('### Adapter: artifacts (explicit opt-in)', 1)[1].split(
-        '### Adapter: vault', 1
-    )[0])
-    activation = normalized(output.split('### Activation', 1)[1].split('## 2. Common Requirements', 1)[0])
-    output = normalized(output)
-    assert 'only when the caller explicitly chooses `--to artifacts`' in artifacts
-    assert 'explicitly selects `--output artifacts`' in artifacts
-    assert 'It does not change any workflow default' in artifacts
+def test_artifacts_are_default_and_exports_explicit_while_session_is_chat_only():
+    # Static instruction contract only; native host execution is qualified separately.
+    publish = normalized(read('skills/publish/SKILL.md'))
+    output = normalized(read('skills/_shared/output-guide.md'))
+    artifacts = publish.split('### Adapter: artifacts (default)', 1)[1].split('### Adapter: vault', 1)[0]
+    assert 'when no destination is specified' in artifacts
+    assert 'workflow `--output artifacts`' in artifacts
     assert 'The `session` adapter remains chat-only and does not persist files.' in artifacts
-    assert '`--output session`' in output and '`/claudna:publish --to session`' in output
+    assert '`artifacts` (default), `vault`, `docs`' in publish
+    assert '### Adapter: vault (explicit export)' in publish
+    assert '`--auto` controls interaction only; it defaults to `--output artifacts`' in output
+    assert 'It never implicitly authorizes an external export.' in output
+    assert 'content directly in context' in publish
+    assert 'Do not allocate scratch or artifacts for this adapter.' in publish
     assert 'Print the doc body back into the chat, no persistence' in output
-    assert 'explicit user-provided `--output artifacts` takes precedence over the `--auto` implied GitHub target' in output
-    assert '`--auto` implies `--output github`' in output
-    assert '`--output artifacts`' in activation
-    # The pre-existing vault default is not a phase04 cutover.
-    assert 'vault (default)' in publish
+    assert 'Default (no flag): Interactive mode, artifacts output.' in read('skills/forge/SKILL.md')
 
 
 def test_artifact_publication_preserves_canonical_source_and_validates_selected_family():
@@ -177,7 +174,7 @@ def test_workflow_artifact_paths_fail_closed_without_verified_native_identity():
         '**Input and validation.**', 1
     )[0])
     orchestration = read('skills/_shared/orchestration-guide.md')
-    opt_in = normalized(orchestration.split('### Explicit artifacts opt-in', 1)[1].split(
+    allocation_contract = normalized(orchestration.split('## 1. Scratch Directory', 1)[1].split(
         '### 1.1.', 1
     )[0])
     assert 'Obtain the current session ID and host from the qualified native runtime source.' in allocation
@@ -186,10 +183,10 @@ def test_workflow_artifact_paths_fail_closed_without_verified_native_identity():
     assert 'stop the artifact write and report the reason' in allocation
     assert 'Do not fall back to an OS temp path' in allocation
     assert '--session "<verified-native-sid>" --host "<provider>" --kind artifacts --create' in allocation
-    assert 'If identity is absent, conflicting, or unverified' in opt_in
-    assert 'ordinary filesystem permission denies allocation' in opt_in
-    assert 'do not fall back to `mktemp`' in opt_in
-    assert '`--output session` remains chat-only and creates no files.' in opt_in
+    assert 'If identity is absent, conflicting, or unverified' in allocation_contract
+    assert 'ordinary filesystem permission denies allocation' in allocation_contract
+    assert 'do not fall back to `mktemp`' in allocation_contract
+    assert '`--output session` remains chat-only and creates no files.' in allocation_contract
 
 
 def test_plan_discovery_uses_explicit_sources_and_keeps_terminal_state_in_place():

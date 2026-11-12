@@ -1,6 +1,6 @@
 # Subagent Prompt Templates
 
-Reference material for the `/claudna:audit scale` lens. Detailed instructions for the subagents launched during Phases 1–2. All subagents follow the disk-write pattern (`../../_shared/orchestration-guide.md` Sections 2 & 6): write findings to the scratch dir, return a 2-4 line summary, never stream research through the orchestrator. Every research file that captured command output or configuration is scrubbed in place with the redactor (`python3 -B "<claudna-root>/scripts/redact.py" <file>`, with `<claudna-root>` per `../../_shared/claudna-root.md`) before handoff.
+Reference material for the `/claudna:audit scale` lens. Detailed instructions for the subagents launched during Phases 1–2. For persisted-output runs, the orchestrator supplies the verified current native owner (SID/provider) and exact absolute `<scratch>` and `<artifacts>` paths. Use only the supplied scratch path; never create an alternate temp root. Write findings to scratch, return a 2-4 line summary, and never stream research through the orchestrator. For explicit chat-only `--output session`, do not create files; return full bounded findings needed for synthesis/review in context. Every research file that captured command output or configuration is scrubbed in place with the redactor (`python3 -B "<claudna-root>/scripts/redact.py" <file>`, with `<claudna-root>` per `../../_shared/claudna-root.md`) before handoff.
 
 Every prompt receives: the Phase 0 boundary and capacity map, the focus area (if any), and the scratch path `<scratch>/research/`.
 

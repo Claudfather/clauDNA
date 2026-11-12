@@ -46,16 +46,18 @@ digraph when_to_use {
 
 ## The Sprint Ledger
 
-One markdown run log, created before phase 1, updated after every phase and every review round. Location: wherever the epic's docs live (e.g. `documentation/planning/<epic>/RUN_LOG.md`), with frontmatter linking the epic issue.
+One private markdown run log, created before phase 1, updated after every phase and every review round. Location: the actual current native session's `<artifacts>/<run>/RUN_LOG.md`, allocated per orchestration-guide §1, with frontmatter linking the selected source/epic and its revision. The input plan's owner never supplies this run's identity.
 
-For an explicitly selected canonical session-artifact plan, validate the source
+For a selected canonical session-artifact plan, validate the source
 through `../_shared/source-guide.md` before reading it. The new run's ledger and
 reports use its actual current native session's artifacts directory, even when
 the selected plan was produced by an earlier session. Preserve frozen inputs and
 record adaptations separately. Authorized plan status edits stay terminal in
 place; repository archival applies only to explicitly selected project/legacy
 plans. Never select latest or derive the current identity from the input path.
-This opt-in route does not waive native qualification or change broad defaults.
+These defaults apply even to project/legacy input. Missing verified native identity
+or ordinary write permission blocks the ledger write without an OS-temp or
+operation-ID fallback. Native acceptance remains a merge/release gate.
 
 It carries, in order:
 

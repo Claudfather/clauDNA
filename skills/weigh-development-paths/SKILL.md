@@ -2,7 +2,7 @@
 name: weigh-development-paths
 user-invocable: true
 description: "Use when at a development junction with multiple viable approaches — architecture choices, refactoring strategies, where to put new code, or which pattern to follow. Triggers on 'which approach', 'how should I', 'Option A vs B', or any point where the next step isn't obvious and the wrong choice creates rework."
-argument-hint: "[--auto] [--output github|session] [junction-description-or-bundle-path]"
+argument-hint: "[--auto] [--output artifacts|docs|github|vault|notion|session] [junction-description-or-bundle-path]"
 ---
 
 # Weigh Development Paths
@@ -11,17 +11,21 @@ argument-hint: "[--auto] [--output github|session] [junction-description-or-bund
 
 Structured multi-dimensional evaluation for development junctions.
 
+Follow `../_shared/orchestration-guide.md` §1 for native session allocation and exact-owner cleanup. Private comparison notes and working bundles stay in `<scratch>`; the sanitized comparison and refined plan default to `<artifacts>`. `--output artifacts` is the explicit spelling of that default, including with `--auto`. Explicit `--output docs|github|vault|notion` exports the canonical revision and records actual outcome in the current session's private receipt (`docs` → `--to docs`, `github` → `--to github-issue --repo <repo>`, `vault` → `--to vault`, `notion` → `--to notion`). `--output session` is chat-only: no allocation or intermediate files. Missing/conflicting/unverified native identity or ordinary-permission denial stops persistence without cwd, operation-ID, or OS-temp fallback.
+
 **Enter Plan Mode.** Call `EnterPlanMode` to enter deliberation mode. All analysis is read-only — plan mode enforces this. If the user declines plan mode, proceed normally.
 
 ## Arguments
 
 Parse `$ARGUMENTS` at invocation:
-- `--auto`: Non-interactive synthesis mode. Suppresses Plan Mode and all interactive user-question gates. Requires a context bundle path in `$ARGUMENTS`. Emits the structured-result shape from `../_shared/orchestration-guide.md` §10.C with a refined plan in `artifacts.refined_plan`. See "Autonomous Mode" section below.
+- `--auto`: Non-interactive synthesis mode. Suppresses Plan Mode and all interactive user-question gates. Requires a context bundle path in `$ARGUMENTS`. Defaults to a canonical refined-plan artifact and emits the structured-result shape from `../_shared/orchestration-guide.md` §10.C with the same plan in `artifacts.refined_plan`. See "Autonomous Mode" section below.
+- `--output artifacts`: Save the sanitized analysis/refined plan under current-session artifacts (default).
+- `--output docs|github|vault|notion`: Explicitly export the retained canonical document through the corresponding adapter (`github` maps to `--to github-issue --repo <repo>`); record actual URL/path/result in the private receipt. When called as a build synthesis producer, return the contract result to the caller and leave external publication to that caller.
 - `--output github`: Write findings and plans as GitHub Issues. See output guide (`../_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
 - Remaining text: the junction description (interactive mode) or path to a context bundle file (--auto mode).
 
-Default (no flag): Present analysis in chat (session-only by default).
+Default (no flag): persist the sanitized analysis as a canonical artifact and present its result in chat. Use `--output session` for chat-only work with no disk writes.
 
 ## When to Use
 
@@ -105,12 +109,14 @@ State your recommendation with:
 
 ## Output Targets
 
-This skill supports `--output github` and `--output session` in addition to the default `session` target.
+This skill supports `--output artifacts` (default), explicit `docs|github|vault|notion` exports, and `--output session` (chat only).
 
 Follow the output guide at `../_shared/output-guide.md`:
-- For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Create one issue documenting the junction analysis — include the comparison matrix, holistic assessment, and recommendation. Label with `auto-audit` and `enhancement`.
-- For `session` (default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs`: author the full analysis as a publishable doc in `<scratch>` (`../_shared/orchestration-guide.md` §1) with `type: decision` (knowledge-tier validation — no §4.1 skeleton gate; a junction analysis is a decision record, not an implementation plan), then `/claudna:publish <file> --to docs --dir documentation/planning/decisions/<session_name>_<YYYY-MM-DD>/`
+- For `artifacts` (default): write the sanitized analysis and refined plan to `<artifacts>/weigh-development-paths/<junction>.md`; keep private comparison notes in scratch.
+- For explicit `github`: retain the canonical decision document, then publish the selected analysis as an issue with output-guide frontmatter and Section 4 body skeleton, tagged `auto-audit` and `enhancement`; include the comparison matrix, holistic assessment, and recommendation, and record actual URL/status in the private receipt.
+- For explicit `session`: present the analysis in chat without allocation or file writes.
+- For explicit `docs`: retain the canonical decision document, then publish it with `type: decision` to `documentation/planning/decisions/<session_name>_<YYYY-MM-DD>/`; decision records use knowledge-tier validation, so the Section 4 implementation-plan skeleton gate does not apply. Record the actual result in the private receipt.
+- For explicit `vault` or `notion`: retain the canonical decision document, then export through the chosen adapter with a private receipt.
 
 ---
 
@@ -142,7 +148,7 @@ When `--auto` is active:
 4. For **each** open junction, run Steps 1–5 exactly as above (frame → 7-dimension evaluation → matrix → holistic → recommend) — but grounded in the bundle, not live exploration. Then resolve:
    - **Technical comparison** (one option wins on the dimensions, even narrowly, or it's a genuine tie) → **resolve it.** A tie is still a pick; Step 5 names what's lost. Goes to `decisions_resolved`.
    - **Not the matrix's call** (the junction hinges on a human value / policy / security / cost decision the dimensions can't settle — e.g. "bot identity vs personal key") → do **not** force a pick. Goes to `decisions_unresolved`.
-5. Assemble a refined plan: take the original plan body and replace/augment each ambiguous section with the synthesis result. Mark each formerly-open item as RESOLVED with the rationale inline.
+5. Assemble a refined plan: take the original plan body and replace/augment each ambiguous section with the synthesis result. Mark each formerly-open item as RESOLVED with the rationale inline. By default, save this same refined plan under `<artifacts>/weigh-development-paths/synthesis-<bundle-name>.md` before emitting the structured result; if the caller explicitly selected session output, make no file writes.
 
 ### Output (structured result)
 
@@ -157,6 +163,6 @@ Emit exactly one fenced ```json §10.C block (the FINAL output, nothing after it
 - Do NOT write to the original plan file unless explicitly given a write path in the bundle.
 - Do NOT open Plan Mode.
 - Do NOT ask questions.
-- Do NOT route through `/claudna:publish` or persist a decision doc — that's the interactive mode's Output Targets step; `--auto` returns the refined plan to its caller only.
+- Do NOT publish externally from a build-synthesis invocation; `--auto` returns the refined plan to its caller in the existing structured-result contract. Its canonical artifact is the same result for durable recovery, not an independently edited copy. For standalone `--auto`, honor an explicit non-session output target and record the actual result.
 - Do NOT re-explore the codebase — use the bundle's `## Codebase-comparison artifacts`.
 - Do NOT print anything after the JSON block.

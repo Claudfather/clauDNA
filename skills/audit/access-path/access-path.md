@@ -57,7 +57,9 @@ If fewer than 2 access paths found, tell the user: "This system appears to have 
 
 ### Step 2: Parallel Discovery
 
-**Scratch directory:** `<scratch>/research/`, where `<scratch>` is a private directory made with `mktemp -d "${TMPDIR:-/tmp}/audit-access-path.XXXXXX"` (orchestration guide §1)
+**Scratch directory:** `<scratch>/research/`, under the exact current-session scratch path supplied by `../../_shared/orchestration-guide.md` §1. Resolve the actual SID/provider and both absolute paths before dispatch; never create an OS-temp or guessed replacement.
+
+For explicit `--output session`, run discovery inline and keep the analysis in context; create no scratch files. The disk-writing subagent steps below apply to persisted-output runs.
 
 Launch two `general-purpose` subagents in parallel (Agent tool, `subagent_type: "general-purpose"`). Each writes findings to scratch dir, returns 2-4 line summary. Orchestrator does NOT read full research files. With no dispatch primitive available, scan the two areas inline and sequentially per `../../_shared/orchestration-guide.md` §14.2, writing to the same scratch paths so aggregation is unchanged.
 
@@ -135,16 +137,16 @@ Do NOT proceed to Phase 2 without explicit confirmation.
 
 ## Phase 2: Remediation Plans
 
-**Output lands in:**
+**Canonical plan family lands in `<artifacts>/access-path/` by default:**
 ```
-documentation/planning/access-paths/<session_name>_<YYYY-MM-DD>/
+<artifacts>/access-path/
 ├── 00_ACCESS_PATH_AUDIT.md
 ├── 01_<remediation-slug>.md
 ├── 02_<remediation-slug>.md
 └── ...
 ```
 
-Plan agents write the family to the session's scratch docs directory (`<scratch>/docs/`); the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/access-paths/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide, Section 3).
+Plan agents write the family to the workflow-owned `<artifacts>/access-path/` directory under the shared artifact root. For an explicit `--output docs`, export that family with `/claudna:publish <artifacts>/access-path/ --to docs --dir documentation/planning/access-paths/<session_name>_<YYYY-MM-DD>/`; retain the canonical family. Keep research in `<scratch>`.
 
 > **Archive convention:** See orchestration guide, Section 8.
 
@@ -192,12 +194,13 @@ Follow Section 9 of the orchestration guide (`../../_shared/orchestration-guide.
 
 ## Output Targets
 
-This lens supports `--output github`, `--output session` (the engine default, contract §2), and a `docs` target.
+This lens defaults to `--output artifacts` and supports explicit `session`, `github`, and `docs` targets.
 
 Follow the output guide at `../../_shared/output-guide.md`:
-- For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Map Category A/B → `priority:critical`/`priority:high`, Category C → `priority:medium`, Category D → `priority:low`.
-- For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs`: follow the subagent workflow in the orchestration guide (publish step: `--dir documentation/planning/access-paths/<session_name>_<YYYY-MM-DD>/`)
+- For `github`: write each selected finding doc under `<artifacts>/access-path/` (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <artifacts>/access-path/<file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Keep each canonical source and the canonical report/family. Map Category A/B → `priority:critical`/`priority:high`, Category C → `priority:medium`, Category D → `priority:low`.
+- For `artifacts` (default): retain the report and any approved remediation family with `/claudna:publish <artifacts>/access-path/ --to artifacts`.
+- For `session`: present the result in chat only; write no files.
+- For `docs`: explicitly export the selected canonical family from `<artifacts>/access-path/` to `documentation/planning/access-paths/<session_name>_<YYYY-MM-DD>/`; keep the canonical source.
 
 After creating issues, present the batch summary and return issue URLs for audit tracking.
 
@@ -205,7 +208,7 @@ After creating issues, present the batch summary and return issue URLs for audit
 
 ## Phase 2.5: Adversarial Review Pass
 
-Follow `../../_shared/pre-handoff-checklist.md` for the full procedure. Run on each remediation doc (`<NN>_*.md`) and `00_ACCESS_PATH_AUDIT.md` in the session's scratch docs directory, before the family is published to `documentation/planning/access-paths/<session>/`.
+Follow `../../_shared/pre-handoff-checklist.md` for the full procedure. Run on each remediation doc (`<NN>_*.md`) and `00_ACCESS_PATH_AUDIT.md` under `<artifacts>/access-path/` before presentation or export. For explicit chat-only `session`, keep review input and findings in context and create no files.
 
 ### Access-path-specific concern areas
 
@@ -243,13 +246,13 @@ Access Path Audit Summary
     - New access paths should go through domain core, not duplicate transport logic
     - Domain-core concerns should raise domain exceptions, not HTTP exceptions
 
-  Audit docs: documentation/planning/access-paths/<session>/
+  Audit artifacts: <artifacts>/access-path/
 ═══════════════════════════════════════════════════════════════════════════
 ```
 
 Then tell the user:
 
-**"Plans are ready. Run `/claudna:build documentation/planning/access-paths/<session>/` to start building — it will handle challenge review, branching, implementation, and PRs for each phase doc."**
+**"Plans are ready in `<artifacts>/access-path/`. Run `/claudna:build <artifacts>/access-path/` to start building — it will handle challenge review, branching, implementation, and PRs for each phase doc."**
 
 **This lens produces plans, not code** — see the shared reminder in `../../_shared/orchestration-guide.md` §11: build, branch, and PR steps are always `/claudna:build`'s job.
 
@@ -279,11 +282,11 @@ Then tell the user:
 
 ## Autonomous Mode (--auto)
 
-When `--auto` is set, the run is fully non-interactive and implies `--output github` (see orchestration guide Section 10):
+When `--auto` is set, the run is fully non-interactive and defaults to canonical `artifacts`; issue filing occurs only with explicit `--output github` (see orchestration guide Section 10):
 1. Skip Plan Mode — go straight to Phase 1 scan
 2. Skip the user confirmation gate between Phase 1 and Phase 2
 3. Use the focus area from the engine's `[focus]` argument as scope. If none provided, scan full system.
-4. Create GitHub Issues for all Category A and B findings (CRITICAL and HIGH immediately, MEDIUM batched)
+4. With explicit `--output github`, create issues for Category A and B findings (CRITICAL and HIGH immediately, MEDIUM batched); otherwise retain the report and plans in `<artifacts>`, except explicit `session` returns them in context with no files.
 5. Skip Category C (appropriate differences) and Category D at LOW severity
 6. **Emit the structured-result shape** per `../../_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
@@ -296,7 +299,7 @@ When `--auto` is set, the run is fully non-interactive and implies `--output git
     "issues_created": ["..."],
     "findings_by_category": {"A": 1, "B": 2, "C": 4, "D": 1},
     "paths_analyzed": ["HTTP", "CLI", "MCP"],
-    "session_dir": "documentation/planning/access-paths/<session>/"
+    "session_dir": "<artifacts>/access-path/"
   },
   "summary": "<2-3 line digest>",
   "next": null,

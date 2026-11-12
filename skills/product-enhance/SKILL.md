@@ -2,7 +2,7 @@
 name: product-enhance
 user-invocable: true
 description: "Use when you have specific product issues to triage or want to discover enhancement opportunities in an existing product through gap analysis. For exploring what a codebase could become, use /claudna:product-vision."
-argument-hint: "[--auto] [--output github|session] [focus-area]"
+argument-hint: "[--auto] [--output artifacts|docs|github|vault|notion|session] [focus-area]"
 ---
 
 # Product Enhancement Discovery & Design
@@ -11,12 +11,18 @@ argument-hint: "[--auto] [--output github|session] [focus-area]"
 
 **Persona:** Product-minded engineering lead. Think like a PM who can read code. Understand intent first, then produce phased design docs. Concrete observations ranked by impact — no buzzwords.
 
+## Working files and output
+
+Follow `../_shared/orchestration-guide.md` §1 for native session allocation and exact-owner cleanup. Reconnaissance, triage notes, gap research, and drafts stay in `<scratch>`; sanitized findings and generated design-doc families default to `<artifacts>`. `--output artifacts` is the explicit spelling of that default; `--auto` has the same default unless an output target was explicitly supplied. Explicit `--output docs|github|vault|notion` publishes from canonical artifacts and records the actual result in the current session's private receipt (`docs` → `--to docs`, `github` → `--to github-issue --repo <repo>`, `vault` → `--to vault`, `notion` → `--to notion`). `--output session` is chat-only with no allocation or writes; skip disk-writing subagent steps in this mode. Missing/conflicting/unverified native identity or ordinary-permission denial stops persistence with no cwd, operation-ID, or OS-temp fallback. Keep project-authored source/config/worktree changes under their existing project ownership.
+
 ## Arguments
 
 Parse `$ARGUMENTS` at invocation:
-- `--auto`: Fully non-interactive. Implies `--output github`. Uses triage path, skips discovery/interview. See orchestration guide Section 10.
+- `--auto`: Fully non-interactive. By default it writes durable findings/design docs to session artifacts; explicit `--output artifacts` keeps this destination, while explicit `--output docs|github|vault|notion` selects that export. It uses the triage path and skips discovery/interview. See orchestration guide Section 10.
+- `--output artifacts`: Keep sanitized proposals and design docs in the current session's canonical artifact area (default).
+- `--output docs|github|vault|notion`: Explicitly export canonical artifacts through `/claudna:publish` using the matching adapter (`github` maps to `--to github-issue --repo <repo>`); preserve canonical sources and record actual outcomes in the current session's private receipt.
 - `--output github`: Write enhancement proposals as GitHub Issues. See output guide (`../_shared/output-guide.md`).
-- `--output session`: Present findings in chat only, no persistence.
+- `--output session`: Present findings in chat only, no allocation or file writes; omit disk-writing intermediate steps.
 - Remaining text is the focus area. If provided, use it as scope context in Step 1 instead of asking.
 
 ## When NOT to use
@@ -98,7 +104,7 @@ Ask the user: **"Are you coming in with specific issues, or should we discover e
 
 #### Step 1B: Codebase Reconnaissance
 
-Scratch directory: `<scratch>/research/`, with `<scratch>` a private directory made by `mktemp -d "${TMPDIR:-/tmp}/product-enhance.XXXXXX"`. Launch **Explore subagents** covering structure, modules, entry points, docs, tests, dependencies, recent git history. Do NOT read CLAUDE.md/MEMORY.md in orchestrator. Disk-write per orchestration guide, Section 2. Present a `Codebase Context` summary; ask user to confirm.
+Use `<scratch>/research/` for private working notes, allocated per orchestration guide §1. Launch **Explore subagents** covering structure, modules, entry points, docs, tests, dependencies, recent git history. Do NOT read CLAUDE.md/MEMORY.md in orchestrator. Disk-write per orchestration guide, Section 2. Present a `Codebase Context` summary; ask user to confirm.
 
 ---
 
@@ -128,7 +134,7 @@ Compare Step 2 answers against Step 1B findings via **Explore subagents** (disk-
 
 ### Step 5: Generate Phased Design Docs
 
-Output lands in `documentation/planning/phases/<session_name>_<YYYY-MM-DD>/`, prefixed `01_`, `02_` by implementation order — Plan agents write the family to the session's scratch docs directory and the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/phases/<session_name>_<YYYY-MM-DD>/` (family mode; Section 3). `00_OVERVIEW.md`: context, dependency graph, parallel phases, total effort. Archive per Section 8; Plan agents per Section 9, reading from scratch research dir. Plan agents must also read `../_shared/planning-standard.md`.
+Output defaults to `<artifacts>/planning/phases/<session_name>_<YYYY-MM-DD>/`, prefixed `01_`, `02_` by implementation order. Plan agents receive the absolute artifacts path and owning SID/host for this family, while private research remains in scratch. `00_OVERVIEW.md`: context, dependency graph, parallel phases, total effort. For explicit `docs`, `github`, `vault`, or `notion` output, publish the canonical family via the corresponding publisher adapter (use `--to github-issue` per finding for `github`; `docs` also requires its registry `--dir`) and retain it with a private receipt of actual result. Archive per Section 8; Plan agents per Section 9. Plan agents must also read `../_shared/planning-standard.md`.
 
 Present a `Product Enhancement Summary`, then direct user to `/claudna:build`. **This skill produces plans, not code.**
 
@@ -136,7 +142,7 @@ Present a `Product Enhancement Summary`, then direct user to `/claudna:build`. *
 
 ### Step 5.5: Adversarial Review Pass
 
-Follow `../_shared/pre-handoff-checklist.md` for the full procedure. Run on each phase doc (`<NN>_*.md`) and `00_OVERVIEW.md` in the session's scratch docs directory, before the family is published to `documentation/planning/phases/<session>/`. Apply in all modes.
+Follow `../_shared/pre-handoff-checklist.md` for the full procedure. Run on each phase doc (`<NN>_*.md`) and `00_OVERVIEW.md` in the canonical `<artifacts>/planning/phases/<session>/` family before presenting or publishing it. Apply in all output modes. For chat-only output, run the same review in context with `--dispatch --output session` per the checklist; create no temporary document.
 
 ---
 
@@ -151,14 +157,16 @@ Follow `../_shared/pre-handoff-checklist.md` for the full procedure. Run on each
 
 ## Output Targets
 
-This skill supports `--output github` and `--output session` in addition to the default `docs` target.
+This skill supports `--output artifacts` (default), explicit `docs|github|vault|notion` exports, and `--output session` (chat only).
 
 Follow the output guide at `../_shared/output-guide.md`:
-- For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Apply `enhancement` label to all issues. Map impact ranking to priority labels.
-- For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs` (default): follow the subagent workflow in the orchestration guide (publish step: `--dir documentation/planning/phases/<session_name>_<YYYY-MM-DD>/`)
+- For `artifacts` (default): write sanitized findings and the design-doc family to canonical artifacts; do not publish externally. Phase docs must keep the output guide's frontmatter and Section 4 body skeleton; the `00_OVERVIEW.md` family master keeps its presence-only exemption.
+- For explicit `github`: retain canonical docs, then publish each selected finding as an issue (`--to github-issue --repo <repo>`); keep the actual URLs/status in the private receipt.
+- For explicit `session`: present sanitized findings in chat without allocating session storage or writing files.
+- For explicit `docs`: retain canonical docs, then publish the family with `/claudna:publish <artifacts-family> --to docs --dir documentation/planning/phases/<session_name>_<YYYY-MM-DD>/`; keep phase skeleton/master validation and record the actual result.
+- For explicit `vault` or `notion`: retain canonical docs and use the corresponding publisher adapter, recording its actual result.
 
-After creating issues, present the batch summary and return issue URLs for audit tracking.
+For explicit `github` output, present the batch summary and return issue URLs for audit tracking. Issue documents retain the output guide's frontmatter and Section 4 body skeleton, include the `enhancement` tag, and map impact ranking to priority labels.
 
 ---
 
@@ -168,7 +176,7 @@ When `--auto` is set (see orchestration guide Section 10):
 1. Skip Plan Mode and the intent interview (Steps 2-3) — use triage path only
 2. Run codebase reconnaissance (Step 1B) automatically with scope from `$ARGUMENTS`
 3. Auto-generate enhancement proposals from gap analysis (skip user selection)
-4. Create GitHub Issues for all proposals ranked High or Medium impact
+4. For explicit `session`, return proposals in context with no files; otherwise write sanitized proposals to `<artifacts>` by default. Create issues for High/Medium proposals only when `--output github` was explicitly selected; keep canonical artifacts and record actual URLs/status privately.
 5. **Emit the structured-result shape** per `../_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
 ```json
@@ -176,9 +184,9 @@ When `--auto` is set (see orchestration guide Section 10):
   "skill": "product-enhance",
   "outcome": "completed",
   "artifacts": {
-    "issues_created": ["https://github.com/org/repo/issues/123", "..."],
+    "issues_created": [],
     "proposals_ranked": 8,
-    "session_dir": "documentation/planning/phases/<session>/"
+    "canonical_report": "<artifacts>/product-enhance/<session>/"
   },
   "summary": "<2-3 line digest of proposals filed>",
   "next": null,
@@ -187,4 +195,4 @@ When `--auto` is set (see orchestration guide Section 10):
 }
 ```
 
-- `outcome` is `completed` on success, `blocked` if codebase reconnaissance can't run.
+- `outcome` is `completed` on success, `blocked` if codebase reconnaissance can't run. `issues_created` is populated only for explicit `--output github`; the canonical artifact path records the default durable destination.

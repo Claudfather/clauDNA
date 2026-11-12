@@ -33,7 +33,7 @@ The full per-part requirements live in `evaluation-prompt-template.md` (same dir
 
 Follow the steps in order. Call `EnterPlanMode` first per the lens contract (`../../_shared/audit-lens-contract.md`) §6 — every step through the direction gate (1–6) is read-only for the orchestrator. After the gate, follow the **mode-specific** plan-mode transition in Step 7. All pre-gate scratch files are written by subagents (Task = separate sessions, not bound by the orchestrator's plan mode), per the house pattern (`../../_shared/orchestration-guide.md` §2–§3, §6).
 
-**Scratch root** for this run: `<scratch>/data-model-redesign/`, where `<scratch>` is the run's private directory, made once with `mktemp -d "${TMPDIR:-/tmp}/audit.XXXXXX"` — reconstruction files under `research/`, authored deliverables under `docs/`. The Write tool creates directories on first write; do not `mkdir`.
+**Scratch root** for this run: `<scratch>/data-model-redesign/`, under the exact current-session scratch path supplied by `../../_shared/orchestration-guide.md` §1. Resolve the actual SID/provider and exact absolute paths before dispatch; never use OS temp or a guessed replacement. Reconstruction and working evaluation files stay under `research/`; final deliverables go under the workflow-owned `<artifacts>/data-model-redesign/` directory.
 
 Do not re-read CLAUDE.md or MEMORY.md if already in context.
 
@@ -89,14 +89,14 @@ The orchestrator reads `research/evaluation.md` and presents — **in protocol o
 
 **Plan-mode transition (mode-specific).** On direction choice:
 
-- **`--output session`:** stay in Plan Mode (output-guide §5 — subagents author to scratch; `/claudna:publish --to session` only prints).
-- **`--output github` / `--output docs`:** call `ExitPlanMode` before Step 8's publishing — issue creation and `documentation/` placement are mutations plan mode blocks.
+- **`--output session`:** stay in Plan Mode and present in chat only; create no deliverable files.
+- **`--output artifacts` (default), `github`, or `docs`:** call `ExitPlanMode` before writing the final canonical family or performing an explicit export.
 
 ---
 
 ### Step 7: Migration plan (Part 7) — Plan agents
 
-Delegate authoring to `general-purpose` subagents acting as Plan agents (orchestration guide §3; the orchestrator never authors docs itself). Each reads the `research/` files, `../../_shared/planning-standard.md`, and `migration-playbook.md` (this directory), and writes publishable docs (output-guide §3 frontmatter + §4.1 body skeleton) to `docs/` in scratch, returning metadata summaries only:
+For persisted-output runs, delegate authoring to `general-purpose` subagents acting as Plan agents (orchestration guide §3; the orchestrator never authors docs itself). Each reads the `research/` files, `../../_shared/planning-standard.md`, and `migration-playbook.md` (this directory), and writes publishable docs (output-guide §3 frontmatter + §4.1 body skeleton) directly under `<artifacts>/data-model-redesign/`, returning metadata summaries only. Under explicit `--output session`, present the chosen migration plan in context and create no files:
 
 - `00_DATA_MODEL_REDESIGN.md` — master: the seven-part deliverable — reconstruction summary, source-of-truth table, path traces, evaluation, comparison matrix, recommendation, the chosen direction, and the migration-stage index. Authored by a dedicated Plan agent from the `research/` files (master-class: the §4.1 skeleton is not required — publish Step 1b's presence-only exemption), since it carries substantive content the orchestrator must not compose from summaries alone.
 - `NN_<stage-slug>.md` — one phase doc per migration stage (or coherent stage group), each = one PR, following the playbook: expand → backfill → dual-write → shadow-read → cutover → contract, with the **per-consumer coverage matrix** (every consumer from Part 1's inventory has a disposition in every stage) and a **rollback entry per stage** (trigger, mechanism, blast radius). If the chosen direction is incremental repair, the plan is the repair sequence under the same staging discipline (playbook's adaptation rules — skipped stages are named and justified, never silent).
@@ -111,9 +111,10 @@ Before anything is presented or published, run `verification-checklist.md` (this
 
 `--output` semantics are owned by the lens contract (§2). Follow `../../_shared/output-guide.md`:
 
-- **`session`** (default): after verification, `/claudna:publish <docs>/00_DATA_MODEL_REDESIGN.md --to session` presents the deliverable in chat; migration stage docs stay in scratch, offered on request. No repo writes.
+- **`artifacts` (default):** retain the verified master and migration stage family under `<artifacts>/data-model-redesign/`; present the path and summary. Research remains in `<scratch>`.
+- **`session`:** present the verified deliverable in chat only; create no files.
 - **`github`**: one issue per migration stage doc plus the master as the umbrella — `/claudna:publish <file> --to github-issue --repo <repo>`, sequentially so publish's dedup sees prior creations. Label `auto-audit` + `enhancement`; map severity → `priority:*` per output-guide §4.4.
-- **`docs`**: `/claudna:publish <scratch>/docs/ --to docs --dir documentation/planning/data-model/<session_name>_<YYYY-MM-DD>/` — the same directory convention as the sibling `data-model` lens (documentation-standard §2 registry; family mode validates the `00_*` + `NN_*` set).
+- **`docs`**: explicitly export the selected canonical family with `/claudna:publish <artifacts>/data-model-redesign/ --to docs --dir documentation/planning/data-model/<session_name>_<YYYY-MM-DD>/` — the same directory convention as the sibling `data-model` lens (documentation-standard §2 registry; family mode validates the `00_*` + `NN_*` set). Retain canonical artifacts.
 
 ## Notes
 

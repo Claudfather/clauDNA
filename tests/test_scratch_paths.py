@@ -1,10 +1,9 @@
 """Scratch files and directories are private to the user who made them.
 
-A skill, agent or hook makes its scratch directory with `mktemp -d` (created
-new, readable by the user alone) and keeps hook state in the user's own state
-directory. No file names a fixed or timestamped path in the shared temp
-directory, and every file a skill writes for its own use goes in that private
-directory (orchestration guide §1). Each failure names the file and line.
+Native workflows allocate scratch through the existing session-store primitive
+beneath their verified native owner. Static Markdown routing checks are separate
+from executable allocator/concurrency/failure fixtures below; neither claims
+native-host acceptance. Internal writes never fall back to OS temporary paths.
 """
 
 from __future__ import annotations
@@ -49,9 +48,9 @@ _TEMP_PATH = re.compile(
     r"(?<![\w$}.~])/tmp(?:/|(?=[\s&;|)]|$))"
     r"|\$\{?TMPDIR\b(?:\}|:?[-=?+][^}\s]*\})?(?=[/\s&;|)]|$)"
 )
-# Removed before matching, and only that span of the line: the template `mktemp` makes new and
-# private (up to its run of X), and a `Bash(...)` permission pattern.
-_PRIVATE = re.compile(r"\bmktemp\b[^`\n]*?X{3,}[\"']?|\bBash\([^)]*\)")
+# A permission declaration is not an executed output path. Unlike the previous
+# policy, mktemp under an OS-temp root is an active ownership violation too.
+_PRIVATE = re.compile(r"\bBash\([^)]*\)")
 
 
 def _flags(line: str) -> bool:
@@ -63,13 +62,13 @@ _SECTION_1 = r"orchestration[- ]guide(?:\.md`?\)?)? §\s?1(?!\d)"
 # A line that has the model write a file it names only by a placeholder, or not at all.
 _WRITES_A_FILE = re.compile(r"\b(?:with|by|via) the Write tool\b")
 _UNNAMED_FILE = re.compile(r"<[a-z0-9-]*file>|\b(?:a|two|three|its own|those three) files?\b|\btemp(?:orary)? file\b")
-_SAYS_WHERE = re.compile(r"<scratch>|\bmktemp\b|" + _SECTION_1)
+_SAYS_WHERE = re.compile(r"<scratch>|<artifacts>|" + _SECTION_1)
 # Output written "to a scratch directory" or "in scratch": the file must make one or point at §1.
 _WRITES_TO_SCRATCH = re.compile(
     r"\b(?:to|in|into) (?:a |the )?scratch\b|\ba scratch (?:file|directory|dir)\b|\btemporary or ignored directory\b",
     re.I,
 )
-_MAKES_OR_POINTS = re.compile(r"<scratch>|\bmktemp -d\b|" + _SECTION_1)
+_MAKES_OR_POINTS = re.compile(r"<scratch>|" + _SECTION_1)
 
 
 def _leaves_the_file_unplaced(line: str) -> bool:
@@ -92,7 +91,29 @@ def test_no_file_names_a_path_in_the_shared_temp_dir():
         for number, line in enumerate(path.read_text().splitlines(), 1):
             if _flags(line):
                 hits.append(f"{path.relative_to(REPO)}:{number}: {line.strip()[:120]}")
-    assert not hits, "make it with mktemp -d, or keep it in the user's state directory:\n" + "\n".join(hits)
+    assert not hits, "use the native session allocator and owned state paths:\n" + "\n".join(hits)
+
+
+@pytest.mark.parametrize(
+    "line, rejected",
+    [
+        ('psql -f "<scratch>/query.sql" > output.csv', True),
+        ('snowsql -f "<scratch>/query.sql" > "output.csv"', True),
+        ('Report: ~/Downloads/activity.html', True),
+        ('psql -f "<scratch>/query.sql" > "<artifacts>/output.csv"', False),
+        ('Explicit export: > "<user-selected-export>/output.csv"', False),
+        ('Edit the project README.md when explicitly requested.', False),
+    ],
+)
+def test_report_placement_source_fixtures(line, rejected):
+    # Narrow static examples for the audited CSV and Downloads defaults.
+    assert bool(re.search(r'>\s*["\']?output\.csv\b|~/Downloads/', line)) is rejected
+
+
+def test_analyst_and_activity_defaults_do_not_write_cwd_or_downloads():
+    for relative in ('agents/neon-analyst.md', 'agents/snowflake-analyst.md',
+                     'skills/github-activity-report/SKILL.md'):
+        assert not re.search(r'>\s*["\']?output\.csv\b|~/Downloads/', (REPO / relative).read_text())
 
 
 def test_each_file_a_skill_writes_says_where():
@@ -108,19 +129,21 @@ def test_each_file_a_skill_writes_says_where():
 
 def test_a_file_that_writes_to_scratch_makes_it_or_points_at_section_1():
     hits = [str(p.relative_to(REPO)) for p in PROSE if _leaves_scratch_unmade(p.read_text())]
-    assert not hits, "make <scratch> with mktemp -d, or point at orchestration guide §1:\n" + "\n".join(hits)
+    assert not hits, "allocate <scratch> through the native session store, per orchestration guide §1:\n" + "\n".join(hits)
 
 
 def test_section_1_states_the_rule_and_the_refusal():
     guide = (REPO / "skills" / "_shared" / "orchestration-guide.md").read_text()
     section_1 = guide.split("\n## 1.", 1)[1].split("\n## 2.", 1)[0]
-    assert "Every file a skill writes for its own use goes in `<scratch>`" in section_1
-    assert "If `mktemp -d` is refused, stop and say so" in section_1
+    assert "Working files go in `<scratch>`; durable deliverables go in `<artifacts>`" in section_1
+    assert "If the native allocation is refused, stop that write and say so" in section_1
+    assert "--session \"<verified-native-sid>\" --host \"<provider>\"" in section_1
 
 
 @pytest.mark.parametrize(
     "line",
     [
+        'D=$(mktemp -d "${TMPDIR:-/tmp}/audit-x.XXXXXX")',
         "Scratch dir: `/tmp/audit-<YYYY-MM-DD_HHMMSS>/`",
         'OUT="${OUT:-/tmp/gh-activity-stats}"',
         'MARKER="${TMPDIR:-/tmp}/claudna-reflected-${SESSION_ID}"',
@@ -142,10 +165,9 @@ def test_the_lint_flags_each_form(line):
 @pytest.mark.parametrize(
     "line",
     [
-        'D=$(mktemp -d "${TMPDIR:-/tmp}/audit-x.XXXXXX")',
         "  - Bash(rm -rf /tmp/heist-*)",
         "Scratch directory: `<scratch>/research/`",
-        "Never name a scratch path yourself under `/tmp` or `$TMPDIR`: make it with `mktemp -d`.",
+        "Never name a scratch path yourself under `/tmp` or `$TMPDIR`.",
         'if path in ("/", "/tmp", os.path.expanduser("~")):',
         "state lives in the Issue's comments, not `/tmp`, which stays ephemeral.",
     ],
@@ -171,7 +193,7 @@ def test_an_unplaced_file_is_flagged(line):
     "line",
     [
         "Write the keywords to `<keywords-file>` in `<scratch>` (`../_shared/orchestration-guide.md` §1) with the Write tool",
-        "write the title and the body to two files with the Write tool, inside a directory you make with mktemp -d",
+        "write the title and the body to two files with the Write tool, inside `<scratch>` from the native session allocator",
         "Create `CLAUDE.md` in the project root with the Write tool.",
     ],
 )

@@ -12,26 +12,11 @@ Shared reference for skills that use subagent orchestration to produce design do
 
 ## 1. Scratch Directory
 
-When the workflow first needs scratch files, make one private scratch directory for this run. A short inline check that writes nothing needs none:
+All internal output belongs under the effective clauDNA root (`CLAUDNA_STATE_DIR` when configured, otherwise `~/.claudna`). Session-specific work belongs to the actual current native session. A read-only inline check needs no directory; `--output session` remains chat-only and creates no files. A dry run performs no allocation or other mutation.
 
-```bash
-mktemp -d "${TMPDIR:-/tmp}/<skill-name>.XXXXXX"
-```
+### Native session allocation
 
-- `<skill-name>` is the slash command name (e.g., `product-enhance`, `audit`)
-- `mktemp -d` makes a new directory that only you can read or write, and prints its path. That path is `<scratch>` in every skill's steps; put it, absolute, into every subagent prompt that reads or writes there.
-- Research subagents write research files to `<scratch>/research/` (use `general-purpose` subagents — Explore agents lack the Write tool)
-- Plan agents read research from there
-
-Never name a scratch path yourself under `/tmp` or `$TMPDIR` (a fixed name, or one built from a timestamp): make it with `mktemp -d`.
-
-**Every file a skill writes for its own use goes in `<scratch>`, orchestrated or not:** a file a command takes its text from (a title, a body, search terms, a message, a JSON payload), a draft of a doc to publish, fetched content, a working ledger. A skill that has not made `<scratch>` yet makes it as above before it writes the first such file. Never write one at a name you chose under `/tmp` or `$TMPDIR`, however unlikely the name.
-
-**Permissions note:** If `mktemp -d` is refused, stop and say so; never fall back to a name of your own. Subagents write with the Write tool, which creates subdirectories (`research/`, `docs/`) inside `<scratch>`. The owner also needs the foreground finalization calls below.
-
-### Explicit artifacts opt-in (source-prepared; broader migration held)
-
-The `mktemp` flow above remains the default for existing workflows. Only a workflow that the user explicitly selects with `--output artifacts` (or `/claudna:publish ... --to artifacts`) uses native session storage. Resolve the loaded package root using [`claudna-root.md`](claudna-root.md), then use the actual CLI entrypoint; do not substitute a guessed session, operation ID, cwd-derived identity, or an OS temporary directory:
+Resolve the loaded package root using [`claudna-root.md`](claudna-root.md). Verify the current native SID and provider from the host's actual identity source, including agreement of available aliases. Pass both explicitly to the existing CLI:
 
 ```bash
 python3 -B "<claudna-root>/lib/claudna/session_store" scratch \
@@ -40,7 +25,17 @@ python3 -B "<claudna-root>/lib/claudna/session_store" paths \
   --session "<verified-native-sid>" --host "<provider>" --kind artifacts --create
 ```
 
-Use the exact paths returned by these calls as the run's `<scratch>` and artifact directory. The identity must come from a qualified current native host source. If identity is absent, conflicting, or unverified, or ordinary filesystem permission denies allocation, report the artifact route as partial/unavailable and stop that write; do not fall back to `mktemp` or infer that the host lacks the capability. A dry run performs no allocation or other mutation. `--output session` remains chat-only and creates no files. This is source-prepared routing only: native receipts and broad migration acceptance are still pending, so existing workflows and defaults do not change.
+Use the exact returned absolute paths as `<scratch>` and `<artifacts>`. Allocate scratch only when working files are needed and reuse the caller's allocation when nested. Resolve artifacts only when durable output is needed. The existing allocator makes unique private scratch beneath the native session; do not construct the allocation yourself.
+
+If identity is absent, conflicting, or unverified, or ordinary filesystem permission denies allocation, report persistence as partial/unavailable and stop that write; do not fall back to `mktemp`, an OS temporary directory, a fabricated SID, cwd-derived identity, arbitrary latest session, or operation ID. Continue authorized read-only analysis in chat where possible. Missing evidence does not establish that a host is unsupported. Cursor remains hook-free. Native identity/write acceptance is required before merge/release; static instructions and executable fixtures are separate evidence.
+
+**Working files go in `<scratch>`; durable deliverables go in `<artifacts>`.** Research bundles, command input files and intermediate drafts use scratch. Plans, reports, ledgers and selected sanitized evidence use artifacts. Generated documents default to `--output artifacts` and `/claudna:publish --to artifacts`, including with `--auto`; explicit source edits and selected docs/vault/GitHub/Notion exports retain their own authority. Never retain credentials, unselected private working trees, or copied host transcripts in durable artifacts or exports. Where an existing tool requires a credential-bearing input file, keep only the necessary private working copy in owned scratch and remove it through exact-owner finalization. Manual artifact writes work with capture off and do not synthesize lifecycle events.
+
+Before writing content, create private directories (`0700`) and files (`0600`) using ordinary authorized tools; verify those modes. Never change global permissions to obtain access. For authorized content updates, helpers reuse `lib/claudna/session_store/fsio.py`'s existing same-directory atomic text writer; do not add a persistence layer. A new deliverable must not overwrite an unrelated existing artifact: use an unoccupied family/path or report a conflict. Finished scratch material goes through publish's selected, hash-verified, atomic no-replacement promotion. Existing canonical sources stay in place during exports; returned destinations go in current-owner private receipts.
+
+Fill every delegated prompt with the actual absolute scratch/artifact paths, verified parent SID and provider, ownership of files, and the cleanup owner. Children borrow those paths; they do not allocate under their child identity or rediscover a latest session. Research agents write under `<scratch>/research/`; final plan/report agents write the designated private artifact family. A chat-only workflow returns content directly rather than creating intermediate files.
+
+**Permissions note:** If the native allocation is refused, stop that write and say so. Do not broaden permissions or silently choose another location. File creation, private-mode setup, promotion and foreground finalization use the host's actual exposed tools under ordinary permissions.
 
 **Subagent type note:** Explore agents (`subagent_type: "Explore"`) do NOT have the Write tool — they are read-only. For the disk-write pattern, use `general-purpose` subagents (`subagent_type: "general-purpose"`) which have access to all tools including Write. Use Explore agents only when you need fast, read-only codebase searches that don't need to persist results to disk.
 
@@ -51,8 +46,8 @@ The workflow that created `<scratch>` owns finalization. A nested skill or subag
 On completion, no findings, all-duplicate output, blocked work or handled cancellation:
 
 1. Wait for this run's writers to finish, or stop them through their actual owned handles and observe exit. Never delete beneath a live writer or infer ownership from a process name.
-2. Preserve the deliverable outside scratch and verify publication. For session output, present the sanitized findings or carry them in the final result. If publication fails, return those findings in the session result and report the requested publication as blocked before deleting its drafts. For an artifacts opt-in, preserve canonical material on every outcome; if promotion has not been verified, retain scratch and report partial instead of deleting its drafts. A deliberate active handoff may retain the one root, with its exact path and next owner recorded in the existing handoff; it is not a terminal cleanup success.
-3. For the default flow, substitute the **exact absolute path returned by this run's `mktemp -d`**; for an explicit artifacts opt-in, substitute only the exact scratch path returned by `session_store scratch`. Quote it, and run these as separate foreground calls. Never reconstruct a path, expand a glob or delete a caller's directory. Keep canonical artifacts outside scratch:
+2. Preserve the deliverable in canonical artifacts and verify its hashes before cleaning working copies. Preserve canonical material on every outcome. If an explicit export fails, report it as blocked and keep the local artifact. If promotion has not been verified, retain scratch and report partial instead of deleting its drafts. Chat-only output creates no files; return its sanitized findings directly. A deliberate active handoff may retain the one root, with its exact path and next owner recorded in the existing handoff; it is not a terminal cleanup success.
+3. Substitute only the **exact absolute scratch path returned by this run's `session_store scratch`**. Quote it, and run these as separate foreground calls. Never reconstruct a path, expand a glob or delete a caller's directory. Keep canonical artifacts outside scratch:
 
    ```bash
    rm -rf -- "<scratch>"
@@ -64,7 +59,7 @@ On completion, no findings, all-duplicate output, blocked work or handled cancel
 
 This finalizer applies to observed exits. An uncatchable process termination does not prove cleanup; do not add age-based scans, guessed recovery paths or background reapers to conceal that limit.
 
-For an artifacts opt-in, only the owner that allocated the exact scratch may finalize it, after every writer child has actually exited. Borrowing children return cleanup to that owner. If the owner is unknown or a writer is still running, retain the scratch. Remove and verify only the exact returned scratch path; never remove the durable artifact directory or canonical files as scratch cleanup.
+Only the owner that allocated the exact scratch may finalize it, after every writer child has actually exited. Borrowing children return cleanup to that owner. If the owner is unknown or a writer is still running, retain the scratch. Remove and verify only the exact returned scratch path; never remove the durable artifact directory or canonical files as scratch cleanup.
 
 ---
 
@@ -117,7 +112,7 @@ Full research: <scratch>/research/auth-flow.md
 
 ## 3. Plan Agent → Disk Pattern
 
-Plan agents read research from disk, read this guide for quality standards, and write final docs into the session's **scratch docs directory** (`<scratch>/docs/`). The orchestrator then publishes the finished family in one call — placement into `documentation/` is `/claudna:publish`'s job, never the agents' and never the orchestrator's own Write calls.
+Plan agents read research from disk, read this guide for quality standards, and write final docs into the current native session's private **artifact family** (`<artifacts>/<family>/`). Use §1's private modes and explicit ownership. The orchestrator validates the finished family through publish; a selected `documentation/` edition is an explicit export through `/claudna:publish`.
 
 ### Launch prompt template for Plan agents
 
@@ -136,7 +131,9 @@ The orchestrator constructs a prompt for each Plan agent that includes the follo
 ## Task
 
 Write a phase document for: <enhancement title>
-Output path: <scratch>/docs/<NN>_<slug>.md
+Output path: <artifacts>/<family>/<NN>_<slug>.md
+Parent native session: <verified-native-sid> | Host: <provider>
+Scratch owner: <orchestrator>; return cleanup to the owner
 
 ## When done
 
@@ -154,15 +151,15 @@ Do NOT return the full document content.
 
 ### Publishing the family (orchestrator step)
 
-After all Plan agents complete, the **orchestrator composes the `00_` master** from the Plan agents' metadata summaries and writes it to the same scratch docs directory — the sole exception to "never write docs" (§6's read-the-first-15-20-lines allowance exists for exactly this), with output-guide §3 frontmatter like every family member. The existing docs route remains the default. Only when the user explicitly selected artifacts output, use the native allocation in §1 and route the selected finished family with `/claudna:publish <scratch>/docs/ --to artifacts`.
-
-For the existing docs route, place the family with one call:
+After all Plan agents complete, the **orchestrator composes the `00_` master** from their metadata summaries in the same private artifact family — the sole exception to "never write docs" (§6's first-15-20-lines allowance exists for this). Include output-guide §3 frontmatter in every family member. Validate the selected family with the default route:
 
 ```
-/claudna:publish <scratch>/docs/ --to docs --dir documentation/planning/<subdirectory>/<session_name>_<YYYY-MM-DD>/
+/claudna:publish <artifacts>/<family>/ --to artifacts
 ```
 
-Family mode validates each doc — `NN_*` phase docs against the full §4.1 skeleton, the `00_*` master under the presence-only exemption — and writes nothing on any failure (see `skills/publish/SKILL.md` Step 1b / the docs adapter). The `--dir` value comes from the registry in `../_shared/documentation-standard.md` §2.
+Canonical files stay in place. If the user selects a repository edition, export that family with `/claudna:publish <artifacts>/<family>/ --to docs --dir documentation/planning/<subdirectory>/<session_name>_<YYYY-MM-DD>/`; choose `--dir` from documentation-standard §2. Other explicit adapters follow output-guide §1 and retain the canonical source plus a private receipt. A chat-only target has no family on disk.
+
+Family mode validates `NN_*` phase docs against the full §4.1 skeleton and the `00_*` master under the presence-only exemption. Validation failure publishes nothing and preserves the authored material; it does not authorize scratch deletion.
 
 ### What the orchestrator MUST NOT do
 
@@ -194,7 +191,7 @@ The orchestrator session is long-running and must stay within context limits. Th
 ### Launching Plan agents
 
 - Launch ALL Plan agents in parallel using `run_in_background: true`
-- Each Plan agent writes its output to the scratch docs directory via the Write tool
+- Each Plan agent writes its output to the private artifact family via the Write tool
 - Collect Plan agent completions via TaskOutput one at a time
 - Each TaskOutput response contains only the metadata summary (not the full doc)
 - After all agents complete, present the summary table to the user
@@ -219,24 +216,12 @@ Even with the disk-write pattern, collect agent completions ONE AT A TIME:
 
 ## 7. Permissions & Tool Usage
 
-The disk-write workflow is designed to use **only Read and Write tools** for all file I/O — no Bash commands. This means:
+Use the host's actual exposed file tools under ordinary permissions. Read/Write tools are preferred for document content; Glob/Grep (or their native equivalents) handle discovery/search. The native session allocator, private-mode setup, atomic promotion and exact-owner finalizer in §1 require their documented foreground calls. Do not assume blanket permission from a skill's text: honor a refusal and report the unavailable write without changing grants.
 
-- **No `mkdir` calls** — Write tool creates parent directories automatically
-- **No `cp` or `mv` calls** — all file creation goes through the Write tool
-- **No `cat` or `head`/`tail` calls** — all file reading goes through the Read tool (use `limit` and `offset` parameters for partial reads)
-- **Command input transport stays file-based** per `SKILL_CONTRACT.md` §1.2: documented adapters such as `--body-file` or `"$(cat <terms-file>)"` supply text to a command, rather than inspecting it in chat. Keep the latter as one quoted argument; it does not evaluate the file's contents as shell code.
-- **No `find` calls** — use the Glob tool for file discovery by pattern
-- **No `grep` calls** — use the Grep tool for content search (supports regex, glob filters, output modes, and `head_limit`)
-
-Both Read and Write are blanket-allowed via the `claude-workflow` permission category (default in clauDNA). This means:
-
-- Research subagents writing research to `<scratch>` → **no permission prompt**
-- Plan agents reading research from `<scratch>` → **no permission prompt**
-- Plan agents reading this guide from `../_shared/` → **no permission prompt**
-- Plan agents writing docs to the scratch docs directory (`<scratch>/docs/`) → **no permission prompt**
-- `/claudna:publish --to docs` placing the family under `documentation/planning/` (Read/Write tools) → **no permission prompt**
-
-Subagents launched via the Task tool inherit the parent session's permissions. No additional permission grants are needed.
+- File tools must preserve §1's private modes; creating parents automatically is not evidence of `0700`/`0600`.
+- Command input transport stays file-based per `SKILL_CONTRACT.md` §1.2: use documented adapters such as `--body-file` or `"$(cat <terms-file>)"`. Keep the latter as one quoted argument; file contents are not shell code.
+- Delegated workers inherit ordinary host controls and the parent's explicit path/identity contract; no new global grants.
+- Source edits and explicitly selected exports may write their authorized target. Internal working files never become project/package output.
 
 ### Shell operator restriction
 
@@ -282,7 +267,7 @@ Run it over any research or findings file that captured command output before th
 
 ## 8. Archive Convention
 
-Output directories follow this pattern per skill (reached via `publish --to docs --dir` — the registry in `../_shared/documentation-standard.md` §2; skills never *place finished docs* here directly. Documented exceptions: `/claudna:build`'s status-marker write-backs and its `git mv` archive move, which follow that standard's §5 and §6):
+Explicit repository editions follow this pattern per skill (reached via `publish --to docs --dir` — the registry in `../_shared/documentation-standard.md` §2; skills never *place finished docs* here directly. Documented exceptions: `/claudna:build`'s status-marker write-backs and its `git mv` archive move, which follow that standard's §5 and §6):
 
 ```
 documentation/planning/<subdirectory>/<session_name>_<YYYY-MM-DD>/
@@ -294,7 +279,7 @@ Where `<subdirectory>` varies by skill or audit lens:
 - `audit security`: `security/`
 - `audit tech-debt`: `tech_debt/`
 
-For the existing docs route, when all phases are complete, the project session directory moves to:
+For an explicitly selected project/legacy docs source, when all phases are complete, the project session directory moves to:
 
 ```
 documentation/archive/<session_name>_<YYYY-MM-DD>/
@@ -315,7 +300,7 @@ When a skill's doc generation step (typically the final step) delegates to Plan 
 > - Archive convention (Section 8)
 > - Pre-handoff adversarial review (`../_shared/pre-handoff-checklist.md`)
 >
-> Plan agents read research from the session's scratch directory, write docs into the scratch docs directory (the orchestrator publishes the family via `/claudna:publish --to docs` — §3), and return only a metadata summary.
+> Plan agents read research from the session's scratch directory, write final docs into the private artifact family (the orchestrator validates via `/claudna:publish --to artifacts`; selected exports retain that canonical family — §3), and return only a metadata summary.
 >
 > **The orchestrator MUST NOT write docs itself.** Always delegate to Plan subagents.
 
@@ -323,7 +308,7 @@ Skills that have domain-specific quality requirements or custom phase doc sectio
 
 ### Alternative Output Targets
 
-Skills support `--output github` and `--output session` in addition to the default `docs` target. An explicit `--output artifacts` opt-in is also source-prepared; it uses the native session allocation in §1 and does not alter existing defaults. The broader migration remains held pending native receipts and consumer acceptance. When `--output github` is active, the skill runs the full analysis and plan generation pipeline (no phases are skipped), then writes output as GitHub Issues instead of planning docs. When `--output session` is active, findings are presented in chat only with no persistence.
+Skills default to `--output artifacts`, using the native session allocation in §1. `--output docs` and `--output github` are explicit exports of retained canonical documents. `--output session` is chat-only and creates no files. Every target receives the full analysis pipeline; `--auto` changes interaction only. Native/consumer acceptance remains a merge/release gate, not a claim established by this source contract.
 
 Follow the output guide at `../_shared/output-guide.md` for target-specific formatting, deduplication, labels, and subagent workflow details.
 
@@ -337,20 +322,20 @@ Planning skills that support `--auto` can run fully non-interactively — no use
 
 When `$ARGUMENTS` contains `--auto`:
 
-1. **Implies `--output github`.** Findings always go to GitHub Issues, never to planning docs. The planning doc workflow requires user decisions (session naming, scope confirmation, selection) that can't happen without a human.
+1. **Preserves the selected output target.** With no target, use `--output artifacts`. `--auto` changes interaction, not publication authority. GitHub issues and repository/vault editions require an explicit destination; `--output session` remains chat-only.
 2. **Skip all user gates.** Do not ask for confirmation, scope selection, or approval. Proceed with sensible defaults.
 3. **Scope from arguments.** The focus area must come from `$ARGUMENTS` (e.g., a directory path). If no scope is provided, scan the full codebase but limit findings to the top 10 most impactful.
-4. **No Plan Mode.** Skip `EnterPlanMode`/`ExitPlanMode` — there's no deliberation phase when running autonomously. Go straight to scan → findings → issues.
-5. **Bail gracefully.** If the skill genuinely cannot proceed without user input (e.g., deployed URL required for the audit engine's design lens), write what you have to the handoff file and stop. Do not block.
+4. **No Plan Mode.** Skip `EnterPlanMode`/`ExitPlanMode` — there's no deliberation phase when running autonomously. Go straight to scan → findings → selected output.
+5. **Bail gracefully.** If the skill genuinely cannot proceed without user input (e.g., deployed URL required for the audit engine's design lens), retain available output in current-session artifacts (or chat for session-only/unavailable persistence) and stop. Do not block.
 
 ### Default behavior changes with `--auto`
 
 | Interactive (default) | `--auto` |
 |---|---|
 | Ask user for scope | Use scope from `$ARGUMENTS`, or full codebase |
-| Present findings, wait for confirmation | Create issues immediately |
+| Present findings, wait for confirmation | Produce the selected output immediately |
 | Ask which findings to act on | Act on all findings above LOW severity |
-| Write planning docs (`--output docs`) | Create GitHub Issues (`--output github`) |
+| Default to private artifacts | Default to private artifacts; explicit exports remain explicit |
 | Multiple user gates between phases | Zero interaction |
 
 ### How skills should reference this
@@ -358,7 +343,7 @@ When `$ARGUMENTS` contains `--auto`:
 Skills that support `--auto` should add to their Arguments section:
 
 ```
-- `--auto`: Fully non-interactive. Implies `--output github`. Scans, creates issues, returns summary. See orchestration guide Section 10.
+- `--auto`: Fully non-interactive. Defaults to `--output artifacts`; preserves explicit destinations. Scans, produces output, returns summary. See orchestration guide Section 10.
 ```
 
 And at the end of their procedure, add an "Autonomous Mode" section:
@@ -369,13 +354,13 @@ And at the end of their procedure, add an "Autonomous Mode" section:
 When `--auto` is set (see orchestration guide Section 10):
 1. Skip [specific user gates in this skill]
 2. [Any skill-specific auto defaults]
-3. Create GitHub Issues per the output guide (`--output github`)
+3. Produce the selected output per the output guide (default `--output artifacts`)
 4. Return structured summary for audit tracking
 ```
 
 ### For implementation skills (Tier 3)
 
-The rules above describe planning skills that produce GitHub Issues. Implementation skills (Tier 3 per §13: `/claudna:build`, and any future skill that produces PRs from existing plans) follow a parallel `--auto` contract with these differences:
+The rules above describe planning skills that produce documents or explicitly selected issue editions. Implementation skills (Tier 3 per §13: `/claudna:build`, and any future skill that produces PRs from existing plans) follow a parallel `--auto` contract with these differences:
 
 - **A completed run produces a PR, not an issue.** Does NOT imply `--output github`. The successful terminal artifact is an open PR on the work item's source branch; non-completed exits follow the skill's outcome contract (for example, build's failed verification preserves work without a PR).
 - **Never merges.** The merge gate is unconditionally skipped in `--auto`. A human ratifies the PR.
@@ -419,7 +404,7 @@ Every `--auto` run emits a single fenced JSON block as its final output (the las
 
 - `skill` (required): the skill's name as it appears in frontmatter.
 - `outcome` (required): exactly one of the five values listed. Skills MUST NOT invent new outcome strings.
-- `artifacts` (required): an object. Keys are skill-dependent — planning skills include `issues_created`; implementation skills include `pr_url`. Both are optional fields within `artifacts`. Skills SHOULD include `files_changed`, `lines_added`, `lines_removed`, `branch` when they touch code.
+- `artifacts` (required): an object. Keys are skill-dependent — planning skills include `artifact_paths` for local output or `issues_created` for an explicit GitHub edition; implementation skills include `pr_url`. Both are optional fields within `artifacts`. Skills SHOULD include `files_changed`, `lines_added`, `lines_removed`, `branch` when they touch code.
 - `summary` (required): 2-4 lines of plain text. No markdown. For Telegram report-back.
 - `next` (optional, may be null): a one-sentence hint for the orchestrator.
 - `errors` (required, may be empty): array of strings describing non-fatal issues encountered during the run.
@@ -429,7 +414,7 @@ Every `--auto` run emits a single fenced JSON block as its final output (the las
 
 | Outcome | Meaning | Retry safe? |
 |---|---|---|
-| `completed` | Work landed; PR or issues exist as expected. | n/a (don't retry) |
+| `completed` | The declared endpoint is verified; artifacts, PR or issues exist as expected. | n/a (don't retry) |
 | `bypassed` | Explicit decision not to work this item (heavy-refactor tripwire, scope-exceeded). | No — needs policy change |
 | `needs-input` | Cannot proceed without a human decision (ambiguous design, conflicting plans). A comment was posted on the source. | No — needs human action first |
 | `blocked` | Attempted work but couldn't complete due to environment failure or unresolved internal contradiction. | Yes in principle, but treat as suspect until investigated |
@@ -446,13 +431,13 @@ Every `--auto` run emits a single fenced JSON block as its final output (the las
 
 | Skill | Auto-viable? | Notes |
 |---|---|---|
-| `/claudna:audit tech-debt` | ✅ Yes | Scan + issue creation, no user input needed |
-| `/claudna:audit security` | ✅ Yes | Scan + issue creation, no user input needed |
+| `/claudna:audit tech-debt` | ✅ Yes | Scan + selected output, no user input needed |
+| `/claudna:audit security` | ✅ Yes | Scan + selected output, no user input needed |
 | `/claudna:audit booby-traps` | ✅ Yes | Read-only sweep or focused spot check; finalizes owned scratch before its result |
 | `/claudna:product-enhance` | ✅ Yes | Uses triage path (skip discovery/interview) |
 | `/claudna:audit frontend-perf` | ✅ Yes | Requires page/flow in arguments |
 | `/claudna:audit docs` | ✅ Yes | Global review mode, auto-fix stale docs |
-| `/claudna:audit access-path` | ✅ Yes | Scan + issue creation, no user input needed |
+| `/claudna:audit access-path` | ✅ Yes | Scan + selected output, no user input needed |
 | `/claudna:product-vision` | ⚠️ Limited | Vision without user input produces generic ideas. Use only with tight scope. |
 | `/claudna:audit design` | ❌ No | Requires screenshots, deployed URL, visual judgment |
 | `/claudna:session` (handoff/resume/checkpoint modes) | ✅ Yes | Already implemented |

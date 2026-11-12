@@ -18,9 +18,11 @@ Tool note: the standalone predecessor pre-approved its browser-automation comman
 
 ### Step 1: Scope & Context Gathering
 
-Ask: (1) deployed URL, (2) focus area, (3) anything to skip, (4) front-end stack. If a deployed URL or focus area was provided as the focus argument, use it and skip asking for it. Reuse the caller's `<scratch>` when nested; otherwise make one private root with `mktemp -d "${TMPDIR:-/tmp}/audit-design.XXXXXX"`. Research lives in `<scratch>/research/`.
+Ask: (1) deployed URL, (2) focus area, (3) anything to skip, (4) front-end stack. If a deployed URL or focus area was provided as the focus argument, use it and skip asking for it. Resolve the actual current native owner and exact absolute `<scratch>` and `<artifacts>` paths through `../../_shared/orchestration-guide.md` §1. Research lives in `<scratch>/research/`; never use OS temp or a guessed replacement.
 
-Parallel: **A.** Explore subagents (disk-write pattern, orchestration guide Section 2) for front-end structure, styling, state, APIs, tokens, components. **B.** Begin Step 2.
+For explicit `--output session`, keep research notes and results in context and create no disk intermediates; the disk-writing subagent workflow below applies to persisted-output runs.
+
+Parallel: **A.** general-purpose research subagents (disk-write pattern, orchestration guide Section 2) for front-end structure, styling, state, APIs, tokens, components. **B.** Begin Step 2.
 
 Present codebase context summary. Confirm with user.
 
@@ -64,7 +66,7 @@ Ask these one group at a time, waiting for answers:
 
 ### Step 4: Design Gap Analysis
 
-Compare intent (Step 3) vs. observations (Step 2) vs. code (Step 1). Explore subagents for targeted digs.
+Compare intent (Step 3) vs. observations (Step 2) vs. code (Step 1). general-purpose research subagents for targeted digs.
 
 Subagents read from this directory: `audit-checklist.md`, `ai-slop-blacklist.md`, `font-knowledge.md`, `design-hard-rules.md`. Calibrate by page-type. Present gap analysis with scoped scores (Design + AI Slop where assessed), referencing collected evidence and code.
 
@@ -84,7 +86,7 @@ Ask: **"Which would you like me to design? Pick by number or adjust."** Wait for
 
 ### Step 6: Generate Phased Design Docs
 
-Output lands in `documentation/planning/phases/<session_name>_<YYYY-MM-DD>/` — Plan agents write the family to the session's scratch docs directory and the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/phases/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide Section 3). Overview + numbered docs (1 PR each). Orchestration guide Section 9.
+By default, Plan agents write the final family under `<artifacts>/design/`. Keep research and intermediate material in `<scratch>`. For an explicit `--output docs`, export the selected canonical family with `/claudna:publish <artifacts>/design/ --to docs --dir documentation/planning/phases/<session_name>_<YYYY-MM-DD>/` and retain the source. Overview + numbered docs (1 PR each). Orchestration guide Section 9.
 
 Phase docs include: header, context + supporting evidence, change spec (observable before/after), dependencies, implementation plan, responsive behavior, accessibility checklist, test plan, verification, "What NOT To Do."
 
@@ -102,7 +104,7 @@ Before presenting output (all modes), run the adversarial review gate per `../..
 
 - **User gates** at every step -- never auto-proceed.
 - **Evidence proves the claim** -- cite the relevant screenshot, observation, DOM measurement, code or request result; use video only where static evidence is insufficient.
-- **Subagents:** Steps 1/4 Explore, Step 6 Plan. Disk-write pattern per orchestration guide.
+- **Subagents:** Steps 1/4 general-purpose research, Step 6 general-purpose planning. Disk-write pattern per orchestration guide.
 - **Critique format:** "I notice..." / "I wonder..." / "What if..." / "I think... because..."
 - **Respect existing design system.** Accessibility non-negotiable. Orchestration guide Section 10.
 
@@ -110,12 +112,13 @@ Before presenting output (all modes), run the adversarial review gate per `../..
 
 ## Output Targets
 
-This lens supports `--output github`, `--output session` (the engine default, contract §2), and a `docs` target.
+This lens defaults to `--output artifacts` and supports explicit `session`, `github`, and `docs` targets.
 
 Follow the output guide at `../../_shared/output-guide.md`:
-- For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Apply `design` label. Include SAFE vs RISK classification in issue body.
-- For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs`: follow the subagent workflow in the orchestration guide (publish step: `--dir documentation/planning/phases/<session_name>_<YYYY-MM-DD>/`)
+- For `github`: write selected issue docs under `<artifacts>/design/` (frontmatter + the Section 4 body skeleton), then delegate to `/claudna:publish <artifact-file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Keep each canonical source and the canonical report/family. Apply `design` label. Include SAFE vs RISK classification in issue body.
+- For `artifacts` (default): retain the report and selected plan family with `/claudna:publish <artifacts>/design/ --to artifacts`.
+- For `session`: present results in chat only; create no files.
+- For `docs`: explicitly export the selected canonical family from `<artifacts>/design/` to `documentation/planning/phases/<session_name>_<YYYY-MM-DD>/`; retain the canonical source.
 
 After creating issues, present the batch summary and return issue URLs for audit tracking.
 

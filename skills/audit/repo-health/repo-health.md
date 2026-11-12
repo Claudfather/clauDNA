@@ -74,11 +74,12 @@ Once the user picks a repo, suggest the relevant skill (`/claudna:session resume
 
 ## Output Targets
 
-Follow the output guide at `../../_shared/output-guide.md`. Beyond the shared `--output github|session` surface (contract §2), this lens supports a `docs` target for persisting the dashboard:
+Follow the output guide at `../../_shared/output-guide.md`. This lens defaults to retaining the final dashboard under the current owner's `<artifacts>` directory and supports explicit `session`, `github`, and `docs` destinations:
 
-- For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Create one issue per repo with actionable findings (stale branches, failing CI, PRs needing review). Label with `auto-audit` and `repo-health`.
-- For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs`: author the dashboard and priority recommendations as a publishable doc in `<scratch>` (`../../_shared/orchestration-guide.md` §1) named `00_REPO_HEALTH.md` (master-class: no §4.1 skeleton required — publish Step 1b), then `/claudna:publish <file> --to docs --dir documentation/planning/repo_health/<session_name>_<YYYY-MM-DD>/` (underscore form, matching the `tech_debt/` planning-dir convention)
+- For `artifacts` (default): retain `00_REPO_HEALTH.md` with `/claudna:publish <artifacts>/00_REPO_HEALTH.md --to artifacts` and present its path and summary. Resolve the actual SID/provider and exact paths through orchestration guide §1.
+- For `session`: present the dashboard in chat only; write no report file.
+- For `github`: write selected issue docs under `<artifacts>/repo_health/`, then explicitly export them with `/claudna:publish <artifact-file> --to github-issue --repo <repo>`; retain every source and the report. Use frontmatter and the Section 4 body skeleton; publish validates, dedups, and labels (`auto-audit` and `repo-health`). Create one issue per repo with actionable findings.
+- For `docs`: explicitly export the selected canonical dashboard to `documentation/planning/repo_health/<session_name>_<YYYY-MM-DD>/`; retain the source.
 
 ---
 

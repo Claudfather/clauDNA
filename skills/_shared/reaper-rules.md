@@ -9,7 +9,7 @@ The reaper runs in memory on handoff preparation and resume reads (`/claudna:ses
   - `git status`, `git log --since="30 days ago"` (covers the longest TTL window — Decisions at 30d), `git stash list`, `git branch --list`
   - `gh pr list --author @me --json number,title,state,updatedAt`
   - File-presence checks for any path mentioned in handoff items
-  - `documentation/planning/` status markers (`IN PROGRESS`, `PENDING`, `✅ COMPLETE`)
+  - Status markers (`IN PROGRESS`, `PENDING`, `✅ COMPLETE`) in current-owner artifact plans or explicitly selected scoped/legacy plan paths, validated per source-guide §3; no broad session scan or latest-session selection
 - The current ISO-8601 UTC timestamp
 
 ## Per-section rules

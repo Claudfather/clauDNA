@@ -16,13 +16,15 @@ tools:
 
 Data analysis agent that queries Snowflake and provides insights.
 
+Follow `skills/_shared/orchestration-guide.md` §1 for native SID/provider, effective root, private scratch, artifacts, and exact-owner finalization. Query files, raw SnowSQL output, and sensitive working data stay in `<scratch>`. Sanitized reports and deliberately requested, scope-authorized CSV exports default to `<artifacts>`; include only requested rows and columns, excluding credentials, unrelated results, and unreviewed raw output. Explicit external exports retain the canonical artifact and a private receipt of actual outcome. Missing/conflicting/unverified identity or ordinary-permission denial means no persistence, with no cwd, operation-ID, or OS-temp fallback. Native project memory remains host-owned.
+
 ## Purpose
 
 Answer data questions by writing and executing Snowflake queries. Think like a data analyst - explore, query, and explain findings.
 
 ## Connection
 
-Use SnowSQL with key pair auth. The connection comes from `~/.snowsql/config`; never put a credential on the command line. Write every query to a file in a private directory made with `mktemp -d`, with the Write tool, and pass the file, so the SQL is never parsed as shell:
+Use SnowSQL with key pair auth. The connection comes from `~/.snowsql/config`; never put a credential on the command line. Write every working query to `<scratch>` allocated per orchestration-guide §1, with the Write tool, and pass the file, so the SQL is never parsed as shell:
 ```bash
 snowsql -c default -f <sql-file>
 ```
@@ -65,7 +67,7 @@ snowsql -c default -f <sql-file>
 
 For data export:
 ```bash
-snowsql -c default -o output_format=csv -o header=true -f <sql-file> > output.csv
+snowsql -c default -o output_format=csv -o header=true -f <sql-file> > "<artifacts>/output.csv"
 ```
 
 ## Example

@@ -150,17 +150,17 @@ Ask: "Would you like me to generate detailed tech debt documentation and phased 
 
 **Exit Plan Mode.** Call `ExitPlanMode` per `../../_shared/audit-lens-contract.md` §6 — doc generation past this point requires the Write tool.
 
-If yes, ask the user for a **short session name** (e.g., `api-cleanup`, `db-layer`) or derive one from the focus area. Output lands in:
+If yes, ask the user for a **short session name** (e.g., `api-cleanup`, `db-layer`) or derive one from the focus area. By default, the final family lands in `<artifacts>/tech_debt/`:
 
 ```
-documentation/planning/tech_debt/<session_name>_<YYYY-MM-DD>/
+<artifacts>/tech_debt/
 ├── 00_TECH_DEBT.md
 ├── 01_<remediation-slug>.md
 ├── 02_<remediation-slug>.md
 └── ...
 ```
 
-Plan agents write the family to the session's scratch docs directory (`<scratch>/docs/`, with `<scratch>` the private directory made by `mktemp -d "${TMPDIR:-/tmp}/audit-tech-debt.XXXXXX"`); the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/tech_debt/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide, Section 3).
+Resolve the actual native SID/provider and exact absolute `<scratch>` and `<artifacts>` paths through `../../_shared/orchestration-guide.md` §1 before dispatch. Research stays in `<scratch>`; Plan agents write final docs directly to `<artifacts>/tech_debt/`. An explicit `--output docs` exports the selected canonical family with `/claudna:publish <artifacts>/tech_debt/ --to docs --dir documentation/planning/tech_debt/<session_name>_<YYYY-MM-DD>/`; retain the source.
 
 > **Archive convention:** See orchestration guide, Section 8.
 
@@ -196,24 +196,25 @@ Each plan document represents **exactly 1 PR** and must include:
 
 #### C. Subagent Workflow
 
-Follow Section 9 of the orchestration guide (`../../_shared/orchestration-guide.md`). Plan agents must also read `../../_shared/planning-standard.md` for quality standards and phase doc structure. Scratch directory: `<scratch>/research/`.
+Follow Section 9 of the orchestration guide (`../../_shared/orchestration-guide.md`). Plan agents must also read `../../_shared/planning-standard.md` for quality standards and phase doc structure. Persisted-output runs use the exact `<scratch>/research/` path supplied by orchestration guide §1. For explicit `--output session`, conduct discovery and planning in context and create no disk intermediates.
 
 ---
 
 ## Phase 2.5: Adversarial Review Pass
 
-Follow `../../_shared/pre-handoff-checklist.md` for the full procedure. The adversarial-review `--dispatch` output is markdown with YAML frontmatter per `../../_shared/contracts/lens-result-contract.md` — parse `status` from frontmatter and findings from body sections. Run on each phase doc (`<NN>_*.md`) and the master `00_TECH_DEBT.md` in the session's scratch docs directory, before the family is published to `documentation/planning/tech_debt/<session>/`. Apply in all output modes and `--auto`.
+Follow `../../_shared/pre-handoff-checklist.md` for the full procedure. The adversarial-review `--dispatch` output is markdown with YAML frontmatter per `../../_shared/contracts/lens-result-contract.md` — parse `status` from frontmatter and findings from body sections. Run on each phase doc (`<NN>_*.md`) and the master `00_TECH_DEBT.md` under `<artifacts>/tech_debt/` before presenting or exporting the family. Apply in all output modes and `--auto`.
 
 ---
 
 ## Output Targets
 
-`--output` flag semantics are owned by the lens contract (§2). This lens supports `github` and `session` in addition to the `docs` deliverable produced by the full interactive procedure above.
+`--output` flag semantics are owned by the lens contract (§2). This lens defaults to `artifacts` and supports explicit `session`, `github`, and `docs` destinations.
 
 Follow the output guide at `../../_shared/output-guide.md`:
-- For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Map scan priorities: High → `priority:high`, Medium → `priority:medium`, Low → `priority:low`.
-- For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs`: follow the subagent workflow in the orchestration guide (publish step: `--dir documentation/planning/tech_debt/<session_name>_<YYYY-MM-DD>/`)
+- For `github`: write selected finding docs under `<artifacts>/tech_debt/` (frontmatter + the Section 4 body skeleton), then delegate to `/claudna:publish <artifact-file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Keep each canonical source and the canonical report/family. Map scan priorities: High → `priority:high`, Medium → `priority:medium`, Low → `priority:low`.
+- For `artifacts` (default): retain the report and plan family with `/claudna:publish <artifacts>/tech_debt/ --to artifacts`.
+- For `session`: present findings in chat only; create no report files.
+- For `docs`: explicitly export the selected canonical family from `<artifacts>/tech_debt/` to `documentation/planning/tech_debt/<session_name>_<YYYY-MM-DD>/`; retain source artifacts.
 
 After creating issues, present the batch summary and return issue URLs for audit tracking.
 
@@ -224,9 +225,9 @@ After creating issues, present the batch summary and return issue URLs for audit
 When `--auto` is set (see the lens contract §4 and orchestration guide Section 10):
 1. Skip Plan Mode — go straight to Phase 1 scan
 2. Skip the user confirmation gate between Phase 1 and Phase 2
-3. Implies `--output github`
+3. Defaults to canonical `artifacts`; file issues only when `--output github` is explicit.
 4. Use the focus area from the dispatched arguments as scope. If none provided, scan full codebase but limit to top 10 findings.
-5. Create GitHub Issues per the output guide (`--output github`) for all findings above LOW severity
+5. With explicit `--output github`, create issues per the output guide for all findings above LOW severity
 6. **Emit the structured-result shape** per `../../_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
 ```json
@@ -236,7 +237,7 @@ When `--auto` is set (see the lens contract §4 and orchestration guide Section 
   "artifacts": {
     "lens": "tech-debt",
     "issues_created": ["https://github.com/org/repo/issues/123", "..."],
-    "session_dir": "documentation/planning/tech_debt/<session>/",
+    "session_dir": "<artifacts>/tech_debt/",
     "files_changed": 0
   },
   "summary": "<2-3 line digest of N findings, M issues filed>",

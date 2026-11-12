@@ -93,18 +93,21 @@ authorized. Durable artifacts and operation markers survive scratch cleanup.
 | Claude hook | Native event `session_id`, provider claude | Actual hook plus ordinary scratch/artifact write receipt |
 | Claude local/plugin skill | Rendered `${CLAUDE_SESSION_ID}` | Actual invocation; a raw file read or shell variable is insufficient |
 | Codex hook | Native event `session_id`, provider codex | Actual hook receipt, separate from Desktop skill execution |
-| Codex skill | Surface-provided native thread/session ID; present aliases agree | Qualify each actual execution surface separately |
+| Codex skill | Surface-provided native thread/session ID; present aliases agree | Bind the actual surface and qualify each materially different identity-delivery mechanism |
 | Cursor hook-free skill | Native identity transport remains to be established | Actual hook-free invocation and write receipt; no added hooks |
 
 Each receipt binds loaded revision, host version/surface, identity source,
 ordinary write outcome, capture-off behavior and observed filesystem effects.
 Missing evidence is unverified, not unsupported. A hook-only transport cannot
 qualify a hook-free workflow. No global grants or authentication changes are
-part of qualification. Broad workflow defaults wait for these prerequisites.
+part of qualification. These prerequisites gate merge/release of broad workflow
+defaults; the held draft implementation may proceed before acceptance. One smoke
+test per materially different identity-delivery mechanism is sufficient when
+source equivalence is recorded; unrelated host mechanisms do not inherit a pass.
 
 The first three phases supply allocation/classification, runtime ownership and
-scoped continuity. Broad workflow defaults remain held by the native prerequisite;
-maintainer callers remain pending their owning phase. Existing tests passing
+scoped continuity; phase04 supplies the broad workflow defaults on the held draft
+stack. Maintainer callers remain pending their owning phase. Existing tests passing
 does not establish package-wide root compliance. The integration stack remains
 unmerged and unreleased pending native and consumer acceptance, a compatible
 recovery candidate or approved forward recovery, and the owner's breaking-release
@@ -185,12 +188,13 @@ backs up under `R/backups/legacy-install/<run>/`. Old saved lists/backups are
 read-only inputs for explicit discovery/restore, never silently migrated.
 
 
-## Explicit workflow artifacts (partial phase04 preparation)
+## Workflow artifacts and explicit editions
 
-`--output artifacts` and `/claudna:publish --to artifacts` explicitly select
-session-owned durable material. Existing workflow defaults remain unchanged
-until the native identity/write prerequisites above pass. `session` remains a
-chat-only alias. These Markdown contracts and static assertions do not establish
+`--output artifacts` and `/claudna:publish --to artifacts` are the defaults for
+generated durable output, including with `--auto`. Repository, vault, GitHub and
+Notion editions remain explicit exports. `session` remains a chat-only alias
+with no intermediate file allocation. Missing native identity or ordinary write
+permission makes persistence unavailable without an OS-temp or operation fallback. These Markdown contracts and static assertions do not establish
 native execution or publication acceptance.
 
 Use the shared allocator with the actual current native owner. Promotion from

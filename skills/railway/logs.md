@@ -4,6 +4,8 @@ Invoked by /claudna:railway in logs mode. Pre-flight (CLI install, version gate,
 
 View and filter Railway service logs. Supports JSON output, level filtering, time ranges, and pattern matching. Follow these steps in order.
 
+For any file-backed operation, follow `../_shared/orchestration-guide.md` §1 and use native-session `<scratch>` for unreviewed raw logs/JSON and sensitive working data. A user-requested durable report defaults to `<artifacts>/railway/logs/<run>.md`. After review and credential redaction, deliberately selected requested log evidence may be retained in canonical artifacts; never promote unreviewed raw service output. Do not use cwd, operation IDs, or OS-temp directories for durable ownership. Finalize only the exact owned scratch at terminal completion after all writers and log readers/analysis have finished; preserve canonical artifacts.
+
 ## Step 1: Fetch Logs
 
 **Default (last 100 lines):**
@@ -91,7 +93,7 @@ railway logs --lines 100 --json
 ```bash
 railway logs --lines 500 --json
 ```
-If the user wants logs saved to a file, make a private directory with `mktemp -d "${TMPDIR:-/tmp}/railway.XXXXXX"` and write the output to `railway-log-output.json` inside it using the Write tool.
+If the user wants raw logs saved for analysis, use `<scratch>/railway-log-output.json` allocated per orchestration-guide §1 and do not print sensitive raw values. If the user requests a durable report, write a sanitized summary to `<artifacts>/railway/logs/<run>.md`; never promote raw service logs without explicit authorization and review.
 
 **Structured view:**
 ```bash

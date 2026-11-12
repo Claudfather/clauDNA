@@ -8,7 +8,7 @@ Reference material for the `/claudna:audit access-path` lens. Detailed instructi
 
 Launch a general-purpose subagent:
 
-**Prompt:** "Discover every access path into this system's core logic. Create the directory and write your findings to `<scratch>/research/path-inventory.md` using the Write tool. Return a 2-4 line summary when done."
+**Prompt:** "Discover every access path into this system's core logic. The orchestrator supplies the verified current native owner (SID/provider) and exact absolute `<scratch>` and `<artifacts>` paths; use only the supplied `<scratch>` path and do not create an alternate temp root. Write findings to `<scratch>/research/path-inventory.md` using the Write tool. Return a 2-4 line summary when done. For explicit chat-only `--output session`, do not create files; return the full bounded findings needed for synthesis/review in context."
 
 The subagent should:
 
@@ -55,7 +55,7 @@ The subagent should:
 
 Launch a general-purpose subagent:
 
-**Prompt:** "Map how cross-cutting concerns are enforced across this system's access paths. Read the scan categories from `<skill-dir>/scan-categories.md` for the checklist. Write your findings to `<scratch>/research/concern-mapping.md` using the Write tool. Return a 2-4 line summary when done."
+**Prompt:** "Map how cross-cutting concerns are enforced across this system's access paths. Read the scan categories from `<skill-dir>/scan-categories.md` for the checklist. The orchestrator supplies the verified current native owner (SID/provider) and exact absolute `<scratch>` and `<artifacts>` paths; use only the supplied `<scratch>` path and do not create an alternate temp root. Write findings to `<scratch>/research/concern-mapping.md` using the Write tool. Return a 2-4 line summary when done. For explicit chat-only `--output session`, do not create files; return the full bounded findings needed for synthesis/review in context."
 
 The subagent should:
 
@@ -99,7 +99,7 @@ The subagent should:
 
 Launch a third general-purpose subagent after A and B complete:
 
-**Prompt:** "Read the path inventory and concern mapping research files in `<scratch>/research/`. Also read the codebase directly to verify and deepen the findings. Build a concern placement analysis and write it to `<scratch>/research/convergence.md` using the Write tool. Return a summary of key findings (2-4 lines)."
+**Prompt:** "Read the path inventory and concern mapping research files in the caller-supplied `<scratch>/research/`. Also read the codebase directly to verify and deepen the findings. The orchestrator supplies the verified current native owner (SID/provider) and exact absolute `<scratch>` and `<artifacts>` paths; do not create an alternate temp root. Build a concern placement analysis and write it to `<scratch>/research/convergence.md` using the Write tool. Return a summary of key findings (2-4 lines). For explicit chat-only `--output session`, create no files and return the full bounded convergence findings in context for synthesis/review instead of the short summary."
 
 The convergence subagent must perform three analyses:
 

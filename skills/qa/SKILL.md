@@ -1,8 +1,8 @@
 ---
 name: qa
 user-invocable: true
-description: "Use for headless-browser QA against a running app — systematic bug-hunting with optional fixes, post-deploy canary monitoring, performance benchmarking, ad-hoc browser interaction, cookie import, or an autonomous full-site visual crawl with per-route findings filed as issues. For a judgment-based design critique, use /claudna:audit design; for static code-level performance analysis, use /claudna:audit frontend-perf. Replaces /visual-crawl."
-argument-hint: "[test|report|canary|benchmark|browse|cookies|crawl] [--auto] [--deep] [--output github|session] [--url <base-url>] [--local] [focus-area]"
+description: "Use for headless-browser QA against a running app — systematic bug-hunting with optional fixes, post-deploy canary monitoring, performance benchmarking, ad-hoc browser interaction, cookie import, or an autonomous full-site visual crawl with per-route findings and explicit issue export. For a judgment-based design critique, use /claudna:audit design; for static code-level performance analysis, use /claudna:audit frontend-perf. Replaces /visual-crawl."
+argument-hint: "[test|report|canary|benchmark|browse|cookies|crawl] [--auto] [--deep] [--output artifacts|docs|github|vault|notion|session] [--url <base-url>] [--local] [focus-area]"
 allowed-tools:
   - "Bash(which *)"
   - "Bash(test *)"
@@ -29,6 +29,10 @@ allowed-tools:
 > **Codex:** Read `../_shared/codex-tools.md` before following this skill. Apply its tool, root and dispatch mappings throughout.
 
 Browser-automation framework with modes for different QA tasks. Uses a fast headless browser (~100ms per command) for navigating, interacting, screenshotting, and verifying state.
+
+## Working files and output
+
+Follow `../_shared/orchestration-guide.md` §1 for native session allocation and exact-owner cleanup. Browser jobs, raw logs, screenshots, cookie material, and working findings stay in `<scratch>`. Sanitized QA reports and deliberately selected, redacted evidence default to `<artifacts>`; browser-managed profiles and host screenshots remain host-owned. `--output artifacts` is the explicit spelling of the default; `--auto` has the same default unless another output target is explicitly supplied. Explicit `--output docs|github|vault|notion` exports the canonical report/evidence and records actual results in the current session's private receipt. `--output session` produces only in-context findings and performs no allocation or intermediate file writes; if a requested crawl requires disk-backed evidence, report persistence unavailable and stop before writing. Missing/conflicting/unverified native identity or ordinary-permission denial has no cwd, operation-ID, or OS-temp fallback. Keep user-requested project fixes separate and project-owned.
 
 For PR visual evidence in test, report or browse mode, read
 `../_shared/visual-evidence.md` §1 before capture. Reuse the shared evidence decision
@@ -146,7 +150,7 @@ Use before test-and-fix, report-only, canary, or crawl mode if auth is required.
 
 **When:** user says "visual crawl", "crawl the site", "screenshot every page", "test the whole frontend."
 
-Systematic visual crawl of a frontend application. Discovers routes, screenshots every page at three viewports, tests interactions for errors, compares observed styles against design tokens, and files GitHub issues with screenshot evidence for every finding.
+Systematic visual crawl of a frontend application. Discovers routes, screenshots every page at three viewports, tests interactions for errors, compares observed styles against design tokens, and retains findings with selected screenshot evidence; explicit `--output github` also files issues.
 
 Runs on a real Playwright engine. Three support files in this directory carry the mechanics:
 - `deep-crawl.md` — copy-pasteable scripts: screenshot recipe (`device_scale_factor=2`, networkidle, full-page), console-error collector, the `--deep` interactive harness (click ≤30 buttons / fill ≤10 forms with before/after diffs), and the chat-simulation driver.
@@ -156,10 +160,11 @@ Runs on a real Playwright engine. Three support files in this directory carry th
 ### Arguments
 
 Parse `$ARGUMENTS` at invocation:
-- `--auto`: Fully non-interactive. Implies `--output github`. Crawl, screenshot, test, file issues, return summary.
+- `--auto`: Fully non-interactive. Defaults to canonical artifacts; explicit `--output docs|github|vault|notion` selects that export. Crawl, screenshot, test, and return a summary. File issues only for explicit `--output github`.
 - `--deep`: Full interactive testing. Extends the interaction-testing step with: click every button/link and verify result, fill and submit forms, simulate chat conversations with sample queries, screenshot before/after each interaction, report broken flows. Uses Playwright for interaction testing (see `deep-crawl.md`).
-- `--output github`: Write findings as GitHub Issues (default). See output guide (`../_shared/output-guide.md`).
-- `--output session`: Present findings in chat only, no persistence.
+- `--output artifacts`: Save the sanitized report and selected evidence in current-session artifacts (default).
+- `--output docs|github|vault|notion`: Explicitly export canonical artifacts through the matching publisher and retain a private receipt.
+- `--output session`: Present findings in chat only, with no allocation or file writes.
 - `--url <base-url>`: Crawl a deployed URL (e.g., `--url https://app.example.com`).
 - `--local`: Spin up a local dev server from the project directory and crawl it.
 - Remaining text is a focus area or constraint (e.g., "only the dashboard pages").
@@ -177,7 +182,7 @@ If neither `--url` nor `--local` is specified, ask the user.
 
 ### Process
 
-1. **Setup.** Scratch dir: make it with `mktemp -d "${TMPDIR:-/tmp}/qa-crawl.XXXXXX"` (`<scratch>` below). Create subdirectories: `screenshots/`, `research/`, `console-logs/`. Detect Chrome/Chromium: `which chromium`, `which google-chrome`, `which chromium-browser` in parallel.
+1. **Setup.** Check the output target before allocation or starting a crawl: `--output session` cannot run this disk-backed screenshot crawler. Report that limitation in chat without creating directories, jobs, screenshots, or logs. For artifact-backed output, resolve `<scratch>` and `<artifacts>` per orchestration-guide §1 before writing; create `screenshots/`, `research/`, and `console-logs/` under scratch. Detect Chrome/Chromium: `which chromium`, `which google-chrome`, `which chromium-browser` in parallel.
 
 2. **Determine base URL.**
    - **If `--url <base-url>`:** Use directly. Verify reachable with `curl -sI <base-url>`. That is the base URL you were given; a route found on the site never goes on a command line (`deep-crawl.md`, the bundled runner).
@@ -195,8 +200,10 @@ If neither `--url` nor `--local` is specified, ask the user.
 7. **Findings compilation.** Classify per `crawl-checklist.md`'s categories and priority mapping (Critical / High / Medium / Low).
 
 8. **Output.** **Exit Plan Mode** (`ExitPlanMode`).
-   - **`--output github` or `--auto`:** write each finding as a doc (frontmatter + Section 4 body skeleton; group related findings per `crawl-checklist.md`'s grouping rules), `tags:` including `auto-audit`, `visual-crawl`, a category label, a priority label; delegate each to `/claudna:publish <file> --to github-issue --repo <repo>`. Finish with a batch summary doc (output guide §4.6).
-   - **`--output session`:** present findings in chat with inline screenshot references. Stay in Plan Mode.
+   - **`--output artifacts` (default, including `--auto` alone):** save sanitized findings and only deliberately selected/redacted screenshots under `<artifacts>`; raw screenshots/logs stay in scratch.
+   - **Explicit `--output github`:** retain the canonical report and selected evidence, then publish selected finding docs as issues. Record actual URLs/status in the private receipt. `--auto` alone does not file issues.
+   - **Explicit `--output docs`, `vault`, or `notion`:** retain the canonical report/evidence and use the selected adapter, recording the actual outcome.
+   - **`--output session`:** present findings only when the requested work can stay in context without scratch/job/evidence files; otherwise stop before writing and report that the requested crawl needs an artifact-backed route.
 
 Return structured summary:
 ```
@@ -219,9 +226,9 @@ Scoped to **Crawl mode only** — the other six modes have no `--auto` contract.
 When `--auto` is set:
 1. Skip Plan Mode — go straight to crawl
 2. Skip user confirmation gates
-3. Implies `--output github`
+3. Defaults to canonical `<artifacts>` output; explicit `--output github` selects issue publishing.
 4. Must have `--url` or `--local` (cannot prompt for URL)
-5. Create GitHub Issues for all findings at Medium priority or above
+5. Create GitHub Issues for findings at Medium priority or above only when `--output github` was explicitly selected; retain the canonical report and selected evidence.
 6. **Emit the structured-result shape** per `../_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
 ```json
@@ -237,7 +244,7 @@ When `--auto` is set:
     "dead_links": 1,
     "interaction_failures": 0,
     "design_token_violations": 5,
-    "scratch_dir": "<scratch>/"
+    "canonical_artifacts": "<artifacts>/qa/<run>/"
   },
   "summary": "<2-3 line digest>",
   "next": null,
@@ -249,7 +256,7 @@ When `--auto` is set:
 - `outcome` is `completed` on success, `blocked` if base URL is unreachable or no routes were discovered.
 - `--deep` mode produces additional artifacts; if `--deep` was used, add `deep_findings: N` to artifacts.
 
-`--auto` and `--deep` can be combined: `--auto --deep --url https://app.example.com` runs a full interactive crawl with issue filing, no human in the loop.
+`--auto` and `--deep` can be combined: `--auto --deep --url https://app.example.com` runs a full interactive crawl with canonical artifact output, no human in the loop. Issue filing additionally requires explicit `--output github`.
 
 ---
 
@@ -269,5 +276,6 @@ When `--auto` is set:
 ## Output Targets (crawl mode)
 
 Follow the output guide at `../_shared/output-guide.md`:
-- For `github` (default): write each finding as a doc (frontmatter + Section 4 body skeleton) with `tags:` including `visual-crawl` + a category label, then delegate to `/claudna:publish <file> --to github-issue --repo <repo>` (publish dedups + labels).
-- For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
+- For `artifacts` (default): keep the sanitized report/findings and selected evidence in `<artifacts>`.
+- For explicit `github`: preserve canonical artifacts, then publish selected finding docs to issues and record actual URLs/status.
+- For `session`: present in chat without session allocation or file writes; disk-backed crawl requests must stop as unavailable.

@@ -14,6 +14,8 @@ requires:
 
 Set up a project with standard clauDNA configuration: `CLAUDE.md`, `CHANGELOG.md`, `PROJECT_MISSION.md`, the `documentation/` planning structure, and the shared-docs seam (a `## Shared Documentation` section in CLAUDE.md — Step 6.5). Works for both new repos and existing projects that lack these files.
 
+The files this user explicitly asks to initialize (`AGENTS.md`/`CLAUDE.md`, `CHANGELOG.md`, `PROJECT_MISSION.md`, setup templates, and the requested project scaffold) remain project-owned outputs at the selected project root. Follow `../_shared/orchestration-guide.md` §1 only for private intermediate research or a generated status report; do not relocate project instructions/config or user-authored files into session artifacts. If a status report is requested, persist its sanitized copy under `<artifacts>`; missing/conflicting/unverified native identity or permission denial means omit that persistence, with no cwd/operation fallback. No session-only report means no session allocation.
+
 ## Codex project target
 
 On Codex, use `AGENTS.md` as the instruction target in Steps 1–3 and 7, with
@@ -157,7 +159,7 @@ documentation/
 If `documentation/` already exists, scan for missing subdirectories and create only what's missing.
 
 **Directory purposes:**
-- `planning/` — skill output from `/claudna:audit tech-debt`, `/claudna:audit security`, `/claudna:product-enhance`, `/claudna:product-vision`. Session subdirectories created at runtime.
+- `planning/` — project-owned docs explicitly exported by a user-selected `--output docs`; the default generated reports for `/claudna:audit`, `/claudna:product-enhance`, and `/claudna:product-vision` live in the owning session's artifacts. Existing project planning files are not moved by setup.
 - `decisions/` — Architecture Decision Records (ADRs). Why we chose X over Y. Permanent, not archived.
 - `specs/` — Technical specifications, API contracts, data schemas. Living docs.
 - `guides/` — Setup guides, onboarding, runbooks. Living docs.

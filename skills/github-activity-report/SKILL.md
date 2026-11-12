@@ -13,6 +13,8 @@ requires:
 
 Pulls accurate per-org or per-user GitHub activity stats over a chosen time window. Avoids the GitHub search API's 1,000-result pagination cap by iterating each repo's `pulls` and `commits` endpoints directly.
 
+Follow `../_shared/orchestration-guide.md` §1 for native session allocation and exact-owner cleanup. The repo list, raw JSONL crawl, progress log, and rollup intermediates stay in `<scratch>`. The finished report defaults to `<artifacts>/<scope>-activity-<since>_to_<until>.md`; a user-requested external copy is an explicit export that keeps the canonical report and records its actual result in the current session's private receipt. Missing/conflicting/unverified native identity or ordinary-permission denial stops persistence without cwd, operation-ID, Downloads, or OS-temp fallback. The crawl script always requires caller-supplied `OUT`; pass the exact allocated scratch path.
+
 **Reference:** `crawl.sh` — the per-repo crawl script. Run the bundled script from this skill's own directory, never a copy.
 
 ---
@@ -30,7 +32,7 @@ A markdown report with:
 - **Concentration insight**: who is #1 in which repos, dominant share (>80%), and which repo patterns exist (solo-driven vs lead-with-team vs multi-contributor)
 - Caveats (search-API cap, identity-string fallback for unattributed commits, bot traffic)
 
-Saved to `~/Downloads/<scope>-activity-<since>_to_<until>.md` by default. Raw JSONL data is left in the scratch directory (`<scratch>`, readable by you alone) for further slicing.
+Saved to `<artifacts>/<scope>-activity-<since>_to_<until>.md` by default. Raw JSONL data remains private in `<scratch>` while the crawl and requested analysis are active; do not copy it into the durable report or external exports unless the user explicitly requests and approves that data. Before terminal completion, finalize the exact scratch after the crawl exits and report the observed cleanup. An explicit active handoff may retain it only with the exact path and named next owner; unknown/running writers retain it without a cleanup-complete claim.
 
 ---
 
@@ -95,7 +97,7 @@ query($endCursor: String) {
 }' --jq '.data.viewer.repositories.nodes[] | select(.isArchived == false) | .name'
 ```
 
-Make the scratch directory with `mktemp -d "${TMPDIR:-/tmp}/gh-activity-stats.XXXXXX"` (`<scratch>` below) and save the list to `<scratch>/repos.txt`. Show the count and ask the user to confirm before crawling (active repos × 2 endpoints × paged calls = potentially hundreds of API calls).
+Resolve `<scratch>` through orchestration-guide §1 and save the repo list to `<scratch>/repos.txt`. Show the count and ask the user to confirm before crawling (active repos × 2 endpoints × paged calls = potentially hundreds of API calls).
 
 ### Step 4: Run the crawl
 
@@ -147,7 +149,7 @@ done
 
 ### Step 6: Write the report
 
-Generate `~/Downloads/<scope>-activity-<since>_to_<until>.md` with:
+Generate `<artifacts>/<scope>-activity-<since>_to_<until>.md` with:
 
 - Title, window, generation date, scope, method line
 - Headline totals table
@@ -165,7 +167,7 @@ Generate `~/Downloads/<scope>-activity-<since>_to_<until>.md` with:
 
 ### Step 7: Confirm
 
-Tell the user the report path and the raw JSONL location. Offer to slice further (e.g., "Show me <user>'s breakdown by repo" or "Strip bots and re-rank").
+Tell the user the canonical report path. Offer further slicing before finalizing scratch (e.g., "Show me <user>'s breakdown by repo" or "Strip bots and re-rank"). If an external export was explicitly requested, report its actual path separately; never imply a private raw-data export. On terminal completion report verified scratch cleanup; do not report a deleted raw-data path as a retained deliverable.
 
 ---
 

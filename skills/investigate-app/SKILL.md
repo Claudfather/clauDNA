@@ -10,6 +10,10 @@ description: "Use when something is broken in production and you need to investi
 
 Production debugging workflow: detect platform, gather evidence, root-cause analysis, generate fix plans.
 
+## Working files and output
+
+Follow `../_shared/orchestration-guide.md` §1 for native session allocation and exact-owner cleanup. Raw logs, query results, research notes, and delegated work stay in `<scratch>`; sanitized findings, the investigation summary, and generated fix-plan family default to `<artifacts>`. Explicit `--output docs|github|vault|notion` publishes that canonical revision and records its actual result in the current session's private receipt. `--output session` is chat-only and performs no allocation or writes. Missing/conflicting/unverified native identity or ordinary-permission denial means no persistence; never fall back to cwd, an operation ID, or OS temp. Preserve project source/config/worktree ownership and host-managed browser or memory data.
+
 **Persona:** Senior SRE -- methodical, evidence-driven, never guesses. Every finding cites evidence. Every recommendation includes confidence and rationale.
 
 ## The Iron Law
@@ -41,7 +45,7 @@ Run detection checks in parallel, bootstrap missing CLIs, present detection summ
 
 ### Steps 3-4: Gather Evidence & Trace Code
 
-Scratch directory: `<scratch>/research/`, with `<scratch>` a private directory made by `mktemp -d "${TMPDIR:-/tmp}/investigate-app.XXXXXX"`.
+Use `<scratch>/research/` for working evidence and `<artifacts>` for sanitized durable findings and final plans. Resolve both through orchestration-guide §1 before the first write; do not place raw evidence or credentials in artifacts.
 
 Launch **parallel Explore subagents** per orchestration guide, Section 2 (Explore Agent Disk Pattern). Each writes research to the scratch directory, returns a 2-4 line summary. Do NOT read CLAUDE.md or MEMORY.md in the orchestrator.
 
@@ -77,7 +81,7 @@ Ask the user: **"Which fixes would you like me to plan? Pick by number, or tell 
 
 Generate implementation plans for approved fixes. Ask user for a session name (e.g., `api-500s`).
 
-**Output** lands in `documentation/planning/investigations/<session_name>_<YYYY-MM-DD>/` -- `00_INVESTIGATION.md` (full record) plus numbered fix docs. Plan agents write the family to the session's scratch docs directory and the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/investigations/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide, Section 3). Archive convention: orchestration guide, Section 8.
+**Output** defaults to `<artifacts>/investigations/<session_name>_<YYYY-MM-DD>/` — `00_INVESTIGATION.md` (sanitized record) plus numbered fix docs. Plan agents write the family under `<artifacts>` after receiving its absolute path and the owning SID/host; they keep private research in `<scratch>`. For an explicitly selected `docs` export, publish the canonical family with `/claudna:publish <artifacts-family> --to docs --dir documentation/planning/investigations/<session_name>_<YYYY-MM-DD>/`; retain the canonical family and record the actual result in the private receipt. Archive convention: orchestration guide, Section 8.
 
 **Subagent workflow:** Orchestration guide, Section 9. Plan agents read from the scratch directory. Keep fix docs proportional to complexity.
 

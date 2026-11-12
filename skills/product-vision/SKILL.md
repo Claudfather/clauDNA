@@ -2,7 +2,7 @@
 name: product-vision
 user-invocable: true
 description: "Use when you want to explore what a codebase could become — candidate features one or two hops from existing infrastructure, compound plays, and a trajectory aligned to the project mission. For triaging known issues in an existing product, use /claudna:product-enhance. For discovery gated on an active piece of creative work, needing user approval before implementation, use /claudna:kindle instead. Replaces /product-brainstorm."
-argument-hint: "[--auto] [--output github|session] [focus-area]"
+argument-hint: "[--auto] [--output artifacts|docs|github|vault|notion|session] [focus-area]"
 ---
 
 # Product Vision — Architecture-Grounded Feature Exploration
@@ -11,10 +11,16 @@ argument-hint: "[--auto] [--output github|session] [focus-area]"
 
 Act as a product strategist with deep technical fluency. Unlike generic brainstorming, this skill is **grounded in the actual codebase** — every idea must trace back to existing infrastructure that makes it feasible. The goal is to find what's **1-2 hops away** from what already exists, group ideas into **compound plays** that are greater than the sum of their parts, and align everything to a **project mission**.
 
+## Working files and output
+
+Follow `../_shared/orchestration-guide.md` §1 for native session allocation and exact-owner cleanup. Exploration and intermediate notes stay in `<scratch>`; the sanitized capability map, scored ideas, vision report, and generated plan docs default to `<artifacts>`. `--output artifacts` is the explicit spelling of that default; `--auto` uses the same default unless an output target was explicitly supplied. Explicit `--output docs|github|vault|notion` publishes retained canonical artifacts and records actual outcomes in the current session's private receipt (`docs` → `--to docs`, `github` → `--to github-issue --repo <repo>`, `vault` → `--to vault`, `notion` → `--to notion`). `--output session` is chat-only and performs no allocation or writes; skip disk-writing subagent steps in this mode. Missing/conflicting/unverified identity or ordinary-permission denial stops persistence without cwd, operation-ID, or OS-temp fallback. Preserve user-authored project source/config as project-owned.
+
 ## Arguments
 
 Parse `$ARGUMENTS` at invocation:
-- `--auto`: Fully non-interactive. Implies `--output github`. Explore, analyze, create issues, return summary. See Section: Autonomous Mode.
+- `--auto`: Fully non-interactive. Defaults to canonical session artifacts; an explicit `--output docs|github|vault|notion` selects an export. Explore, analyze, and return a summary. See Section: Autonomous Mode.
+- `--output artifacts`: Keep sanitized reports and any generated plan docs in current-session artifacts (default).
+- `--output docs|github|vault|notion`: Explicitly export the canonical revision through `/claudna:publish` using the matching adapter (`github` maps to `--to github-issue --repo <repo>`), retaining the source and recording the actual result.
 - `--output github`: Write findings as GitHub Issues. See output guide (`../_shared/output-guide.md`).
 - `--output session`: Present findings in chat only, no persistence.
 - Remaining text is a focus area or constraint. If provided, scope exploration to that area.
@@ -41,7 +47,7 @@ Look for `PROJECT_MISSION.md` in the repo root. This file contains the project's
 
 ### Step 2: Deep Codebase Exploration
 
-Launch **Explore subagents** in parallel (disk-write pattern, scratch dir: `<scratch>/research/`, with `<scratch>` made by `mktemp -d "${TMPDIR:-/tmp}/product-vision.XXXXXX"`). Each subagent writes findings to a file and returns only a summary.
+Launch **Explore subagents** in parallel (disk-write pattern, scratch dir: `<scratch>/research/`, allocated per `../_shared/orchestration-guide.md` §1). Each subagent writes private findings there and returns only a summary.
 
 Subagent assignments:
 1. **Architecture & capabilities** — what does this system do today? Map every major module, service, API endpoint, and user-facing feature.
@@ -149,7 +155,7 @@ Present conversationally for the user to edit. **Do not write the file in `--aut
 
 **Exit Plan Mode.** Call `ExitPlanMode`.
 
-Create GitHub Issues (if `--output github` or `--auto`):
+Create GitHub Issues only when `--output github` is explicitly selected:
 - One issue per feature idea (tagged with `product-vision`, hop count, compound play if applicable)
 - One issue per compound play (meta-issue linking the component features)
 - Cross-reference against existing open issues to avoid duplicates
@@ -169,9 +175,9 @@ Present summary:
 When `--auto` is set:
 1. Skip Plan Mode — go straight to exploration
 2. Skip user confirmation gates
-3. Implies `--output github`
+3. Defaults to `--output artifacts`; explicit `--output docs|github|vault|notion` selects that export.
 4. Use focus area from `$ARGUMENTS` as scope. If none, explore full codebase.
-5. Create GitHub Issues for all ideas scored 🟢 or 🟡
+5. For explicit `session`, return the report and ideas in context with no files; otherwise write the sanitized vision report and idea set to `<artifacts>`. Create GitHub Issues for ideas scored 🟢 or 🟡 only when `--output github` was explicitly selected; retain canonical artifacts and record actual URLs/status privately.
 6. Do NOT write PROJECT_MISSION.md — just include proposed mission in summary
 7. **Emit the structured-result shape** per `../_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
@@ -180,7 +186,8 @@ When `--auto` is set:
   "skill": "product-vision",
   "outcome": "completed",
   "artifacts": {
-    "issues_created": ["..."],
+    "issues_created": [],
+    "canonical_report": "<artifacts>/VISION.md",
     "compound_plays_identified": 3,
     "one_hop_features": 7,
     "two_hop_features": 4,
@@ -194,7 +201,7 @@ When `--auto` is set:
 }
 ```
 
-- `mission_proposed` is `true` when no PROJECT_MISSION.md existed and one was synthesized; the proposed text remains in chat per existing rule (not written to disk in --auto).
+- `mission_proposed` is `true` when no PROJECT_MISSION.md existed and one was synthesized; the proposed mission text remains in the summary, while the generated vision report is canonical under `<artifacts>`.
 - `outcome` is `completed` on success.
 
 ---
@@ -202,9 +209,12 @@ When `--auto` is set:
 ## Output Targets
 
 Follow the output guide at `../_shared/output-guide.md`:
-- For `github`: write each finding/play as a doc (frontmatter + Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish dedups and applies labels from `tags:`
-- For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs` (default): author the vision report as a publishable doc in scratch named `00_VISION.md` (master-class: no §4.1 skeleton required — publish Step 1b; compound-play/feature docs that ARE implementation-ready go out per-finding via `github`), then `/claudna:publish <file> --to docs --dir documentation/planning/product-vision/<session_name>_<YYYY-MM-DD>/`
+- For `artifacts` (default): write the sanitized vision report and any planning-doc family under `<artifacts>/product-vision/<session_name>_<YYYY-MM-DD>/`; private exploration remains in scratch.
+- For explicit `github`: retain canonical reports, then publish selected findings/plays as issues; record actual URLs/status in the private receipt.
+- GitHub issue documents retain output-guide frontmatter and Section 4 body skeleton, with `product-vision`, hop-count, and compound-play tags. Publish one issue per selected feature idea and one linking meta-issue per selected compound play; cross-reference existing open issues and apply `enhancement`, `product-vision`, and `one-hop` or `two-hop` labels.
+- For explicit `docs`: retain the canonical family, then publish `00_VISION.md` as the publishable family master (presence-only validation); publish implementation-ready compound-play or feature docs individually only when GitHub output is selected.
+- For explicit `session`: present sanitized results in chat without allocation or file writes; do not run disk-writing subagent steps.
+- For explicit `docs`, `vault`, or `notion`: retain canonical reports and use the selected publisher adapter, recording its actual result.
 
 ---
 

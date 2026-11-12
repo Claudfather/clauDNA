@@ -29,12 +29,9 @@ Lead with a boxed summary: lens, scope (files scanned), and counts by score. The
 
 ## Output Targets
 
-Beyond the shared `--output github|session` surface (contract §2):
+This lens defaults to retaining a sanitized `00_CACHE_AUDIT.md` report with `/claudna:publish <artifacts>/00_CACHE_AUDIT.md --to artifacts`; resolve the actual SID/provider and exact paths through orchestration guide §1. Explicit `session` presents the summary and findings in chat only, with no report file. Explicit `github` writes selected issue docs under `<artifacts>/cache/` and exports them with `/claudna:publish <artifact-file> --to github-issue --repo <repo>`; retain the sources. Publish validates, dedups, and applies labels (`auto-audit` + `cache`).
 
-- `session` (engine default): present the summary + findings table in chat.
-- `github`: author each WARN/FAIL cluster as a finding doc (frontmatter + the §4.1 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels. Label `auto-audit` + `cache`.
-
-Under `--auto` (auto: yes): emit the single fenced structured-result JSON per `../../_shared/orchestration-guide.md` §10.C (skill: `audit`, `"lens": "cache"` inside `artifacts`), findings included — no chat prose.
+Under `--auto` (auto: yes): preserve the selected output target. With artifact-backed output, retain the canonical report; explicit `session` keeps findings in context without files. Then emit the single fenced structured-result JSON per `../../_shared/orchestration-guide.md` §10.C (skill: `audit`, `"lens": "cache"` inside `artifacts`, including `report_path` only when a canonical report was actually written) — no chat prose.
 
 ## Notes
 

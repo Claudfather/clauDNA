@@ -46,7 +46,7 @@ Each finding names the broken protection, file:line evidence, affected party, la
 
 ### 4. Deliver through the existing output route
 
-For `session` (default), present a compact scope/count summary, severity-ordered findings and cleared candidates. A clean scope is a valid result; do not manufacture findings.
+For `artifacts` (default), retain the sanitized findings report with `/claudna:publish <artifacts>/booby-traps.md --to artifacts` and present its path with the compact scope/count summary, severity-ordered findings and cleared candidates. Resolve the actual SID/provider and exact paths through `../../_shared/orchestration-guide.md` §1. Explicit `session` presents in chat only and creates no report file. A clean scope is a valid result; do not manufacture findings.
 
 **Automatic GitHub filing (`--auto` with explicit `--output github`):** select only **Confirmed** or **Likely** findings for issue docs. Retain every **Hypothesis** in the final findings/result at its assessed severity, with the missing evidence and exact confirming check. Confidence limits automatic filing, not impact severity. This gate applies only to this lens's automatic GitHub output; session output retains all findings. With no eligible findings, return `completed` with no issues only after Step 5 succeeds.
 

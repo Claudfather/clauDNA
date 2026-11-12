@@ -1,4 +1,4 @@
-Invoked by /claudna:neon in branch mode — do not load this file for any other verb. Pre-flight (neon + psql checks, auth probe, discovery of `<PROJECT_ID>` and `<ORG_ID>`) has already run per SKILL.md. It made the private directory `<scratch>` and chose `<NEON>`, the form every neon command below runs as.
+Invoked by /claudna:neon in branch mode — do not load this file for any other verb. Pre-flight (neon + psql checks, auth probe, discovery of `<PROJECT_ID>` and `<ORG_ID>`) has already run per SKILL.md. It allocated `<scratch>` through `../_shared/orchestration-guide.md` §1 and chose `<NEON>`, the form every neon command below runs as. Connection strings, API output containing them, branch-specific SQL, and raw query output stay in scratch. Only reusable/sanitized SQL or a requested CSV/report may persist under `<artifacts>`; never persist credentials or private result rows there.
 
 Branches are instant copy-on-write snapshots — use them for safe experimentation, pre-migration testing, and disposable dev environments.
 
@@ -6,7 +6,7 @@ Branches are instant copy-on-write snapshots — use them for safe experimentati
 
 - Every neon command requires `--project-id "<PROJECT_ID>" --org-id "<ORG_ID>"`. If either is missing after discovery, ask the user.
 - The CLI reads `NEON_API_KEY` from its environment, and `<NEON>` already hands it over when the key is in use. Never add `--api-key`.
-- A branch's connection string is a credential, so it goes into a file in `<scratch>` and never onto the screen or into a command. Write it there with `>`, and delete `<scratch>` with `rm -r <scratch>` when the branch work ends. `branches create` prints the new branch's connection strings too, so its output goes to a file as well. Never use the CLI's `--psql` option (it passes the URL to psql as an argument) or `connection-string --extended` (it prints the password).
+- A branch's connection string is a credential, so it goes into a file in `<scratch>` and never onto the screen or into a command. `branches create` prints the new branch's connection strings too, so its output goes to a file as well. Keep the exact returned scratch path until every writer/psql process has exited and finalize only that path under orchestration-guide §1. Never use the CLI's `--psql` option (it passes the URL to psql as an argument) or `connection-string --extended` (it prints the password).
 
 ## Auth recovery
 
@@ -73,7 +73,7 @@ Present the §6 boxed summary (branch name, project, what is discarded) and ask 
 <NEON> branches delete "<branch-name>" --project-id "<PROJECT_ID>" --org-id "<ORG_ID>"
 ```
 
-Clean up only the recorded task-owned disposable branches after the gate, then remove only this task's private connection-string scratch directory: `rm -r <scratch>`.
+Clean up only the recorded task-owned disposable branches after the gate, then finalize only the exact `<scratch>` after all CLI/psql children have exited. Preserve `<artifacts>` and all canonical deliverables.
 
 ### Reset branch — destructive, gated (contract §5)
 
@@ -117,9 +117,7 @@ Apply the destructive gate above to the recorded exact branch ID after ownership
 ```bash
 <NEON> branches delete "<recorded-branch-id>" --project-id "<PROJECT_ID>" --org-id "<ORG_ID>"
 ```
-```bash
-rm -r <scratch>
-```
+After every provider and psql writer exits, finalize only the exact `<scratch>` returned for this run and verify removal per orchestration-guide §1. Keep `<artifacts>` intact.
 
 ## Limits
 

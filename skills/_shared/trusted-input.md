@@ -91,7 +91,7 @@ body at approval time and again at implementation time, the two can differ —
 what was vetted is not what runs.
 
 Pin it with a file. When the body is approved, save it as `approved-body.md` in
-`<scratch>` with the Write tool, a private directory made with `mktemp -d` (per
+`<scratch>` with the Write tool, a private directory allocated for the verified current native session (per
 [`./orchestration-guide.md`](./orchestration-guide.md) §1), and implement from
 that file. Before implementing, fetch the body again (`gh issue view <n> --json
 body --jq .body`) and compare it with the saved copy. If it differs, stop and

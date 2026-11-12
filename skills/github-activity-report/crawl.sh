@@ -7,8 +7,8 @@
 #   SCOPE          GitHub org login OR username (personal scope)
 #   SINCE_DATE     YYYY-MM-DD (window start, inclusive)
 #   UNTIL_DATE     YYYY-MM-DD (window end, inclusive)
-#   OUT            output dir: the private directory (mktemp -d) the calling
-#                  skill made, holding repos.txt
+#   OUT            output dir: the exact private session scratch directory the
+#                  calling skill supplies, holding repos.txt
 #
 # Optional:
 #   SCOPE_TYPE     "org" or "user" (default: org). Affects which API path lists repos.
@@ -20,7 +20,7 @@ set -u
 : "${SCOPE:?SCOPE is required (org login or username)}"
 : "${SINCE_DATE:?SINCE_DATE is required (YYYY-MM-DD)}"
 : "${UNTIL_DATE:?UNTIL_DATE is required (YYYY-MM-DD)}"
-: "${OUT:?OUT is required: the private directory (mktemp -d) holding repos.txt}"
+: "${OUT:?OUT is required: the allocated private session scratch directory holding repos.txt}"
 
 SINCE="${SINCE_DATE}T00:00:00Z"
 UNTIL="${UNTIL_DATE}T23:59:59Z"

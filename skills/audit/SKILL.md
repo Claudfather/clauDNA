@@ -2,7 +2,7 @@
 name: audit
 user-invocable: true
 description: "Use for codebase audits — security vulnerabilities, technical debt, stale documentation, visual and UX design, frontend performance (janky scroll, slow loads), cross-cutting interfaces, data model fit and redesign, scale/throughput and multi-tenant isolation, birds-eye repositories, whole-system comprehension, decaying safeguards and operational footguns, and prompt-cache efficiency."
-argument-hint: "[security|tech-debt|docs|design|access-path|data-model|data-model-redesign|frontend-perf|repo-health|system|cache|scale|booby-traps] [--auto] [--output github|session] [focus]"
+argument-hint: "[security|tech-debt|docs|design|access-path|data-model|data-model-redesign|frontend-perf|repo-health|system|cache|scale|booby-traps] [--auto] [--output artifacts|session|github|docs] [focus]"
 requires:
   - cli: gh
     reason: "GitHub CLI for --output github issue filing (via publish) and the repo-health lens's PR/CI listing"
@@ -42,7 +42,9 @@ Lenses that fan out dispatch research subagents. Where the host has no dispatch 
 
 ## Surfaces (contract §2–§4)
 
-- `--output github` files findings as issues per `../_shared/output-guide.md` (all filing routes through `/claudna:publish`); `--output session` (default) presents in chat.
+- `--output artifacts` is the default for generated audit reports and plan families: retain them under the current native session's canonical artifacts directory. `--output session` is an explicit chat-only route with no file persistence. Explicit `github` and `docs` destinations export selected canonical output; the original artifacts remain. `--auto` defaults to `artifacts`; external filing occurs only when `--output github` is explicit. Follow `../_shared/audit-lens-contract.md` §2 and `../_shared/orchestration-guide.md` §1 for ownership, exact paths and unavailable-persistence behavior.
+
+Before any delegated or local file write, resolve the actual current session owner and exact absolute `<scratch>` and `<artifacts>` paths through the shared orchestration contract. Pass the owning native SID and provider together with those paths to each delegated writer. Research and temporary inputs stay in `<scratch>`; final reports and plan families go to `<artifacts>`. Missing or unverified identity means read-only/chat-only continuation, never a guessed owner or OS-temp fallback.
 - `--auto` runs non-interactively for lenses marked **Auto: yes** and emits the structured-result JSON per `../_shared/orchestration-guide.md` §10.C as the final output. For an **Auto: no** lens, emit the structured result with `"outcome": "blocked"` naming the lens as interactive-only — never improvise a non-interactive variant.
 
 ## Related

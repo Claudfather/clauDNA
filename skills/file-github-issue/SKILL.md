@@ -14,6 +14,10 @@ requires:
 
 Turn a screenshot + a short description into a well-structured GitHub issue on the target repo. Images are committed to a user-configured public attachments repo (set via the `CLAUDNA_ATTACHMENTS_REPO=<owner>/<repo>` env var) and embedded in the issue body via their raw URLs. If no attachments repo is configured, the skill prompts once and falls back to embedding the screenshot's local file path in the issue body.
 
+## Working files and external issue
+
+This skill is an explicit GitHub issue workflow: the confirmed issue and any user-approved public image upload remain external exports. Follow `../_shared/orchestration-guide.md` §1 to allocate private `<scratch>` before writing keywords/body/title/labels or base64 data; use no OS-temp path, cwd guess, or operation-ID fallback. Retain the exact confirmed issue body as a canonical artifact under `<artifacts>` before the external create, then record its verified hash, target repo, returned issue/attachment URLs, and actual result in a private current-session receipt. Do not copy raw screenshots into session artifacts; preserve the host/user image source. Finalize only the exact scratch after the CLI writer exits; if status is uncertain, keep scratch and report it.
+
 **Reference files:**
 
 - `body-template.md` — issue body structure, title rules, proposed-label logic.
@@ -78,10 +82,10 @@ Wait for a reply. Use it as the Page/URL value.
 
 **4c. Dupe and related-issue search.** Run once, against the target repo (re-run if target repo changes during Step 5 edits). Use 2–3 salient keywords from the user prose and screenshot (the draft title doesn't exist yet — it's produced in 4d):
 
-Write the keywords to `<keywords-file>`, a file in `<scratch>` (`../_shared/orchestration-guide.md` §1), with the Write tool, then:
+After allocating `<scratch>` per `../_shared/orchestration-guide.md` §1, write the keywords to `<scratch>/keywords.txt` with the Write tool, then:
 
 ```sh
-gh issue list --repo <repo-slug> --search="$(cat <keywords-file>)" --state all --limit 10 --json number,title,state
+gh issue list --repo <repo-slug> --search="$(cat "<scratch>/keywords.txt")" --state all --limit 10 --json number,title,state
 ```
 
 Include any clearly related hits in the `## Related > Issues` bullet with their state and a one-line relationship note. If the search returns nothing germane, the bullet is "none found" (or omit if there are also no Links).
@@ -127,7 +131,7 @@ Wait for the user's reply:
 
 ### Step 6: Upload images
 
-Only run after the user replies `y`. If `$ATTACHMENTS_MODE=local` from Step 4e, skip this entire step — substitute each `<attachment-url-N>` placeholder with `file://<absolute-path>` of the corresponding image instead, then go to step 7.
+Only run after the user replies `y`. Before any attachment upload, resolve/create the current-owner private artifact and receipt destinations per orchestration-guide §1, retain the confirmed pre-upload body under an unoccupied `<artifacts>/issues/<issue-slug>/preview.md`, and verify private write capability. Stop before uploading if this fails. Initialize the private receipt with the confirmed source hash and selected destinations; record each actual upload outcome as it occurs. If `$ATTACHMENTS_MODE=local` from Step 4e, skip this entire step — substitute each `<attachment-url-N>` placeholder with `file://<absolute-path>` of the corresponding image instead, then go to step 7.
 
 Images are committed to `$ATTACHMENTS_REPO` (resolved in Step 4e) on the `main` branch at `<YYYY>/<MM>/<uuid>.<ext>`. Each image gets a fresh UUID so paths don't collide and aren't guessable by enumeration.
 
@@ -141,7 +145,7 @@ For each image (in turn order):
    ```
 2. Commit the image via the Contents API. Base64-encode to a tmpfile first, then use `jq --rawfile` — passing the base64 as a `--arg` value still puts it on the command line and blows past `ARG_MAX` on anything over ~100KB:
    ```sh
-   B64_FILE=$(mktemp "${TMPDIR:-/tmp}/file-github-issue-b64.XXXXXX")
+   B64_FILE="<scratch>/attachment-<N>.b64"
    base64 -i "$IMG_PATH" | tr -d '\n' > "$B64_FILE"
    jq -n --arg msg "file-github-issue attachment: <title>" \
          --rawfile content "$B64_FILE" \
@@ -155,22 +159,22 @@ For each image (in turn order):
    ```sh
    ATTACH_URL="https://raw.githubusercontent.com/$ATTACHMENTS_REPO/main/$ATTACH_PATH"
    ```
-4. Substitute the `<attachment-url-N>` placeholder matching this image's turn position (image 1 → `<attachment-url-1>`, image 2 → `<attachment-url-2>`, etc.) with this image's `$ATTACH_URL`.
+4. Record the confirmed attachment URL, source image hash, and actual successful result in the private receipt; do not retain image bytes. A lost/ambiguous API response is unknown, never success. Substitute the `<attachment-url-N>` placeholder matching this image's turn position (image 1 → `<attachment-url-1>`, image 2 → `<attachment-url-2>`, etc.) with this image's `$ATTACH_URL`.
 
-If any upload fails: abort before filing. Print the attachment URLs of any images already committed — they're persistent and re-usable. No rollback.
+If any upload fails or its result is unknown: record that actual outcome and all previously confirmed attachment URLs/hashes in the private receipt, then abort before filing. If receipt writing itself fails, stop further uploads and report the recording failure without claiming a complete receipt. Print the attachment URLs of any images already committed — they're persistent and re-usable. No rollback.
 
 Max file size: the Contents API hard-limits at 100MB. For files over ~1MB the API also warns — still works for typical screenshots (well under), but if you hit a size error, surface it and halt.
 
 ### Step 7: File the issue
 
-1. Write the substituted body to a tmpfile. BSD `mktemp` on macOS requires `XXXXXX` at the **end** of the template — no `.md` suffix; `gh --body-file` doesn't care about extension:
+1. Write the substituted body, title, and label list to separate files in `<scratch>` (for example `<scratch>/issue-body.md`, `<scratch>/issue-title.txt`, and `<scratch>/issue-labels.txt`) using the Write tool. They are private working files; do not place them at a chosen OS-temp path:
    ```sh
-   TMPFILE=$(mktemp "${TMPDIR:-/tmp}/claudna:file-github-issue.XXXXXX")
-   TITLEFILE=$(mktemp "${TMPDIR:-/tmp}/claudna:file-github-issue.XXXXXX")
-   LABELFILE=$(mktemp "${TMPDIR:-/tmp}/claudna:file-github-issue.XXXXXX")
+   TMPFILE="<scratch>/issue-body.md"
+   TITLEFILE="<scratch>/issue-title.txt"
+   LABELFILE="<scratch>/issue-labels.txt"
    ```
    Write the title into `$TITLEFILE` the same way, and the effective labels, comma-separated, into `$LABELFILE`. The title and labels never go into the command itself.
-2. File the issue with the effective label set from step 3:
+2. Retain the exact substituted, confirmed body under the preflighted `<artifacts>/issues/<issue-slug>/issue.md` without overwriting an unrelated file with private modes. Verify its hash matches `$TMPFILE` before filing, and preserve it on every outcome. Recheck the preflighted private receipt destination before issuing the create. Then file the issue with the effective label set from step 3:
    ```sh
    gh issue create \
      --repo <repo-slug> \
@@ -179,11 +183,11 @@ Max file size: the Contents API hard-limits at 100MB. For files over ~1MB the AP
      --label "$(cat "$LABELFILE")"
    ```
    Leave out the `--label` line when the effective label set is empty.
-3. Delete the tmpfiles: `rm "$TMPFILE" "$TITLEFILE" "$LABELFILE"`.
+3. After a successful response, write the private artifact receipt described above; it records only source hashes/paths and actual external URLs/status, not image bytes or credentials.
 4. Print the issue URL (from `gh` stdout) and the attachment URL(s). If any labels were dropped in step 3, repeat the warning:
    > ⚠ Filed without labels (target repo missing: `<comma-separated>`). Create them in the repo to enable labeling next time.
 
-If `gh issue create` fails (e.g., 403/404 for missing permissions): surface the exact `gh` stderr and suggest requesting access. The attachment URLs are preserved — print them so the user can reuse or delete (delete via `gh api --method DELETE /repos/$ATTACHMENTS_REPO/contents/<path>` with the file's blob SHA).
+If `gh issue create` fails (e.g., 403/404 for missing permissions): preserve the source screenshots and attachment URLs, record only the actual failed/unknown result if receipt writing is possible, surface the exact `gh` stderr and suggest requesting access. The attachment URLs are preserved — print them so the user can reuse or delete (delete via `gh api --method DELETE /repos/$ATTACHMENTS_REPO/contents/<path>` with the file's blob SHA). After the final CLI writer has exited, remove only the exact `<scratch>` allocated by this run and verify removal; retain it if ownership or writer exit is uncertain.
 
 ## Invocation
 

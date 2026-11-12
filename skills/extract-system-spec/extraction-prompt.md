@@ -13,13 +13,13 @@ Your job is to inspect the entire supplied project and produce a single, standal
 ### Inputs and deliverable
 
 - Project root: `{{PROJECT_ROOT}}` (default: current working directory)
-- Final output: `{{OUTPUT_PATH}}` (default: `FULL_SYSTEM_SPEC.md` in the project root)
+- Final output: `{{OUTPUT_PATH}}` (always the canonical final spec under the current native session's `<artifacts>`; default filename `FULL_SYSTEM_SPEC.md`)
 - Optional scope notes: `{{SCOPE_NOTES}}` (default: none; inspect the full project)
-- Scratch workspace: a private directory made with `mktemp -d` (`../_shared/orchestration-guide.md` §1), outside the final deliverable, for inventories, evidence, agent reports, and alias mappings.
+- Scratch workspace: the exact private native-session directory allocated through `../_shared/orchestration-guide.md` §1, outside the final deliverable, for inventories, evidence, agent reports, and alias mappings. Do not use `mktemp`, cwd, operation IDs, or OS temp as a fallback.
 
-Produce exactly one authoritative final specification at the requested output path. Intermediate research may be split across many files, but it is not part of the deliverable.
+Produce exactly one authoritative canonical final specification at `{{OUTPUT_PATH}}` under `<artifacts>`. An explicit `--out` is a later export: only after the canonical spec passes privacy and hash validation, copy that verified revision to the requested path and record the actual result in the private receipt. Intermediate research may be split across many files, but it is not part of the deliverable.
 
-Treat inspection as read-only. Do not alter application source, configuration, schemas, infrastructure, dependencies, or project data. Do not invoke commands that can mutate databases, queues, cloud resources, deployments, external services, or user accounts. Run tests or probes only when they are local, bounded, and non-mutating. The only authorized writes are scratch research artifacts and the requested final Markdown file.
+Treat inspection as read-only. Do not alter application source, configuration, schemas, infrastructure, dependencies, or project data. Do not invoke commands that can mutate databases, queues, cloud resources, deployments, external services, or user accounts. Run tests or probes only when they are local, bounded, and non-mutating. The only authorized writes are native-session scratch research, the canonical final Markdown, and an explicitly requested final export plus its private publication receipt.
 
 ### Non-negotiable outcome
 

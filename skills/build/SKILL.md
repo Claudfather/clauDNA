@@ -346,8 +346,8 @@ For an explicit canonical session artifact, first use the source guide's
 identity, selected source owner, scope and privacy. Read only its returned path;
 no latest-session selection or broad session scan. A selected family validates
 its master and selected phases individually. Missing evidence returns unavailable,
-not a different source. This opt-in path leaves the default browser unchanged
-until native identity/write qualification permits the broader migration.
+not a different source. Native identity/write acceptance remains a merge/release
+gate; source routing and executable fixture results do not establish it.
 
 - If it's a `.md` file, read it, confirm with user (interactive) or proceed silently (`--auto`), add to queue as a single item.
 - If it's a directory:
@@ -361,13 +361,13 @@ Fetch the issue via `gh issue view <number> --json number,title,body,labels,stat
 
 If `--auto` is set, EXIT with `outcome: "blocked"`, `blocker_description: "no source provided in --auto; require --source github <number> or explicit plan file path"`. Do not scan or present pickers.
 
-1. Scan `documentation/planning/` for subdirectories containing `0N_*.md` files
+1. Resolve the current native owner's artifact directory without creating it and enumerate its plan families per source-guide §3. An explicitly selected scoped pointer may supply a prior plan. Project/legacy directories are read only when explicitly selected. No latest-session, cwd-identity or broad session scan.
 2. If none found: fall back to asking **"Which document should I implement?"** and accept a file path
 3. **Level 1 — Directory picker** (single-select, paginated):
    - Use an interactive question prompt to present up to 3 directories + "More..." as 4th option
    - Each option label: directory name. Each description: N plans, M complete.
    - Selecting "More..." presents the next page of directories
-4. Read `00_*.md` (overview) from chosen directory
+4. Validate the exact selected canonical master path and its owner before reading `00_*.md`; validate each selected phase separately before content read
 5. **Level 2 — Plan picker** (multi-select, paginated):
    - If only 1 plan exists: auto-select it, confirm with user, skip picker
    - Print a full summary table in chat: plan number, title, status, severity/effort
@@ -545,7 +545,7 @@ Read `challenge-round-questions.md` for the question matrix and `red-flags-and-r
 
 Per design §5.5.2 and the canonical Autonomous Mode reference earlier in this skill, replace the interactive challenge round with a machine synthesis pass that delegates to `/claudna:weigh-development-paths --auto`. The producer/consumer schema between the two skills is canonical at `../_shared/contracts/synthesis-contract.md`.
 
-1. **Create scratch directory.** Make it with `mktemp -d "${TMPDIR:-/tmp}/build.XXXXXX"` (`<scratch>` below), then use the Write tool to create `<scratch>/synthesis-bundle.md`.
+1. **Allocate owned working storage.** Use the existing native session allocator in `../_shared/orchestration-guide.md` §1 and its exact returned `<scratch>` path, then use the Write tool to create `<scratch>/synthesis-bundle.md`. Reuse a caller's allocation and return cleanup ownership. Missing verified identity or write permission blocks persistence without a fallback; final synthesis reports and run evidence belong in current-session `<artifacts>`.
 
 2. **Extract open junctions.** Read the plan body and identify every decision that is genuinely open, from three possible sources:
    - **Adversarial findings** — search for `## Adversarial Review Findings`; collect each finding where the checkbox is `- [ ]` (unchecked). Each has `severity`, `concern_area`, `summary`, `recommendation`.

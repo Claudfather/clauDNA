@@ -40,7 +40,7 @@ hook remains its capture route; Cursor remains hook-free and unsupported here.
 | Task / Agent | Use actual subagent dispatch controls on this same execution host, following the role procedure below. |
 | TaskOutput | Wait using the exposed agent-wait control and the returned agent identifier; retain its actual completion. |
 | TaskStop | Interrupt the identified owned agent using the exposed control. |
-| TodoWrite | Use the exposed plan tool, or maintain a concise task checklist in the current run's scratch directory. |
+| TodoWrite | Use the exposed plan tool, or maintain a concise task checklist in the verified current native session's private artifacts directory (orchestration-guide §1). |
 | EnterPlanMode / ExitPlanMode | Use actual mode controls only when exposed. Otherwise keep the planning phase read-only; do not claim a mode switch. |
 | AskUserQuestion | Use an available input control or a concise direct question for missing information. Existing authorization and preferences persist. |
 | dangerouslyDisableSandbox | Request the specific permission required by the operation; never change global permissions. |
