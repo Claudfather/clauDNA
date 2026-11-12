@@ -11,6 +11,8 @@ allowed-tools: Read(*), Bash(ls *), Bash(cat *), Bash(diff *), Bash(cp *), Bash(
 
 Removes the pre-plugin clauDNA overlay from `~/.claude/` so plugin-installed skills don't get shadowed by stale copies. Works for users who previously installed via clauDNA's `install.sh`, or via the sibling `claudefather` / `claudfather` projects.
 
+Backups belong under the effective clauDNA state root `R/backups/legacy-install/<run>/`. In this native Claude Code skill, `<run>` must use this invocation's actual native Claude session ID. Never invent or infer a session ID. If the skill does not receive a usable native ID, stop; standalone maintainer backup operations are separate operator-run operations outside any Claude, Codex, or Cursor workflow and are not a fallback for this skill. The local skill mechanism documents `${CLAUDE_SESSION_ID}` substitution, but native acceptance of its rendered value remains pending. This skill remains discovery-first and requires the explicit confirmations below before source deletion.
+
 The skill is **discovery-based**: it enumerates the names this plugin would now install (skills, agents, hook scripts) and only removes matching-name files in `~/.claude/`. Anything you added yourself with a different name is untouched.
 
 ## Procedure
@@ -176,28 +178,43 @@ Use Read + Edit (not Bash) to modify settings.json. Never use `>` redirect to ov
 
 ### Step 8: Final Confirmation
 
-Print the full final manifest (after Step 6 user choices) and ask one last time:
+Print the full final manifest (after Step 6 user choices), identify the current native Claude session as the run owner, and ask one last time:
 
 > Will remove N files/directories. Continue? [y/N]
 
-Require explicit `y` or `yes`. Anything else aborts.
+Require explicit `y` or `yes`. Anything else aborts. If the loaded local skill does not provide a usable native session ID, stop this workflow; do not rename it standalone or switch to an operation ID.
 
 ### Step 9: Backup
 
-Before any destructive operation, back up the entire manifest to a timestamped directory:
+Before any destructive operation, back up the entire manifest beneath the effective clauDNA root. The documented local Claude Code skill mechanism renders `${CLAUDE_SESSION_ID}`; native acceptance of that substitution remains pending. Resolve `R` with the phase-01 path resolver and use that exact validated native ID:
 
 ```bash
-TS=$(date +%Y-%m-%d_%H%M%S)
-BACKUP_DIR=~/.local/share/clauDNA/backups/cleanup-legacy-install-$TS
-mkdir -p "$BACKUP_DIR"
+SESSION_ID='${CLAUDE_SESSION_ID}'
+case "$SESSION_ID" in
+  ''|*CLAUDE_SESSION_ID*) echo "No resolved native Claude session ID; stop before cleanup."; exit 1 ;;
+esac
+SESSION_ARTIFACTS=$(python3 -B "${CLAUDE_PLUGIN_ROOT}/lib/claudna/session_store" paths \
+  --host claude --session "$SESSION_ID" --kind artifacts) || exit 1
+STATE_ROOT=${SESSION_ARTIFACTS%/sessions/*}
+RUN="session-$SESSION_ID"
+BACKUP_DIR="$STATE_ROOT/backups/legacy-install/$RUN"
+if [ -e "$BACKUP_DIR" ]; then
+  echo "Backup path already exists; stop without overwriting it: $BACKUP_DIR"
+  exit 1
+fi
+umask 077
+mkdir -p -m 700 "$STATE_ROOT/backups/legacy-install"
+mkdir -m 700 "$BACKUP_DIR" || exit 1
 ```
+
+When `${CLAUDE_PLUGIN_ROOT}` is unavailable, substitute the absolute package `<claudna-root>` resolved from the loaded skill per [`../_shared/claudna-root.md`](../_shared/claudna-root.md). Do not replace a missing native session ID with a standalone operation ID. A maintainer who is explicitly operating outside all native Claude, Codex, and Cursor workflows must run the separate standalone operation contract (`session_store operation-dir --label legacy-cleanup --create`) as its own operation; this skill's manifest and source-deletion workflow do not perform that operation.
 
 For each path in the manifest, `cp -r` (or `cp` for files) into a mirror structure under `$BACKUP_DIR`. Preserve the original path structure so restoration is `cp -r` back.
 
-This location is outside `~/.claude/` so Claude Code never discovers the backup.
+If any backup copy fails or the copied count does not match the manifest, stop before Step 10. Keep the partial backup for review; do not remove source files or silently reuse this run path.
 
 Print:
-> Backed up N items to ~/.local/share/clauDNA/backups/cleanup-legacy-install-<timestamp>/
+> Backed up N items to R/backups/legacy-install/<run>/
 
 ### Step 10: Execute
 
@@ -224,10 +241,10 @@ rmdir ~/.claude/skills ~/.claude/hooks ~/.claude/agents ~/.claude/commands ~/.cl
 Cleanup complete.
 ═══════════════════════════════════════════════════════════════
   Removed:  N files/directories
-  Backup:   ~/.local/share/clauDNA/backups/cleanup-legacy-install-<timestamp>/
+  Backup:   R/backups/legacy-install/<run>/
   
 Restore any file with:
-  cp -r ~/.local/share/clauDNA/backups/cleanup-legacy-install-<timestamp>/<path> ~/.claude/<path>
+  cp -r "$BACKUP_DIR/<path>" "$HOME/.claude/<path>"
 
 Next:
   - Run /reload-plugins (or restart Claude Code) to pick up the cleanup.
@@ -240,6 +257,7 @@ Next:
 - **Never run without an installed plugin.** Step 2 enforces this. Without the plugin, the discovery step has no manifest to work from.
 - **Never auto-resolve customized files.** Step 6 requires per-file confirmation for anything that differs from the plugin's version.
 - **Always back up before removing.** Step 9 is mandatory.
+- **Keep existing backups read-only.** Existing `~/.local/share/clauDNA/backups/cleanup-legacy-install-<timestamp>/` directories are not migrated or removed. To restore an item from an old backup, copy its mirrored path back, for example `cp -r "$HOME/.local/share/clauDNA/backups/cleanup-legacy-install-<timestamp>/skills/<name>" "$HOME/.claude/skills/<name>"`. From a new backup, restore using the same relative path beneath `$BACKUP_DIR`; restoration is an explicit operator action.
+- **Never overwrite a run backup.** If the new backup path already exists, stop and retain it. Do not use a timestamp, PID, cwd, or fabricated session as a fallback identity.
 - **Never modify `permissions.allow` entries in settings.json.** Old `Bash(...)` patterns added by install.sh are additive and still useful in the plugin world. Leaving them alone is correct.
 - **Use Read + Edit for settings.json edits.** Never `>` overwrite — that races with concurrent Claude sessions writing to the same file.
-- **Backups live outside `~/.claude/`** at `~/.local/share/clauDNA/backups/` so Claude Code never discovers them and confuses itself with duplicate copies.

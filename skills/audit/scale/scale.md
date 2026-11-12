@@ -96,7 +96,9 @@ If the system has neither an isolation unit nor any scale-out surface (no replic
 
 ### Phase 1: Parallel discovery
 
-**Scratch directory:** `<scratch>/research/`, where `<scratch>` is a private directory made with `mktemp -d "${TMPDIR:-/tmp}/audit-scale.XXXXXX"` (orchestration guide §1)
+**Scratch directory:** `<scratch>/research/`, under the exact current-session scratch path resolved through `../../_shared/orchestration-guide.md` §1. Resolve the actual SID/provider and exact paths before dispatch; never use OS temp or a guessed replacement.
+
+For explicit `--output session`, perform discovery and convergence inline and keep findings in context; create no scratch files. Disk-writing subagent steps below apply to persisted-output runs.
 
 Launch four `general-purpose` subagents in parallel (disk-write pattern per `../../_shared/orchestration-guide.md` — subagents write findings to the scratch dir and return 2-4 line summaries; the orchestrator never reads full research files):
 
@@ -131,34 +133,36 @@ Do NOT proceed to Phase 4 without explicit confirmation.
 
 ## Phase 4: Remediation Plans
 
-**Output lands in:**
+**Canonical plan family lands in `<artifacts>/scale/` by default:**
 ```
-documentation/planning/scale/<session_name>_<YYYY-MM-DD>/
+<artifacts>/scale/
 ├── 00_SCALE_AUDIT.md
 ├── 01_<remediation-slug>.md
 └── ...
 ```
 
-Plan agents write the family to the session's scratch docs directory (`<scratch>/docs/`); the orchestrator publishes it with `/claudna:publish <scratch-docs-dir> --to docs --dir documentation/planning/scale/<session_name>_<YYYY-MM-DD>/` (family mode; orchestration guide, Section 3).
+Plan agents write final docs directly under `<artifacts>/scale/`. Keep research in `<scratch>`. Explicit `--output docs` exports the selected canonical family with `/claudna:publish <artifacts>/scale/ --to docs --dir documentation/planning/scale/<session_name>_<YYYY-MM-DD>/`; retain the source.
 
 `00_SCALE_AUDIT.md` is the full Phase 3 report. Each numbered doc is exactly one PR, grouping related findings (e.g., all mandatory-tenant-context changes → one PR; all lease-fencing changes → one PR), ordered P0 first, and must include the required invariants it discharges plus the acceptance-test rows that prove it. Plan agents follow Section 9 of the orchestration guide and `../../_shared/planning-standard.md`.
 
 **Adversarial review pass:** follow `../../_shared/pre-handoff-checklist.md` on every doc before publishing. Prioritize `concern_area` values `security`, `data-integrity`, `error-handling`. If a critic finds that a proposed remediation *itself* opens a cross-tenant window (e.g., a backfill that guesses ownership), elevate to CRITICAL.
 
-Then hand off: **"Plans are ready. Run `/claudna:build documentation/planning/scale/<session>/` to start building."** This lens produces plans, not code — see `../../_shared/orchestration-guide.md` §11.
+Then hand off: **"Plans are ready in `<artifacts>/scale/`. Run `/claudna:build <artifacts>/scale/` to start building."** This lens produces plans, not code — see `../../_shared/orchestration-guide.md` §11.
 
 ---
 
 ## Output Targets
 
-This lens supports `--output github`, `--output session` (the engine default, contract §2), and the `docs` deliverable above.
+This lens defaults to `--output artifacts` and supports explicit `session`, `github`, and `docs` destinations.
 
 Follow the output guide at `../../_shared/output-guide.md`:
-- For `github`: write each finding-cluster as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>`. Map severities per `report-template.md`: P0 → `priority:critical`, P1 → `priority:high`, P2 → `priority:medium`, P3 → `priority:low`.
-- For `session` (engine default): produce the report doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5).
-- For `docs`: the Phase 4 subagent workflow above.
+- For `github`: write selected finding-cluster docs under `<artifacts>/scale/` (frontmatter + the Section 4 body skeleton), scrub them with the redactor, then delegate to `/claudna:publish <artifact-file> --to github-issue --repo <repo>`. Keep each canonical source. Map severities per `report-template.md`: P0 → `priority:critical`, P1 → `priority:high`, P2 → `priority:medium`, P3 → `priority:low`.
+- For `artifacts` (default): retain the report and plan family with `/claudna:publish <artifacts>/scale/ --to artifacts`.
+- For `session`: present findings in chat only; create no report files.
+- For `github`: explicitly export selected findings as issues from the canonical report; retain source artifacts.
+- For `docs`: explicitly export the selected canonical family from `<artifacts>/scale/` to `documentation/planning/scale/<session_name>_<YYYY-MM-DD>/`; retain source artifacts.
 
-**Credential rule:** tenant credentials and connection strings surface in exactly this kind of audit. Never reproduce a secret value — file:line and variable name only, and scrub every research/findings file in place with the redactor (`python3 "<claudna-root>/scripts/redact.py" <file>`, with `<claudna-root>` per `../../_shared/claudna-root.md`; see `../../_shared/orchestration-guide.md` §7) before it leaves a subagent or is published.
+**Credential rule:** tenant credentials and connection strings surface in exactly this kind of audit. Never reproduce a secret value — file:line and variable name only, and scrub every research/findings file in place with the redactor (`python3 -B "<claudna-root>/scripts/redact.py" <file>`, with `<claudna-root>` per `../../_shared/claudna-root.md`; see `../../_shared/orchestration-guide.md` §7) before it leaves a subagent or is published.
 
 ---
 
@@ -189,12 +193,12 @@ Follow the output guide at `../../_shared/output-guide.md`:
 
 ## Autonomous Mode (--auto)
 
-When `--auto` is set (implies `--output github`; lens contract §4, orchestration guide Section 10):
+When `--auto` is set (defaults to canonical `artifacts`; lens contract §4, orchestration guide Section 10):
 
 1. Skip Plan Mode — run Phases 0–3 directly.
 2. Skip the user confirmation gate; do not generate Phase 4 remediation plans.
 3. Use the engine's `[focus]` argument as scope; if none, audit the full system.
-4. Create GitHub Issues for all P0 and P1 findings (immediately), P2 batched; skip P3 unless particularly noteworthy. **Confidence floor:** a `low`-confidence (pattern-only) lead never files as P0/P1 — batch it with the P2s, naming the evidence that would confirm or dismiss it.
+4. With explicit `--output github`, create issues for P0 and P1 findings (immediately), P2 batched; skip P3 unless particularly noteworthy. Without that flag retain findings in `<artifacts>`. **Confidence floor:** a `low`-confidence (pattern-only) lead never files as P0/P1 — batch it with the P2s, naming the evidence that would confirm or dismiss it.
 5. Scrub every published doc through the redactor (orchestration-guide §7) — no raw credential values in issue bodies or artifacts.
 6. **Emit the structured-result shape** per `../../_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
@@ -209,7 +213,7 @@ When `--auto` is set (implies `--output github`; lens contract §4, orchestratio
     "findings_by_severity": {"P0": 1, "P1": 2, "P2": 4, "P3": 3},
     "scorecard": {"identity-authorization": 3, "data-isolation": 2, "distributed-coordination": 2, "provider-isolation": 3, "fairness-capacity": 1, "observability": 2, "migration-safety": 3, "testability": 2},
     "unverified_claims": 2,
-    "session_dir": "documentation/planning/scale/<session>/"
+    "session_dir": "<artifacts>/scale/"
   },
   "summary": "<2-3 line digest>",
   "next": null,

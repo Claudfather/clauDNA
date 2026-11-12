@@ -20,9 +20,9 @@ from typing import Iterable
 from .events import REGISTRY
 from .fsio import read_json
 from .paths import SessionPaths
-from .project import load_activity, load_lifecycle, segment_docs, session_doc
+from .project import load_activity, load_lifecycle, segment_docs, session_doc, session_facts
 from .rollup import current, rollup_path, trusted
-from .store import SessionStore
+from .store import SessionStore, capture_state
 
 _SINCE = re.compile(r"^(\d+)([mhdw])$")
 _SINCE_MINUTES = {"m": 1, "h": 60, "d": 60 * 24, "w": 60 * 24 * 7}
@@ -67,15 +67,32 @@ def list_sessions(store: SessionStore, *, since: str | None = None, repo: str | 
     cutoff = since_cutoff(since)
     rows = []
     for sid in store.session_ids():
-        paths = store.session(sid).paths
+        handle = store.session(sid)
+        paths = handle.paths
         try:
-            if cutoff and _older_than(paths.lifecycle, cutoff):
-                continue  # its log hasn't changed since before the cutoff, so it opened before it too
-            doc = session_doc(paths)
+            state = capture_state(paths)
+            if state == "artifact-only":
+                continue
+            lifecycle = load_lifecycle(paths)
+            if not include_private and session_facts(lifecycle.events).private:
+                continue
+            if not any(event["kind"] == "session.opened" for event in lifecycle.events):
+                if state in ("partial", "corrupt") and unreadable is not None:
+                    unreadable.append(sid)
+                continue
+            doc = session_doc(paths, lifecycle)
             actor, origin = doc.get("actor") or {}, doc.get("origin") or {}
-            if (doc.get("private") and not include_private) or (cutoff and (doc.get("opened_at") or "") < cutoff) \
-                    or (repo and origin.get("repo") != repo) or (bot and bot not in (actor.get("bot_name"),
-                                                                                       actor.get("bot_id"))):
+            # Resolve lifecycle privacy before reporting a damaged SID. Private
+            # session identities stay out of cross-session diagnostics too.
+            if doc.get("private") and not include_private:
+                continue
+            if state in ("partial", "corrupt") and unreadable is not None:
+                unreadable.append(sid)
+            if cutoff and (_older_than(paths.lifecycle, cutoff) or
+                           (doc.get("opened_at") or "") < cutoff):
+                continue  # the lifecycle mtime and opening timestamp both predate the cutoff
+            if (repo and origin.get("repo") != repo) or (bot and bot not in (actor.get("bot_name"),
+                                                                              actor.get("bot_id"))):
                 continue
             roll = _rollup(paths)  # only for a row that is kept
         except OSError:
@@ -98,7 +115,7 @@ def list_sessions(store: SessionStore, *, since: str | None = None, repo: str | 
 def show(store: SessionStore, sid: str) -> dict:
     """One session: ``session.json``, its segments, the rollup and its lineage."""
     handle = store.session(sid)
-    if not handle.exists():
+    if handle.capture_state() == "artifact-only" or not handle.exists():
         raise LookupError(f"no session {sid}")
     paths = handle.paths
     lifecycle = load_lifecycle(paths)
@@ -149,7 +166,7 @@ def timeline(store: SessionStore, sid: str) -> list[dict]:
     timestamp goes first, and a tie is broken by meaning (:func:`_lifecycle_first`).
     """
     handle = store.session(sid)
-    if not handle.exists():
+    if handle.capture_state() == "artifact-only" or not handle.exists():
         raise LookupError(f"no session {sid}")
     paths = handle.paths
     life = load_lifecycle(paths).events
@@ -173,10 +190,25 @@ def _failures(store: SessionStore, sids: Iterable[str], cutoff: str | None, *, s
     for sid in sids:
         paths = store.session(sid).paths
         try:
+            state = capture_state(paths)
+            if state == "artifact-only":
+                continue
             indices = [i for i in paths.segment_indices()  # untouched since before the cutoff: one stat, no read
                        if not (cutoff and _older_than(paths.segment(i).events, cutoff))]
-            if not indices or (skip_private and session_doc(paths).get("private")):
+            lifecycle = load_lifecycle(paths)
+            if skip_private and session_facts(lifecycle.events).private:
+                continue
+            if not any(event["kind"] == "session.opened" for event in lifecycle.events):
+                if skip_private and unreadable is not None and state in ("partial", "corrupt"):
+                    unreadable.append(sid)
+                if skip_private:
+                    continue
+            if skip_private and session_doc(paths, lifecycle).get("private"):
                 continue  # signatures carry hosts, paths, repo URLs: never folded into another session's view
+            if state in ("partial", "corrupt") and unreadable is not None:
+                unreadable.append(sid)
+            if not indices:
+                continue
             for index in indices:
                 out += [{"sid": sid, "seg": index, "ts": e["ts"], **e["data"]}
                         for e in load_activity(paths, index).events if e["kind"] == "tool.failed"]

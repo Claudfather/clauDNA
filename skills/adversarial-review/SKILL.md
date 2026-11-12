@@ -2,7 +2,7 @@
 name: adversarial-review
 user-invocable: true
 description: "Use at any juncture where you have a plan, design, or proposal and want it stress-tested before execution — pre-mortem analysis, assumption mapping, hidden failure modes, and edge cases surfaced before they are locked in. For the standing multi-lens hardening loop on a published plan, use /claudna:ironclad."
-argument-hint: "[plan-file-path] [--dispatch] [--output github|session]"
+argument-hint: "[plan-file-path] [--dispatch] [--output artifacts|session|github]"
 ---
 
 # Adversarial Review
@@ -16,10 +16,13 @@ You are a critical thinker, not an advocate. Your job is to find the weaknesses,
 ## Arguments
 
 Parse `$ARGUMENTS` at invocation:
-- **First positional arg:** Path to the plan document. If omitted, prompt for it.
+- **First positional arg:** Path to the plan document. If omitted, prompt for it in interactive mode; a caller using `--dispatch --output session` may supply the complete plan in context and omit the path.
 - `--dispatch`: Multi-reviewer mode AND non-interactive mode. Spawns parallel subagents with different review angles AND suppresses all interactive elements (no Plan Mode, no AskUserQuestion). Emits a markdown document with YAML frontmatter containing structured findings (see Structured Result Emission below). Use this mode when invoking adversarial-review from another skill or from an orchestrator (e.g., ironclad). Without this flag, perform a single consolidated review interactively.
-- `--output github`: Write findings as GitHub Issues. See `../_shared/output-guide.md`.
-- `--output session`: Present findings in chat only (default).
+- `--output artifacts` (default): retain the final review report under the current native session's canonical artifacts directory. Research and reviewer files remain in the caller's exact `<scratch>`.
+- `--output session`: present findings in chat only, with no file persistence.
+- `--output github`: write selected issue docs under `<artifacts>/adversarial-review/` and explicitly export with `/claudna:publish <artifact-file> --to github-issue --repo <repo>`. Keep each canonical source. See `../_shared/output-guide.md`.
+
+For persisted-output runs, resolve the current native owner and exact absolute `<scratch>` and `<artifacts>` paths through `../_shared/orchestration-guide.md` §1 before writing. Pass those paths plus the actual owning SID/provider to delegated reviewers. Missing or unverified identity leaves persistence unavailable; continue read-only or in chat without fallback. In explicit `--output session`, keep the plan and findings in context and create no files; a supplied external path requires source-guide ownership/privacy validation before reading.
 
 ---
 
@@ -53,7 +56,7 @@ Before proceeding, you must be able to answer:
 Gather surrounding context:
 - **Codebase state** — does the code the plan references actually look the way the plan assumes? Are there recent changes the plan doesn't account for?
 - **Open PRs/Issues** — anything in flight that conflicts with or duplicates this plan?
-- **Prior attempts** — has something similar been tried before? Write the keywords to `<keywords-file>` in `<scratch>` (`../_shared/orchestration-guide.md` §1) with the Write tool, then `git log --all --oneline --grep="$(cat <keywords-file>)"` for signals.
+- **Prior attempts** — has something similar been tried before? For persisted-output runs, write keywords to `<keywords-file>` under the supplied `<scratch>` path and query `git log --all --oneline --grep="$(cat <keywords-file>)"`. For explicit `--output session`, use read-only query arguments and do not create a keywords file.
 
 ---
 
@@ -200,7 +203,7 @@ Launch these reviewers in parallel:
 | **User** | Consumer experience | How does someone actually use this? Is the workflow ergonomic? What's the learning curve? |
 | **Counter-Planner** | Dialectical inquiry | Develop a complete alternative approach built on the opposite assumptions. Present it seriously, not as a straw man. |
 
-Each reviewer writes findings to `<scratch>/<reviewer>.md`, where `<scratch>` is a private directory the orchestrator makes first with `mktemp -d "${TMPDIR:-/tmp}/adversarial-review.XXXXXX"`.
+For persisted-output runs, each reviewer writes findings to `<scratch>/<reviewer>.md`, where `<scratch>` is the exact current-session scratch path supplied by the orchestrator under `../_shared/orchestration-guide.md` §1. Never create an OS-temp or guessed replacement. The orchestrator retains the selected sanitized final report in `<artifacts>` by default; a dispatched invocation returns its contract document to its caller, which owns final retention. Under explicit `--output session`, reviewers return their findings in context and create no files.
 
 After all return, synthesize: merge overlapping findings, resolve contradictions, rank by severity.
 
@@ -294,7 +297,8 @@ What should be removed? (via negativa)]
 
 ### Output Targets
 
-- `--output session` (default): Present the review in chat.
+- `--output artifacts` (default): retain the final review report in the current session's artifacts directory, then present its path and summary.
+- `--output session`: Present the review in chat only; create no files.
 - `--output github`: Create one umbrella issue ("Adversarial Review: [Plan Title]") with the full review body, plus individual issues for each Blocker and critical-severity Risk.
 
 ---

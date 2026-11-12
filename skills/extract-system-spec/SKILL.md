@@ -11,6 +11,10 @@ argument-hint: "[full-system | wing <name> | targeted <scope>] [--budget <tokens
 
 Produce a single, standalone, anonymized Markdown specification from which a capable team could rebuild a system from scratch — without the original repo. Orchestrator + subagents; coverage-gated; hard-anonymized; adversarially reviewed. The full 6-phase method lives in `extraction-prompt.md` in this skill directory; this file governs *when* to run it, at *what scope*, and at *what cost*.
 
+## Working files and output
+
+Follow `../_shared/orchestration-guide.md` §1 for native session allocation and exact-owner cleanup. Research, inventories, evidence, reviewer material, and the private alias ledger belong in `<scratch>`. The anonymized final spec defaults to `<artifacts>/FULL_SYSTEM_SPEC.md`, `<artifacts>/WING-<name>-SPEC.md`, or `<artifacts>/TARGETED-SPEC.md`. A caller-supplied `--out` is an explicit export path: retain the canonical final spec in artifacts, copy the verified final revision to that path, and record the actual path/hash/result in the current session's private publication receipt. Never place raw research, source paths, identifiers, or private alias mappings in artifacts or exports. Missing/conflicting/unverified native identity or ordinary-permission denial makes persistence unavailable; do not fall back to cwd, an operation ID, or OS temp. Chat-only output performs no allocation or writes.
+
 ## When to use this — and when NOT
 
 **Use when** the payoff of a portable rebuild blueprint justifies a large, deliberate token spend:
@@ -56,7 +60,7 @@ The first argument selects scope. All three scopes run the *same* method (`extra
 
 `<HARD-GATE>` — do this before loading the method or launching any subagent.
 
-1. Parse args: scope (default `full-system`), `--budget <tokens>`, `--depth` (default `standard`), `--out <path>`. The default output name is scope-derived, written at the project root: FULL_SYSTEM_SPEC.md for full-system, WING-<name>-SPEC.md for a wing, TARGETED-SPEC.md for a targeted slice.
+1. Parse args: scope (default `full-system`), `--budget <tokens>`, `--depth` (default `standard`), `--out <path>`. The default output name is scope-derived under `<artifacts>`: `<artifacts>/FULL_SYSTEM_SPEC.md` for full-system, `<artifacts>/WING-<name>-SPEC.md` for a wing, `<artifacts>/TARGETED-SPEC.md` for a targeted slice. A supplied `--out` is an explicit export in addition to that canonical artifact.
 2. Cheap, read-only size estimate — this is NOT the Phase 1 inventory yet:
    - `git ls-files | wc -l` (fallback: `find . -type f` minus vendor/build dirs).
    - Approximate LOC over source globs; count deployable units; get rough entry-point and persisted-entity counts; note languages/frameworks.
@@ -70,7 +74,7 @@ The first argument selects scope. All three scopes run the *same* method (`extra
 Read `extraction-prompt.md` in this skill directory and execute it faithfully as the orchestrator. Fill its template variables from Phase 0:
 
 - `{{PROJECT_ROOT}}` → the target repo root (default: cwd).
-- `{{OUTPUT_PATH}}` → `--out`.
+- `{{OUTPUT_PATH}}` → always the canonical final-spec path under `<artifacts>`. After the method completes its privacy/hash validation, copy that verified revision to a supplied `--out` export path and record the actual result in the private receipt.
 - `{{SCOPE_NOTES}}` → derived from the scope dial:
   - `full-system` → none (inspect the full project).
   - `wing <name>` → "Restrict primary coverage to the '<name>' wing/capability and the seams where it meets the rest of the system; classify the remainder as out-of-scope context, not a coverage target."
@@ -83,12 +87,12 @@ The method owns the rigor; do not weaken it — a complete inventory + coverage 
 ### Phase 7 — verify gates & report
 
 1. Confirm every applicable completion gate in the method passed — or the deliverable is honestly marked **Incomplete Specification** with the blocked gates named.
-2. Confirm the final Markdown exists at `--out`, that the Phase 6 privacy gate passed (plus the exhaustive re-scan if `--depth exhaustive`), and that it contains all required sections.
+2. Confirm the final Markdown exists at the canonical artifact path (and at the explicit `--out` export path when supplied), that the Phase 6 privacy gate passed (plus the exhaustive re-scan if `--depth exhaustive`), and that it contains all required sections. Record verified export status; preserve the canonical spec on any export failure.
 3. Report: output path, gate pass/fail, anonymized coverage totals, and the count of unresolved known unknowns. No project-identifying details.
 
 ## Rules
 
-- **Read-only on the target.** The only writes are scratch research artifacts (in a private directory made with `mktemp -d`) and the final Markdown. Never mutate source, config, schemas, data, or external systems.
+- **Read-only on the target.** The only writes are session-owned scratch research artifacts and the canonical final Markdown under `<artifacts>` (plus a caller-requested export). Never mutate source, config, schemas, data, or external systems.
 - **Coverage, not length.** Completion is gate-based. Context pressure means subdivide into another wave — never omit scope.
 - **Hard anonymization.** The deliverable carries no PII, secrets, identity, source paths, symbols, or repo metadata. The private alias ledger is scratch — never shipped with the spec.
 - **Never fabricate.** Uncertain or contradictory behavior is labeled, not invented.

@@ -7,7 +7,7 @@ Read-only views over the session store (`~/.claudna/sessions/`, SETUP_GUIDE §3.
 Run the store's reader for the verb, with `<claudna-root>` resolved per [`../_shared/claudna-root.md`](../_shared/claudna-root.md):
 
 ```bash
-python3 "<claudna-root>/lib/claudna/session_store" <verb> [args]
+python3 -B "<claudna-root>/lib/claudna/session_store" <verb> [args]
 ```
 
 | Verb | Args | Shows |

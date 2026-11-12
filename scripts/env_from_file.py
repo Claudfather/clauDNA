@@ -35,6 +35,8 @@ import re
 import sys
 from urllib.parse import parse_qsl, unquote, urlsplit
 
+sys.dont_write_bytecode = True
+
 USAGE = (
     "usage: env_from_file.py <env-file> --has KEY [KEY ...]\n"
     "       env_from_file.py <env-file> KEY[=NAME|=@libpq] [...] -- COMMAND [ARGS ...]\n"

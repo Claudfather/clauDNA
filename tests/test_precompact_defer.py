@@ -273,8 +273,8 @@ class TestOptOutStillWins:
 
 
 class TestTheMarkerIsPerUser:
-    """The marker that lets the second /compact through lives in the user's own
-    state directory and is created exclusively, never in the shared TMPDIR."""
+    """The marker that lets the second /compact through belongs to the native
+    session under the clauDNA state root, never to the shared TMPDIR."""
 
     def test_a_marker_in_tmpdir_does_not_suppress_the_prompt(self, tmp_path):
         sid = "sess-planted-1"
@@ -287,18 +287,35 @@ class TestTheMarkerIsPerUser:
         sid = "sess-state-1"
         code, out = run_hook(tmp_path, user_settings=ENGINE_HOOK, engine_version=None, session_id=sid)
         assert prompts(out), (code, out)
-        state = tmp_path / "home" / ".claudna" / "hooks"
-        marker = state / f"reflected-{sid}"
+        session_hooks = tmp_path / "home" / ".claudna" / "sessions" / sid / "hooks"
+        marker = session_hooks / "reflected"
         assert marker.is_file()
-        assert state.stat().st_mode & 0o077 == 0, oct(state.stat().st_mode)
+        assert session_hooks.stat().st_mode & 0o077 == 0, oct(session_hooks.stat().st_mode)
+        assert marker.stat().st_mode & 0o077 == 0, oct(marker.stat().st_mode)
+        assert not (tmp_path / "home" / ".claudna" / "hooks").exists()
+        assert list((tmp_path / "tmpd").iterdir()) == []
         # The next call lets the compaction through and removes the marker.
         code, out = run_hook(tmp_path, user_settings=ENGINE_HOOK, engine_version=None, session_id=sid)
         assert code == 0 and out.strip() == "" and not marker.exists()
 
 
 def test_a_state_root_this_hook_creates_is_private(tmp_path):
-    """#373 review: if this hook creates ~/.claudna first, it must still be 0700."""
+    """#373 review: session-owned marker ancestors remain private."""
     code, out = run_hook(tmp_path, engine_version=None)
     assert prompts(out)
-    for path in (tmp_path / "home" / ".claudna", tmp_path / "home" / ".claudna" / "hooks"):
+    for path in (
+        tmp_path / "home" / ".claudna",
+        tmp_path / "home" / ".claudna" / "sessions",
+        tmp_path / "home" / ".claudna" / "sessions" / "sess-defer-1",
+        tmp_path / "home" / ".claudna" / "sessions" / "sess-defer-1" / "hooks",
+    ):
         assert path.stat().st_mode & 0o077 == 0, oct(path.stat().st_mode)
+
+
+@pytest.mark.parametrize("sid", ["", "SESSION_ID", "native-session-id"])
+def test_missing_or_placeholder_event_identity_fails_open_without_global_or_tmp_marker(tmp_path, sid):
+    code, out = run_hook(tmp_path, engine_version=None, session_id=sid)
+    assert defers(code, out)
+    assert not (tmp_path / "home" / ".claudna" / "hooks").exists()
+    assert not (tmp_path / "home" / ".claudna" / "sessions").exists()
+    assert list((tmp_path / "tmpd").iterdir()) == []

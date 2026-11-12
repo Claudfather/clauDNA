@@ -129,6 +129,12 @@ class TestRetention:
 
     def test_age_cap_retires_final_segments_and_logs_first(self, store):
         h = session_with(store, "s1", ["done", "done"])
+        handoff = "---\nschema_version: 2\nlast_updated: 2026-11-11T12:00:00Z\ncwd: /work\n---\n"
+        h.paths.handoff.write_text(handoff)
+        fsio.ensure_dir(h.paths.artifacts)
+        (h.paths.artifacts / "plan.md").write_text("retained plan")
+        h.ack("outside-reader", 1)
+        consumer_bytes = h.paths.consumers.read_bytes()
         rollup.refresh(h.paths)
         report = retention.sweep(store, {}, now=self.later(31))
         assert report.retired == ["s1/seg-001 (age)", "s1/seg-002 (age)"] and h.paths.segment_indices() == []
@@ -137,6 +143,9 @@ class TestRetention:
         assert json.loads(h.paths.session_json.read_text())["segments"] == {"count": 0, "open": None, "retired": 2}
         assert json.loads(rollup.rollup_path(h.paths).read_text())["fields"]["blocks"][0]["claim"] == BLOCK_A["claim"]
         assert check_session(h).problems == []
+        assert h.paths.handoff.read_text() == handoff
+        assert (h.paths.artifacts / "plan.md").read_text() == "retained plan"
+        assert h.paths.consumers.read_bytes() == consumer_bytes
 
     def test_acked_segments_wait_for_the_floor(self, store):
         h = session_with(store, "s1", ["done", "done"])

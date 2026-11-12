@@ -33,6 +33,8 @@ import os
 import subprocess
 import sys
 
+sys.dont_write_bytecode = True
+
 TRUSTED = {"OWNER", "MEMBER", "COLLABORATOR"}
 
 # Values GitHub documents for author_association. A value outside this set is

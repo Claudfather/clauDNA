@@ -20,7 +20,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from skill_checks import parse_frontmatter, skill_dirs  # noqa: E402
+from skill_discovery import skill_dirs  # noqa: E402
+from skill_frontmatter import parse_frontmatter  # noqa: E402
 
 BUDGET_FILE = Path("scripts") / "catalog-budget.json"
 #: Entries named in an over-budget error: where to look first.

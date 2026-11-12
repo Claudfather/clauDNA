@@ -12,7 +12,7 @@ Follow these steps exactly in order.
 
 ### Step 1: Identify the PR
 
-Accept PR number, URL, or no argument (run `gh pr list` and ask user to pick). Fetch with `gh pr view <number> --json title,body,author,baseRefName,headRefName,isCrossRepository,files,additions,deletions,reviews,comments` (`authorAssociation` is not a `gh ... --json` field on this gh version — read it with the provenance gate). Present overview (author, branch, files, status, existing reviews). Check provenance with `python3 <claudna-root>/scripts/check_provenance.py <owner> <repo> pr <number>` (exit 0 = trusted; resolve `<claudna-root>` per [`../_shared/claudna-root.md`](../_shared/claudna-root.md)); note its verdict and `isCrossRepository` — they gate local verification in Step 4.
+Accept PR number, URL, or no argument (run `gh pr list` and ask user to pick). Fetch with `gh pr view <number> --json title,body,author,baseRefName,headRefName,isCrossRepository,files,additions,deletions,reviews,comments` (`authorAssociation` is not a `gh ... --json` field on this gh version — read it with the provenance gate). Present overview (author, branch, files, status, existing reviews). Check provenance with `python3 -B <claudna-root>/scripts/check_provenance.py <owner> <repo> pr <number>` (exit 0 = trusted; resolve `<claudna-root>` per [`../_shared/claudna-root.md`](../_shared/claudna-root.md)); note its verdict and `isCrossRepository` — they gate local verification in Step 4.
 
 ### Step 2: Read the Diff
 

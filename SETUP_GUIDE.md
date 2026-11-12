@@ -1,18 +1,46 @@
 # clauDNA Setup Guide
 
+For host-specific scope, install/update/removal, pin/rollback limits and retained
+data, start with the [package support guide](documentation/guides/PACKAGE_SUPPORT.md).
+Its generated catalog derives counts and prerequisites from the package sources.
+
+The [storage ownership contract](documentation/guides/STORAGE_OWNERSHIP.md)
+defines native-session artifacts and scratch, explicit standalone operations,
+root relocation, privacy boundaries and the native capability gates. Allocation
+does not enable session capture; migration of existing writer defaults is staged
+and historical data is preserved.
+
 ## Cross-provider delegation
 
 `/claudna:delegate run` supports Claude-to-Codex and Codex-to-Claude. It requires Python 3.9+, the destination's installed/authenticated native CLI (measured with Codex 0.162.1 and Claude 2.1.304), and the actual parent session recorded by clauDNA. It reuses native account/model/permission policy; no API key is required to install the plugin. Claude uses its native `--permission-prompts none` flag: unanswered permission requests are denied without a permission broker or launcher retry. Denied calls remain visible separately from native completion; parent checks must establish the required result before acceptance. No permission is broadened.
 
-Hand off a clean, task-owned workspace exclusively during execution. Provider-qualified child links and separate worker/acceptance/cleanup events appear through `/claudna:session show`/`timeline`, distinct from `/clear` continuity. No extra checkout or dependency copy. Code and native provider history remain; only `<state>/delegation/active.json` is temporary, with one stable empty lock retained.
+Hand off a clean, task-owned workspace exclusively during execution. Provider-qualified child links and separate worker/acceptance/cleanup events appear through `/claudna:session show`/`timeline`, distinct from `/clear` continuity. No extra checkout or dependency copy. Code and native provider history remain. The durable job record lives at `R/sessions/<parent-sid>/delegation/<job-id>.json`; `R/delegation/active.json` is only a versioned pointer (job ID, parent SID/provider), with one stable empty lock retained.
 
-Normal completion cleans bookkeeping automatically. SessionStart and the next invocation retry known-terminal cleanup even with capture/harvest off. Unknown execution stays protected and may need an ownership decision after a crash; it is never age-deleted or automatically replaced. No cleanup runs while the host is absent. V1 excludes native resume, concurrent workers, Git integration, recovery archives and direct Claudron publishing. Parent verification remains required.
+Normal completion clears only the matching coordination pointer; durable payload and lifecycle evidence remain. SessionStart and the next invocation retry known-terminal cleanup even with capture/harvest off. Unknown execution, unresolved legacy full records, missing/mismatched payloads and orphans stay protected for explicit reconciliation; nothing is relaunched or age-deleted. Legacy full records are recognized without migration: only their known-terminal coordination slot can receive the existing exact-match cleanup. Missing parent history permits cleanup only when the durable payload still establishes observed terminal status. No cleanup runs while the host is absent. V1 excludes native resume, concurrent workers, Git integration, recovery archives and direct Claudron publishing. Parent verification remains required.
 
 **Last Updated:** 2026-05-11
 
 This guide is the deep-dive companion to [README.md](./README.md). The README covers the marketplace install (`/plugin install claudna@Claudfather`); this guide covers everything beyond that — recommended `settings.json` tweaks, headless provisioning for bots and CI, Snowflake key-pair auth, shell aliases, the Claude Code configuration hierarchy, and troubleshooting.
 
 If all you need is "install clauDNA", read the README. Come here when something goes sideways or you want to understand *why* the defaults are what they are.
+
+## Optional setup resources
+
+The source tree and full maintainer package include these resources for real
+setup. Plugin installation does not apply them to your project or user settings.
+They are separate from the skills, agents and hooks selected by each host's
+manifest; a packaged file is not necessarily a discovered or executed component.
+
+| Resource | Purpose | How it takes effect |
+|----------|---------|---------------------|
+| [`project-template/`](./project-template/) | Starter project instructions and `.claude/` settings | Copy and adapt manually; `/claudna:init-project` uses its own generation templates for guided setup |
+| [`shell/zshrc-additions.sh`](./shell/zshrc-additions.sh) | Optional worktree aliases and shell functions | Review and merge into your shell configuration yourself ([§6](#6-shell-configuration)) |
+| [`snowflake/snowsql-config-template`](./snowflake/snowsql-config-template) | SnowSQL connection configuration template | Fill in your connection details and apply to your own SnowSQL configuration ([§5.5](#55-configure-snowsql)) |
+
+The shell integration and SnowSQL template stay in their named root directories.
+The plugin does not source the shell file, configure SnowSQL, or copy project
+templates just because it is enabled. `.cursor/` configures contributor cloud
+environments; `.cursor-plugin/` describes the consumer plugin.
 
 ---
 
@@ -297,7 +325,7 @@ The plugin ships a `PreCompact` hook that automatically triggers `/claudna:captu
 
 ### 3.6 SessionStart briefing (on by default)
 
-Every interactive session opens with a short context briefing injected by `plugin-hooks/session-start.sh`: current branch and tree state, the per-cwd handoff summary (`<cwd>/.claude/session.md`, staleness-aware), and your open PRs — plus a directive telling the agent to synthesize a 1–2 sentence warm start instead of greeting you cold. It is context for the agent, not terminal output.
+Every supported interactive session opens with a short context briefing injected by `plugin-hooks/session-start.sh`: current branch and tree state, an available scoped handoff summary from the session store, and your open PRs — plus a directive telling the agent to synthesize a 1–2 sentence warm start instead of greeting you cold. Continuity requires a verified native session identity and is resolved through scoped references; a source edit or hook fixture does not establish native host acceptance. It is context for the agent, not terminal output.
 
 - **Disable it** with `CLAUDNA_SESSION_BRIEFING=0` (same pattern as `CLAUDNA_PRECOMPACT_REFLECT`).
 - **Bots / CI / `claude -p`:** there is no reliable in-hook headless signal, so the env var *is* the headless mechanism — set `CLAUDNA_SESSION_BRIEFING=0` in your bot environment (the §4.4 Dockerfile recipe includes it). The hook is harmless if left on (it only adds context and degrades silently), but headless runs don't need the token cost.
@@ -327,20 +355,20 @@ With summaries enabled, a detached worker summarizes each segment after it is se
 | `CLAUDNA_STATE_DIR` | `~/.claudna` | Where all clauDNA state lives: the store, hook markers, logs. It must be an absolute path. A relative one keeps no state instead of writing into your project. |
 
 - **What it never does:** it never writes to the vault except through `claudron`, never writes to git (it reads the branch and HEAD once, at SessionStart), never prints into your session, and never blocks. It always exits 0.
-- **Sessions that never ended:** a crash or a kill skips SessionEnd and leaves a session open. About every 6 hours, a SessionStart starts a detached sweep. It closes up to 5 sessions that have sat idle for `CLAUDNA_UNCLOSED_AFTER_H` and whose owning agent process is gone, and marks them `abandoned`. Their last segment is summarized if its recorded policy allows it. A session that recorded no process id is never closed automatically. `python3 "<plugin>/lib/claudna/session_store" sweep --dry-run` lists the candidates, and `seal <session-id>` closes one by hand. A worker or manual `seal` cannot override a recorded summary opt-out.
+- **Sessions that never ended:** a crash or a kill skips SessionEnd and leaves a session open. About every 6 hours, a SessionStart starts a detached sweep. It closes up to 5 sessions that have sat idle for `CLAUDNA_UNCLOSED_AFTER_H` and whose owning agent process is gone, and marks them `abandoned`. Their last segment is summarized if its recorded policy allows it. A session that recorded no process id is never closed automatically. `python3 -B "<plugin>/lib/claudna/session_store" sweep --dry-run` lists the candidates, and `seal <session-id>` closes one by hand. A worker or manual `seal` cannot override a recorded summary opt-out.
 - **For fleet tooling:** each opening SessionStart rewrites `<state root>/entrypoint.json` (`$CLAUDNA_STATE_DIR`, default `~/.claudna`), naming the store's entrypoint, plugin version and agent CLI. A consumer runs the store by contract instead of guessing a plugin-cache path (spec §8). `session export --include-skipped` includes status items for final segments without a summary; private segments and sessions never export.
 - **`/clear` lineage:** the session a `/clear` starts records the one it cleared (`parent_sid`), and every session in that chain shares one `chain_id`.
 - **Looking back:** `/claudna:session list`, `show <id>`, `timeline <id>` and `failures [--group]` read what the store recorded. `failures --group` shows which tool errors recur across sessions. Each session's rolled-up summary is `sessions/<id>/summary.json`.
-- **What the background work did:** `python3 "<plugin>/lib/claudna/session_store" runs` lists the summarizer, harvest and sweep runs, newest first, from `~/.claudna/runs/runs.jsonl`.
-- **Pipeline health:** `python3 "<plugin>/lib/claudna/session_store" health --json` reads the existing store, worker receipts and draft review decisions. It reports recorded capture choices (including unknown historical choices), final summary states, ready/unacknowledged harvest segments, their age relative to this process's retention settings, and failures in retained worker runs. It launches no worker and writes nothing. `observed` means evidence was read, not that every host or provider is healthy; `no_evidence` is not success. The command exits 0 when the read completes even if warnings need attention. Run `runs --kind summarize --json` or `runs --kind harvest --json` for causes. Harvest is triggered by later SessionStart events, not a continuously scheduled daemon. A backlog near the age cap needs investigation before the next sweep can retire its data.
+- **What the background work did:** `python3 -B "<plugin>/lib/claudna/session_store" runs` lists the summarizer, harvest and sweep runs, newest first, from `~/.claudna/runs/runs.jsonl`.
+- **Pipeline health:** `python3 -B "<plugin>/lib/claudna/session_store" health --json` reads the existing store, worker receipts and draft review decisions. It reports recorded capture choices (including unknown historical choices), final summary states, ready/unacknowledged harvest segments, their age relative to this process's retention settings, and failures in retained worker runs. It launches no worker and writes nothing. `observed` means evidence was read, not that every host or provider is healthy; `no_evidence` is not success. The command exits 0 when the read completes even if warnings need attention. Run `runs --kind summarize --json` or `runs --kind harvest --json` for causes. Harvest is triggered by later SessionStart events, not a continuously scheduled daemon. A backlog near the age cap needs investigation before the next sweep can retire its data.
 - **Draft quality:** health counts explicit review decisions per draft revision; repeated records for the same revision count once. Acceptance is promoted / (promoted + discarded), excluding kept/undecided revisions, and is null when there are no decisions. It is a selected review sample, not an automatic correctness measure or a skill score. Review source evidence for factual claims, distinguish durable learning from transient inventory, and discard unsupported generalizations. Successful summarization and harvesting prove transport, not truth.
 - **Reviewing drafts:** when harvest has written drafts, SessionStart shows a `Memory, to review:` line. `/claudna:capture --review` walks you through them, most-reinforced first: promote, discard or skip each one. Nothing is promoted without you.
 - **Retention:** once every consumer registered for a session has acked a segment (harvest, and any `session export --ack` caller), and the segment is a week old (`CLAUDNA_RETAIN_ACKED_DAYS`), or once it is 30 days old whatever happened to it (`CLAUDNA_RETAIN_DAYS`; `0` turns this age cap off, so only acked segments are retired), the background sweep deletes its directory. A session opened with `CLAUDNA_HARVEST=1` counts harvest as registered from its first segment, so nothing in it retires early just because harvest hasn't run yet. What it summarized stays in the session's rolled-up summary.
-- **Keeping one session out:** `python3 "<plugin>/lib/claudna/session_store" private <session-id>` marks a session private: subsequent activity/skill telemetry is suppressed, and it is never summarized or harvested. This does not erase earlier records. `--off` clears the mark.
+- **Keeping one session out:** `python3 -B "<plugin>/lib/claudna/session_store" private <session-id>` marks a session private: subsequent activity/skill telemetry is suppressed, and it is never summarized or harvested. This does not erase earlier records. `--off` clears the mark.
 - **Activity:** each segment also records what happened inside it, in `seg-NNN/events.jsonl`: one line per prompt, per Skill call, per failing tool call, and per tool call you stopped with Esc. Those hooks run in the background, so no prompt waits on them. Tool events store the tool, the exit code and a normalized, redacted one-line signature, plus a pointer to the call in Claude Code's own transcript. The command and its error output are never copied.
 - **Skill evidence:** Claude's native `Skill` result records an invocation automatically; `ok` means the tool result, not successful execution of the whole procedure or its task. Failed Skill calls retain their skill name on `tool.failed`. The default local store does not depend on `CLAUDNA_TELEMETRY=1`. A missing telemetry file does not mean local recording is off.
 - **Privacy:** prompt text is redacted and capped at 500 characters; `CLAUDNA_CAPTURE_PROMPTS=0` keeps only its length and identifiers. Free text the store keeps, and everything the summarizer sees, goes through the credential redactor first. Summaries also pass an instruction screen (`lib/claudna/screen.py`): text shaped like an injected instruction is kept out of what harvest drafts and the review digest offers. It catches attack shapes, not lies, so drafts stay unverified until you promote them. Directories are `0700` and files `0600`.
-- **When something breaks:** `~/.claudna/hooks/errors.log` holds one JSON line per failure. `session-store.stderr`, `summarizer.stderr` and `harvest.stderr` next to it catch anything Python couldn't log itself. `python3 "<plugin>/lib/claudna/session_store" check <session-id>` validates a session's files.
+- **When something breaks:** attributable errors, permissions logs, reflection markers and summarizer stderr live in `R/sessions/<native-sid>/hooks/`. Without a usable identity/import, `R/hooks/` retains fixed error classes and counts only. Whole-store harvest/sweep stderr is replaced by a bounded failure code. Health reports counts without copying payload or private identities; inspect the owning files locally. `python3 -B "<plugin>/lib/claudna/session_store" check <session-id>` validates a session's files. Existing old logs remain untouched by relocation.
 - **Removal:** uninstalling the plugin leaves `~/.claudna/` in place, so session history survives a reinstall. Delete that directory to remove it.
 - **Upgrading from 0.21.x:** earlier versions kept hook state in `${XDG_STATE_HOME:-~/.local/state}/claudna/`. Nothing reads it any more. Its `permissions.log` holds whole command lines, so delete that directory by hand.
 
@@ -528,7 +556,7 @@ If you hit `Insufficient privileges to operate on user`, send your admin:
 
 ### 5.5 Configure SnowSQL
 
-Use the template at `snowflake/snowsql-config-template` in this repo as a starting point, then write to `~/.snowsql/config`:
+Use the template at `snowflake/snowsql-config-template` in this repo as a starting point, then apply your completed configuration to `~/.snowsql/config` yourself. Enabling clauDNA does not create or modify this file:
 
 ```ini
 [connections]
@@ -577,7 +605,7 @@ No browser should open. If one does, see [Troubleshooting](#9-troubleshooting).
 
 ## 6. Shell Configuration
 
-claudna ships shell aliases for git worktrees in [`shell/zshrc-additions.sh`](./shell/zshrc-additions.sh). To install:
+clauDNA includes optional shell integration for git worktrees in [`shell/zshrc-additions.sh`](./shell/zshrc-additions.sh). Plugin installation does not source it or modify `~/.zshrc`. Review the file, then merge the functions you want into your own shell configuration. To append the complete file once from a source checkout:
 
 ```bash
 cat shell/zshrc-additions.sh >> ~/.zshrc
@@ -696,7 +724,7 @@ Each `claudna:*` skill call appends one line, in Claudosseum's ingestion format:
 | `data.skill_slug` | the skill without its `claudna:` prefix |
 | `data.duration_ms` | how long the Skill call took, from Claude Code |
 | `data.success` | whether the Skill call succeeded, from Claude Code (a failed call is recorded too, with `false`) |
-| `data.session_id` | Claude Code's session id |
+| `data.session_id` | Claude Code's native session id, or null when absent from the source event |
 
 This compatibility file contains no prompts, tool arguments or file paths. Since 0.23, `telemetry-emit.sh` hands the payload to the session store's telemetry writer (§3.7). The shape is unchanged, but `duration_ms`, `success` and `session_id` are now the real values. Before, they were `null`, a guess from the skill's output text, and the hook shell's pid. It represents the same invocation as the session-store event: never add the two counts. It has no uploader. With `CLAUDNA_SESSION_STORE=0`, it runs only when explicitly requested with `CLAUDNA_TELEMETRY=1`.
 
@@ -705,10 +733,12 @@ This compatibility file contains no prompts, tool arguments or file paths. Since
 Events are appended as JSONL to:
 
 ```
-~/.claude/telemetry/skill-events.jsonl
+${CLAUDNA_STATE_DIR:-~/.claudna}/telemetry/skill-events.jsonl
 ```
 
-Override the path with `CLAUDNA_TELEMETRY_PATH`.
+An absolute `CLAUDNA_TELEMETRY_PATH` inside the effective clauDNA root overrides the destination. Relative/outside-root overrides produce a bounded configuration notice and no compatibility observation; they are never silently redirected. The writer, shell wrapper and report default use the same resolver. Use the report's explicit read-only `--telemetry <legacy-path>` to inspect an old feed, never sum old/new copies independently. Historical telemetry is not migrated or deleted.
+
+This source relocation is held unshipped until actual downstream telemetry readers accept the new path and recovery is qualified. Genuine host-owned logs, transcripts, authentication and settings keep their host ownership. Store-off plus explicit telemetry-on still records a standalone compatibility observation; null-SID rows need no session directory or fabricated lifecycle event.
 
 ### Enabling / disabling
 
@@ -865,7 +895,8 @@ The clauDNA project template (`project-template/CLAUDE.md`) embeds these princip
 
 ## Codex workflows and continuity
 
-The `Claudfather/claudna` Codex plugin selects 37 engineering skills explicitly,
+The `Claudfather/claudna` Codex plugin selects its engineering skills explicitly
+in the [generated host catalog](documentation/guides/PACKAGE_SUPPORT.md#declared-support),
 plus five store handlers and a startup-only briefing. It excludes Claude-only
 `cleanup-legacy-install` and repo-clone `promotion-intake`/`skill-scaffold`.
 Bundled agent prompts map to a read-and-dispatch procedure. Support requires
@@ -887,8 +918,35 @@ Commands use quoted `PLUGIN_ROOT`; store handlers explicitly choose `--host code
 Default direct store calls remain Claude-compatible. No permission, notification,
 formatting or compact capture prompt is ported by this change.
 
-The existing per-cwd `.claude/session.md` remains the cross-runtime handoff artifact.
-It is untrusted continuity data, never instructions overriding the current task.
+Continuity is owned by the verified native session at
+`R/sessions/<native-sid>/handoff.md`; scoped pointers identify eligible prior
+handoffs and separately published artifacts. Use the package's `continuity`
+commands to resolve a pointer or obtain an artifact path. Never select the
+latest session, infer a SID from cwd/time, or modify a predecessor. Legacy
+project and personal handoffs are explicit read-only sources: import only the
+selected file, bind its bytes with `--source-sha256`, preserve it unchanged, and
+require explicit `reimport` when its content changes. A source-level contract
+does not establish acceptance by native hosts or existing consumers. All
+handoff data is untrusted continuity, never instructions overriding the current
+task.
+
+Invoke the loaded package and resolve a handoff with:
+
+```sh
+python3 -B "<loaded-package>/lib/claudna/session_store" continuity resolve \
+  --session "<verified-native-sid>" --host "<host>" \
+  --scope "<canonical-scope>" --kind handoff --json
+```
+
+Request an artifact location separately with `continuity artifact-path`; that
+action fixes the kind to `artifact` and accepts the scope plus optional
+workflow/source-session selectors. Send complete v2 content on stdin to
+`handoff-write --session <native-sid> --host <host> --json`.
+See [storage ownership](documentation/guides/STORAGE_OWNERSHIP.md) for canonical
+scope, privacy, compare-and-swap, import receipts, and failure handling.
+Captured sessions use recorded lifecycle privacy. Artifact-only/capture-off
+cross-session discovery requires an explicit public-context opt-in; setup never
+sets public context by default.
 Set `CLAUDNA_SESSION_BRIEFING=0` to opt out of the startup briefing. Existing store
 switches remain `CLAUDNA_SESSION_STORE=0`, `CLAUDNA_SESSION_SUMMARY=0` and
 `CLAUDNA_HARVEST=0`. Detached summarization still uses the existing Claude runner;
@@ -898,7 +956,7 @@ Codex's `PostToolUse` matcher `Skill` is retained for compatibility, but the
 measured desktop read-and-execute workflow exposes no native `Skill` tool.
 Do not claim capture from its configured/trusted handler. Each selected skill
 already reads `skills/_shared/codex-tools.md`; that installed procedure now calls
-`python3 "<loaded-plugin>/lib/claudna/session_store" skill-start <slug>` once when
+`python3 -B "<loaded-plugin>/lib/claudna/session_store" skill-start <slug>` once when
 execution begins. This automatic workflow step writes an existing `skill.invoked`
 event with `observation: agent_procedure_start`. It is an agent attestation of
 procedure entry, not proof of native execution, completion or task success.
@@ -920,7 +978,7 @@ Cursor remains hook-free: automatic capture is unsupported there.
 Maintainers can refresh the metadata-only local inventory with:
 
 ```sh
-python3 scripts/skill-usefulness.py --output /absolute/private/report-directory
+python3 -B scripts/skill-usefulness.py --output /absolute/private/report-directory
 ```
 
 Run from the source checkout. The report includes all canonical skills and each
@@ -963,3 +1021,37 @@ Descriptions should put their most distinctive trigger first. Hosts can shorten
 descriptions when many skills compete for context; discovery, an instruction
 read, procedure entry, and completed work are different observations. Keep local
 integration reports and their native receipts outside published release artifacts.
+
+
+## Held storage ownership qualification
+
+Internal output uses `CLAUDNA_STATE_DIR` (absolute), default `~/.claudna`.
+Maintainer scripts reuse the session-store resolver and allocator through
+`scripts/release_toolchain.py`. A coherent real native context owns its scratch
+and receipts; otherwise pass the actual `--session` and `--host` supplied by the
+host. Outside all native workflows, explicitly opt into `--standalone` or
+`STORAGE_OWNER_ARGS=--standalone` for Make targets. Missing/conflicting native
+identity must never be repaired with an operation ID. Standalone operations are
+typed separately under `R/operations/op-<32 hex>/` and create no session lifecycle.
+
+Package/release output paths, routing report paths and canary `--dir` are explicit
+exports. Canonical private receipts remain under the selected owner and bind the
+export to its exact commit/archive or report digest. Private host fixture
+`--home`, `--codex-home` and `--tmpdir` options do not redirect canonical output.
+Owned checks disable Ruff/pytest/bytecode caches; dependency installation and
+native host/tool cache policy remain unchanged. Use the pinned toolchain through
+`python3 -m`; run fresh checks in isolated exports with private HOME/TMP and state.
+
+The five-PR storage stack remains held outside main and the release path. Phase04
+supplies native-session artifact defaults on the held draft stack; native
+identity/write acceptance gates merge/release, with one smoke per materially
+different identity-delivery mechanism. Static Markdown checks, executable fixtures, actual
+native skill/publication execution and named external-consumer acceptance are
+separate evidence. A fixture pass is not a complete package storage or cutover
+verdict. Keep historical data in place. Readers must accept the new handoff/feed
+protocol before writer cutover. A specific recovery artifact must read retained
+new layout and write only under R, with native/consumer acceptance; otherwise an
+approved forward-recovery plan is required. An arbitrary older package is not
+qualified rollback. D6 requires a major release or an owner-approved exception,
+and release/installation still need their own authorization. No intermediate
+version bump or release is permitted.

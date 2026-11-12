@@ -5,6 +5,9 @@ Use this template for each Task tool call when launching subagents into worktree
 ```
 WORKTREE: /absolute/path/to/repo-worktrees/<branch>
 MAIN REPO: /absolute/path/to/repo
+NATIVE OWNER: <actual-session-sid> via <provider>
+SCRATCH: <absolute-current-session-scratch-path>
+ARTIFACTS: <absolute-current-session-artifacts-path>
 
 ## CRITICAL — READ THIS FIRST
 
@@ -32,6 +35,6 @@ For Python: use `./venv/bin/python` and `./venv/bin/pytest` directly — never `
 1. Run tests to verify your changes work
 2. Commit your changes with a descriptive message
 3. Push the branch: git push -u origin <branch-name>
-4. Create a PR: write the title and the body to two files with the Write tool, inside a directory you make with mktemp -d, then run gh pr create --base main --title "$(cat <title-file>)" --body-file <body-file>. Never put the title or body into the command itself.
+4. Create a PR: write the title and body to files under the supplied `<SCRATCH>` path, then run gh pr create --base main --title "$(cat <title-file>)" --body-file <body-file>. Never create an OS-temp or guessed directory, and never put the title or body into the command itself. Keep canonical task reports and plans under `<ARTIFACTS>` on every outcome.
 5. Report back: the PR URL and a summary of what was done
 ```

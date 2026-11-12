@@ -13,13 +13,14 @@ The shared skeleton for the `/audit` engine and its lenses. The engine (`skills/
 Every lens accepts, via the engine:
 
 - `[focus]` — free-text scope narrowing (an area, path, page, or repo set, per the lens's Focus note in the table).
-- `--output github|session` — `github` files findings as issues per `../_shared/output-guide.md` (output mutations route through `/claudna:publish`; required read-only tracker/repo-health queries may use `gh` directly under existing permissions); `session` (default) presents the analysis in chat.
+- `--output artifacts|github|docs|session` — `artifacts` (default) retains private current-session reports/plans; `github` and `docs` explicitly export editions via `/claudna:publish`; `session` presents analysis in chat with no files. Follow `../_shared/output-guide.md`; required read-only tracker/repo-health queries may use `gh` directly under existing permissions.
 - `--auto` — non-interactive run, only for lenses whose table row says **auto: yes**. See §4.
 
 ## 3. Shared output conventions
 
 - Findings carry the concern vocabulary from `../_shared/contracts/lens-result-contract.md` — that file is the **single source** for concern-area names (architecture, scope, performance, compatibility, dependencies, testing, observability, data-integrity); lenses do not mint their own.
 - `--output github`: one issue per finding-cluster per the output-guide's §4.1 body contract, labels per its label rules, dedup before filing.
+- Artifacts output: selected final findings/plans in `<artifacts>` with private modes; working research in `<scratch>` per orchestration-guide §1.
 - Session output: severity-ordered findings with file:line evidence, then a phased remediation sketch. Boxed summary at the top: lens, scope, counts by severity.
 
 ## 4. Autonomous mode
@@ -32,9 +33,9 @@ Every lens accepts, via the engine:
 
 Lenses that fan out (multi-area scans, per-repo sweeps) follow `../_shared/orchestration-guide.md`: research subagents write findings to `<scratch>` (its §1), the lens procedure aggregates; subagents never return long results through the orchestrator's context. Lens procedures reference their own `subagent-prompts.md` where one exists.
 
-Scratch is created only when needed. The owning workflow runs orchestration-guide §1.1 finalization before any terminal result, including no-findings, all-duplicate and blocked exits; borrowers return to that owner. Cleanup is part of the workflow, not a later user step.
+Scratch is created only when needed for persisted-output workflows; session-only analysis returns content directly. **Session-mode override applies to every lens phase and nested prompt:** skip allocation and disk-backed command files, pass required inputs in context, and return the full bounded findings needed for synthesis/review in context instead of writing/reading research paths. Use read-only query arguments for tracker searches. Keep the same analysis, reconciliation and review requirements. If a requested operation inherently needs files (for example screenshot capture), report that specific operation unavailable before starting it; do not silently switch output or claim its evidence. `--auto` preserves the selected destination and defaults to artifacts, never implicitly to GitHub. The owning workflow runs orchestration-guide §1.1 finalization before any terminal result, including no-findings, all-duplicate and blocked exits; borrowers return to that owner. Cleanup is part of the workflow, not a later user step.
 
-**Hosts without subagents.** Fan-out is the *preferred* path, not the only one. Where the host has no dispatch primitive (orchestration-guide §14.1), a fan-out lens scans its areas inline and sequentially per §14.2 — announcing the inline path, writing each area's findings to the same scratch-dir path and in the same shape the subagent prompt specifies, so the lens's aggregation step runs unchanged. The independence caveat in §14.3 applies and is reported: areas scanned inline share context.
+**Hosts without subagents.** Fan-out is the *preferred* path, not the only one. Where the host has no dispatch primitive (orchestration-guide §14.1), a fan-out lens scans its areas inline and sequentially per §14.2 — announcing the inline path, returning each area's findings in context for session output or writing to the same scratch-dir path and shape for persisted output, so the lens's aggregation step runs unchanged. The independence caveat in §14.3 applies and is reported: areas scanned inline share context.
 
 ## 6. Plan-mode discipline (interactive lenses)
 

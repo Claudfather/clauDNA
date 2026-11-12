@@ -1,0 +1,44 @@
+{
+  "schema": "claudna.host-policy/1",
+  "hosts": {
+    "claude-code": {
+      "manifest": ".claude-plugin/plugin.json",
+      "marketplace": ".claude-plugin/marketplace.json",
+      "agents": "Native agent definitions",
+      "hook_capability": "Claude lifecycle, permission, formatting and notification hooks",
+      "runtime_platforms": ["macOS", "Linux"],
+      "runtime_prerequisites": [
+        {"cli": "python3>=3.9", "reason": "Session store and Python hook helpers; standard library only"},
+        {"cli": "bash", "reason": "Packaged shell hooks"},
+        {"cli": "jq", "reason": "Permission hook silently does nothing without jq"},
+        {"cli": "git", "reason": "Repository workflows and startup context"},
+        {"cli": "gh", "reason": "Baseline health diagnostic for GitHub workflows; not a hook gate"},
+        {"cli": "node", "reason": "Baseline health diagnostic for Node workflows; not a hook gate"},
+        {"cli": "npx", "reason": "Baseline health diagnostic for Node workflows; not a hook gate"}
+      ],
+      "evidence_limits": "Declared packaging only. Native discovery, hook execution and context delivery require separate evidence. Notifications are macOS-specific."
+    },
+    "cursor": {
+      "manifest": ".cursor-plugin/plugin.json",
+      "marketplace": ".cursor-plugin/marketplace.json",
+      "agents": "Native agent definitions",
+      "hook_capability": "No hooks",
+      "runtime_platforms": [],
+      "runtime_prerequisites": [],
+      "evidence_limits": "Declared packaging only. Native discovery and execution are unverified by this catalog. Hook capture is unsupported; workflow-specific prerequisites still apply."
+    },
+    "codex": {
+      "manifest": ".codex-plugin/plugin.json",
+      "marketplace": ".agents/plugins/marketplace.json",
+      "agents": "Read-and-dispatch prompts only; no native agent registration",
+      "hook_capability": "Session store and startup briefing only; operator hook trust required",
+      "runtime_platforms": ["macOS", "Linux"],
+      "runtime_prerequisites": [
+        {"cli": "python3>=3.9", "reason": "Packaged session store and startup briefing; standard library only"},
+        {"cli": "bash", "reason": "Packaged shell hooks"},
+        {"cli": "git", "reason": "Repository workflows and startup context"}
+      ],
+      "evidence_limits": "Declared packaging only. Native install/discovery, trust, execution and stdout delivery are separate unknowns. Desktop delegation does not certify native CLI support; procedure-entry records do not prove task completion."
+    }
+  }
+}

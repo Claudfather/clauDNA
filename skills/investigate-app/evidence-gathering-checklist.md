@@ -29,7 +29,7 @@ SELECT * FROM pg_stat_activity WHERE state = 'active' AND query NOT LIKE '%pg_st
 COMMIT;
 ```
 
-- Neon / Postgres: `python3 "<claudna-root>/scripts/env_from_file.py" .env --has DATABASE_URL NEON_PROD_URL POSTGRES_URL` names the variable. Then `python3 "<claudna-root>/scripts/env_from_file.py" .env <NAME>=@libpq -- psql -X -f <sql-file>` runs the query with the URL in psql's environment only (`@libpq` splits it into libpq's own variables; psql does not read a URL from `PGDATABASE`). A `DATABASE_URL` already in the environment: `python3 "<claudna-root>/scripts/env_from_file.py" --url-env DATABASE_URL -- psql -X -f <sql-file>`. Resolve `<claudna-root>` per `../_shared/claudna-root.md`. A libpq service works too: `psql "service=<name>" -X -f <sql-file>`.
+- Neon / Postgres: `python3 -B "<claudna-root>/scripts/env_from_file.py" .env --has DATABASE_URL NEON_PROD_URL POSTGRES_URL` names the variable. Then `python3 -B "<claudna-root>/scripts/env_from_file.py" .env <NAME>=@libpq -- psql -X -f <sql-file>` runs the query with the URL in psql's environment only (`@libpq` splits it into libpq's own variables; psql does not read a URL from `PGDATABASE`). A `DATABASE_URL` already in the environment: `python3 -B "<claudna-root>/scripts/env_from_file.py" --url-env DATABASE_URL -- psql -X -f <sql-file>`. Resolve `<claudna-root>` per `../_shared/claudna-root.md`. A libpq service works too: `psql "service=<name>" -X -f <sql-file>`.
 - Snowflake: check for `~/.snowsql/config`, write `SHOW RUNNING QUERIES;` to a file, run `snowsql -c default -f <sql-file>`.
 - Check for connection pool exhaustion, long-running queries, locks
 

@@ -2,7 +2,7 @@
 
 On by default (``CLAUDNA_TELEMETRY=0`` opts out), every
 ``claudna:*`` Skill call appends one line to
-``${CLAUDNA_TELEMETRY_PATH:-~/.claude/telemetry/skill-events.jsonl}``, in
+``<effective clauDNA root>/telemetry/skill-events.jsonl``, in
 Claudosseum's ingestion format::
 
     {"ts", "bot", "type": "skill_invocation", "source": "vitals",
@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Mapping
 
 from .activity import skill_call
-from .fsio import FILE_MODE, append_jsonl, ensure_dir, exclusive_lock, read_jsonl, utc_seconds
+from .fsio import FILE_MODE, append_jsonl, cap_log, ensure_dir, exclusive_lock, read_jsonl, utc_seconds
 from .paths import CHILD_ENV, SessionPaths, state_root, validate_sid
 
 ENABLE_ENV = "CLAUDNA_TELEMETRY"
@@ -44,8 +44,20 @@ _SLUG = re.compile(r"^[A-Za-z0-9:_-]+$")
 
 
 def telemetry_path(env: Mapping[str, str]) -> Path:
-    return Path(env.get(PATH_ENV) or Path(env.get("HOME") or os.path.expanduser("~")) / ".claude" / "telemetry"
-                / "skill-events.jsonl")
+    """One writer/report policy: overrides must stay inside the effective root.
+
+    Reject configured legacy destinations instead of silently redirecting their
+    consumers. Explicit read-only report inputs are a separate CLI option.
+    """
+    root = state_root(dict(env))
+    configured = env.get(PATH_ENV)
+    if not configured:
+        return root / "telemetry" / "skill-events.jsonl"
+    path = Path(configured)
+    resolved, boundary = path.resolve(), root.resolve()
+    if not path.is_absolute() or resolved == boundary or not resolved.is_relative_to(boundary):
+        raise ValueError("telemetry destination must be absolute and inside the effective clauDNA root")
+    return path
 
 
 def enabled(env: Mapping[str, str]) -> bool:
@@ -117,8 +129,8 @@ def emit(payload: dict, env: Mapping[str, str]) -> bool:
 def run_hook(raw: bytes | str, env: Mapping[str, str]) -> str:
     """The ``telemetry`` verb's hook body: never raises (a hook fails open); returns what happened.
 
-    A failure is also printed to stderr, which ``telemetry-emit.sh`` keeps in
-    ``<telemetry file>.stderr``: failing open never means failing silently.
+    Failures retain fixed file-level codes beside an accepted feed. The shell
+    wrapper discards arbitrary interpreter stderr and reports bootstrap codes.
     """
     try:
         if not enabled(env):
@@ -132,7 +144,18 @@ def run_hook(raw: bytes | str, env: Mapping[str, str]) -> str:
             prune(env)
         return outcome
     except Exception as exc:  # noqa: BLE001 — telemetry must never break a Skill call
-        outcome = f"error: {type(exc).__name__}: {exc}"
+        # File-level diagnostics are global: never keep payload, path, arbitrary
+        # exception text or interpreter stderr in the compatibility feed's owner.
+        code = "decode" if isinstance(exc, (UnicodeError, json.JSONDecodeError)) else (
+            "configuration" if isinstance(exc, ValueError) else
+            "io" if isinstance(exc, OSError) else "runtime")
+        outcome = f"error: {code}"
+        try:
+            path = telemetry_path(env)
+            ensure_dir(path.parent)
+            append_jsonl(cap_log(path.with_name(path.name + ".stderr")), {"code": code, "count": 1}, durable=False)
+        except (OSError, ValueError):
+            pass  # no valid writable destination: the bounded stderr notice remains
         print(f"session_store telemetry: {outcome}", file=sys.stderr)
         return outcome
 

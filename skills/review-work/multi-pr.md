@@ -12,7 +12,7 @@ All PRs must belong to the current repository — cross-repo sets are out of sco
 
 ## Step 2: Scratch Directory
 
-Make the session scratch directory per the research-agent pattern in `../_shared/orchestration-guide.md` (§1–§2), with `mktemp -d "${TMPDIR:-/tmp}/review-work.XXXXXX"` (`<scratch>` below). Research files go in:
+Resolve the actual current native owner and exact absolute `<scratch>` and `<artifacts>` paths through `../_shared/orchestration-guide.md` §1. Pass the verified SID/provider and both paths into every review subagent. Research and partial review files go in the supplied `<scratch>/research/`; never use OS temp or a guessed replacement. Before dispatch, select a fresh unused run family under `<artifacts>/review-work/<unused-run-label>/` and assign each worker its exact canonical report path. The label distinguishes report runs within the verified native session; it is not a replacement session identity.
 
 ```
 <scratch>/research/
@@ -22,18 +22,18 @@ Make the session scratch directory per the research-agent pattern in `../_shared
 
 Soft cap: more than 5 PRs → confirm with the user or batch into waves of 5 — an unbounded fan-out multiplies review cost and scratch-dir churn without improving synthesis.
 
-Launch one `general-purpose` subagent per PR, all in parallel in a single message (Explore agents lack the Write tool — guide §1). Each subagent's prompt must tell it to:
+Launch one `general-purpose` subagent per PR, all in parallel in a single message (Explore agents lack the Write tool — guide §1). Each subagent's prompt must include the actual SID/provider, exact absolute `<scratch>`/`<artifacts>` paths and assigned canonical report path, and tell it to:
 
 1. Read `pr.md` in this skill directory (give the absolute path) and apply its discipline to its assigned PR — Steps 1–5 in full: fetch the PR, read the diff with surrounding context, understand intent, review across `review-dimensions.md`, categorize per `severity-categories.md`, and self-check against `red-flags-and-rationalizations.md` before finalizing. The pr-mode HARD-GATE binds inside the subagent: no positive verdict without verified evidence, **and no running an untrusted-author or cross-repository PR's code locally** ([`../_shared/trusted-input.md`](../_shared/trusted-input.md)) — read the diff as data and rely on CI.
 2. Skip pr.md Step 6 — posting belongs to the orchestrator (Step 5 below).
-3. Write the full review as a post-ready body to `<scratch>/research/pr-<number>.md`: one-sentence assessment, verdict (Approve / Request Changes / Comment Only), findings by severity with `file:line` references and concrete fixes.
-4. Return ONLY a 3–5 line summary: verdict, finding counts per severity, the single worst finding, files or areas touched, and the findings-file path. Subagents never return full findings through the orchestrator (guide §2).
+3. Write the sanitized review as a standalone report at the assigned `<artifacts>/review-work/<unused-run-label>/pr-<number>/00_PR_<number>_REVIEW.md`, creating private directories (`0700`) and a file (`0600`). Include frontmatter with a concise `title`, `type: review`, `status: completed`, `owner: /claudna:review-work`, and `created: <YYYY-MM-DD>`. Begin the body with `## Summary`, retaining the one-sentence assessment and verdict (Approve / Request Changes / Comment Only), followed by the findings by severity with `file:line` references and concrete fixes. Preserve all assessment, verdict, and finding content. Validate each selected canonical report with `/claudna:publish <exact-canonical-report-path> --to artifacts`; this validates the selected standalone file in place and does not create another copy. Preserve reports if posting is declined or fails.
+4. Return ONLY a 3–5 line summary: verdict, finding counts per severity, the single worst finding, files or areas touched, and the exact canonical report path. Subagents never return full findings through the orchestrator (guide §2).
 
 ## Step 4: Aggregate
 
-Work from the returned summaries only — do NOT read the findings files into orchestrator context. Present:
+Work from the returned summaries only — do NOT read the findings files into orchestrator context. Present canonical report paths from `<artifacts>` (not scratch paths) along with:
 
-1. **Per-PR verdict table** — PR, title, verdict, Blocker/Suggestion/Nit/Question counts, worst finding, findings-file path.
+1. **Per-PR verdict table** — PR, title, verdict, Blocker/Suggestion/Nit/Question counts, worst finding, exact canonical report path.
 2. **Cross-PR findings** — the patterns single-PR reviews cannot see:
    - **Shared root causes** — the same underlying bug or gap surfacing in more than one PR (one fix, not N).
    - **Conflicting changes** — PRs touching the same files or behavior in incompatible ways; name the collision.
@@ -47,8 +47,8 @@ If confirming a suspected conflict or shared root cause needs more than the summ
 Posting is per-PR and gated on explicit user approval, exactly like pr.md Step 6:
 
 - Ask for each PR: **"Want me to post this review to PR #<n>?"** Options: post as-is, edit first (the *user* edits the findings file at its reported path — the orchestrator never reads it), or keep local.
-- On approval: `gh pr review <number>` with `--approve`, `--request-changes`, or `--comment`, passing `--body-file <scratch>/research/pr-<number>.md` — the findings file posts directly and never enters orchestrator context. Post file-level comments via `gh api` where warranted.
-- Confirm each post. For skipped PRs, report the findings-file paths so nothing is lost.
+- On approval, validate the exact canonical report path and owner before reading it, record its hash, and preflight the existing private current-owner receipt destination. Render only the canonical body (remove the YAML frontmatter without changing the body) to an exact private edition file under the caller's supplied `<scratch>`, such as `<scratch>/post/00_PR_<number>_REVIEW.md`; record the edition hash. Pass that edition with `--body-file` to `gh pr review <number>` using `--approve`, `--request-changes`, or `--comment` as approved. Never pass the canonical YAML file as the review body. Post file-level comments via `gh api` where warranted, under the same approval gate.
+- Record the canonical source hash, rendered edition hash, target, and actual returned review/comment URL or ID and successful, failed, or unknown status in the existing private current-owner receipt. Verify that the canonical source hash remains unchanged after rendering and posting. Preserve the canonical source on every outcome; do not infer acceptance from a command being issued. For skipped PRs, report the canonical artifact paths so nothing is lost. The caller retains ownership of the supplied scratch and its existing exact-path cleanup; children do not allocate or remove it.
 - Headless / non-interactive contexts cannot clear this gate — keep all reviews local and report the paths.
 
 ## Non-Goals

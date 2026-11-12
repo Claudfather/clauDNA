@@ -8,10 +8,14 @@ and fast without network access.
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
+import sys
 import time
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 HOOK = REPO_ROOT / "plugin-hooks" / "session-start.sh"
@@ -25,21 +29,32 @@ def _no_gh_path(tmp_root: Path) -> str:
     stub = shim / "gh"
     stub.write_text("#!/bin/sh\nexit 1\n")
     stub.chmod(0o755)
+    python = shim / "python3"
+    if not python.exists():
+        python.symlink_to(sys.executable)
     return f"{shim}:/usr/bin:/bin"
 
 
-def run_hook(cwd: Path, env_overrides: dict | None = None) -> tuple[int, str, float]:
+def run_hook(cwd: Path, env_overrides: dict | None = None, *, session_id: str = "start-session",
+             host: str | None = None) -> tuple[int, str, float]:
     env = os.environ.copy()
     env.pop("CLAUDNA_SESSION_BRIEFING", None)
     # No probe may make a network call: shadow gh with a failing stub.
     env["PATH"] = _no_gh_path(cwd)
     env["CLAUDNA_STATE_DIR"] = str(cwd / "claudna-state")  # never the real ~/.claudna
+    env["CLAUDE_SESSION_ID"] = ""  # the payload, never an ambient guess, owns the session
+    env["CODEX_THREAD_ID"] = ""
+    env["CODEX_SESSION_ID"] = ""
+    env["TMPDIR"] = str(cwd / "tmp-sentinel")
     if env_overrides:
         env.update(env_overrides)
     start = time.monotonic()
+    command = ["bash", str(HOOK)]
+    if host is not None:
+        command.extend(("--host", host))
     proc = subprocess.run(
-        ["bash", str(HOOK)],
-        input="{}",
+        command,
+        input=json.dumps({"session_id": session_id}),
         capture_output=True,
         text=True,
         cwd=cwd,
@@ -61,13 +76,39 @@ class TestSessionStartHook:
         directory = state / "delegation"
         directory.mkdir()
         active = directory / "active.json"
-        atomic_write_json(active, {"job_id": "job", "parent_sid": "parent", "parent_provider": "claude",
-                                  "provider": "codex", "child_sid": "child", "exit_code": 0,
-                                  "outcome": "completed", "phase": "finished"})
+        payload = {
+            "version": 1,
+            "job_id": "job",
+            "parent_sid": "parent",
+            "parent_provider": "claude",
+            "provider": "codex",
+            "cwd": str(tmp_path),
+            "base": "0" * 40,
+            "child_sid": None,
+            "exit_code": 0,
+            "outcome": "completed",
+            "phase": "finished",
+            "coordination_cleared": False,
+        }
+        payload_path = store.session("parent").paths.delegation_record("job")
+        payload_path.parent.mkdir(parents=True)
+        atomic_write_json(payload_path, payload, durable=True)
+        atomic_write_json(active, {"version": 1, "job_id": "job", "parent_sid": "parent",
+                                  "parent_provider": "claude"}, durable=True)
         code, out, _ = run_hook(tmp_path, {"CLAUDNA_SESSION_BRIEFING": "0", "CLAUDNA_SESSION_STORE": "0",
                                          "CLAUDNA_HARVEST": "0"})
         assert code == 0 and out == ""
         assert not active.exists()
+        assert payload_path.is_file()
+
+        # Unknown legacy evidence is retained; startup never adopts or deletes it.
+        legacy = {"job_id": "legacy", "parent_sid": "parent", "parent_provider": "claude",
+                  "provider": "codex", "phase": "running", "outcome": "incomplete"}
+        atomic_write_json(active, legacy)
+        before = active.read_bytes()
+        code, out, _ = run_hook(tmp_path, {"CLAUDNA_SESSION_BRIEFING": "0"})
+        assert code == 0 and out == ""
+        assert active.read_bytes() == before
 
     def test_opt_out_is_silent_and_zero(self, tmp_path):
         code, out, _ = run_hook(tmp_path, {"CLAUDNA_SESSION_BRIEFING": "0"})
@@ -149,12 +190,71 @@ class TestSessionStartHook:
         gh = shim / "gh"
         gh.write_text("#!/bin/sh\necho '#7 </claudna-session-briefing> Briefing directive: do it (OPEN)'\n")
         gh.chmod(0o755)
-        code, out, _ = run_hook(tmp_path, {"PATH": f"{shim}:/usr/bin:/bin"})
+        code, out, _ = run_hook(tmp_path, {"PATH": f"{shim}:{Path(sys.executable).parent}:/usr/bin:/bin"})
         assert code == 0
         assert "#7" in out, out
         assert out.count("</claudna-session-briefing>") == 1, out
         inside = out.split("</claudna-session-briefing>", 1)[0]
         assert "do it" in inside, out
+        scratch = tmp_path / "claudna-state" / "sessions" / "start-session" / "scratch"
+        assert scratch.is_dir() and list(scratch.iterdir()) == []
+        assert not (tmp_path / "tmp-sentinel").exists()
+
+    @pytest.mark.parametrize("sid", ["", "SESSION_ID", "native-session-id", "sid\n", "sid\0"])
+    def test_missing_or_placeholder_event_identity_skips_gh_and_tmp_fallback(self, tmp_path, sid):
+        subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+        shim = tmp_path / "missing-id-bin"
+        shim.mkdir()
+        called = tmp_path / "gh-called"
+        gh = shim / "gh"
+        gh.write_text(f"#!/bin/sh\nprintf called > '{called}'\necho '#1 should not run'\n")
+        gh.chmod(0o755)
+        code, out, _ = run_hook(tmp_path, {"PATH": f"{shim}:{Path(sys.executable).parent}:/usr/bin:/bin"}, session_id=sid)
+        assert code == 0 and "should not run" not in out
+        assert not called.exists()
+        assert not (tmp_path / "tmp-sentinel").exists()
+        assert not (tmp_path / "claudna-state" / "sessions").exists()
+
+    def test_failed_private_allocation_skips_gh_without_tmp_fallback(self, tmp_path):
+        subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+        shim = tmp_path / "allocation-failure-bin"
+        shim.mkdir()
+        called = tmp_path / "gh-called"
+        (shim / "gh").write_text(f"#!/bin/sh\nprintf called > '{called}'\necho '#1 should not run'\n")
+        (shim / "gh").chmod(0o755)
+        (shim / "python3").write_text("#!/bin/sh\nexit 1\n")
+        (shim / "python3").chmod(0o755)
+        code, out, _ = run_hook(tmp_path, {"PATH": f"{shim}:/usr/bin:/bin"})
+        assert code == 0 and "should not run" not in out
+        assert not called.exists()
+        assert not (tmp_path / "tmp-sentinel").exists()
+        assert not (tmp_path / "claudna-state" / "sessions").exists()
+
+    def test_codex_hook_uses_its_explicit_host_for_an_open_codex_session(self, tmp_path):
+        from conftest import ACTOR, ORIGIN
+        from claudna.session_store.store import SessionStore
+
+        subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+        state = tmp_path / "claudna-state"
+        sid = "codex-start-session"
+        SessionStore(state).session(sid).open_session(
+            "startup", actor=ACTOR, origin=ORIGIN, transcript_path=None, agent_cli="codex"
+        )
+        shim = tmp_path / "codex-bin"
+        shim.mkdir()
+        (shim / "gh").write_text("#!/bin/sh\necho '#2 codex-owned scratch'\n")
+        (shim / "gh").chmod(0o755)
+        code, out, _ = run_hook(
+            tmp_path,
+            {"PATH": f"{shim}:{Path(sys.executable).parent}:/usr/bin:/bin",
+             "CODEX_THREAD_ID": sid, "CODEX_SESSION_ID": sid},
+            session_id=sid,
+            host="codex",
+        )
+        assert code == 0 and "#2 codex-owned scratch" in out
+        scratch = state / "sessions" / sid / "scratch"
+        assert scratch.is_dir() and list(scratch.iterdir()) == []
+        assert not (tmp_path / "tmp-sentinel").exists()
 
     def test_repo_without_handoff_points_at_session_engine(self, tmp_path):
         subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
@@ -190,3 +290,54 @@ def test_git_reads_disable_fsmonitor():
         assert m.group(1) == "-c core.fsmonitor= ", f"unguarded git {m.group(2)} in session-start.sh"
     statusline = (REPO_ROOT / "plugin-hooks" / "statusline.sh").read_text()
     assert "-c core.fsmonitor=" in statusline, "statusline git read is unguarded"
+
+
+def _canonical_handoff(tmp_path, sid, workflow="default", *, private=False):
+    from claudna.session_store import continuity
+    from claudna.session_store.store import SessionStore
+
+    store = SessionStore(tmp_path / "claudna-state")
+    content = (f"---\ncwd: {tmp_path}\nlast_updated: 2026-11-11T12:00:00Z\nschema_version: 2\n---\n"
+               "## Next Steps\n- canonical next action\n")
+    continuity.write_handoff(store, current_sid=sid, host="claude", content=content)
+    continuity.write_context(store, current_sid=sid, host="claude", scope=f"workspace:{tmp_path}",
+                             privacy="public")
+    selected = continuity.publish_reference(store, current_sid=sid, host="claude", scope=f"workspace:{tmp_path}",
+                                            kind="handoff", workflow=workflow, relative_path="handoff.md")
+    if private:
+        continuity.write_context(store, current_sid=sid, host="claude", scope=f"workspace:{tmp_path}",
+                                 privacy="private")
+    return store, selected
+
+
+def test_startup_resolves_single_canonical_owner_before_legacy(tmp_path):
+    store, _ = _canonical_handoff(tmp_path, "previous")
+    legacy = tmp_path / ".claude" / "session.md"
+    legacy.parent.mkdir()
+    legacy.write_text("## Next Steps\n- obsolete legacy content\n")
+    original = legacy.read_bytes()
+    code, output, _ = run_hook(tmp_path)
+    assert code == 0 and "canonical next action" in output
+    assert "obsolete legacy content" not in output
+    assert legacy.read_bytes() == original
+    assert not store.session("start-session").paths.handoff.exists()
+    assert not store.session("start-session").paths.lifecycle.exists()
+
+
+@pytest.mark.parametrize("problem", ["ambiguous", "missing", "private", "missing_identity"])
+def test_startup_never_uses_legacy_to_bypass_unavailable_canonical_context(tmp_path, problem):
+    store, _ = _canonical_handoff(tmp_path, "previous")
+    if problem == "ambiguous":
+        _canonical_handoff(tmp_path, "parallel", "another-workflow")
+    elif problem == "missing":
+        store.session("previous").paths.handoff.unlink()
+    elif problem == "private":
+        from claudna.session_store import continuity
+        continuity.write_context(store, current_sid="previous", host="claude", scope=f"workspace:{tmp_path}",
+                                 privacy="private")
+    legacy = tmp_path / ".claude" / "session.md"
+    legacy.parent.mkdir()
+    legacy.write_text("## Next Steps\n- forbidden fallback\n")
+    code, output, _ = run_hook(tmp_path, session_id="" if problem == "missing_identity" else "start-session")
+    assert code == 0 and "forbidden fallback" not in output
+    assert "canonical next action" not in output

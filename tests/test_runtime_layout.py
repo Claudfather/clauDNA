@@ -33,33 +33,36 @@ PACKAGE = "claudna"
 SESSION_STORE_LAYERS = {
     "schema": 0,
     "paths": 1,
-    "fsio": 1,
+    "fsio": 2,
     "claudron": 1,
     "transcript": 1,
-    "lineage": 2,
-    "events": 2,
-    "project": 3,
-    "digest": 5,
-    "filing": 5,
-    "ops": 2,
-    "store": 4,
-    "rollup": 4,
+    "lineage": 3,
+    "events": 3,
+    "project": 4,
+    "digest": 6,
+    "filing": 6,
+    "ops": 3,
+    "store": 5,
+    "rollup": 5,
+    "continuity": 6,
     "activity": 1,
-    "telemetry": 2,
-    "summarize": 5,
-    "readers": 5,
-    "retention": 5,
-    "export": 5,
-    "unclosed": 5,
-    "harvest": 6,
-    "health": 6,
-    "host": 5,
-    "host_claude": 6,
-    "host_codex": 6,
-    "boundaries": 7,
-    "cli": 8,
-    "__main__": 9,
+    "telemetry": 3,
+    "summarize": 6,
+    "readers": 6,
+    "retention": 6,
+    "export": 6,
+    "unclosed": 6,
+    "harvest": 7,
+    "health": 7,
+    "host": 6,
+    "host_claude": 7,
+    "host_codex": 7,
+    "boundaries": 8,
+    "cli": 9,
+    "__main__": 10,
 }
+
+PACKAGE_SUPPORT_LAYERS = {"catalog": 0, "doctor": 1, "__main__": 2}
 
 
 def lib_modules() -> list[Path]:
@@ -166,6 +169,20 @@ def test_session_store_imports_only_lower_layers(path):
             f"{path.name}:{line} imports {target} (layer {SESSION_STORE_LAYERS[target]}) "
             f"from layer {rank} — imports must point strictly downward"
         )
+
+
+@pytest.mark.parametrize(
+    "path", sorted((LIB / PACKAGE / "package_support").glob("*.py")), ids=lambda p: p.stem
+)
+def test_package_support_imports_only_lower_layers(path):
+    assert path.stem in PACKAGE_SUPPORT_LAYERS or path.stem == "__init__"
+    rank = PACKAGE_SUPPORT_LAYERS.get(path.stem, -1)
+    for name, line in imports_of(path.read_text(), dotted(path)):
+        if name.startswith("claudna.package_support."):
+            target = name.split(".")[2]
+            assert PACKAGE_SUPPORT_LAYERS[target] < rank, f"{path.name}:{line} imports upward"
+        if name.startswith("claudna.session_store."):
+            assert path.stem == "doctor" and name.split(".")[2] in {"health", "store"}
 
 
 @pytest.mark.parametrize("path", lib_modules(), ids=lambda p: dotted(p))

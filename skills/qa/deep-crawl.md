@@ -8,7 +8,7 @@ Pair this with:
 
 ## Conventions
 
-- **Scratch dir:** `<scratch>/`, made with `mktemp -d "${TMPDIR:-/tmp}/qa-crawl.XXXXXX"`, with subdirectories `screenshots/`, `console-logs/`, `deep-crawl/`.
+- **Working directories:** Follow `../_shared/orchestration-guide.md` §1 and use `<scratch>/` for jobs, raw screenshots, console logs, and deep-crawl results. The caller owns `<artifacts>/` for the sanitized report and deliberately selected/redacted evidence. Never move browser-managed profiles or host screenshots.
 - **One screenshot per Bash call.** No shell operators (`&&`, `||`, `;`, `|`). Playwright commands are single-shot.
 - **Sequential routes, parallel viewports.** Capture the three viewports of one route in parallel (3 Bash calls), but process routes one at a time — keeps browser memory pressure low and avoids resource exhaustion on constrained hardware.
 - **Screenshots are evidence.** Every finding must reference at least one screenshot file.
@@ -31,7 +31,7 @@ For each discovered route, capture screenshots at three viewports:
 
 ### The bundled runner
 
-Every browser step runs one bundled script, `<claudna-root>/scripts/crawl_page.py` (resolve `<claudna-root>` per `../_shared/claudna-root.md`). A route found on the site goes into a JSON job file, written with the Write tool, and never into a command line or program text. Name job files by number (`<scratch>/jobs/job-001.json`), never after a route. Every output path in a job must stay inside `<scratch>`. `<route-slug>`, the name of a route's files and the `deep` verb's `page_name`, must match `^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$`: replace every other character of the route with `-`, drop leading characters that are not letters or digits, cut it to 100 characters, and use `home` when nothing is left. The runner refuses a job that breaks either rule.
+Every browser step runs one bundled script, `<claudna-root>/scripts/crawl_page.py` (resolve `<claudna-root>` per `../_shared/claudna-root.md`). A route found on the site goes into a JSON job file in `<scratch>`, written with the Write tool, and never into a command line or program text. Name job files by number (`<scratch>/jobs/job-001.json`), never after a route. Every raw output path in a job must stay inside `<scratch>`. After review, copy only deliberately selected and redacted evidence into `<artifacts>`; a chat-only run must not create job or evidence files. `<route-slug>`, the name of a route's files and the `deep` verb's `page_name`, must match `^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$`: replace every other character of the route with `-`, drop leading characters that are not letters or digits, cut it to 100 characters, and use `home` when nothing is left. The runner refuses a job that breaks either rule.
 
 ### Screenshot recipe
 
@@ -44,7 +44,7 @@ For each route and viewport, write a job:
 then run it, one per Bash call:
 
 ```bash
-python3 "<claudna-root>/scripts/crawl_page.py" shot "<scratch>/jobs/job-001.json"
+python3 -B "<claudna-root>/scripts/crawl_page.py" shot "<scratch>/jobs/job-001.json"
 ```
 
 **Parallelism:** Capture all three viewports of a single route in parallel (3 Bash calls). Process routes sequentially to avoid overloading the browser.
@@ -58,7 +58,7 @@ For each route, write a job and run the `console` verb. It writes the page's con
 ```
 
 ```bash
-python3 "<claudna-root>/scripts/crawl_page.py" console "<scratch>/jobs/job-002.json"
+python3 -B "<claudna-root>/scripts/crawl_page.py" console "<scratch>/jobs/job-002.json"
 ```
 
 ---
@@ -89,7 +89,7 @@ For each route, use Playwright to:
 
 4. **Empty state detection:** Check for pages that render with no visible content, "No data" messages, or loading spinners that never resolve.
 
-Write interaction findings to `<scratch>/research/interactions.md`.
+For an artifact-backed run, write private interaction findings to `<scratch>/research/interactions.md`; the caller promotes only sanitized, selected findings to `<artifacts>`. A chat-only run must not create this file.
 
 ---
 
@@ -108,7 +108,7 @@ Enumerates interactive elements, clicks up to 30 buttons/links with a before/aft
 ```
 
 ```bash
-python3 "<claudna-root>/scripts/crawl_page.py" deep "<scratch>/jobs/job-003.json"
+python3 -B "<claudna-root>/scripts/crawl_page.py" deep "<scratch>/jobs/job-003.json"
 ```
 
 It writes `<page_name>_results.json` and the before, after, click and form screenshots into `output_dir`.
@@ -122,12 +122,12 @@ If the app has a chat or console interface, run the `chat` verb. It drives the c
 ```
 
 ```bash
-python3 "<claudna-root>/scripts/crawl_page.py" chat "<scratch>/jobs/job-004.json"
+python3 -B "<claudna-root>/scripts/crawl_page.py" chat "<scratch>/jobs/job-004.json"
 ```
 
 ### After deep testing
 
-Read all screenshots from `<scratch>/deep-crawl/` to visually inspect results. Read `*_results.json` files for structured findings.
+Read all screenshots from `<scratch>/deep-crawl/` to visually inspect results. Read `*_results.json` files for structured findings. Keep raw results in scratch; only the calling skill's approved artifact route may persist a sanitized report and selected evidence.
 
 Merge deep findings into the findings list with appropriate severity:
 - `page-load-error` → Critical

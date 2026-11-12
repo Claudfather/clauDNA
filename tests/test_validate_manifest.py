@@ -18,11 +18,15 @@ if the functions were imported and called in-process.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = REPO_ROOT / "scripts" / "validate-manifest.py"
@@ -38,10 +42,10 @@ def build_repo(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     (root / "scripts").mkdir(parents=True)
     shutil.copy2(SCRIPT, root / "scripts" / "validate-manifest.py")
-    # validate-manifest.py imports check_cursor_scope, which imports
-    # skill_checks (#340) -- both travel with it so the subprocess's
-    # top-level import resolves.
-    for module in ("check_cursor_scope.py", "check_codex_scope.py", "plugin_scope.py", "skill_checks.py"):
+    # Include the scope checks and their discovery/parsing dependencies so the
+    # staged subprocess resolves the same modules as the real manifest gate.
+    for module in ("check_cursor_scope.py", "check_codex_scope.py", "plugin_scope.py",
+                   "skill_checks.py", "skill_discovery.py", "skill_frontmatter.py"):
         shutil.copy2(REPO_ROOT / "scripts" / module, root / "scripts" / module)
 
     for manifest_dir in (".claude-plugin", ".cursor-plugin"):
@@ -364,11 +368,10 @@ def test_cursor_manifest_shipping_a_restricted_skill_is_rejected(tmp_path):
     issuecomment-5883111726). If validate-manifest.py's call to
     run_cursor_scope_check were removed, or its errors were printed instead
     of passed to error(), this is the only test in the suite that would
-    notice: make check still catches manifest drift through
+    notice: make check also catches manifest drift through
     test_cursor_scope.py's test_real_repo_passes_clean, which calls run_check
-    directly, but the standalone `validate-manifest.yml` workflow runs only
-    this script as a subprocess, with no such backstop -- and that gap is
-    exactly what let a restricted skill ship to Cursor in the first place.
+    directly. Direct `make check-manifest` and staged package validation must
+    still reject a restricted skill without relying on the pytest backstop.
     """
     root, marked = build_repo_with_restricted_skill(tmp_path)
     code, output = run_gate(root)
@@ -421,19 +424,72 @@ def test_codex_inert_component_directory_cannot_grow_content(tmp_path):
     assert "inert .gitkeep" in output
 
 
-def test_release_bumps_all_three_manifests_together(tmp_path):
+@pytest.mark.parametrize("qualification_passes", [True, False])
+def test_release_bumps_all_three_manifests_together(tmp_path, qualification_passes, maintainer_toolchain):
+    from test_release_candidate import fixture_targets
+
     root = build_repo(tmp_path)
-    shutil.copy2(REPO_ROOT / "scripts/release.sh", root / "scripts/release.sh")
+    fixture_targets(root)
+    if not qualification_passes:
+        (root / "scripts/fixture_check.py").write_text("raise SystemExit('fixture source check failed')\n")
+    catalog_path = "lib/claudna/package_support/catalog.json"
+    guide_path = "documentation/guides/PACKAGE_SUPPORT.md"
+    for relative in ("scripts/release.sh", "scripts/generate_package_support.py",
+                     "lib/claudna/package_support/host-policy.json", catalog_path, guide_path,
+                     "plugin-hooks/hooks.json"):
+        destination = root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(REPO_ROOT / relative, destination)
     (root / "CHANGELOG.md").write_text("# Changelog\n\n## [Unreleased]\n\n### Added\n- Fixture release.\n")
     for args in (["init", "-q"], ["config", "user.name", "Fixture"],
                  ["config", "user.email", "fixture@example.invalid"], ["add", "."],
                  ["commit", "-qm", "fixture"]):
         subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
-    result = subprocess.run(["bash", "scripts/release.sh", "patch"], cwd=root, text=True, capture_output=True)
+    original_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root)
+    subprocess.run(["git", "update-ref", "refs/remotes/origin/main", original_head.decode().strip()],
+                   cwd=root, check=True)
+    private_home = tmp_path / "release-home"
+    private_home.mkdir(mode=0o700)
+    env = os.environ.copy()
+    env["HOME"] = str(private_home.resolve())
+    state_root = (tmp_path / "release-state").resolve()
+    assert state_root.is_absolute() and state_root.is_relative_to(tmp_path.resolve())
+    env["CLAUDNA_STATE_DIR"] = str(state_root)
+    for key in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
+        env.pop(key, None)
+    result = subprocess.run(["bash", "scripts/release.sh", "--dry-run", "patch"],
+                            cwd=root, env=env, text=True, capture_output=True)
     assert result.returncode == 0, result.stdout + result.stderr
+    assert subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root) == original_head
+    assert subprocess.check_output(["git", "status", "--porcelain"], cwd=root) == b""
+    assert subprocess.check_output(["git", "tag"], cwd=root) == b""
+    assert not state_root.exists()
+    result = subprocess.run(["bash", "scripts/release.sh", "--standalone", "patch"],
+                            cwd=root, env=env, text=True, capture_output=True)
+    if qualification_passes:
+        assert result.returncode == 0, result.stdout + result.stderr
+    else:
+        assert result.returncode != 0 and "qualification failed" in result.stderr
     versions = [json.loads((root / component / "plugin.json").read_text())["version"]
                 for component in (".claude-plugin", ".cursor-plugin", ".codex-plugin")]
     assert len(set(versions)) == 1 and versions[0] != json.loads((REPO_ROOT / CLAUDE).read_text())["version"]
+    # Inspect the release commit itself: generated outputs must travel with the
+    # version bump, and their hashes must bind to the committed inputs.
+    catalog = json.loads(subprocess.check_output(["git", "show", f"HEAD:{catalog_path}"], cwd=root))
+    assert catalog["package_version"] == versions[0]
+    for relative, expected_hash in catalog["sources"].items():
+        committed = subprocess.check_output(["git", "show", f"HEAD:{relative}"], cwd=root)
+        assert hashlib.sha256(committed).hexdigest() == expected_hash, relative
+    guide = subprocess.check_output(["git", "show", f"HEAD:{guide_path}"], cwd=root).decode()
+    assert f"Source package version: **{versions[0]}**" in guide
+    if qualification_passes:
+        assert subprocess.check_output(["git", "rev-parse", f"v{versions[0]}^{{commit}}"], cwd=root) == (
+            subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root)
+        )
+    else:
+        assert subprocess.check_output(["git", "tag"], cwd=root) == b""
+        assert subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root) != original_head
+    assert subprocess.check_output(["git", "status", "--porcelain"], cwd=root) == b""
 
 
 def test_codex_marketplace_uses_native_source_grammar(tmp_path):
@@ -447,11 +503,15 @@ def test_codex_marketplace_uses_native_source_grammar(tmp_path):
     assert "measured local source grammar" in output
 
 
-def test_codex_startup_timeout_and_matcher_are_exact(tmp_path):
+@pytest.mark.parametrize("field,value", [
+    ("timeout", 600),
+    ("command", '\"${PLUGIN_ROOT}/plugin-hooks/session-start.sh\" --host claude'),
+])
+def test_codex_startup_timeout_and_host_are_exact(tmp_path, field, value):
     root = build_repo(tmp_path)
     path = root / "plugin-hooks/codex-hooks.json"
     doc = json.loads(path.read_text())
-    doc["hooks"]["SessionStart"][1]["hooks"][0]["timeout"] = 600
+    doc["hooks"]["SessionStart"][1]["hooks"][0][field] = value
     path.write_text(json.dumps(doc))
     code, output = run_gate(root)
     assert code != 0

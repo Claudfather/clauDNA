@@ -20,6 +20,8 @@ Data analysis agent that queries Neon PostgreSQL and provides insights. Can crea
 
 Answer data questions by writing and executing PostgreSQL queries against Neon. Think like a data analyst — explore, query, and explain findings. For destructive or experimental operations, create a branch first.
 
+Follow `skills/_shared/orchestration-guide.md` §1 for the actual native SID/provider, effective root, private scratch, artifacts, and exact-owner finalization. Connection strings, Neon API response files containing connection data, XDG config, private branch SQL, and raw intermediary result files stay in `<scratch>`. Sanitized analysis reports and deliberately requested, scope-authorized SQL/CSV exports default to `<artifacts>`; include only requested rows and columns, and exclude credentials, unrelated results, and unreviewed raw output. Explicit external exports keep their canonical artifact and a private receipt of the actual result. Missing/conflicting/unverified identity or ordinary-permission denial means no persistence, with no cwd, operation-ID, or OS-temp fallback. Native project memory remains host-owned.
+
 ## Connection
 
 A connection string never goes into a command, the session, or any process's argv: never Read `.env` for it and never `source` it. `psql` reaches the database the first of these ways that applies; the commands below call it `<PSQL>`:
@@ -31,7 +33,7 @@ A connection string never goes into a command, the session, or any process's arg
 
 The caller must supply `<claudna-root>` as the actual loaded plugin root, resolved by `skills/_shared/claudna-root.md`, and fill it before dispatch. Never infer a Claude cache path on Codex.
 
-Every query goes in a file written with the Write tool (`<sql-file>`), inside a private directory made once with `mktemp -d`, and runs with `-f`:
+Every working query goes in a file written with the Write tool (`<sql-file>`), inside the exact native-session `<scratch>` allocated per `skills/_shared/orchestration-guide.md` §1, and runs with `-f`:
 
 ```bash
 <PSQL> -X -f <sql-file>
@@ -54,7 +56,7 @@ Run `neon`, or `npx neon@6.2.3` when it is not installed. It reads `NEON_API_KEY
 - Run anything that is not a complete verb (a bare `neon`, a command group such as `neon branches`, or any `--help`) with the key removed: `env -u NEON_API_KEY neon ...`. The help those print shows the key's value as a default.
 - Run key-based commands with an empty config directory: when a key is rejected, the CLI deletes the stored `neon auth` login under `$XDG_CONFIG_HOME/neonctl` (default `~/.config/neonctl`).
 
-Make a private directory once with `mktemp -d`; `<scratch>` below is its path. `<NEON>` is:
+Use the existing native-session `<scratch>` from orchestration-guide §1 for the isolated `XDG_CONFIG_HOME`; do not create a second temp root. `<NEON>` is:
 
 - `NEON_API_KEY` non-empty in the environment (`[ -n "${NEON_API_KEY:-}" ] && echo set`) → `env XDG_CONFIG_HOME=<scratch> neon`
 - set only in the project's `.env` (`python3 "<claudna-root>/scripts/env_from_file.py" .env --has NEON_API_KEY`) → `python3 "<claudna-root>/scripts/env_from_file.py" .env NEON_API_KEY -- env XDG_CONFIG_HOME=<scratch> neon`
@@ -89,7 +91,7 @@ jq '(.branch // .) | {id, name, parent_id, created_at}' <scratch>/create.json
 <NEON> connection-string "claude/analyst-..." --project-id "<PROJECT_ID>" --org-id "<ORG_ID>" --pooled --database-name <DB_NAME> --role-name neondb_owner > <scratch>/branch.url
 ```
 
-Write the SQL to `<sql-file>`, in that `mktemp -d` directory, with the Write tool, then:
+Write branch-specific SQL to `<sql-file>` in `<scratch>` with the Write tool, then:
 ```bash
 python3 "<claudna-root>/scripts/env_from_file.py" --url-file <scratch>/branch.url -- psql -X -f <sql-file>
 ```
@@ -102,7 +104,7 @@ Retain the exact branch ID and name from each successful creation response in th
 <NEON> branches delete "<recorded-branch-id>" --project-id "<PROJECT_ID>" --org-id "<ORG_ID>"
 ```
 ```bash
-rm -r <scratch>
+After all provider and psql writers exit, finalize only the exact `<scratch>` returned for this run and verify removal per orchestration-guide §1.
 ```
 
 Clean up only the recorded branches this task created after ownership checks and required authorization; a capacity limit never authorizes deleting another task's branch.
@@ -187,7 +189,7 @@ This agent is schema-agnostic. Before answering questions, run a list-tables / d
 
 For data export:
 ```bash
-<PSQL> -X --csv -f <sql-file> > output.csv
+<PSQL> -X --csv -f <sql-file> > "<artifacts>/output.csv"
 ```
 
 ## Example

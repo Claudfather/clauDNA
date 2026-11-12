@@ -1,8 +1,10 @@
 # Documentation Standard
 
-Shared reference for skills that read from or write to the two documentation planes — the per-project `documentation/` tree (§1–§9) and the plane doctrine covering both it and the shared-docs vault (§10). Skills reference this file at `../_shared/documentation-standard.md`.
+Shared reference for skills that explicitly read from or export to the two documentation planes — the per-project `documentation/` tree (§1–§9) and the plane doctrine covering both it and the shared-docs vault (§10). Skills reference this file at `../_shared/documentation-standard.md`.
 
 ---
+
+Generated internal plans/reports default to the current native session's private artifacts (orchestration-guide §1, output-guide §1). This document's repository directories and archival commands apply to explicitly selected project/legacy sources or `--output docs` exports. Authorized source edits such as README, CLAUDE.md, AGENTS.md, MISSION.md, ADRs, schemas and dbt docs remain in the project. Host-owned logs, transcripts, settings, auth, memory and plugin installation data retain their owners. Canonical session artifacts become terminal in place; never apply repository `git mv` archival to them.
 
 ## 1. Directory Layout
 
@@ -31,7 +33,7 @@ Every repo initialized with `/claudna:init-project` has this structure:
 
 ## 2. Planning Output Paths — the `--dir` registry
 
-Planning output (the default `--output docs` target) routes through `/claudna:publish --to docs --dir <path>` — the author writes its doc(s) to `<scratch>` (`../_shared/orchestration-guide.md` §1) and publish validates + places them. This table is the `--dir` registry: each skill passes its category directory **with its session directory appended** (`<category>/<session-name>_<YYYY-MM-DD>/`, §3) — publish places docs into exactly the `--dir` it receives, no path composition of its own.
+An explicitly selected repository edition (`--output docs`) routes through `/claudna:publish --to docs --dir <path>` — the author retains its canonical doc(s) in `<artifacts>` (`../_shared/orchestration-guide.md` §1) and publish validates + places them. This table is the `--dir` registry: each skill passes its category directory **with its session directory appended** (`<category>/<session-name>_<YYYY-MM-DD>/`, §3) — publish places docs into exactly the `--dir` it receives, no path composition of its own.
 
 | Skill | `--dir` |
 |-------|-----------------|
@@ -175,7 +177,7 @@ Lives at repo root (not in `documentation/`). Contains a one-paragraph mission s
 
 ## 10. The Two Documentation Planes
 
-Documentation lives on two planes, and `/claudna:publish` is the single router over both. Plane fit is advised, never blocked (see the publish adapters).
+Explicit documentation editions use the following two planes, and `/claudna:publish` routes both. Generated canonical plans/reports remain in private session artifacts by default. Plane fit is advised, never blocked (see the publish adapters).
 
 | | `documentation/` (this standard, §1–§9) | The shared-docs vault |
 |---|---|---|
@@ -184,7 +186,7 @@ Documentation lives on two planes, and `/claudna:publish` is the single router o
 | **Reviewed via** | Pull requests | Lifecycle management (status/supersession; curation) |
 | **Discovered via** | git + status-marker greps (§8) | Raw tree: INDEX.md (`/claudna:index` writes it, `/claudna:recall` scans it) · Claudron vault: engine-indexed, no INDEX.md (annotation semantics below) |
 | **Visibility** | Public when the repo is | Private by default |
-| **Publish adapter** | `--to docs --dir <path>` (§2 registry) | `--to vault` (the default adapter) |
+| **Publish adapter** | `--to docs --dir <path>` (§2 registry) | `--to vault` (explicit export) |
 
 ### The Shared Documentation section — locating the root
 

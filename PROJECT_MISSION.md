@@ -2,7 +2,7 @@
 
 ## What this project is
 
-clauDNA is the canonical set of skills, hooks, and agents for Claude Code, distributed as a marketplace plugin; another agent host receives the surfaces its plugin model can carry, each by an approval-gated decision — Cursor: skills and agents, no hooks (#315); Codex: 36 selected engineering skills, session-store and startup hooks, and bundled role prompts dispatched only through supported same-host controls (#404; no native agent registration). Install it and any Claude Code instance gains a curated set of well-tested capabilities.
+clauDNA is the canonical set of skills, hooks, and agents for Claude Code, distributed as a marketplace plugin; another agent host receives the surfaces its plugin model can carry, each by an approval-gated decision — Cursor: skills and agents, no hooks (#315); Codex: manifest-selected engineering skills, session-store and startup hooks, and bundled role prompts dispatched only through supported same-host controls (#404; no native agent registration). The [generated support table](documentation/guides/PACKAGE_SUPPORT.md#declared-support) derives current per-host selections and counts. Install it and any Claude Code instance gains a curated set of well-tested capabilities.
 
 It's the "genome" of the Claudfather ecosystem — what every bot inherits at startup. Skills here are procedural (how to do X), not referential (what we know about X). Reference knowledge lives in Claudron, evaluation happens in Claudosseum, runtime is Claudlobby. clauDNA's job is just: ship the canonical capabilities, predictably, with version discipline.
 
@@ -32,7 +32,7 @@ Materially smarter Claude Code with one install.
 **Produces:** a marketplace plugin that Claudlobby bots install and Claude Code, Cursor or Codex users can install, each with its declared host scope ([Codex workflow scope and evidence](documentation/planning/2026-10-16-codex-engineering-workflows.md)) — the "what skills exist" answer for the entire ecosystem.
 
 **Sibling boundaries:**
-- clauDNA writes only to the user's disk — the session store (spec `documentation/specs/2026-09-28-session-store-design.md`) and, with `CLAUDNA_TELEMETRY=1`, the `skill_invocation` lines Claudosseum ingests (`plugin-hooks/telemetry-emit.sh`, `lib/claudna/session_store/telemetry.py`); it never transmits. Scoring and any hosted telemetry are Claudosseum's.
+- clauDNA writes only to the user's disk — the session store (spec `documentation/specs/2026-09-28-session-store-design.md`) and the default-on local `skill_invocation` compatibility feed Claudosseum ingests (opt out with `CLAUDNA_TELEMETRY=0`) (`plugin-hooks/telemetry-emit.sh`, `lib/claudna/session_store/telemetry.py`); it never transmits. Scoring and any hosted telemetry are Claudosseum's.
 - clauDNA does not store reference knowledge. Claudron does.
 - clauDNA does not run bots. Claudlobby does.
 - clauDNA does not evaluate skills. Claudosseum does.
@@ -61,6 +61,17 @@ Materially smarter Claude Code with one install.
 
 - **Runtime skill distribution via MCP.** That was Claudosseum's old role. clauDNA is plugin-only.
 - **A hosted dashboard or web UI.** clauDNA is files in a plugin. Discovery happens via the marketplace and the README.
-- **Telemetry collection.** No phone-home. clauDNA writes only to the user's disk — the session store, which exports on request (spec §1.1 rule 1, §8), and, with `CLAUDNA_TELEMETRY=1`, the `skill_invocation` lines Claudosseum ingests; scoring and any hosted telemetry live in Claudosseum.
+- **Telemetry collection.** No phone-home. clauDNA writes only to the user's disk — the session store, which exports on request (spec §1.1 rule 1, §8), and the default-on local `skill_invocation` compatibility feed Claudosseum ingests (opt out with `CLAUDNA_TELEMETRY=0`); scoring and any hosted telemetry live in Claudosseum.
 - **Per-user customization.** clauDNA is the canonical set. Users wanting personalized skill sets layer their own atop, or run Claudosseum locally to produce their own promotions.
 - **Skills that depend on hosted services.** A skill requiring third-party auth narrows the audience and adds fragility. Skills here should work standalone.
+
+
+Internal clauDNA state belongs to the effective root (`CLAUDNA_STATE_DIR`, otherwise
+`~/.claudna`). Native session output belongs to that verified session; explicit
+standalone maintainer operations have distinct operation ownership. Host-owned
+transcripts, settings, authentication, memory and plugin installations keep their
+owners. The compatibility row and canonical skill event observe the same invocation
+and must not be counted twice. Explicit telemetry-on with capture off remains a
+standalone observation, including null-SID rows; absent observations do not prove
+non-use. The held storage stack's source/fixture checks are separate from native,
+consumer and recovery acceptance and do not authorize release or historical migration.

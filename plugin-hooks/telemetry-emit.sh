@@ -3,15 +3,15 @@
 #
 # On by default, each claudna:*
 # Skill call appends one line to
-# ${CLAUDNA_TELEMETRY_PATH:-~/.claude/telemetry/skill-events.jsonl}:
+# <effective clauDNA root>/telemetry/skill-events.jsonl:
 #   {"ts","bot","type":"skill_invocation","source":"vitals",
 #    "data":{"skill_slug","duration_ms","success","session_id"}}
 # The writer is the session store's telemetry.py (it decodes the Skill payload
 # once, with the same code that records skill.invoked); this script only gates
 # on opt-outs, so telemetry costs nothing when off. Explicit CLAUDNA_TELEMETRY=1
 # also works with the session store off. Always exits 0 and prints nothing. A failure (an ImportError
-# included) lands in <telemetry file>.stderr, capped at 1 MiB like the store's
-# own capture: failing open, never silently (lib/CLAUDE.md).
+# included) produces a fixed bounded diagnostic, never arbitrary stderr.
+# File-level codes live beside the accepted feed; bootstrap codes live under R/hooks/.
 #
 # Env vars:
 #   CLAUDNA_TELEMETRY       — "0" to disable; defaults on
@@ -24,15 +24,15 @@
 if [ "${CLAUDNA_SESSION_STORE:-1}" = "0" ] && [ "${CLAUDNA_TELEMETRY:-}" != "1" ]; then exit 0; fi
 command -v python3 > /dev/null 2>&1 || exit 0
 umask 077
-OUT="${CLAUDNA_TELEMETRY_PATH:-${HOME:+$HOME/.claude/telemetry/skill-events.jsonl}}"
-ERR=/dev/null
-if [ -n "$OUT" ] && { [ -d "$(dirname "$OUT")" ] || mkdir -p -m 700 "$(dirname "$OUT")" 2> /dev/null; }; then
-  ERR="$OUT.stderr"
-  if [ -f "$ERR" ] && [ "$(wc -c < "$ERR" 2> /dev/null || echo 0)" -gt 1048576 ]; then
-    mv -f "$ERR" "$ERR.old" 2> /dev/null || :
-  fi
-  { : >> "$ERR"; } 2> /dev/null || ERR=/dev/null  # an unwritable capture must not stop the writer
-fi
+. "${BASH_SOURCE[0]%/*}/lib/state-dir.sh"
 PKG="${BASH_SOURCE[0]%/*}/../lib/claudna/session_store"
-python3 -S "$PKG" telemetry > /dev/null 2>> "$ERR"
+# This read-only resolver is shared with the writer and report default. Never
+# redirect an invalid configured consumer or create its outside-root directory.
+if ! python3 -B -S "$PKG" telemetry-path >/dev/null 2>/dev/null; then
+  claudna_bootstrap_error telemetry_configuration
+  exit 0
+fi
+if ! python3 -B -S "$PKG" telemetry >/dev/null 2>/dev/null; then
+  claudna_bootstrap_error telemetry_runtime
+fi
 exit 0

@@ -55,7 +55,7 @@ even if the decision changes to `none`.
 
 ## 2. Own the packet before capture
 
-The outer workflow owns one private `<scratch>` outside Git, made with `mktemp -d`
+The outer workflow owns one private native-session `<scratch>` outside Git, allocated
 per `../_shared/orchestration-guide.md` §1. Reuse a caller's root when nested and
 return ownership to that caller; do not create per-skill copies. Record the exact
 root and actual browser/context/server handles for foreground finalization.
@@ -159,7 +159,7 @@ RETURNED_VIDEO_ATTACHMENT_URL
 ```
 
 Include the concise provenance and verification results in the existing PR/result;
-the full scratch manifest need not become a permanent new document. Capture may
+retain selected sanitized evidence and its provenance/verification manifest in the current-session artifact area; do not promote the full working directory. Capture may
 precede PR creation; publication and reviewer verification finish on the actual PR.
 
 ## 5. Verify the published reviewer experience
@@ -194,8 +194,9 @@ of owned writers/contexts, stop only owned servers by their actual handles, and
 close owned browser tabs. Never delete under a live recorder or use process-name
 scans, timed reapers or a later user cleanup command.
 
-First preserve usable evidence as verified published attachments or a durable
-host/user-authorized deliverable outside Git, with the sanitized manifest/results.
+First preserve selected usable evidence and the sanitized manifest/results in
+current-session `<artifacts>` through publish's verified promotion. Explicitly
+authorized attachments/exports are editions of that retained local evidence.
 If publication is blocked, deliver it locally and report the incomplete state.
 If no durable delivery surface exists, retain the one root only as an explicit
 active handoff under §1.1; do not discard sole evidence or claim cleanup complete.

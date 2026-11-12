@@ -27,11 +27,11 @@ Ask the user how to find repos:
 
 1. **"Scan a parent directory?"** — provide a path (e.g., `~/Projects`). Use Glob with `*/.git` to find repos one level deep.
 2. **"Specific repos?"** — provide a list of paths.
-3. **"Use saved list?"** — check the host-specific saved-list path (below) for a previously saved list.
+3. **"Use saved list?"** — check the shared clauDNA state list below for a previously saved list.
 
 Present discovered repos and ask the user to confirm. Offer to save the list for next time.
 
-**If using a saved list**, validate each path exists and contains `.git/`. Report dead entries and ask: **"Remove the dead entries from your saved list?"**
+**If using a saved list**, validate each path exists and contains `.git/`. Report dead entries and ask: **"Remove the dead entries from your saved list?"** For an older Claude Code list, discovery at `~/.claude/repo-health-repos.txt` is read-only: offer its entries for this run, and never modify or migrate that legacy file. If the user explicitly asks to save the current list, write only the canonical shared file below.
 
 ---
 
@@ -74,11 +74,12 @@ Once the user picks a repo, suggest the relevant skill (`/claudna:session resume
 
 ## Output Targets
 
-Follow the output guide at `../../_shared/output-guide.md`. Beyond the shared `--output github|session` surface (contract §2), this lens supports a `docs` target for persisting the dashboard:
+Follow the output guide at `../../_shared/output-guide.md`. This lens defaults to retaining the final dashboard under the current owner's `<artifacts>` directory and supports explicit `session`, `github`, and `docs` destinations:
 
-- For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Create one issue per repo with actionable findings (stale branches, failing CI, PRs needing review). Label with `auto-audit` and `repo-health`.
-- For `session` (engine default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs`: author the dashboard and priority recommendations as a publishable doc in `<scratch>` (`../../_shared/orchestration-guide.md` §1) named `00_REPO_HEALTH.md` (master-class: no §4.1 skeleton required — publish Step 1b), then `/claudna:publish <file> --to docs --dir documentation/planning/repo_health/<session_name>_<YYYY-MM-DD>/` (underscore form, matching the `tech_debt/` planning-dir convention)
+- For `artifacts` (default): retain `00_REPO_HEALTH.md` with `/claudna:publish <artifacts>/00_REPO_HEALTH.md --to artifacts` and present its path and summary. Resolve the actual SID/provider and exact paths through orchestration guide §1.
+- For `session`: present the dashboard in chat only; write no report file.
+- For `github`: write selected issue docs under `<artifacts>/repo_health/`, then explicitly export them with `/claudna:publish <artifact-file> --to github-issue --repo <repo>`; retain every source and the report. Use frontmatter and the Section 4 body skeleton; publish validates, dedups, and labels (`auto-audit` and `repo-health`). Create one issue per repo with actionable findings.
+- For `docs`: explicitly export the selected canonical dashboard to `documentation/planning/repo_health/<session_name>_<YYYY-MM-DD>/`; retain the source.
 
 ---
 
@@ -86,12 +87,8 @@ Follow the output guide at `../../_shared/output-guide.md`. Beyond the shared `-
 
 - **Speed matters.** Triage tool, not a deep audit. Scan fast, present concisely.
 - **Subagent parallelism.** Launch one Explore subagent per repo for speed.
-- **Saved repo list.** the host-specific saved-list path (below) — one path per line, never synced.
+- **Saved repo list.** `R/repo-health-repos.txt` is shared across hosts, one absolute repo path per line. Resolve `R` with the loaded clauDNA session-store path resolver (`$CLAUDNA_STATE_DIR`, else `~/.claudna`); do not use host config, Claude's plugin cache, or agent memory. Reject an invalid relative override rather than silently falling back. The previous Codex location (`R/repo-health-repos.txt`) is already this file. The old Claude Code list at `~/.claude/repo-health-repos.txt` may be discovered read-only as described in Step 1; never modify or migrate it. Saving requires the user's explicit authorization and writes only the canonical file. Create the state root with private permissions only when saving is authorized, preserve existing directory modes, and write the new shared file; do not create state during lookup.
 - **CI is best-effort.** Skip gracefully if `gh` is unavailable; note "no CI data."
 - **Mostly read-only.** Steps 1–4 and 6 don't modify anything. Step 5 modifies only with explicit user confirmation.
 - **Stale branch threshold.** 14 days, configurable if the user asks.
 - **GitHub CLI dependency.** PR/CI data requires `gh` and an authenticated session.
-
-### Saved-list path by host
-
-On Codex, use the explicitly set `CLAUDNA_STATE_DIR` plus `/repo-health-repos.txt`, else `~/.claudna/repo-health-repos.txt`. Create that clauDNA-owned state directory only when saving is authorized. Never use Codex internal memory or config. Claude Code retains `~/.claude/repo-health-repos.txt`. Expand the chosen path to an absolute path and quote it.

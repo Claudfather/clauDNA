@@ -26,6 +26,10 @@ Point at any GitHub repo and extract what's worth adopting — skills, config pa
 
 **Persona:** A crew boss running a heist. Send scouts to case the target, review what they find, take only what genuinely improves the family.
 
+## Working files and output
+
+Follow `../_shared/orchestration-guide.md` §1 for native session allocation and exact-owner cleanup. Clone/API working material, scout research, comparison notes, and any private candidate copies stay in `<scratch>`. The sanitized catalog, comparison report, and adoption summary default to `<artifacts>`. Any selected adoption remains an explicit user-approved project/repository edit; preserve that project ownership and never treat it as session output. Missing/conflicting/unverified native identity or ordinary-permission denial makes persistence unavailable; do not use cwd, an operation ID, or OS temp as fallback. Remove only the exact owned scratch after all scouts/children have exited; retain artifacts on every outcome.
+
 ## Process
 
 ```
@@ -56,7 +60,7 @@ Accept `org/repo` or full GitHub URL (extract `org/repo`). Validate with `gh rep
 
 ### Step 2: Recon
 
-Create the scratch dir with `mktemp -d "${TMPDIR:-/tmp}/heist-XXXXXX"` (`<scratch>` below). Fetch file tree via `gh api repos/<org>/<repo>/git/trees/<default-branch>?recursive=1`.
+Resolve `<scratch>` through orchestration-guide §1 before fetching the file tree via `gh api repos/<org>/<repo>/git/trees/<default-branch>?recursive=1`. Store only private working material there; write sanitized selected findings to `<artifacts>`.
 
 Count interesting files (`SKILL.md`, `CLAUDE.md`, `.claude/**`, `hooks/*`, `agents/*`, `commands/*`, root `*.md`, `settings.json`, etc.). If ≤30 → API browse. If >30 → recommend `git clone --depth 1`; if declined, API browse.
 
@@ -86,7 +90,7 @@ Naming collision on adopt: ask for alternative name.
 
 ### Step 7: Summary & Cleanup
 
-Present target, counts (scanned/selected), actions (ADOPTED with paths, ENHANCED with changes, SKIPPED). Next steps: `git diff`, bump plugin version in `.claude-plugin/plugin.json`, update CHANGELOG.md, push for `/plugin update` to pick up the new version. Cleanup: `rm -rf <scratch>/`
+Present target, counts (scanned/selected), actions (ADOPTED with paths, ENHANCED with changes, SKIPPED), and the canonical artifact report path. Next steps: inspect `git diff`; if a skill was adopted or enhanced and the user requests a release, bump the version in `.claude-plugin/plugin.json`, update `CHANGELOG.md`, and push so `/plugin update` can pick it up. Finalize only the exact `<scratch>` after actual scout/worker exits; retain `<artifacts>` and any user-approved project adoption on every outcome.
 
 ---
 

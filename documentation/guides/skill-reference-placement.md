@@ -1,15 +1,15 @@
 ---
-title: "[plan] D2 — Closure-triage ledger: reference payloads inside clauDNA skills"
-type: plan
-status: draft
+title: "Skill reference placement: D2 closure-triage ledger"
+type: knowledge
+status: current
 owner: chris
 created: 2026-07-22
-updated: 2026-07-22
-tags: [planning, boundary, claudron, knowledge, triage, closure]
+updated: 2026-11-04
+tags: [boundary, claudron, knowledge, triage, closure]
 repos: clauDNA
 ---
 
-# D2 — Closure-triage ledger (clauDNA)
+# Skill reference placement — D2 closure-triage ledger
 
 The clauDNA-side deliverable of **phase D2** of the Claudron·clauDNA·Claudlobby boundary
 re-architecture program (Claudron repo, `documentation/archive/boundary-rearchitecture_2026-07-20/07_d2-closure-triage.md`;
@@ -20,6 +20,9 @@ inventory of skill-embedded reference payloads, records a verdict + one-line rat
 promotion signal for each, and states the move protocol (deferred by default). The authoring rule
 it codifies also lives in [`SKILL_CONTRACT.md` §7](../../SKILL_CONTRACT.md) (the binding contract a
 skill author reads) and, as placement guidance at the seam, in [`skills/CLAUDE.md`](../../skills/CLAUDE.md).
+
+D2's delivery checklist below is complete. This guide retains the placement
+decisions and promotion signals for ongoing use; it is not an outstanding plan.
 
 ## The rule (Q-closure)
 

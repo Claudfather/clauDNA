@@ -1,0 +1,830 @@
+{
+  "hosts": {
+    "claude-code": {
+      "agents": "Native agent definitions",
+      "evidence_limits": "Declared packaging only. Native discovery, hook execution and context delivery require separate evidence. Notifications are macOS-specific.",
+      "hook_capability": "Claude lifecycle, permission, formatting and notification hooks",
+      "hooks": {
+        "events": {
+          "Notification": 1,
+          "PostToolUse": 3,
+          "PostToolUseFailure": 2,
+          "PreCompact": 2,
+          "PreToolUse": 1,
+          "SessionEnd": 1,
+          "SessionStart": 2,
+          "UserPromptSubmit": 1
+        },
+        "handler_count": 13,
+        "path": "plugin-hooks/hooks.json"
+      },
+      "manifest": ".claude-plugin/plugin.json",
+      "marketplace": ".claude-plugin/marketplace.json",
+      "runtime_platforms": [
+        "macOS",
+        "Linux"
+      ],
+      "runtime_prerequisites": [
+        {
+          "cli": "python3>=3.9",
+          "reason": "Session store and Python hook helpers; standard library only"
+        },
+        {
+          "cli": "bash",
+          "reason": "Packaged shell hooks"
+        },
+        {
+          "cli": "jq",
+          "reason": "Permission hook silently does nothing without jq"
+        },
+        {
+          "cli": "git",
+          "reason": "Repository workflows and startup context"
+        },
+        {
+          "cli": "gh",
+          "reason": "Baseline health diagnostic for GitHub workflows; not a hook gate"
+        },
+        {
+          "cli": "node",
+          "reason": "Baseline health diagnostic for Node workflows; not a hook gate"
+        },
+        {
+          "cli": "npx",
+          "reason": "Baseline health diagnostic for Node workflows; not a hook gate"
+        }
+      ],
+      "skill_count": 40,
+      "skills": [
+        "adversarial-review",
+        "audit",
+        "build",
+        "build-all",
+        "capture",
+        "claudron",
+        "cleanup-legacy-install",
+        "dbt",
+        "delegate",
+        "development-retro",
+        "extract-system-spec",
+        "file-github-issue",
+        "find-skills",
+        "forge",
+        "github-activity-report",
+        "heist",
+        "index",
+        "init-project",
+        "investigate-app",
+        "ironclad",
+        "kindle",
+        "modal",
+        "neon",
+        "product-enhance",
+        "product-vision",
+        "promotion-intake",
+        "publish",
+        "qa",
+        "railway",
+        "recall",
+        "review-work",
+        "session",
+        "ship",
+        "skill-scaffold",
+        "sync-branches",
+        "using-claudna",
+        "vercel",
+        "verify-completion",
+        "weigh-development-paths",
+        "worktree"
+      ]
+    },
+    "codex": {
+      "agents": "Read-and-dispatch prompts only; no native agent registration",
+      "evidence_limits": "Declared packaging only. Native install/discovery, trust, execution and stdout delivery are separate unknowns. Desktop delegation does not certify native CLI support; procedure-entry records do not prove task completion.",
+      "hook_capability": "Session store and startup briefing only; operator hook trust required",
+      "hooks": {
+        "events": {
+          "PostToolUse": 1,
+          "PreCompact": 1,
+          "SessionEnd": 1,
+          "SessionStart": 2,
+          "UserPromptSubmit": 1
+        },
+        "handler_count": 6,
+        "path": "plugin-hooks/codex-hooks.json"
+      },
+      "manifest": ".codex-plugin/plugin.json",
+      "marketplace": ".agents/plugins/marketplace.json",
+      "runtime_platforms": [
+        "macOS",
+        "Linux"
+      ],
+      "runtime_prerequisites": [
+        {
+          "cli": "python3>=3.9",
+          "reason": "Packaged session store and startup briefing; standard library only"
+        },
+        {
+          "cli": "bash",
+          "reason": "Packaged shell hooks"
+        },
+        {
+          "cli": "git",
+          "reason": "Repository workflows and startup context"
+        }
+      ],
+      "skill_count": 37,
+      "skills": [
+        "adversarial-review",
+        "audit",
+        "build",
+        "build-all",
+        "capture",
+        "claudron",
+        "dbt",
+        "delegate",
+        "development-retro",
+        "extract-system-spec",
+        "file-github-issue",
+        "find-skills",
+        "forge",
+        "github-activity-report",
+        "heist",
+        "index",
+        "init-project",
+        "investigate-app",
+        "ironclad",
+        "kindle",
+        "modal",
+        "neon",
+        "product-enhance",
+        "product-vision",
+        "publish",
+        "qa",
+        "railway",
+        "recall",
+        "review-work",
+        "session",
+        "ship",
+        "sync-branches",
+        "using-claudna",
+        "vercel",
+        "verify-completion",
+        "weigh-development-paths",
+        "worktree"
+      ]
+    },
+    "cursor": {
+      "agents": "Native agent definitions",
+      "evidence_limits": "Declared packaging only. Native discovery and execution are unverified by this catalog. Hook capture is unsupported; workflow-specific prerequisites still apply.",
+      "hook_capability": "No hooks",
+      "hooks": {
+        "events": {},
+        "handler_count": 0,
+        "path": null
+      },
+      "manifest": ".cursor-plugin/plugin.json",
+      "marketplace": ".cursor-plugin/marketplace.json",
+      "runtime_platforms": [],
+      "runtime_prerequisites": [],
+      "skill_count": 35,
+      "skills": [
+        "adversarial-review",
+        "audit",
+        "build",
+        "build-all",
+        "capture",
+        "claudron",
+        "dbt",
+        "development-retro",
+        "extract-system-spec",
+        "file-github-issue",
+        "find-skills",
+        "forge",
+        "github-activity-report",
+        "heist",
+        "index",
+        "init-project",
+        "investigate-app",
+        "ironclad",
+        "kindle",
+        "modal",
+        "neon",
+        "product-enhance",
+        "product-vision",
+        "publish",
+        "qa",
+        "railway",
+        "recall",
+        "review-work",
+        "session",
+        "ship",
+        "sync-branches",
+        "vercel",
+        "verify-completion",
+        "weigh-development-paths",
+        "worktree"
+      ]
+    }
+  },
+  "package_version": "0.34.12",
+  "schema": "claudna.package-support/1",
+  "skills": {
+    "adversarial-review": {
+      "description": "Use at any juncture where you have a plan, design, or proposal and want it stress-tested before execution — pre-mortem analysis, assumption mapping, hidden failure modes, and edge cases surfaced before they are locked in. For the standing multi-lens hardening loop on a published plan, use /claudna:ironclad.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/adversarial-review/SKILL.md",
+      "requires": [],
+      "requires_context": null
+    },
+    "audit": {
+      "description": "Use for codebase audits — security vulnerabilities, technical debt, stale documentation, visual and UX design, frontend performance (janky scroll, slow loads), cross-cutting interfaces, data model fit and redesign, scale/throughput and multi-tenant isolation, birds-eye repositories, whole-system comprehension, decaying safeguards and operational footguns, and prompt-cache efficiency.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/audit/SKILL.md",
+      "requires": [
+        {
+          "cli": "gh",
+          "reason": "GitHub CLI for --output github issue filing (via publish) and the repo-health lens's PR/CI listing"
+        }
+      ],
+      "requires_context": null
+    },
+    "build": {
+      "description": "Use when you have a design or development plan document ready to implement against the codebase. Executes ONE plan doc end to end: challenge round, deliverable audit, PR workflow. Replaces /implement-plan. NOT for a failing compile or CI build (that's systematic-debugging) and NOT for `dbt build` (that's the /claudna:dbt skill); for several ordered phase docs as one run, use /claudna:build-all.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/build/SKILL.md",
+      "requires": [],
+      "requires_context": null
+    },
+    "build-all": {
+      "description": "Use when executing multiple phase or plan docs as one ordered workstream — an epic spanning several PRs, possibly several repos, with phases that must land in a declared order. Also when a forge epic's phases are ready for execution. For a single plan doc, use /claudna:build instead.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/build-all/SKILL.md",
+      "requires": [],
+      "requires_context": null
+    },
+    "capture": {
+      "description": "Use to save knowledge to the vault — a note you write, external content (an article URL, a file, a transcript), or the current session's learnings (bare `/claudna:capture` distills what happened after corrections, surprises, or fixes, before compaction). One write door. To read the vault use /claudna:recall; to search by term use /claudna:claudron lookup; to route a finished doc use /claudna:publish. Replaces /learn and /reflect.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/capture/SKILL.md",
+      "requires": [
+        {
+          "cli": "claudron>=0.2",
+          "reason": "Claudron CLI — `capture` writes the note to the vault with index-backed dedup; without it, capture falls back to the frozen raw-tree write + /claudna:index"
+        }
+      ],
+      "requires_context": null
+    },
+    "claudron": {
+      "description": "Use to search the shared fleet vault by term, check its health, or diagnose and migrate it — the lookup, status and doctor verbs over the Claudron CLI. Requires the Claudron CLI. To save knowledge to the vault (a note, external content, or the current session's learnings), use /claudna:capture; to recall prior knowledge before starting work, use /claudna:recall.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/claudron/SKILL.md",
+      "requires": [
+        {
+          "cli": "claudron>=0.2",
+          "reason": "Claudron CLI — vault search (lookup), health (status) and doctor verbs; v0.2.0 is the envelope/exit-code contract this engine targets, and doctor also gates at runtime on the engine's declared doctor capability"
+        }
+      ],
+      "requires_context": null
+    },
+    "cleanup-legacy-install": {
+      "description": "Use when upgrading from a pre-plugin clauDNA install (install.sh, claudefather, or claudfather) to the marketplace plugin. Detects and removes the legacy ~/.claude/ overlay so plugin-installed skills don't get shadowed by stale copies.",
+      "hosts": [
+        "claude-code"
+      ],
+      "path": "skills/cleanup-legacy-install/SKILL.md",
+      "requires": [],
+      "requires_context": null
+    },
+    "dbt": {
+      "description": "Use when you need to run dbt commands against Snowflake -- build, test, compile, or full-refresh.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/dbt/SKILL.md",
+      "requires": [
+        {
+          "cli": "dbt",
+          "reason": "dbt CLI for model builds, tests, and compilation"
+        }
+      ],
+      "requires_context": null
+    },
+    "delegate": {
+      "description": "Use when delegating a bounded task between Claude Code and native Codex. For same-provider work or isolation, use /claudna:worktree.",
+      "hosts": [
+        "claude-code",
+        "codex"
+      ],
+      "path": "skills/delegate/SKILL.md",
+      "requires": [
+        {
+          "cli": "python3",
+          "reason": "Stdlib launcher; the destination's native Claude or Codex CLI must also be installed and authenticated"
+        }
+      ],
+      "requires_context": null
+    },
+    "development-retro": {
+      "description": "Use when a PR has been merged, a development session is ending, or the user asks what else you noticed — surfaces journey-specific observations, systemic patterns, and friction points from the implementation process.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/development-retro/SKILL.md",
+      "requires": [],
+      "requires_context": null
+    },
+    "extract-system-spec": {
+      "description": "Use when you need a portable, anonymized reconstruction spec for a whole system (or a single wing or targeted slice) — a standalone rebuild blueprint an independent team could implement in a fresh session without the original repo. Exhaustive and expensive by design: reserve it for when a full rebuild spec is genuinely worth the token spend. For finding problems in a system you are keeping, use /claudna:audit; this instead extracts a portable spec to rebuild the system elsewhere.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/extract-system-spec/SKILL.md",
+      "requires": [],
+      "requires_context": null
+    },
+    "file-github-issue": {
+      "description": "Use when a user wants to file a GitHub issue with a screenshot against a GitHub repo. Expected inputs: a screenshot, a short description, the target repo, and the page URL or app section where the issue was observed (the skill prompts for the URL if missing).",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/file-github-issue/SKILL.md",
+      "requires": [
+        {
+          "cli": "gh",
+          "reason": "GitHub CLI for issue creation"
+        }
+      ],
+      "requires_context": null
+    },
+    "find-skills": {
+      "description": "Use when the user asks about finding, discovering, or installing agent skills from the public ecosystem, or asks how to do something that might exist as an installable skill. For raiding a specific repo's patterns into clauDNA, use /claudna:heist.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/find-skills/SKILL.md",
+      "requires": [
+        {
+          "cli": "npx",
+          "reason": "Node package runner for skills CLI"
+        }
+      ],
+      "requires_context": null
+    },
+    "forge": {
+      "description": "Use when planning a workstream that spans multiple PRs, involves decision forks, or needs structured phasing before implementation — a technical spec, design document, initiative roadmap, or pre-implementation proposal. Not for single-PR changes with an obvious path; plain plan mode covers those.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/forge/SKILL.md",
+      "requires": [],
+      "requires_context": null
+    },
+    "github-activity-report": {
+      "description": "Use when the user asks for GitHub activity stats (PRs authored, commits, top contributors, top repos) across an organization or their personal account over a time window. Iterates per-repo to avoid the search API's 1,000-result cap.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/github-activity-report/SKILL.md",
+      "requires": [
+        {
+          "cli": "gh",
+          "reason": "GitHub CLI for API operations"
+        }
+      ],
+      "requires_context": null
+    },
+    "heist": {
+      "description": "Use when you want to raid a GitHub repo for skills, config patterns, or novel approaches worth adopting into clauDNA. For browsing or installing published skills from the open ecosystem, use /claudna:find-skills.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/heist/SKILL.md",
+      "requires": [
+        {
+          "cli": "gh",
+          "reason": "GitHub API access for fetching repo contents and file trees"
+        }
+      ],
+      "requires_context": null
+    },
+    "index": {
+      "description": "Use after creating, promoting, or editing docs in a directory whose INDEX.md should be regenerated, when frontmatter needs validating against the documentation standard, or to audit knowledge-base health. The sole writer of INDEX.md files.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/index/SKILL.md",
+      "requires": [
+        {
+          "cli": "claudron",
+          "reason": "Optional — engine-managed-root detection in Step 1 only (a `(claudron vault)` root is never indexed); without it, index degrades per the standard notice in ../_shared/claudron-engine.md §3.1 and treats the target as a raw tree"
+        }
+      ],
+      "requires_context": null
+    },
+    "init-project": {
+      "description": "Use when setting up a new project or adding shared project instructions (CLAUDE.md or AGENTS.md), CHANGELOG.md and documentation to an existing project.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/init-project/SKILL.md",
+      "requires": [
+        {
+          "cli": "claudron",
+          "reason": "Optional — Step 6.5 vault detection only; every ladder branch degrades when absent and announces it with the standard notice in ../_shared/claudron-engine.md §3.1 (this is a soft dependency, not a functional requirement)"
+        }
+      ],
+      "requires_context": null
+    },
+    "investigate-app": {
+      "description": "Use when something is broken in production and you need to investigate -- errors, outages, degraded performance, or unexpected behavior.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/investigate-app/SKILL.md",
+      "requires": [],
+      "requires_context": null
+    },
+    "ironclad": {
+      "description": "Use to harden a plan or review a PR with a panel of independent lenses, or to step back and challenge a plan's premise (are we solving the right problem?) — primary target a §4.1 plan Issue produced by /claudna:forge; also reviews implementation PRs. For a live stress test with no plan to review, use /claudna:adversarial-review; to choose between approaches, /claudna:weigh-development-paths. Subagent-preferred: dispatch it rather than following it inline.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/ironclad/SKILL.md",
+      "requires": [
+        {
+          "cli": "gh",
+          "reason": "Reads PR diff and metadata, scans PR comments for fork state, and posts the aggregated review comment via the GitHub API."
+        }
+      ],
+      "requires_context": null
+    },
+    "kindle": {
+      "description": "Use before any creative work — creating features, building components, adding functionality, or modifying behavior. The ideation phase: discovers intent and requirements into an approved spec before /claudna:forge plans and /claudna:ironclad hardens. Requires a presented design and user approval before any implementation. For an on-demand, codebase-driven opportunity scan not gated on active creative work, use /claudna:product-vision instead.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/kindle/SKILL.md",
+      "requires": [],
+      "requires_context": null
+    },
+    "modal": {
+      "description": "Use for Modal serverless operations — deploy or roll back an app, stream, search, or debug logs, or check workspace status (apps, containers, secrets, volumes). Replaces /modal-deploy, /modal-logs, /modal-status.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/modal/SKILL.md",
+      "requires": [
+        {
+          "cli": "modal",
+          "reason": "Modal CLI for deployment, log streaming, and workspace inspection"
+        }
+      ],
+      "requires_context": null
+    },
+    "neon": {
+      "description": "Use for Neon PostgreSQL operations — query (run SQL, explore schema), branch (create, list, delete, or reset database branches for safe experimentation), or info (connection and size overview). Replaces /neon-branch, /neon-info, /neon-query.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/neon/SKILL.md",
+      "requires": [
+        {
+          "cli": "psql",
+          "reason": "PostgreSQL client — query execution (query verb) and connection tests (branch/info verbs)"
+        },
+        {
+          "cli": "neon",
+          "reason": "Neon CLI — branch management (branch verb) and project/branch listing (info verb)"
+        }
+      ],
+      "requires_context": null
+    },
+    "product-enhance": {
+      "description": "Use when you have specific product issues to triage or want to discover enhancement opportunities in an existing product through gap analysis. For exploring what a codebase could become, use /claudna:product-vision.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/product-enhance/SKILL.md",
+      "requires": [],
+      "requires_context": null
+    },
+    "product-vision": {
+      "description": "Use when you want to explore what a codebase could become — candidate features one or two hops from existing infrastructure, compound plays, and a trajectory aligned to the project mission. For triaging known issues in an existing product, use /claudna:product-enhance. For discovery gated on an active piece of creative work, needing user approval before implementation, use /claudna:kindle instead. Replaces /product-brainstorm.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/product-vision/SKILL.md",
+      "requires": [],
+      "requires_context": null
+    },
+    "promotion-intake": {
+      "description": "Use when a Claudosseum promotion package (manifest + battle history + telemetry + SKILL.md bundle) is ready to land in clauDNA — validates it against the promotion contract and stages the skill as a reviewable PR. Not for authoring new skills by hand; use /claudna:skill-scaffold for those.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/promotion-intake/SKILL.md",
+      "requires": [
+        {
+          "cli": "gh",
+          "reason": "Fetching remote packages and the PR step (via /claudna:ship)"
+        }
+      ],
+      "requires_context": "repo-clone"
+    },
+    "publish": {
+      "description": "Use when a finished markdown document — plan, audit or review findings, retro, decision, or knowledge page — needs to reach its destination: the shared-docs vault, the repo's documentation/ tree, a GitHub issue, a PR description, the chat session, a Notion page, or the default private session artifact area. The single output sink: skills author content, publish delivers it. For a quick vault note rather than a finished document, use /claudna:claudron.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/publish/SKILL.md",
+      "requires": [
+        {
+          "cli": "claudron",
+          "reason": "Optional — `--to vault` routes the doc through `claudron capture` when the engine is present; without it, that one adapter degrades per the standard notice in ../_shared/claudron-engine.md §3.1 and writes the frozen raw tree. Every other adapter is unaffected"
+        }
+      ],
+      "requires_context": null
+    },
+    "qa": {
+      "description": "Use for headless-browser QA against a running app — systematic bug-hunting with optional fixes, post-deploy canary monitoring, performance benchmarking, ad-hoc browser interaction, cookie import, or an autonomous full-site visual crawl with per-route findings and explicit issue export. For a judgment-based design critique, use /claudna:audit design; for static code-level performance analysis, use /claudna:audit frontend-perf. Replaces /visual-crawl.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/qa/SKILL.md",
+      "requires": [],
+      "requires_context": null
+    },
+    "railway": {
+      "description": "Use for Railway operations — deploy or roll back a service, view, filter, or debug logs, or check project status (services, deployments, environments, metrics). Replaces /railway-deploy, /railway-logs, /railway-status.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/railway/SKILL.md",
+      "requires": [
+        {
+          "cli": "railway",
+          "reason": "Railway CLI (>=4.27.3 for deploy) for deployment, logs, and project inspection"
+        }
+      ],
+      "requires_context": null
+    },
+    "recall": {
+      "description": "Use before starting substantive work in a repo — surfaces what the fleet and this project already know (prior decisions, patterns, conventions) so you don't rework solved problems. Orientation briefing over `claudron recall`; falls back to scanning INDEX.md when Claudron is absent. First verb in the knowledge loop. To search the vault by term, use /claudna:claudron lookup; to save new knowledge, use /claudna:capture. Replaces /remember.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/recall/SKILL.md",
+      "requires": [
+        {
+          "cli": "claudron>=0.2",
+          "reason": "Claudron CLI — `recall` assembles the briefing (conventions + project/fleet tiers); without it, recall falls back to the frozen INDEX.md scan"
+        }
+      ],
+      "requires_context": null
+    },
+    "review-work": {
+      "description": "Use when work needs review before it lands — uncommitted changes before committing, a pull request before merging, or several PRs reviewed in parallel. For hardening a plan Issue with the lens panel, use /claudna:ironclad. Replaces /review-changes, /review-pr.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/review-work/SKILL.md",
+      "requires": [
+        {
+          "cli": "gh",
+          "reason": "PR diff/metadata reads and review submission for the pr and multi-pr modes"
+        }
+      ],
+      "requires_context": null
+    },
+    "session": {
+      "description": "Use at session boundaries — resume at the start of a new session (resolve a scoped handoff and brief on where to pick up), handoff at the end of a session (write it), checkpoint for a mid-session save without the full ceremony, or name to label the session. Also use to look back at recorded sessions — list, show, timeline, or recurring tool failures. Replaces /session-handoff, /session-resume, /name-session.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/session/SKILL.md",
+      "requires": [],
+      "requires_context": null
+    },
+    "ship": {
+      "description": "Use when changes are ready to land — a fast local checkpoint, or the full flow through push and an open pull request. Defaults to the PR flow; say 'commit' or 'quick commit' for a checkpoint-only. Replaces /commit-push-pr, /quick-commit.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/ship/SKILL.md",
+      "requires": [
+        {
+          "cli": "gh",
+          "reason": "GitHub CLI for PR creation (pr mode)"
+        }
+      ],
+      "requires_context": null
+    },
+    "skill-scaffold": {
+      "description": "Use when you want to scaffold a new clauDNA skill directory with correct structure, valid frontmatter, and a starter body that passes validation.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/skill-scaffold/SKILL.md",
+      "requires": [],
+      "requires_context": "repo-clone"
+    },
+    "sync-branches": {
+      "description": "Use to bring every local branch and worktree across your sibling git repos up to date with origin/main in one pass — fetches, fast-forwards where safe, and reports conflicts without forcing anything. For creating a NEW worktree to isolate feature work, use /claudna:worktree instead.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/sync-branches/SKILL.md",
+      "requires": [],
+      "requires_context": null
+    },
+    "using-claudna": {
+      "description": "Use to verify clauDNA installation is healthy — hooks, skills and capture — or orient at conversation start and choose an installed skill for a task. For discovering third-party skills from the public ecosystem, use /claudna:find-skills. Replaces /skill-health.",
+      "hosts": [
+        "claude-code",
+        "codex"
+      ],
+      "path": "skills/using-claudna/SKILL.md",
+      "requires": [],
+      "requires_context": null
+    },
+    "vercel": {
+      "description": "Use for Vercel operations — deploy to production or preview (or roll back), view, filter, or debug deployment logs, or check project status (deployments, domains, env vars, config). Replaces /vercel-deploy, /vercel-logs, /vercel-status.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/vercel/SKILL.md",
+      "requires": [
+        {
+          "cli": "vercel",
+          "reason": "Vercel CLI for deployments, logs, and project inspection"
+        }
+      ],
+      "requires_context": null
+    },
+    "verify-completion": {
+      "description": "Use when about to claim work is complete, fixed, or passing -- requires running verification commands and confirming output before making any success claims.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/verify-completion/SKILL.md",
+      "requires": [],
+      "requires_context": null
+    },
+    "weigh-development-paths": {
+      "description": "Use when at a development junction with multiple viable approaches — architecture choices, refactoring strategies, where to put new code, or which pattern to follow. Triggers on 'which approach', 'how should I', 'Option A vs B', or any point where the next step isn't obvious and the wrong choice creates rework.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/weigh-development-paths/SKILL.md",
+      "requires": [],
+      "requires_context": null
+    },
+    "worktree": {
+      "description": "Use when starting feature work that needs isolation from the current workspace, or when running multiple Claude sessions in parallel on different branches — creates and manages git worktrees. For fetching latest main into every existing worktree and branch across your sibling repos, use /claudna:sync-branches instead.",
+      "hosts": [
+        "claude-code",
+        "codex",
+        "cursor"
+      ],
+      "path": "skills/worktree/SKILL.md",
+      "requires": [],
+      "requires_context": null
+    }
+  },
+  "sources": {
+    ".agents/plugins/marketplace.json": "b537c39cf727d44c93da3c55892daf382394e163dd26f3aeabcc12d21d36163e",
+    ".claude-plugin/marketplace.json": "951282634d5c2369fcd5b1904c45821ac5a0dfcd365377074fd34f706018d6d1",
+    ".claude-plugin/plugin.json": "1fc4d641f12d5d083056bf9a5fdafd70085ed03ed8b1a86cdf8f98ea4ef8f396",
+    ".codex-plugin/plugin.json": "a0f43428732d5d9151812721dcdcd2677e54ad226344a6685ab73f8a7e52a71a",
+    ".cursor-plugin/marketplace.json": "bf37d8df35f18fcdb1d6b677a7ac5551d1873a378603ad649da97a2d3495e852",
+    ".cursor-plugin/plugin.json": "72aca0d513a7116dd3e39fdc1c1eaf6f5baf0de75178d743bc0b9dc47f356b02",
+    "lib/claudna/package_support/host-policy.json": "6da6b14b449044cb4c98f17b49bcb81f21039b175bd7391d6646d3ba24079e1d",
+    "plugin-hooks/codex-hooks.json": "da9fa60d3dcd3f583b0cef4ea67685073f3eeecf0aa3238dffe7daffb4177e9c",
+    "plugin-hooks/hooks.json": "d64bf123e5c8a8faab67f8f7d2061b7c8a81d94e842d018f921b35a35d961a4e",
+    "skills/adversarial-review/SKILL.md": "3aa0b35950920df336a3c547b684f13ea9528d32033a4cd6d5896123c85e6dbc",
+    "skills/audit/SKILL.md": "6fbc1e7a679aa75f4c5812d6da37cd408925770d83ff2e686fe35370a8a38f78",
+    "skills/build-all/SKILL.md": "ff718dd1455cafaef403e6866a9cdee360cb9bb915532ab520b9ef240af34b05",
+    "skills/build/SKILL.md": "14ff381fe0082bd44d5746edd42e73a76b048e8dbdb6d024a1811ec04fe124b4",
+    "skills/capture/SKILL.md": "143b7700debabc6c50664c8b062302134448308e654be3007dc064280a902bb4",
+    "skills/claudron/SKILL.md": "c71d9523af39e2a71a58f86e4e711aa44d9c2742091b825fa413a1df5752a5ae",
+    "skills/cleanup-legacy-install/SKILL.md": "a65f292d370a895903dfb35526aa3e3cce6a03d55df605f86a1ab119744bf541",
+    "skills/dbt/SKILL.md": "6849c0dd19677018fced69a54464b7af72950dd94976618e4f0e740ba821d1a8",
+    "skills/delegate/SKILL.md": "4025c7ff48de005d3dc35e623212c043f33c434c6e69cf6ac46bd98ffe0dc9c7",
+    "skills/development-retro/SKILL.md": "ab54362ba4323b893336ed09681f58b87456164c5eb260ac199210fbcd3d27cd",
+    "skills/extract-system-spec/SKILL.md": "664165aa66a638f9aa2d8b65a4359e7e43355d8c5a4e58a31b6d1552b8d55b15",
+    "skills/file-github-issue/SKILL.md": "f9d0e676ae71de72dff596ac961401e45e246d108262161ed79c2ce08dc68601",
+    "skills/find-skills/SKILL.md": "ad38f603f99e6ca0dac405bd6a636b05811723851f3f4dbcde014111664b7b01",
+    "skills/forge/SKILL.md": "cb0824cca567ddb5ab9035632bafa8695d24b668b9f997e4aab92ae4bd1ec1fe",
+    "skills/github-activity-report/SKILL.md": "7d4fd53151f2c463c2ff606e68dd949e6e1a402122b0b544d6caf1649a3bfd66",
+    "skills/heist/SKILL.md": "9332823bda2f46f769c71b69a62cf6f4fdce29c91ab5a442ca7c06d28bc4c8ba",
+    "skills/index/SKILL.md": "11bf70464a32d1a4b946131c0fc652f120aacbeeeb58cc853b35a52d178e9610",
+    "skills/init-project/SKILL.md": "99f771b713a84a9fab46e7c71e0aacfe4b88e114748267548f8469c981f55a1f",
+    "skills/investigate-app/SKILL.md": "65fb2b1d7ad680002f7958df3d21321e44fb58853bf69df7d4fa67b444672667",
+    "skills/ironclad/SKILL.md": "1e2c4b502fdfde29626d4b38255e2f7eb11f64e8003cdf08cc56067654c337d5",
+    "skills/kindle/SKILL.md": "a99316bfa2a466471c76cf3009d3ea07cd5bf032ad1691a3ffde0b5cd9dc41fe",
+    "skills/modal/SKILL.md": "b9c311218b1cee1ee9d6d28c240193bb2c49261b80b0b1f502f64a92caa59917",
+    "skills/neon/SKILL.md": "402dee11deb5bf8e4a4a06db1b3f6c4f25b3278b185167d610c1730cc661c2ae",
+    "skills/product-enhance/SKILL.md": "3119fe918bb7cad933eb18422668246e95d2dfe6da7e9839b3fae3d7fb78b916",
+    "skills/product-vision/SKILL.md": "41c87bfc9089c61e4f86c66af49a9927229452029ba77f877172043bec5faf50",
+    "skills/promotion-intake/SKILL.md": "1832cb7fd6b9adec0b059f41ff8adf205a8ba0a129b265cb7137d6f84f0cdb01",
+    "skills/publish/SKILL.md": "9e445772d7f2ce8fe4076516c6dd120d7104d98ce90d3da01bb598a6d9310bfb",
+    "skills/qa/SKILL.md": "e784fe664acde6749d5ea0b892b2a6ccfd8c95545eea5d03c78eba36b156f444",
+    "skills/railway/SKILL.md": "9385eacd65f4ae91cfa838aa5a60982a7acf21ce5042a5c4eaa5c7ed246494b9",
+    "skills/recall/SKILL.md": "3b44ea8eff5d1d4636b8b6ef8a1a86604145260b75ecd0fdf3130827a3542275",
+    "skills/review-work/SKILL.md": "920424d3c7b0a61281155cd2265e5c00770cc43693ab9843c17e399f3e8410a1",
+    "skills/session/SKILL.md": "50ca9decc21e19c057477c8a6a502685e20916adb68361827df4c809891842a5",
+    "skills/ship/SKILL.md": "efb9cedd2de8b5130ad8bb0ecdfc5182d44e027578ffd52d31cb503c190a66dd",
+    "skills/skill-scaffold/SKILL.md": "202908b7c463c6eb7e85a9763a8b7c3139ac3bd37f23ddc7597962ae0c207e74",
+    "skills/sync-branches/SKILL.md": "ee239925a37a71936497a6043b3c15e605037e9838baa37c319e25953f66aa04",
+    "skills/using-claudna/SKILL.md": "66e5cb18fa5b872e4c54cfff310cf7f3c5f5609acf4e79a00a54d7d4ca2f8170",
+    "skills/vercel/SKILL.md": "60c4641a94c521c4975d1c95db6af7a9715cd792aea3d8c887c59a7c361766fb",
+    "skills/verify-completion/SKILL.md": "8ead1f37e9e0ee45cd317d75146b632eb94bc5d8f7d56cd5818aaedf1b778226",
+    "skills/weigh-development-paths/SKILL.md": "75cc4f2cb50bc2cc9d00ebac9c6dea55eff222c26fd4fd33148d9f23df8eba04",
+    "skills/worktree/SKILL.md": "ba3778c68e1384cbfd74859a1742cfc9229e4db0b29b646aeafaf178c6af0cd5"
+  }
+}

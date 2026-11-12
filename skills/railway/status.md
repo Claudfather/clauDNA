@@ -4,6 +4,8 @@ Invoked by /claudna:railway in status mode. Pre-flight (CLI install, version gat
 
 Quick dashboard for your Railway project. Shows project info, services, recent deployments, environments, and resource metrics at a glance. Follow these steps in order.
 
+Follow `../_shared/orchestration-guide.md` §1 before any file write. Raw variable output and private working data go only under native-session `<scratch>`; a sanitized requested dashboard report defaults to `<artifacts>/railway/status/<run>.md`. Never use cwd, operation IDs, or OS-temp paths as durable owners. Preserve the rule never to reveal variable values or Railway credentials. Finalize only the exact owned scratch after its writer exits, retaining any canonical artifact.
+
 ## Step 1: Project & Service Overview
 
 ```bash
@@ -38,7 +40,7 @@ List all environments (production, staging, PR environments, etc.).
 
 ## Step 5: Environment Variables
 
-Its output holds the values, so send it to a file in a private directory (make one with `mktemp -d`; `<scratch>` below) and show only the names:
+Its output holds the values, so send it to `<scratch>/vars.json` in the native-session private directory allocated per orchestration-guide §1 and show only the names:
 
 ```bash
 railway variables list --json > <scratch>/vars.json
@@ -48,7 +50,7 @@ railway variables list --json > <scratch>/vars.json
 jq 'keys' <scratch>/vars.json
 ```
 
-Then `rm -r <scratch>`. Never display a value. Note any common variables that appear unset.
+Never display a value. Note any common variables that appear unset. After the CLI and `jq` have exited, finalize only the exact scratch allocation and verify cleanup; retain the sanitized canonical report if one was requested.
 
 ## Step 6: Resource Metrics
 

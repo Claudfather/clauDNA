@@ -8,7 +8,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Default generated workflow output to private native-session artifacts, including non-interactive planning; keep chat-only output file-free and repository/vault/GitHub editions explicit. Shared allocation, scoped plan discovery, retained canonical sources, private export receipts and exact-owner scratch cleanup now cover the workflow inventory. Native identity/write, consumer and recovery acceptance remain merge/release gates on the held draft stack.
+- Native-session path/scratch allocation and exclusive standalone operation directories under the effective clauDNA root. Artifact-only ownership is distinct from captured, partial and corrupt lifecycle state; manual allocation creates no capture events. This is the held storage-migration foundation, not a release or native-host qualification.
+- Session-owned continuity at `R/sessions/<native-sid>/handoff.md`, with scoped reference resolution, immutable predecessors, and fingerprinted copy-only legacy import. The old per-cwd handoff contract is breaking; downstream reader and native-host acceptance remain pending on the held, unreleased stack.
 - **The `audit security` lens checks CI triggers (category I).** It now reads each workflow's triggers, permissions, checkouts, event text, artifacts and caches, deployments and their creators, secrets, the default token and runners for code or text from outside the project that runs with the repository's token or secrets. It covers three shapes: `deployment` and `deployment_status` workflows run the deployed commit's workflow file, so a deployed pull request can bring its own; `pull_request_target`, `workflow_run`, `issue_comment` and similar events run the default branch's workflow on input anyone can send; and fork pull requests can reach self-hosted runners. Findings are graded by what the outsider's code gets, with a secret or a write token at CRITICAL, and the category lists the usual fixes.
+
+### Breaking Changes
+
+- Session handoffs are owned by verified native sessions, not a shared per-cwd `.claude/session.md`. Resume uses scoped references; legacy sources are read-only and require a source hash plus explicit reimport for changed content. This staged source change is not a release or proof of consumer acceptance.
+
+### Fixed
+- Reject existing release output entries, including dangling symlinks, before resolving destinations or allocating qualification state.
+- Route report-only audits and retained reviews through standalone artifact validation, and post metadata-free review editions while preserving canonical reports and hashes.
+- Keep summary-only capture remnants visible as partial or corrupt sessions, including retained segment summaries, without treating manual artifacts as captured data.
+- Session resume now preserves legacy personal handoffs during both automatic and interactive imports. Timestamp conversion and reaping apply only to the project copy; existing project handoffs skip the fallback.
+
+### Changed
+- Simplified continuity state checks and context helpers; indexed legacy receipts now use one bounded read and validation without changing privacy or ownership requirements.
+- Held qualification: maintainer scratch and canonical export receipts use verified native ownership or an explicit standalone operation; owned checks disable disposable caches. Package fixtures qualify filesystem effects separately from native workflow/publication, consumer, recovery and D6 acceptance. The full workflow-default migration remains unmerged and unreleased.
+- Held storage migration: move compatibility telemetry into the effective clauDNA root, session hook payloads/scratch and durable delegation records into their native-session owners, and keep global bootstrap diagnostics bounded and payload-free. Preserve opt-outs, null-SID observations, unknown delegation residue and historical files; external consumer/native/recovery acceptance still gates release. Runtime helpers suppress package bytecode, saved repo lists and authorized cleanup backups use clauDNA-owned state.
+- Unified CI owns skill and manifest validation on pull requests and main pushes; retired duplicate workflows and their unpinned dependency installation.
+- Separated skill discovery and frontmatter parsing from validation policy, preserving existing imports and parser error behavior.
+- Clarified packaged versus manually applied setup resources while keeping the shell integration, SnowSQL template and project templates in place. Moved the D2 placement ledger from active planning to a living guide.
+
+## [0.34.11] - 2026-11-04
+
+### Added
+- Exact-commit source packages with reproducible archives, file hashes, a reviewable SHA-pinned Claude marketplace descriptor and isolated packaged lifecycle receipts. Release qualification preflights an isolated development interpreter, checks the candidate before tagging, binds both Git and publication-repository tags, and preserves existing release assets. Native marketplace acceptance and promotion remain separate operator steps.
+- A read-only Python 3.9+ package doctor with stable text/JSON diagnostics for package consistency, host selection and workflow prerequisites. It defaults to its loaded package, never executes PATH tools, and reads existing pipeline health only with an explicit store root. Native discovery/trust/execution and unprobed binary versions remain unknown.
+- A source-bound package support catalog and generated host/skill table, derived from the existing manifests and validated skill frontmatter. `make check-package-support` checks drift without writing; runtime consumers need no YAML dependency. Host selection and hook configuration are unchanged.
+- Consumer installation, update, pin/rollback limits, removal, retained-data and privacy guidance for Claude Code, Cursor and Codex, with native certification explicitly separate from declared packaging.
 
 ## [0.34.8] - 2026-11-04
 ### Changed

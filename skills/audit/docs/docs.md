@@ -116,7 +116,7 @@ Execute the user's choices — create or update docs as requested.
 
 Follow `../../_shared/pre-handoff-checklist.md` for the general procedure. The adversarial-review `--dispatch` output is markdown with YAML frontmatter per `../../_shared/contracts/lens-result-contract.md` — parse `status` from frontmatter and findings from body sections. For the docs lens, the workflow is adapted:
 
-1. Write each gap-fix proposal to a temporary scratch file at `<scratch>/proposals/<gap-slug>.md`, with `<scratch>` a private directory made by `mktemp -d "${TMPDIR:-/tmp}/audit-docs.XXXXXX"`.
+1. Write each gap-fix proposal to `<scratch>/proposals/<gap-slug>.md`, using the exact current-session scratch path from `../../_shared/orchestration-guide.md` §1. Resolve the native SID/provider and exact paths before dispatch; never create an OS-temp or guessed replacement.
 
 2. Run the pre-handoff checklist against each scratch file.
 
@@ -168,12 +168,13 @@ Could a new engineer onboard from these docs alone?
 
 ## Output Targets
 
-This lens supports `--output github` and `--output session`. **Lens delta (predecessor-faithful, overrides contract §2's session default):** with no `--output` flag this lens fixes docs inline and asks about gaps — its distinctive behavior.
+This lens defaults to `--output artifacts` for its final review report and supports explicit `session`, `github`, and `docs` destinations. Its distinctive documentation fixes remain in the selected project files. `session` is chat-only and creates no report file.
 
 Follow the output guide at `../../_shared/output-guide.md`:
 - For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Apply `docs` label. Auto-fix verifiable inaccuracies first, then create issues for gaps requiring human judgment.
-- For `session`: produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- No flag (lens delta): fix docs inline and ask about gaps
+- For `artifacts` (default): retain the sanitized final review report with `/claudna:publish <artifacts>/00_DOCS_AUDIT.md --to artifacts`; preserve intentional user-approved source documentation edits.
+- For `session`: present the review in chat only; do not write a report file.
+- For `docs`: explicitly export a selected canonical report with `/claudna:publish <artifacts>/00_DOCS_AUDIT.md --to docs --dir <user-selected-directory>`; this does not replace the source documentation edits.
 
 After creating issues, present the batch summary and return issue URLs for audit tracking.
 
@@ -181,13 +182,13 @@ After creating issues, present the batch summary and return issue URLs for audit
 
 ## Autonomous Mode (--auto)
 
-When `--auto` is set (see orchestration guide Section 10), run fully non-interactively — auto-fix stale docs and create GitHub Issues for gaps (`--auto` implies `--output github`):
+When `--auto` is set (see orchestration guide Section 10), run fully non-interactively and default to retaining the final report under `<artifacts>`. Create GitHub Issues only when `--output github` is explicit:
 1. Use the scope path from the focus argument or default to global review
 2. Skip user confirmation of inventory (Step 2) — proceed with auto-categorization
 3. Auto-fix verifiable inaccuracies in coding overviews (wrong file paths, renamed functions) — commit fixes directly
 4. Auto-mark development plan statuses
 5. Auto-archive fully completed plans
-6. Create GitHub Issues for gaps that require human judgment (new docs to write, structural decisions)
+6. With explicit `--output github`, create GitHub Issues for gaps that require human judgment (new docs to write, structural decisions)
 7. **Emit the structured-result shape** per `../../_shared/orchestration-guide.md` §10.C as the FINAL output of the run — a fenced ```json block with no text after:
 
 ```json

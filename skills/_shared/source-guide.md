@@ -10,7 +10,7 @@ Implementation skills (primarily `/claudna:build`) support multiple input source
 
 | Target | Flag | Behavior |
 |---|---|---|
-| `docs` | (default, no flag needed) | Read from a local file path or session directory |
+| `docs` | (default, no flag needed) | Read a selected local plan; discover current-session artifacts or an explicitly selected scoped pointer |
 | `github` | `--source github <number>` | Fetch a GitHub Issue by number and use its body as the plan |
 | `github` (browse) | `--source github` (no number) | Browse all open issues via paginated picker, select one or more |
 
@@ -24,7 +24,7 @@ Regardless of source, the implementation skill must:
 
 1. **Validate the plan has implementation detail.** Check for the presence of an `## Implementation Plan` section (or equivalent structured content). If the source is findings-only, warn the user and offer to expand it before proceeding.
 2. **Use Plan Mode for deliberation.** The codebase comparison (Step 2) and challenge round (Step 3) execute identically regardless of source.
-3. **Maintain a single source of truth.** During implementation, updates (challenge round changes, status markers, PR references) are written back to the source — whether that's a file on disk or a GitHub Issue body.
+3. **Maintain a single source of truth.** Record the selected source and revision. Authorized updates (challenge round changes, status markers, PR references) go to that source, whether a local file or GitHub Issue body. Frozen input stays unchanged; adaptations belong to the current session artifacts.
 
 ---
 
@@ -37,15 +37,56 @@ Read a planning document from the local filesystem. This is the current default 
 - **File path**: Direct path to a single phase document (e.g., `documentation/planning/tech_debt/session_2026-04-07/01_datetime_migration.md`)
 - **Session directory**: Path to a session directory containing `00_OVERVIEW.md` and phase files. The skill reads the overview, lists phases, and asks which to start.
 
+### Explicit canonical plan artifacts
+
+Canonical plans under the effective clauDNA root are the default discovery plane.
+Use the actual current native SID/host and an explicit workspace or runtime scope.
+A pathname, cwd or operation ID never supplies native identity. With no input path,
+resolve only the current owner's artifact directory using the read-only `paths
+--session <current-native-sid> --host <provider> --kind artifacts` call (no
+`--create`). Enumerate plan families only beneath that returned current-owner
+root. Do not allocate just to browse. An explicitly selected scoped continuity
+pointer can expose a prior plan; explicit project/legacy paths remain valid.
+Do not fall back to a repository-wide or all-session search when identity or
+scoped selection is unavailable. Report the unavailable discovery and accept an
+explicit source instead. Native identity/write qualification remains a gate
+before merge/release, separate from these static routing instructions.
+
+Before reading a selected session artifact, validate its source owner and privacy:
+
+```sh
+python3 -B "<loaded-package>/lib/claudna/session_store" continuity artifact-path --session "<current-native-sid>" --host "<provider>" --scope "<scope>" --from-session "<source-native-sid>" --path "<absolute-plan-path>" --json
+```
+
+Alternatively, select an already published artifact pointer with `artifact-path
+--scope <scope> --workflow <workflow>`, including the same current session/host
+arguments. The explicit `--path` form requires `--from-session` and cannot combine
+with `--workflow`. Use only the verified returned path. Same-session private/manual
+artifacts remain readable by their owner; another session needs public, scoped
+lifecycle/context evidence. Missing, private, ambiguous or unverifiable evidence
+stops selection. Never select latest or scan other sessions. A selected family
+uses its validated master and separately validates each selected phase path before
+reading it; a directory is not a blanket read grant.
+
+Record the selected source and revision/hash. Authorized challenge/status/PR edits
+update that source; a frozen plan remains unchanged, with adaptations in current
+session artifacts. A GitHub edition retains the existing provenance/revision gate
+and declared authority; never reconcile two edited editions silently. Canonical
+session artifacts become terminal in place: update authorized status fields but
+do not `git mv`, move into a repository, or delete the family. Repository archival
+below applies only to explicitly selected project/legacy plans. New run ledgers
+and reports belong to the current session even when the selected plan has an
+earlier owner.
+
 ### Lifecycle
 
 | Step | Action |
 |---|---|
 | Receive plan | Read file from disk |
-| Challenge round updates | Edit the file directly |
+| Challenge round updates | Edit the selected authority only when authorized; frozen-source adaptations go in current artifacts |
 | Mark in progress | Set the `IN PROGRESS` marker in the body; roll frontmatter `status:` up per `../_shared/documentation-standard.md` §5 |
 | Mark complete | Set the `✅ COMPLETE` marker in the body; roll frontmatter `status:` up per `../_shared/documentation-standard.md` §5 |
-| Archive | `git mv` to `documentation/archive/` and a terminal frontmatter `status:`, per `../_shared/documentation-standard.md` §6 |
+| Archive | Explicit project/legacy plan: `git mv` to `documentation/archive/` per `../_shared/documentation-standard.md` §6. Session artifact: terminal in place, preserve its canonical path. |
 
 ---
 
@@ -107,7 +148,7 @@ Run the mechanical gate — exit 0 means trusted (resolve `<claudna-root>` per
 [`./claudna-root.md`](./claudna-root.md), SKILL_CONTRACT §1.1):
 
 ```
-python3 <claudna-root>/scripts/check_provenance.py <owner> <repo> issue <number>
+python3 -B <claudna-root>/scripts/check_provenance.py <owner> <repo> issue <number>
 ```
 
 - The issue author is **trusted** when the gate exits 0 (`author_association` is

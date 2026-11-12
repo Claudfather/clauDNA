@@ -11,12 +11,12 @@
 ## Rules (each enforced by `tests/test_runtime_layout.py`)
 
 1. **Stdlib only.** Imports are the standard library or `claudna.*`. No dev dependency (pyyaml, pytest) may leak into runtime; it would fail inside a hook, silently.
-2. **Imports point downward.** Inside a package, a module imports only strictly lower layers (`session_store`: schema → paths/fsio/transcript/activity → events/lineage/telemetry/ops → project → store/rollup → summarize/unclosed/digest/filing/readers/retention/export/host → harvest/health/host_claude/host_codex → boundaries → cli → `__main__`; the ranks are `SESSION_STORE_LAYERS` in the test). Need to call up? Invert it — pass a callback.
+2. **Imports point downward.** Inside a package, a module imports only strictly lower layers (`session_store`: schema → paths/fsio/transcript/activity → events/lineage/telemetry/ops → project → store/rollup → continuity → summarize/unclosed/digest/filing/readers/retention/export/host → harvest/health/host_claude/host_codex → boundaries → cli → `__main__`; the ranks are `SESSION_STORE_LAYERS` in the test). Continuity owns scoped references and legacy import coordination; it calls down to storage primitives and never owns lifecycle. Need to call up? Invert it — pass a callback.
 3. **One `sys.path` shim, at the entry point.** Only `__main__.py` may touch `sys.path`; library modules never do.
 
 ## How it's invoked
 
-- **Hooks use the directory form:** `python3 "${CLAUDE_PLUGIN_ROOT}/lib/claudna/session_store" <verb>`. Hooks run in the user's project, and `python3 -m` puts the current directory first on `sys.path`, so a project's `json.py` would shadow the stdlib. (`-P` fixes that only from Python 3.11; the floor is 3.9.)
+- **Hooks use the directory form:** `python3 -B "${CLAUDE_PLUGIN_ROOT}/lib/claudna/session_store" <verb>`. `-B` prevents the interpreter's pre-entry bytecode cache; entrypoints also suppress later package-import caches. Hooks run in the user's project, and `python3 -m` puts the current directory first on `sys.path`, so a project's `json.py` would shadow the stdlib. (`-P` fixes that only from Python 3.11; the floor is 3.9.)
 - `python3 -m claudna.session_store <verb>` with `PYTHONPATH=lib` is fine from this repo — tests and local debugging — never from a hook.
 - POSIX only: the store locks with `fcntl`, so it runs on macOS and Linux, not Windows. The stdlib-only gate can't see that.
 - The floor is **Python 3.9** (stock macOS): the `runtime-floor` CI leg runs the runtime suites on it (`make test-runtime`).

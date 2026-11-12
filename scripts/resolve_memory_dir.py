@@ -53,6 +53,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.dont_write_bytecode = True
+
 SETTING_KEY = "autoMemoryDirectory"
 
 # The one project settings file that may choose the directory, relative to the

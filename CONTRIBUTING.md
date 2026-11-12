@@ -39,6 +39,15 @@ make deps   # python3 -m pip install -r requirements-dev.txt
 
 Every check-set target invokes its tool as `python3 -m <tool>` rather than by bare name. That is deliberate: `make deps` usually has no writeable system site-packages, so pip does a user install and the `ruff`/`pytest` console scripts land in `~/.local/bin`, which is not always on PATH. Going through the interpreter means `make check` works regardless, and resolves the tools in the same interpreter they were installed for. Keep new targets in that style.
 
+Release qualification deliberately uses a private HOME and excludes user-site packages. For that maintainer workflow, install the same pinned dependencies in a Python 3.12 virtual environment as described in the [package release guide](documentation/guides/PACKAGE_RELEASE.md). Qualification preflights the selected interpreter; `release.sh` performs that check before changing files or committing a version bump. Ordinary `make check` retains its user-install support.
+
+The unified CI workflow runs the check-set on pull requests (including stacked
+branches) and pushes to `main`. Add validation commands to Makefile targets, not
+standalone validation workflows; all use `requirements-dev.txt`.
+Main pushes set `FULL_VALIDATE=1`, so an empty diff against `origin/main` cannot
+demote skill errors to warnings. PRs retain touched-skill scoping and the
+`full-validate` label override.
+
 ### Cloud Agents
 
 [`.cursor/environment.json`](./.cursor/environment.json) makes the repo ready to work in from the first prompt in a [Cursor Cloud Agent](https://cursor.com/docs/cloud-agent/setup). It declares one `install` step — [`.cursor/install.sh`](./.cursor/install.sh), which runs `make deps` — so an agent boots with the same pinned toolchain CI uses. The requirements list is not duplicated there; the toolchain stays defined once, in `requirements-dev.txt`.
@@ -135,27 +144,32 @@ Maintainers use `scripts/release.sh` to cut releases:
 ./scripts/release.sh major   # 0.3.0 → 1.0.0
 ```
 
-The script bumps all three `plugin.json` manifests together, rewrites the CHANGELOG's `[Unreleased]` section under the new version, commits, and tags. It refuses to start if the three manifests already disagree on the version, so reconcile them first.
+The script preflights the isolated development interpreter and package support generator, bumps all three `plugin.json` manifests together, regenerates the support catalog/table, rewrites the CHANGELOG's `[Unreleased]` section under the new version, then commits the release outputs. It qualifies that exact commit before creating a local tag. It refuses to start if manifest versions disagree or the support projection is stale; set up the release virtual environment, run `make deps`, regenerate and commit as needed before releasing. `--dry-run` validates without changing files, commits or tags. See the [package release guide](documentation/guides/PACKAGE_RELEASE.md) for qualification commands, receipts, and native acceptance limits.
 
-**What a marketplace user receives.** The Claude Code marketplace entry (`.claude-plugin/marketplace.json`) names `{"source": "github", "repo": "Claudfather/clauDNA"}` with no `ref` or `sha`, so it **tracks the default branch**: on a version bump a user fetches the head of the default branch at fetch time, not necessarily the exact commit that bumped the version. Nothing binds a release to the reviewed commit. To bind them, set `sha` (a full commit) or a release-tag `ref` on the entry as part of the release change, and protect that tag separately — a pin is only a gate when the ref it names cannot be rewritten by whoever can write the default branch.
+**What a marketplace user receives.** The Claude Code marketplace entry (`.claude-plugin/marketplace.json`) names `{"source": "github", "repo": "Claudfather/clauDNA"}` with no `ref` or `sha`, so it **tracks the default branch**: on a version bump a user fetches the head of the default branch at fetch time, not necessarily the exact commit that bumped the version. Package receipts bind release artifacts to a commit; they do not change this live catalog. Packaging emits a separate SHA-pinned Claude descriptor for owner review and promotion. Native installation and execution still require their own receipts. Cursor and Codex receive no guessed pin fields.
 
 Contributors don't need to run this — just add your CHANGELOG entry and bump the version if applicable.
 
 ## Distribution
 
-clauDNA ships to three hosts from one tree, and the manifests are not interchangeable:
+clauDNA ships to three hosts from one tree, and the manifests are not interchangeable.
+The [generated support table and consumer lifecycle guide](documentation/guides/PACKAGE_SUPPORT.md)
+derive inventory from these manifests and skill frontmatter. After changing those
+inputs or a package version, run `python3 scripts/generate_package_support.py` and
+commit its catalog/table updates. `make check-package-support` checks drift and is
+part of `make check`; the generator's YAML dependency remains development-only.
 
 | | Claude Code | Cursor | Codex |
 |---|---|---|---|
 | Manifest | `.claude-plugin/plugin.json` | `.cursor-plugin/plugin.json` | `.codex-plugin/plugin.json` |
 | Marketplace manifest | `.claude-plugin/marketplace.json` (name `Claudfather`) | `.cursor-plugin/marketplace.json` (name `claudfather`) | `.agents/plugins/marketplace.json` (name `Claudfather`) |
-| Components | `skills/`, `agents/`, `plugin-hooks/` | `skills/`, `agents/` — no hooks | 36 explicit skills; store hooks + startup briefing; inert native agents |
+| Components | `skills/`, `agents/`, `plugin-hooks/` | `skills/`, `agents/` — no hooks | Explicit skill list; store hooks + startup briefing; inert native agents |
 
 These asymmetries are deliberate and gated by `scripts/validate-manifest.py`:
 
 - **The marketplace names differ in case.** Claude Code's stays `Claudfather` because the documented install command is `/plugin install claudna@Claudfather`. Cursor's must be `claudfather` because Cursor's marketplace identifier grammar allows only lowercase alphanumerics and hyphens.
 - **The Cursor manifest declares no hooks**, so the Claude Code shell hooks never fire in a Cursor-based environment. This is enforced two ways: the validator rejects a `hooks` field in the Cursor manifest, and it rejects a `hooks/hooks.json` at the repo root, which is where Cursor's folder discovery would find hooks with no manifest change to notice.
-- **The Codex manifest explicitly selects 36 skills**, preserving the Claude-only and source-checkout exclusions. All eight bundled role prompts map to a read-and-dispatch procedure. A route is supported only on execution hosts where actual same-host availability and its required fixture proof pass; unsupported routes remain explicit. No native agent registrations. Five store handlers plus the startup briefing are distinct from hook trust/execution. Cursor still ships 35 skills; Claude Code ships 39. Installing does not grant hook trust.
+- **The Codex manifest explicitly selects its skill catalog**, preserving the Claude-only and source-checkout exclusions. All eight bundled role prompts map to a read-and-dispatch procedure. A route is supported only on execution hosts where actual same-host availability and its required fixture proof pass; unsupported routes remain explicit. No native agent registrations. Five store handlers plus the startup briefing are distinct from hook trust/execution. The generated support table owns the current per-host counts. Installing does not grant hook trust.
 
 ### Submitting to the Cursor marketplace
 
@@ -185,3 +199,37 @@ execution/context-delivery evidence are separate gates in the
 [Codex workflow plan](documentation/planning/2026-10-16-codex-engineering-workflows.md).
 Do not transfer desktop delegation proof to native CLI or mark the mixed-fleet
 week complete from a local source/native canary.
+
+
+## Held storage ownership qualification
+
+Internal output uses `CLAUDNA_STATE_DIR` (absolute), default `~/.claudna`.
+Maintainer scripts reuse the session-store resolver and allocator through
+`scripts/release_toolchain.py`. A coherent real native context owns its scratch
+and receipts; otherwise pass the actual `--session` and `--host` supplied by the
+host. Outside all native workflows, explicitly opt into `--standalone` or
+`STORAGE_OWNER_ARGS=--standalone` for Make targets. Missing/conflicting native
+identity must never be repaired with an operation ID. Standalone operations are
+typed separately under `R/operations/op-<32 hex>/` and create no session lifecycle.
+
+Package/release output paths, routing report paths and canary `--dir` are explicit
+exports. Canonical private receipts remain under the selected owner and bind the
+export to its exact commit/archive or report digest. Private host fixture
+`--home`, `--codex-home` and `--tmpdir` options do not redirect canonical output.
+Owned checks disable Ruff/pytest/bytecode caches; dependency installation and
+native host/tool cache policy remain unchanged. Use the pinned toolchain through
+`python3 -m`; run fresh checks in isolated exports with private HOME/TMP and state.
+
+The five-PR storage stack remains held outside main and the release path. Phase04
+supplies native-session artifact defaults on the held draft stack; native
+identity/write acceptance gates merge/release, with one smoke per materially
+different identity-delivery mechanism. Static Markdown checks, executable fixtures, actual
+native skill/publication execution and named external-consumer acceptance are
+separate evidence. A fixture pass is not a complete package storage or cutover
+verdict. Keep historical data in place. Readers must accept the new handoff/feed
+protocol before writer cutover. A specific recovery artifact must read retained
+new layout and write only under R, with native/consumer acceptance; otherwise an
+approved forward-recovery plan is required. An arbitrary older package is not
+qualified rollback. D6 requires a major release or an owner-approved exception,
+and release/installation still need their own authorization. No intermediate
+version bump or release is permitted.

@@ -52,7 +52,7 @@ If the target cannot be fetched, report the error verbatim and stop.
 
 ### Phase 2: Prepare the scratch directory
 
-Create a scratch directory with `mktemp -d "${TMPDIR:-/tmp}/ironclad.XXXXXX"` (referred to as `<scratch>` below), per the scratch-dir convention in `../_shared/orchestration-guide.md`. Use the Write tool to create files inside it. Write `<scratch>/source.md` with the PR metadata, type, and the full (transitively-resolved) plan or diff summary the lenses will review. Lay out per-lens result paths as `<scratch>/lenses/<lens>/result.md`.
+Resolve the actual current native owner and exact absolute `<scratch>` and `<artifacts>` paths through `../_shared/orchestration-guide.md` §1; pass SID/provider and both paths into each delegated prompt. Use only the supplied `<scratch>` for working source/context and per-lens result files. Write the fetched target body and selected review context to private `<scratch>/source.md`; create `<scratch>/lenses/<lens>/` for each selected lens before dispatch. Do not copy credentials or unrelated transcripts into that source. Never create an OS-temp or guessed replacement. Select an unoccupied private family `<artifacts>/ironclad/<owner>-<repo>-<type>-<number>/<unused-run-label>/` (the label distinguishes reports within the same verified native owner; it is not a replacement session identity). Retain the sanitized final report there as `00_CYCLE_<cycle>_IRONCLAD_REVIEW.md`, with frontmatter `title`, `type: review`, `status: completed`, `owner: /claudna:ironclad`, and `created: <YYYY-MM-DD>`. Start the body with `## Summary` and a concise cycle verdict summary; follow it with the existing comment-format content unchanged. Validate the selected standalone canonical report with `/claudna:publish <exact-canonical-report-path> --to artifacts` before posting. If the destination already exists, preserve it and report the collision; do not overwrite it. Keep posting gated as defined below.
 
 **Cycle** starts at `1`. With `--loops N` on a plan Issue the procedure repeats (Phase 10) for up to `N` cycles; cross-cycle state lives in the **Issue's comments** (prior lens findings, `[FORK-LOCK]` markers) and the re-forged body — not `/tmp`, which stays ephemeral.
 
@@ -85,12 +85,15 @@ Launch one `general-purpose` subagent per applicable lens, all in parallel (`run
 ```
 Read <claudna-root>/skills/ironclad/lenses/<lens>.md
 Apply it to: <SOURCE_PATH>
-Write your result to: <scratch>/lenses/<lens>/result.md
+Native owner: <actual-session-sid> via <provider>
+Scratch: <absolute-scratch-path>
+Artifacts: <absolute-artifacts-path>
+Write your result to: <absolute-scratch-path>/lenses/<lens>/result.md
 Operate non-interactively: do not enter plan mode, do not prompt for input.
 Emit structured markdown per <claudna-root>/skills/_shared/contracts/lens-result-contract.md.
 ```
 
-- **Adversarial Review** (a skill): replace the first two lines with `Read <claudna-root>/skills/adversarial-review/SKILL.md` / `Apply the skill with --dispatch to: <SOURCE_PATH>`.
+- **Adversarial Review** (a skill): replace the first two lines with `Read <claudna-root>/skills/adversarial-review/SKILL.md` / `Apply the skill with --dispatch to: <SOURCE_PATH>`. Supply a validated path for persisted-output runs; for chat-only source context, pass the plan inline and use `--output session` without creating input or reviewer files.
 
 Substitute `<SOURCE_PATH>` with the `<scratch>/source.md` path (or the PR URL for codebase-reading lenses such as extension-check and precedent-check), `<scratch>` with the scratch dir, `<lens>` with each lens name, and `<claudna-root>` with the plugin's absolute root, resolved per `../_shared/claudna-root.md` (the subagent has no skill directory to resolve it against). For `align-to-mission`, append the target's repo (and local checkout path if the cwd differs) to the launch prompt — the lens reads mission documents (PROJECT_MISSION.md / README / CLAUDE.md) from the repo under review, never from an unrelated invoking directory, otherwise it grades the plan against the wrong mission.
 
@@ -108,11 +111,13 @@ Read every `<scratch>/lenses/<lens>/result.md`. Deduplicate: findings sharing th
 
 ### Phase 8: Post the aggregated comment
 
-Post a **single** aggregated comment to the target (Issue or PR). A PR comment is an issue comment in GitHub's API; write the markdown body to a file in `<scratch>` (with the Write tool) and post it with `-F body=@<file>` so multi-line markdown stays intact:
+Retain and verify the sanitized canonical report first, then preflight the existing private current-owner publication receipt. Validate the exact canonical report path and owner before reading it, record its hash, and render only its body (strip the YAML frontmatter without changing the body) to an exact private edition file under the caller's supplied `<scratch>`, such as `<scratch>/post/00_CYCLE_<cycle>_IRONCLAD_REVIEW.md`; record the edition hash. Post a **single** aggregated comment to the target (Issue or PR). A PR comment is an issue comment in GitHub's API; pass the rendered edition with `-F body=@<edition-file>` so multi-line markdown stays intact. Never pass the canonical YAML file as the comment body:
 
 ```
-gh api --method POST repos/<owner>/<repo>/issues/<pr-number>/comments -F body=@<body-file>
+gh api --method POST repos/<owner>/<repo>/issues/<pr-number>/comments -F body=@<edition-file>
 ```
+
+Record the canonical source hash, rendered edition hash, target, actual returned comment URL/ID, and successful, failed, or unknown status in the existing private current-owner receipt. Verify that the canonical source hash remains unchanged after rendering and posting. Preserve the canonical report on every outcome; never infer acceptance from a command being issued. The caller retains ownership of the supplied scratch and its existing exact-path cleanup; delegated lenses do not allocate or remove it.
 
 Comment format:
 

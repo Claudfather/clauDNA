@@ -14,6 +14,8 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PRECOMPACT = REPO_ROOT / "plugin-hooks" / "precompact-reflect.sh"
 TELEMETRY = REPO_ROOT / "plugin-hooks" / "telemetry-emit.sh"
@@ -23,7 +25,7 @@ class TestPrecompactSessionIdIsPathSafe:
     """`session_id` becomes part of a marker path — a `/`-bearing value must
     not be used to build it."""
 
-    def _run(self, tmp_path: Path, session_id: str) -> tuple[int, str]:
+    def _run(self, tmp_path: Path, session_id: str, env_overrides: dict | None = None) -> tuple[int, str]:
         marker_dir = tmp_path / "mtmp"
         marker_dir.mkdir(exist_ok=True)
         env = {
@@ -34,6 +36,7 @@ class TestPrecompactSessionIdIsPathSafe:
             # ambient session id so only the payload drives the path.
             "CLAUDE_SESSION_ID": "",
         }
+        env.update(env_overrides or {})
         proc = subprocess.run(
             ["bash", str(PRECOMPACT)],
             input=json.dumps({"session_id": session_id}),
@@ -42,12 +45,18 @@ class TestPrecompactSessionIdIsPathSafe:
         return proc.returncode, proc.stdout
 
     def test_valid_session_id_blocks_first_then_allows(self, tmp_path):
-        code, out = self._run(tmp_path, "sess-abc123.DEF_456")
+        sid = "sess-abc123.DEF_456"
+        code, out = self._run(tmp_path, sid)
         assert code == 0
         assert '"decision":"block"' in out  # first attempt blocks
+        state = tmp_path / "home" / ".claudna" / "sessions" / sid / "hooks"
+        assert (state / "reflected").is_file()
+        assert not (tmp_path / "home" / ".claudna" / "hooks").exists()
+        assert list((tmp_path / "mtmp").iterdir()) == []
         code, out = self._run(tmp_path, "sess-abc123.DEF_456")
         assert code == 0
         assert out.strip() == ""  # marker existed → second attempt allows
+        assert not (state / "reflected").exists()
 
     def test_slash_bearing_session_id_is_rejected_cleanly(self, tmp_path):
         # A traversal-shaped id must not crash the hook nor build a marker path
@@ -63,6 +72,14 @@ class TestPrecompactSessionIdIsPathSafe:
         assert code == 0
         assert list(tmp_path.rglob("*evil*")) == []
 
+    @pytest.mark.parametrize("sid", ["sid\n", "sid\0", "é", "a" * 129, "SESSION_ID", "native-session-id"])
+    def test_non_ascii_newline_or_oversize_identity_creates_no_marker(self, tmp_path, sid):
+        code, out = self._run(tmp_path, sid, {"CLAUDE_SESSION_ID": "ambient-fake"})
+        assert code == 0 and out == ""
+        assert not (tmp_path / "home" / ".claudna" / "hooks").exists()
+        sessions = tmp_path / "home" / ".claudna" / "sessions"
+        assert not sessions.exists() or not list(sessions.glob("**/reflected"))
+
 
 class TestTelemetryEmitsValidJson:
     """Skill telemetry (telemetry-emit.sh, writing through the store's telemetry.py) writes one
@@ -70,9 +87,11 @@ class TestTelemetryEmitsValidJson:
     a slug of the real charset, or nothing at all."""
 
     def _run(self, tmp_path: Path, event: dict) -> list[str]:
-        out_path = tmp_path / "events.jsonl"
+        state = tmp_path / "state"
+        out_path = state / "telemetry" / "events.jsonl"
         env = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "CLAUDNA_TELEMETRY": "1",
-               "CLAUDNA_TELEMETRY_PATH": str(out_path), "CLAUDNA_SESSION_STORE": "0"}
+               "CLAUDNA_STATE_DIR": str(state), "CLAUDNA_TELEMETRY_PATH": str(out_path),
+               "CLAUDNA_SESSION_STORE": "0"}
         subprocess.run(["bash", str(TELEMETRY)], input=json.dumps(event),
                        capture_output=True, text=True, cwd=tmp_path, env=env, timeout=20)
         return out_path.read_text().splitlines() if out_path.exists() else []

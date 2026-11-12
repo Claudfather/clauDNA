@@ -18,7 +18,8 @@ The seven-part protocol below is the required deliverable structure. The lens di
 | `{{SCALE_FACTS}}` | Measured sizes, rates, growth — numbers with sources | medium |
 | `{{CONSTRAINTS}}` | Hard constraints: compliance, uptime floors, team capacity, freeze windows | medium |
 | `{{RUN_PARTS}}` | Which protocol parts this dispatch executes (`1-3`, `4-6`, or `7`) | low |
-| `{{SCRATCH_DIR}}` | The run's scratch root; output paths per the lens procedure | low |
+| `{{OUTPUT_MODE}}` | Selected output target: artifacts, session, github or docs | low |
+| `{{SCRATCH_DIR}}` | Exact supplied native-owner scratch root for persisted output; unused for session | low |
 | `{{RECONSTRUCTION_FILES}}` | Paths of the confirmed Part 1–3 files (waves 2+ only) | low |
 | `{{CHOSEN_DIRECTION}}` | The direction picked at the lens's direction gate (Part 7 dispatch only) | low — post-decision by design |
 
@@ -45,7 +46,7 @@ A prompt that fails the scan and ships anyway produces an evaluation worth nothi
 Fill, scan, dispatch. Ground rules and part requirements are part of the prompt text.
 
 ````markdown
-You are evaluating the data model of {{SYSTEM_NAME}} ({{REPO_PATHS}}; data surfaces: {{DATA_SURFACES}}; scope: {{FOCUS}}). Execute Parts {{RUN_PARTS}} of the protocol below and write each part's output to {{SCRATCH_DIR}} as directed. Return only a 2-4 line summary per part.
+You are evaluating the data model of {{SYSTEM_NAME}} ({{REPO_PATHS}}; data surfaces: {{DATA_SURFACES}}; scope: {{FOCUS}}). Execute Parts {{RUN_PARTS}} of the protocol below. Output mode is {{OUTPUT_MODE}}. For session output, create no files: receive confirmed reconstruction in context and return each complete bounded part result in context for synthesis and review. For persisted output, use only the exact caller-supplied {{SCRATCH_DIR}} under the verified native SID/provider, write each part there as directed, and return only a 2-4 line summary per part. Do not allocate a replacement root.
 
 Context — treat as observations, not conclusions:
 - Motivation: {{MOTIVATION}}
@@ -55,7 +56,7 @@ Context — treat as observations, not conclusions:
 Ground rules:
 - Work only from the code, schemas, migrations, and data surfaces in scope. Every claim cites `file:line` (or a schema/migration identifier). A claim you cannot confirm from source is labeled `Unverified`.
 - Parts 1–3 are descriptive. Record what IS — no critique, no adjectives, no "should". If you notice a problem while reconstructing, keep a private note and hold it for Part 4.
-- Parts 4+ read the confirmed reconstruction from {{RECONSTRUCTION_FILES}} and may not contradict it silently — a discovered error in the reconstruction is reported, not papered over.
+- Parts 4+ read the confirmed reconstruction from {{RECONSTRUCTION_FILES}} (supplied in context for session output) and may not contradict it silently — a discovered error in the reconstruction is reported, not papered over.
 - Label every judgment `Confirmed | Likely | Hypothesis`; a Hypothesis states what would confirm or falsify it.
 - Never reproduce a secret or credential value; cite `file:line` + the variable name only.
 

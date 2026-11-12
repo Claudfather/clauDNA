@@ -6,11 +6,20 @@ can share the same rules without duplication.
 
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 
-import yaml
+# Keep the established skill_checks imports available while low-level callers
+# can depend directly on discovery or parsing without loading every policy.
+from skill_discovery import (
+    GATE_EXTENSIONS as GATE_EXTENSIONS,
+    GATE_PRUNE_DIRS as GATE_PRUNE_DIRS,
+    SKIP_DIRS as SKIP_DIRS,
+    is_virtualenv as is_virtualenv,
+    skill_dirs as skill_dirs,
+    walk_gate_files as walk_gate_files,
+)
+from skill_frontmatter import parse_frontmatter as parse_frontmatter
 
 REQUIRED_FIELDS = {"name", "description"}
 KNOWN_FIELDS = REQUIRED_FIELDS | {
@@ -40,76 +49,12 @@ KNOWN_FIELDS = REQUIRED_FIELDS | {
 KNOWN_HOSTS = {"claude-code", "cursor", "codex"}
 KNOWN_CONTEXTS = {"repo-clone"}
 
-# clauDNA #344: the one definition of "not a skill directory" -- was three
-# independent copies (here, validate-skills.py, integration-test.py,
-# check_cursor_scope.py), which is exactly how a gate and a validator end up
-# disagreeing about what counts as a skill without either one changing.
-SKIP_DIRS = {"_shared"}
-
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*$")
 DESC_MIN = 20
 DESC_MAX = 500
 BODY_MIN = 200
 STALE_PATH_RE = re.compile(r"~/\.claude/(skills|commands|agents)/")
 STALE_PATH_SKIP_SKILLS = {"cleanup-legacy-install"}
-
-# Repo-wide text surfaces the gates walk, minus VCS/build directories. Owned
-# here because two gates reason over the same living-surface file set:
-# validate-skills.py's removed-names scan and check_vault_address.py's
-# vault-address conformance gate.
-GATE_EXTENSIONS = {".md", ".sh", ".py", ".json", ".yaml", ".yml", ".toml", ".txt"}
-# Names with no structural marker to key on: git, CPython and npm each mandate
-# their own directory name, so the name IS the invariant here. A virtualenv is
-# the opposite case and is handled by is_virtualenv() below -- .venv and venv
-# are listed only as a name-level backstop for a venv whose marker is missing
-# or unreadable. "env" is deliberately NOT listed: it is a plausible name for a
-# tracked config directory, and a literal entry would silently drop real files
-# from a gate whose whole job is to find them. A venv named env is caught by
-# the marker instead, which keys on contents rather than on the name.
-GATE_PRUNE_DIRS = {".git", "__pycache__", "worktrees", "node_modules", ".venv", "venv"}
-
-
-def is_virtualenv(path: Path) -> bool:
-    """True when *path* is the root of a Python virtual environment.
-
-    PEP 405 defines ``pyvenv.cfg`` at the environment root as the marker, and
-    ``python -m venv`` writes it (verified). Keying on the marker rather than on
-    the directory name is what stops this recurring the moment a contributor
-    picks ``.venv313``, ``env`` or ``build-venv``: the set of names a person
-    might choose is unbounded, the marker is not.
-
-    Why it matters that the gates skip one: an environment holds thousands of
-    gate-matching files whose lines are long, and the gates run a per-line regex
-    over every file they walk. One in the repo root measured a 33x slowdown --
-    slow enough to read as a hang, which is how it cost hours (#330).
-
-    Layouts that do not write the marker (conda prefix environments, older
-    virtualenv) were not measured; the name-level entries in GATE_PRUNE_DIRS are
-    the backstop for those.
-    """
-    return (path / "pyvenv.cfg").is_file()
-
-
-def walk_gate_files(root: Path) -> list[Path]:
-    """Every gate-relevant file under *root*, vendored directories pruned.
-
-    The single walk behind both gates. os.walk rather than rglob because the
-    prune has to stop the DESCENT: a filter applied to an already-enumerated
-    list still pays to enumerate the environment, and a bare venv is ~1,500
-    files before a single package is installed.
-
-    Callers layer their own path exclusions on top -- the two gates deliberately
-    differ there (see each one's GATE_EXCLUDE_* constants).
-    """
-    out: list[Path] = []
-    for dirpath, dirnames, filenames in os.walk(root):
-        here = Path(dirpath)
-        dirnames[:] = [d for d in dirnames if d not in GATE_PRUNE_DIRS and not is_virtualenv(here / d)]
-        for fname in filenames:
-            if Path(fname).suffix in GATE_EXTENSIONS:
-                out.append(here / fname)
-    return sorted(out)
-
 
 # Skills must delegate GitHub output to /claudna:publish, never call `gh` directly.
 # These three are the gh-endpoint skills where direct `gh` use is the whole point.
@@ -124,38 +69,6 @@ _RAW_GH_PATTERNS = [
     re.compile(r"\bgh\s+issue\s+comment\b"),
     re.compile(r"\bgh\s+pr\s+comment\b"),
 ]
-
-
-def skill_dirs(skills_dir: Path) -> list[Path]:
-    """Each skill directory under ``skills_dir`` (one with a ``SKILL.md``, not in :data:`SKIP_DIRS`), sorted."""
-    if not skills_dir.is_dir():
-        return []
-    return sorted(p for p in skills_dir.iterdir()
-                  if p.is_dir() and p.name not in SKIP_DIRS and (p / "SKILL.md").is_file())
-
-
-def parse_frontmatter(path: Path) -> tuple[dict, str] | None:
-    """Return (frontmatter_dict, body) or None if no frontmatter."""
-    text = path.read_text()
-    if not text.startswith("---"):
-        return None
-    lines = text.splitlines(keepends=True)
-    end = None
-    for i, line in enumerate(lines[1:], start=1):
-        if line.strip() == "---":
-            end = i
-            break
-    if end is None:
-        return None
-    frontmatter_text = "".join(lines[1:end])
-    body = "".join(lines[end + 1 :])
-    try:
-        data = yaml.safe_load(frontmatter_text) or {}
-    except yaml.YAMLError as e:
-        raise ValueError(f"frontmatter YAML parse error: {e}")
-    if not isinstance(data, dict):
-        raise ValueError("frontmatter is not a YAML mapping")
-    return data, body
 
 
 def validate_allowed_tools(value) -> list[str]:

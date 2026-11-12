@@ -30,7 +30,9 @@ If none match, warn the user this lens targets Python/Postgres/SQLAlchemy and of
 
 ## Step 2: Parallel Discovery
 
-**Scratch directory:** `<scratch>/research/`, where `<scratch>` is a private directory made with `mktemp -d "${TMPDIR:-/tmp}/audit-data-model.XXXXXX"` (orchestration guide §1)
+**Scratch directory:** `<scratch>/research/`, under the exact current-session scratch path supplied by `../../_shared/orchestration-guide.md` §1. Resolve the actual SID/provider and exact paths before dispatch; never use OS temp or a guessed replacement.
+
+For explicit `--output session`, run discovery inline and keep the analysis in context; create no scratch files. The disk-writing subagent steps below apply to persisted-output runs.
 
 Launch two `general-purpose` subagents in parallel (Agent tool, `subagent_type: "general-purpose"`). Each writes findings to scratch dir, returns 2-4 line summary. Orchestrator does NOT read full research files. (General-purpose because Explore lacks Write tool.) With no dispatch primitive available, scan the two areas inline and sequentially per `../../_shared/orchestration-guide.md` §14.2, writing to the same scratch paths so aggregation is unchanged.
 
@@ -76,12 +78,13 @@ Print structured report: scope summary, code-to-schema map, ranked findings tabl
 
 ## Output Targets
 
-This lens supports `--output github` and `--output session` (contract §2) in addition to the default `session` target — diagnostic lens, no file output by default.
+This lens defaults to `--output artifacts` and supports explicit `session`, `github`, and `docs` targets. Save the final ranked report at `<artifacts>/data-model/00_DATA_MODEL_AUDIT.md` by default; discovery remains in `<scratch>`. Give the report `title`, `type: audit`, `status: completed`, `owner: /claudna:audit data-model`, and `created: <YYYY-MM-DD>` frontmatter, then start its body with a `## Summary` heading and a concise result summary before the ranked findings.
 
 Follow the output guide at `../../_shared/output-guide.md`:
-- For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Create one issue per ranked finding (Schema Gap, Structural Friction, Performance Anti-pattern, etc.). Label with `auto-audit` and the finding category.
-- For `session` (default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs`: author the full ranked findings report as a publishable doc in scratch named `00_DATA_MODEL_AUDIT.md` (master-class: no §4.1 skeleton required — publish Step 1b), then `/claudna:publish <file> --to docs --dir documentation/planning/data-model/<session_name>_<YYYY-MM-DD>/`
+- For `artifacts` (default): retain the report with `/claudna:publish <artifacts>/data-model/00_DATA_MODEL_AUDIT.md --to artifacts` and present its path and summary.
+- For `session`: present findings in chat only; create no report file.
+- For `github`: write selected issue docs under `<artifacts>/data-model/`, then explicitly export them with `/claudna:publish <artifact-file> --to github-issue --repo <repo>`; retain every source and report. Use frontmatter and the Section 4 body skeleton; publish validates, dedups and labels (`auto-audit` and the finding category). Create one issue per ranked finding.
+- For `docs`: explicitly export the selected canonical report with `/claudna:publish <artifacts>/data-model/00_DATA_MODEL_AUDIT.md --to docs --dir documentation/planning/data-model/<session_name>_<YYYY-MM-DD>/`.
 
 ---
 
@@ -91,5 +94,5 @@ Follow the output guide at `../../_shared/output-guide.md`:
 - **Pass focus area** from Step 1 into both Step 2 subagent prompts.
 - **Secrets masking.** Never include connection strings verbatim — file:line only, and scrub the findings file through the redactor (orchestration-guide §7) before handoff.
 - **User gates.** Confirmation required after Step 3 before fit analysis.
-- **Terminal at report.** Diagnostic only — no artifacts. User acts via `/claudna:build` if desired.
+- **Terminal at report.** Diagnostic only — the canonical report is retained in `<artifacts>` unless `session` is explicitly selected. User acts via `/claudna:build` if desired.
 - Orchestration guide: Section 9 N/A (no Plan subagents). Section 10: "Respect existing architecture" applies; doc/testing rules do not.

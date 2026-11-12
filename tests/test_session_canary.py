@@ -11,6 +11,8 @@ machine.
 from __future__ import annotations
 
 import json
+import hashlib
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -22,6 +24,13 @@ SCRIPT = REPO_ROOT / "scripts" / "session_canary.py"
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import session_canary as canary  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def private_store_root(tmp_path, monkeypatch):
+    monkeypatch.setenv("CLAUDNA_STATE_DIR", str(tmp_path / "relocated state root"))
+    for key in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
+        monkeypatch.delenv(key, raising=False)
 
 PARENT = {"claude_pid_env": 100, "claude_pid_walked": 100, "entrypoint": "cli"}
 
@@ -73,13 +82,33 @@ def test_the_hook_appends_one_private_line_per_payload(tmp_path):
 # --- setup ----------------------------------------------------------------------------------------
 
 def test_setup_writes_a_plugin_whose_hooks_call_the_script(tmp_path):
-    log = canary.write_plugin(tmp_path, SCRIPT)
-    manifest = json.loads((tmp_path / ".claude-plugin" / "plugin.json").read_text())
-    hooks = json.loads((tmp_path / "hooks.json").read_text())["hooks"]
+    output = tmp_path / "plugin export"
+    log = canary.write_plugin(output, SCRIPT)
+    manifest = json.loads((output / ".claude-plugin" / "plugin.json").read_text())
+    hooks = json.loads((output / "hooks.json").read_text())["hooks"]
     assert manifest["hooks"] == "./hooks.json" and set(hooks) == set(canary.EVENTS)
     command = hooks["SessionStart"][0]["hooks"][0]["command"]
     assert str(SCRIPT) in command and str(log) in command
     assert hooks["PostToolUseFailure"][0]["matcher"] == "*" and "matcher" not in hooks["SessionStart"][0]
+    assert output.stat().st_mode & 0o777 == 0o700
+    assert (output / ".claude-plugin").stat().st_mode & 0o777 == 0o700
+    assert (output / "hooks.json").stat().st_mode & 0o777 == 0o600
+    assert (output / ".claude-plugin" / "plugin.json").stat().st_mode & 0o777 == 0o600
+
+
+def test_write_plugin_refuses_foreign_directory_without_changing_its_mode_or_contents(tmp_path):
+    output = tmp_path / "foreign export"
+    output.mkdir(mode=0o750)
+    output.chmod(0o750)
+    sentinel = output / "keep.txt"
+    sentinel.write_text("leave foreign content alone")
+    sentinel.chmod(0o640)
+    with pytest.raises(FileExistsError):
+        canary.write_plugin(output, SCRIPT)
+    assert output.stat().st_mode & 0o777 == 0o750
+    assert sentinel.read_text() == "leave foreign content alone"
+    assert sentinel.stat().st_mode & 0o777 == 0o640
+    assert not (output / ".claude-plugin").exists()
 
 
 # --- §11.3 ----------------------------------------------------------------------------------------
@@ -183,6 +212,7 @@ def test_report_has_a_section_per_canary_and_counts_hook_errors():
 def test_report_without_a_log_says_to_run_setup_first(tmp_path, capsys):
     assert canary.main(["report", str(tmp_path)]) == 1
     assert "run the steps from `setup` first" in capsys.readouterr().err
+    assert not Path(os.environ["CLAUDNA_STATE_DIR"]).exists()
 
 
 # --- review fixes ---------------------------------------------------------------------------------
@@ -233,9 +263,60 @@ def test_setup_refuses_a_dir_holding_an_earlier_run(tmp_path, capsys):
     assert "earlier run" in capsys.readouterr().err
 
 
+def test_setup_refuses_dangling_symlink_without_touching_target_or_allocating(tmp_path, capsys):
+    target = tmp_path / "missing plugin"
+    link = tmp_path / "linked plugin"
+    link.symlink_to(target)
+    assert canary.main(["setup", "--dir", str(link), "--standalone"]) == 1
+    assert "fresh directory" in capsys.readouterr().err
+    assert link.is_symlink() and not target.exists()
+    assert not Path(os.environ["CLAUDNA_STATE_DIR"]).exists()
+
+
 def test_setup_prints_steps_that_work_from_any_directory(tmp_path, capsys):
-    assert canary.main(["setup", "--dir", str(tmp_path)]) == 0
-    assert f"python3 {SCRIPT} report {tmp_path}" in capsys.readouterr().out
+    output = tmp_path / "canary output with spaces"
+    assert canary.main(["setup", "--dir", str(output), "--standalone"]) == 0
+    assert str(output) in capsys.readouterr().out
+    assert output.is_dir() and (output / "hooks.json").is_file()
+    root = Path(os.environ["CLAUDNA_STATE_DIR"])
+    [receipt_path] = list(root.glob("operations/*/artifacts/session-canary-*.json"))
+    receipt = json.loads(receipt_path.read_text())
+    assert receipt["owner"]["kind"] == "operation" and receipt["owner"]["provider"] is None
+    assert receipt["export_path"] == str(output.resolve())
+    assert receipt["export_sha256"] == canary._tree_sha256(output)
+    assert receipt["source_script_sha256"] == hashlib.sha256(Path(canary.__file__).read_bytes()).hexdigest()
+    assert receipt_path.stat().st_mode & 0o777 == 0o600
+
+
+def test_setup_defaults_to_canonical_artifacts_and_requires_explicit_owner(tmp_path, capsys):
+    state = Path(os.environ["CLAUDNA_STATE_DIR"])
+    assert canary.main(["setup"]) == 1
+    assert "native identity required" in capsys.readouterr().err
+    assert not state.exists()
+
+    assert canary.main(["setup", "--standalone"]) == 0
+    capsys.readouterr()
+    [receipt_path] = list(state.glob("operations/*/artifacts/session-canary-*.json"))
+    receipt = json.loads(receipt_path.read_text())
+    output = Path(receipt["export_path"])
+    assert output.is_relative_to(receipt_path.parent.parent)
+    assert output.is_dir() and (output / canary.LOG_NAME).resolve().parent == output
+    assert canary._tree_sha256(output) == receipt["export_sha256"]
+    assert hook(output / canary.LOG_NAME, json.dumps({"hook_event_name": "SessionStart"})).returncode == 0
+    assert (output / canary.LOG_NAME).stat().st_mode & 0o077 == 0
+    assert canary._tree_sha256(output) == receipt["export_sha256"]
+
+
+def test_setup_uses_explicit_native_owner_when_alias_matches(tmp_path, monkeypatch, capsys):
+    sid = "native-canary-session"
+    monkeypatch.setenv("CLAUDE_SESSION_ID", sid)
+    assert canary.main(["setup", "--session", sid, "--host", "claude"]) == 0
+    capsys.readouterr()
+    root = Path(os.environ["CLAUDNA_STATE_DIR"])
+    [receipt_path] = list(root.glob(f"sessions/{sid}/artifacts/session-canary-*.json"))
+    receipt = json.loads(receipt_path.read_text())
+    assert receipt["owner"] == {"kind": "session", "owner_id": sid, "provider": "claude"}
+    assert Path(receipt["export_path"]).is_relative_to(root / "sessions" / sid / "artifacts")
 
 
 def test_the_hook_command_survives_a_path_the_shell_would_expand(tmp_path):

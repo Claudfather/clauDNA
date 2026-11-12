@@ -9,6 +9,11 @@ def read(path):
     return (ROOT / path).read_text()
 
 
+def normalized(text):
+    """Collapse Markdown wrapping so assertions bind clauses, not line breaks."""
+    return ' '.join(text.split())
+
+
 def test_every_selected_entrypoint_maps_tools_before_the_procedure():
     paths = json.loads(read('.codex-plugin/plugin.json'))['skills']
     for path in paths:
@@ -110,3 +115,117 @@ def test_resource_cleanup_selects_recorded_task_ownership_not_prefixes():
     worktree = read('skills/worktree/SKILL.md')
     assert 'only the exact worktrees this task created' in worktree
     assert 'omit branch deletion' in worktree
+
+
+def test_artifacts_are_default_and_exports_explicit_while_session_is_chat_only():
+    # Static instruction contract only; native host execution is qualified separately.
+    publish = normalized(read('skills/publish/SKILL.md'))
+    output = normalized(read('skills/_shared/output-guide.md'))
+    artifacts = publish.split('### Adapter: artifacts (default)', 1)[1].split('### Adapter: vault', 1)[0]
+    assert 'when no destination is specified' in artifacts
+    assert 'workflow `--output artifacts`' in artifacts
+    assert 'The `session` adapter remains chat-only and does not persist files.' in artifacts
+    assert '`artifacts` (default), `vault`, `docs`' in publish
+    assert '### Adapter: vault (explicit export)' in publish
+    assert '`--auto` controls interaction only; it defaults to `--output artifacts`' in output
+    assert 'It never implicitly authorizes an external export.' in output
+    assert 'content directly in context' in publish
+    assert 'Do not allocate scratch or artifacts for this adapter.' in publish
+    assert 'Print the doc body back into the chat, no persistence' in output
+    assert 'Default (no flag): Interactive mode, artifacts output.' in read('skills/forge/SKILL.md')
+
+
+def test_artifact_publication_preserves_canonical_source_and_validates_selected_family():
+    publish = read('skills/publish/SKILL.md')
+    canonical_rule = normalized(publish.split('**Canonical artifact source rule:**', 1)[1].split(
+        '### 1a.', 1
+    )[0])
+    pre_read = normalized(publish.split('**Before reading any source content**', 1)[1].split('### 1a.', 1)[0])
+    family = normalized(publish.split('**Input and validation.**', 1)[1].split(
+        '**Promotion of scratch output.**', 1
+    )[0])
+    promotion = normalized(publish.split('**Promotion of scratch output.**', 1)[1].split(
+        '**Canonical export receipts.**', 1
+    )[0])
+    export = normalized(publish.split('**Canonical export receipts.**', 1)[1].split(
+        'Native host receipts', 1
+    )[0])
+    assert 'validate that exact absolute path and owner' in pre_read
+    assert 'including files individually selected from a family' in pre_read
+    assert 'Missing, private, denied, stale, or otherwise uncertain validation means stop before content read' in pre_read
+    assert 'family with exactly one `00_*.md` master and one or more `NN_*.md` phases' in family
+    assert "all-or-nothing family validation" in family
+    assert 'Non-markdown assets may be included only when explicitly selected as finished output.' in family
+    assert 'content and frontmatter remain unchanged during later exports' in canonical_rule
+    assert 'A failed or uncertain destination may be recorded only with its actual failed/unknown status, never as success.' in canonical_rule
+    assert 'Session/chat output and dry-run remain mutation-free and create no receipt.' in canonical_rule
+    assert 'Leave a selected source that is already canonical in place.' in promotion
+    assert 'promote only the validated selected file/family and explicitly selected finished assets' in promotion
+    assert 'hash each source' in promotion and 'verify final hashes' in promotion
+    assert 'preserve each canonical source' in export
+    assert 'resolve the current session\'s private receipt destination' in export
+    assert 'recording each source path and content hash, destination, and actual returned result' in export
+    assert 'Do not write a receipt during dry-run, session/chat output' in export
+
+
+def test_workflow_artifact_paths_fail_closed_without_verified_native_identity():
+    publish = read('skills/publish/SKILL.md')
+    allocation = normalized(publish.split('**Identity and allocation.**', 1)[1].split(
+        '**Input and validation.**', 1
+    )[0])
+    orchestration = read('skills/_shared/orchestration-guide.md')
+    allocation_contract = normalized(orchestration.split('## 1. Scratch Directory', 1)[1].split(
+        '### 1.1.', 1
+    )[0])
+    assert 'Obtain the current session ID and host from the qualified native runtime source.' in allocation
+    assert 'Never infer identity from cwd, time, an operation ID, a filename, or a guessed value.' in allocation
+    assert 'ordinary permission failure' in allocation
+    assert 'stop the artifact write and report the reason' in allocation
+    assert 'Do not fall back to an OS temp path' in allocation
+    assert '--session "<verified-native-sid>" --host "<provider>" --kind artifacts --create' in allocation
+    assert 'If identity is absent, conflicting, or unverified' in allocation_contract
+    assert 'ordinary filesystem permission denies allocation' in allocation_contract
+    assert 'do not fall back to `mktemp`' in allocation_contract
+    assert '`--output session` remains chat-only and creates no files.' in allocation_contract
+
+
+def test_report_only_workflows_match_publish_validation_and_post_body_contract():
+    # Producer/consumer Markdown contract only; this does not execute a native publisher.
+    data_model = read('skills/audit/data-model/data-model.md')
+    for destination in ('artifacts', 'docs'):
+        assert ('/claudna:publish <artifacts>/data-model/00_DATA_MODEL_AUDIT.md '
+                f'--to {destination}') in data_model
+    for path, filename in (
+        ('skills/review-work/multi-pr.md', '00_PR_<number>_REVIEW.md'),
+        ('skills/ironclad/SKILL.md', '00_CYCLE_<cycle>_IRONCLAD_REVIEW.md'),
+    ):
+        text = read(path)
+        assert filename in text  # Explicit standalone 00_ report uses the existing presence-only tier.
+        assert all(field in text for field in ('`title`', '`type: review`', '`status: completed`',
+                                              '`owner:', '`created: <YYYY-MM-DD>`', '`## Summary`'))
+        assert 'Never pass the canonical YAML file' in text
+        assert 'without changing the body' in text
+        assert 'canonical source hash, rendered edition hash' in text
+        assert '<scratch>/post/' in text
+
+
+def test_plan_discovery_uses_explicit_sources_and_keeps_terminal_state_in_place():
+    source = normalized(read('skills/_shared/source-guide.md'))
+    explicit = normalized(source.split('### Explicit canonical plan artifacts', 1)[1].split(
+        '### Lifecycle', 1
+    )[0])
+    build = normalized(read('skills/build/SKILL.md'))
+    build_all = normalized(read('skills/build-all/SKILL.md'))
+    forge = normalized(read('skills/forge/SKILL.md'))
+    assert 'continuity artifact-path' in explicit and '--from-session' in explicit and '--path' in explicit
+    assert 'Missing, private, ambiguous or unverifiable evidence stops selection.' in explicit
+    assert 'Never select latest or scan other sessions.' in explicit
+    assert 'uses its validated master and separately validates each selected phase path before' in explicit
+    assert 'Canonical session artifacts become terminal in place' in explicit
+    assert 'For an explicit canonical session artifact, first use the source guide' in build
+    assert 'no latest-session selection or broad session scan' in build
+    assert 'artifact path, terminal in place' in build
+    assert 'Authorized plan status edits stay terminal in' in build_all
+    assert 'Never select latest or derive the current identity from the input path.' in build_all
+    assert 'inspect the current owner\'s selected plans or an explicit prior-session artifact' in forge
+    assert 'never select latest or scan other session trees' in forge

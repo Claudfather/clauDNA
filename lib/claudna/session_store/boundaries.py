@@ -39,8 +39,8 @@ from . import events as ev
 from . import activity
 from . import host_claude, host_codex
 from .host_claude import actor_from_env as actor_from_env, claude_pid_of as claude_pid_of, inherited as inherited
-from .paths import CHILD_ENV, InvalidSessionId
-from .fsio import atomic_write_json, cap_log, ensure_dir, file_size, read_json
+from .paths import CHILD_ENV, InvalidSessionId, SessionPaths, validate_sid
+from .fsio import FILE_MODE, atomic_write_json, cap_log, ensure_dir, file_size, read_json
 from .project import SessionFacts, load_lifecycle, session_facts, summary_gate
 from .store import NotAppendable, SessionHandle, SessionStore
 
@@ -176,25 +176,35 @@ def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str],
     return f"session opened ({source})"
 
 
-def spawn_worker(root: Path, args: list[str], env: Mapping[str, str], *, log: str) -> None:
+def spawn_worker(root: Path, args: list[str], env: Mapping[str, str], *, log: str, sid: str | None = None) -> None:
     """Start ``session_store <args> --root <root>`` detached, and return at once.
 
     Its own session (``start_new_session``), so a group kill of the hook's tree
     doesn't reap it; ``CLAUDNA_SESSION_CHILD=1``, so nothing it starts records
-    into the store; its stderr goes to ``<root>/hooks/<log>``.
+    into the store. Session stderr stays with that owner. Whole-store workers
+    retain only a fixed failure code, including import/interpreter failures.
     """
     import subprocess
 
-    with open(cap_log(ensure_dir(root / "hooks") / log), "ab") as err:
+    directory = SessionPaths(root, validate_sid(sid)).hooks if sid is not None else root / "hooks"
+    command = [sys.executable, "-B", "-S", str(ENTRYPOINT), *args, "--root", str(root)]
+    if sid is None:
+        # Positional arguments, never shell interpolation. The shell waits for
+        # this one existing detached worker and replaces raw stderr with a code.
+        command = ["/bin/sh", "-c", '\"$@\" 2>/dev/null || printf \'{"code":"worker_runtime","count":1}\\n\' >&2',
+                   "claudna-worker", *command]
+    path = cap_log(ensure_dir(directory) / log)
+    with os.fdopen(os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, FILE_MODE), "ab") as err:
         subprocess.Popen(
-            [sys.executable, "-S", str(ENTRYPOINT), *args, "--root", str(root)],
+            command,
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=err,
             env={**env, CHILD_ENV: "1"}, start_new_session=True, close_fds=True,
         )
 
 
 def spawn_summarizer(handle: SessionHandle, index: int, env: Mapping[str, str]) -> None:
-    spawn_worker(handle.paths.root, ["summarize", handle.sid, str(index)], env, log="summarizer.stderr")
+    spawn_worker(handle.paths.root, ["summarize", handle.sid, str(index)], env,
+                 log="summarizer.stderr", sid=handle.sid)
 
 
 def spawn_harvest(root: Path, env: Mapping[str, str]) -> None:

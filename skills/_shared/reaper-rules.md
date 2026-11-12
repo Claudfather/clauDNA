@@ -1,15 +1,15 @@
 # Reaper Rules — the `/claudna:session` engine
 
-The reaper runs on every handoff write and every resume read (`/claudna:session` — checkpoint mode deliberately never reaps). Its job: prune stale items from `<cwd>/.claude/session.md` so the file stays scoped to live work.
+The reaper runs in memory on handoff preparation and resume reads (`/claudna:session`; checkpoint deliberately never reaps). It prunes the selected predecessor's content for briefing or uses the current session's existing content when preparing a write. A predecessor is immutable: resume never writes reaped content back to that predecessor. New writes belong only to the verified current native session at `R/sessions/<native-sid>/handoff.md`.
 
 ## Inputs
 
-- The current contents of `<cwd>/.claude/session.md` (if it exists)
+- The selected handoff content returned by scoped continuity resolution, or the current native session's own `handoff.md`
 - A live scan of the current cwd:
   - `git status`, `git log --since="30 days ago"` (covers the longest TTL window — Decisions at 30d), `git stash list`, `git branch --list`
   - `gh pr list --author @me --json number,title,state,updatedAt`
   - File-presence checks for any path mentioned in handoff items
-  - `documentation/planning/` status markers (`IN PROGRESS`, `PENDING`, `✅ COMPLETE`)
+  - Status markers (`IN PROGRESS`, `PENDING`, `✅ COMPLETE`) in current-owner artifact plans or explicitly selected scoped/legacy plan paths, validated per source-guide §3; no broad session scan or latest-session selection
 - The current ISO-8601 UTC timestamp
 
 ## Per-section rules
@@ -42,7 +42,7 @@ Otherwise: keep with a `(stale-flagged YYYY-MM-DD)` suffix appended once. If the
 
 ## Output
 
-The reaper returns a new in-memory representation of the file with stale items removed and survivors preserved. The caller (handoff or resume) decides whether to write back.
+The reaper returns a new in-memory representation with stale items removed and survivors preserved. Handoff may persist a new document only to the current session through the atomic session-store writer. Resume does not write back to the predecessor. Checkpoint does not invoke the reaper.
 
 ## Determinism
 

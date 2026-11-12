@@ -4,6 +4,8 @@ Shared quality standard for all skills that produce planning documents, audit re
 
 ---
 
+Generated plans live in the current native session's private artifact family by default (orchestration-guide §1). Pass their exact canonical path from forge to build, or deliberately select a bounded scoped artifact pointer (source-guide §3); never discover a plan by choosing the latest session. Explicit project/vault/GitHub editions retain the canonical source and current-owner private publication receipt. Terminal canonical plans stay in place; source edits follow the selected authority, and frozen inputs receive separate adaptations.
+
 ## Quality Standard
 
 These plans will be handed off to a **junior engineering team for implementation**. The plans are the sole artifact for knowledge transfer — the junior team will not have access to the original author for clarification. Therefore:

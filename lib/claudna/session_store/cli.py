@@ -51,10 +51,12 @@ from typing import TYPE_CHECKING
 from . import boundaries
 from . import events as ev
 from . import schema
-from .fsio import append_jsonl, cap_log, ensure_dir, read_json, read_jsonl
-from .paths import InvalidSessionId, InvalidStateDir, state_root
+from .fsio import (allocate_operation, append_jsonl, cap_log, ensure_dir,
+                   make_scratch, read_json, read_jsonl)
+from .paths import (InvalidSessionId, InvalidStateDir, SessionPaths, operation_path, owned_path, state_root,
+                    validate_scratch_label, validate_sid)
 from .project import OLDER_PROJECTIONS, SUMMARY_ENV
-from .store import SessionHandle, SessionStore
+from .store import SessionHandle, SessionStore, owned_session
 
 # readers.SINCE_HELP, kept literal: the parser must not import readers (loaded lazily, per verb).
 _SINCE_HELP = "30m, 12h, 7d, 2w, or an ISO date/time"
@@ -84,6 +86,81 @@ def _handle(args: argparse.Namespace) -> SessionHandle | None:
         print(f"error: no session {args.sid} under {store.root}", file=sys.stderr)
         return None
     return handle
+
+
+def _owned_path_command(args) -> int:
+    """Thin manual allocation door; never opens a captured session."""
+    try:
+        store = SessionStore(Path(args.root) if args.root else None)
+        if args.verb == "operation-dir":
+            if args.label is not None and not args.create:
+                raise ValueError("--label requires --create")
+            target = (allocate_operation(store.root, label=args.label, operation_id=args.operation_id)
+                      if args.create else operation_path(store.root, args.operation_id))
+        else:
+            if args.verb == "scratch":
+                validate_scratch_label(args.label)
+            handle = owned_session(store, args.session, args.host)
+            if args.verb == "scratch":
+                target = make_scratch(handle.paths.scratch, args.label)
+            else:
+                target = owned_path(handle.paths, args.kind)
+                if args.create:
+                    ensure_dir(target.parent if args.kind == "handoff" else target)
+        print(target)
+        return 0
+    except (ValueError, OSError, RuntimeError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+
+def _continuity_command(args) -> int:
+    """Explicit owner-scoped persistence and pointer discovery; never starts capture."""
+    from . import continuity
+
+    try:
+        store = SessionStore(Path(args.root) if args.root else None)
+        owner = {"current_sid": args.session, "host": args.host}
+        if args.verb == "handoff-write":
+            if args.background and os.environ.get("CLAUDNA_SESSION_STORE") == "0":
+                raise ValueError("background checkpoint disabled with session capture")
+            target = continuity.write_handoff(store, **owner, content=sys.stdin.read(1048577))
+            result = {"status": "found", "source_sid": args.session, "handoff_path": str(target)}
+        elif args.action == "context":
+            target = continuity.write_context(store, **owner, scope=args.scope, privacy=args.privacy)
+            result = {"status": "found", "source_sid": args.session, "context_path": str(target)}
+        elif args.action == "import":
+            result = continuity.import_legacy(
+                store, **owner, scope=args.scope, workflow=args.workflow, source=Path(args.source),
+                source_sha256=args.source_sha256, decision=args.decision,
+                content=sys.stdin.read(1048577), expect=args.expect)
+        elif args.action == "artifact-path" and args.path:
+            if not args.from_session or args.workflow:
+                raise ValueError("explicit artifact path requires from-session and cannot select a workflow")
+            result = dataclasses.asdict(continuity.selected_artifact(
+                store, **owner, scope=args.scope, from_session=args.from_session, path=Path(args.path)))
+        else:
+            selection = {**owner, "scope": args.scope, "kind": args.kind, "workflow": args.workflow}
+            if args.action == "publish":
+                selected = continuity.publish_reference(store, **selection,
+                                                        relative_path=args.path, expect=args.expect)
+            else:
+                selected = continuity.resolve_predecessor(store, **selection, from_session=args.from_session)
+            result = dataclasses.asdict(selected)
+        if args.json:
+            print(json.dumps(result, default=str))
+        elif result.get("status") == "found":
+            print(result.get("handoff_path") or result.get("artifact_path") or result.get("context_path"))
+        elif result.get("reason"):
+            print(result["reason"], file=sys.stderr)
+        return {"found": 0, "already_imported": 0, "none": 1}.get(result.get("status"), 3)
+    except (ValueError, OSError, RuntimeError) as exc:
+        if args.json:
+            print(json.dumps({"status": "unavailable", "handoff_path": None,
+                              "artifact_path": None, "reason": str(exc)}))
+        else:
+            print(f"continuity unavailable: {exc}", file=sys.stderr)
+        return 2
 
 
 @dataclasses.dataclass(frozen=True)
@@ -185,6 +262,7 @@ def run_hook(event: str, raw: str | bytes, env: dict[str, str] | None = None, *,
     """
     env = dict(os.environ) if env is None else env
     root = None
+    sid = None
     try:
         root = state_root(env)
         selected = boundaries.HOSTS.get(host)
@@ -194,29 +272,46 @@ def run_hook(event: str, raw: str | bytes, env: dict[str, str] | None = None, *,
         if isinstance(raw, bytes):
             raw = raw.decode("utf-8")
         payload = json.loads(raw) if raw.strip() else None
+        if isinstance(payload, dict):
+            try:
+                sid = validate_sid(payload.get("session_id"))
+            except ValueError:
+                pass
         return boundaries.handle(event, payload, store=SessionStore(root), env=env, host=selected)
     except Exception as exc:  # noqa: BLE001 — a hook must fail open, and say so
-        _log_hook_error(root, event, exc)
+        _log_hook_error(root, event, exc, sid=sid)
         return f"error: {type(exc).__name__}: {exc}"
 
 
-def _log_hook_error(root: Path | None, event: str, exc: BaseException) -> None:
-    """One JSON line in ``<root>/hooks/errors.log``; stderr when there is no root to log to."""
+def _log_hook_error(root: Path | None, event: str, exc: BaseException, *, sid: str | None = None) -> None:
+    """Payload diagnostics belong to a known session; bootstrap records carry only fixed codes."""
     import traceback
 
     frame = traceback.extract_tb(exc.__traceback__)[-1] if exc.__traceback__ else None
+    event = event if any(event in h.events for h in boundaries.HOSTS.values()) else "unknown"
+    if root is not None and sid is not None:
+        try:
+            hooks_dir = ensure_dir(SessionPaths(root, validate_sid(sid)).hooks)
+            cap_log(hooks_dir / "session-store.stderr")
+            append_jsonl(cap_log(hooks_dir / "errors.log"), {
+                "ts": ev.now_ts(), "component": "session_store", "event": event,
+                "error": f"{type(exc).__name__}: {exc}",
+                "where": f"{Path(frame.filename).name}:{frame.lineno} in {frame.name}" if frame else None,
+            }, durable=False)
+            return
+        except (OSError, ValueError):
+            pass  # a failed owned allocation must not send its payload to global state
+    code = "decode" if isinstance(exc, (UnicodeError, json.JSONDecodeError)) else (
+        "io" if isinstance(exc, OSError) else "runtime")
     try:
         if root is None:
-            raise exc
+            raise OSError("no root")
         hooks_dir = ensure_dir(root / "hooks")
-        cap_log(hooks_dir / "session-store.stderr")  # the wrapper's capture; the next call starts a fresh one
         append_jsonl(cap_log(hooks_dir / "errors.log"), {
-            "ts": ev.now_ts(), "component": "session_store", "event": event,
-            "error": f"{type(exc).__name__}: {exc}",
-            "where": f"{Path(frame.filename).name}:{frame.lineno} in {frame.name}" if frame else None,
+            "ts": ev.now_ts(), "component": "session_store", "event": event, "code": code, "count": 1,
         }, durable=False)
-    except Exception:  # noqa: BLE001 — nowhere to log to; the wrapper's stderr capture is the last resort
-        print(f"session_store hook {event}: {type(exc).__name__}: {exc}", file=sys.stderr)
+    except OSError:
+        print(f"session_store hook: {code}", file=sys.stderr)
 
 
 def _review(store, digest, item: str, vault: str | None, revision: int | None, *, outcome: str,
@@ -321,12 +416,29 @@ def _read(args) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
+    if argv == ["native-session-id"]:
+        try:
+            payload = json.loads(sys.stdin.buffer.read())
+            print(validate_sid(payload.get("session_id") if isinstance(payload, dict) else None))
+            return 0
+        except (ValueError, UnicodeError):
+            return 2
     if argv[:1] == ["hook"] and len(argv) in (2, 4):  # the hot path: no argparse
         if len(argv) == 2:
             run_hook(argv[1], sys.stdin.buffer.read())
         elif argv[1] == "--host":
             run_hook(argv[3], sys.stdin.buffer.read(), host=argv[2])
         return 0
+    if argv == ["telemetry-path"]:
+        from .telemetry import telemetry_path
+
+        try:
+            print(telemetry_path(os.environ))
+            return 0
+        except (OSError, ValueError):
+            print("telemetry configuration invalid: require an absolute destination inside the clauDNA root",
+                  file=sys.stderr)
+            return 2
     if argv == ["telemetry"]:  # telemetry-emit.sh: its own entry, so it works with the store off
         from . import telemetry
 
@@ -338,6 +450,54 @@ def main(argv: list[str] | None = None) -> int:
     rooted = argparse.ArgumentParser(add_help=False)
     rooted.add_argument("--root", help="store root (default: $CLAUDNA_STATE_DIR or ~/.claudna)")
     sub = parser.add_subparsers(dest="verb", required=True)
+    for verb in ("paths", "scratch"):
+        allocation = sub.add_parser(verb, help="explicit native-session artifact paths", parents=[rooted])
+        allocation.add_argument("--session", required=True)
+        allocation.add_argument("--host", required=True, choices=("claude", "codex", "cursor"))
+        if verb == "paths":
+            allocation.add_argument("--kind", required=True,
+                                    choices=("scratch", "artifacts", "handoff", "hooks", "delegation"))
+            allocation.add_argument("--create", action="store_true")
+        else:
+            allocation.add_argument("--label", required=True)
+    operation = sub.add_parser("operation-dir", help="explicit standalone maintainer allocation", parents=[rooted])
+    identity = operation.add_mutually_exclusive_group(required=True)
+    identity.add_argument("--label")
+    identity.add_argument("--operation-id")
+    operation.add_argument("--create", action="store_true")
+    handoff = sub.add_parser("handoff-write", help="atomically persist the current owner's v2 handoff",
+                             parents=[rooted])
+    handoff.add_argument("--session", required=True)
+    handoff.add_argument("--host", required=True, choices=("claude", "codex", "cursor"))
+    handoff.add_argument("--background", action="store_true", help="honor disabled capture for background checkpoints")
+    handoff.add_argument("--json", action="store_true")
+    continuity = sub.add_parser("continuity", help="explicit scoped handoff and artifact pointers")
+    actions = continuity.add_subparsers(dest="action", required=True)
+    for action in ("resolve", "artifact-path", "publish", "context", "import"):
+        entry = actions.add_parser(action, parents=[rooted])
+        entry.add_argument("--session", required=True)
+        entry.add_argument("--host", required=True, choices=("claude", "codex", "cursor"))
+        entry.add_argument("--scope", required=True)
+        entry.add_argument("--json", action="store_true")
+        if action == "context":
+            entry.add_argument("--privacy", choices=("public", "private"), required=True)
+            continue
+        entry.add_argument("--workflow", required=action in ("publish", "import"))
+        if action == "artifact-path":
+            entry.set_defaults(kind="artifact")
+            entry.add_argument("--path", help="explicit absolute artifact; requires from-session, no workflow")
+        elif action != "import":
+            entry.add_argument("--kind", choices=("handoff", "artifact"), default="handoff")
+        if action in ("resolve", "artifact-path"):
+            entry.add_argument("--from-session")
+        if action in ("publish", "import"):
+            entry.add_argument("--expect", help="exact prior reference SHA-256, required for replacement")
+        if action == "publish":
+            entry.add_argument("--path", required=True, help="path relative to the producing session")
+        if action == "import":
+            entry.add_argument("--source", required=True, help="explicit absolute legacy file, read-only")
+            entry.add_argument("--source-sha256", required=True, help="fingerprint bound to the selected source read")
+            entry.add_argument("--decision", choices=("initial", "reimport"), required=True)
     skill = sub.add_parser("skill-start", help="best-effort Codex agent procedure entry; not task success",
                            parents=[rooted])
     skill.add_argument("skill", help="selected claudna skill slug; no task arguments")
@@ -411,6 +571,10 @@ def main(argv: list[str] | None = None) -> int:
     hook.add_argument("--host", default="claude")
     hook.add_argument("event")
     args = parser.parse_args(argv)
+    if args.verb in ("paths", "scratch", "operation-dir"):
+        return _owned_path_command(args)
+    if args.verb in ("continuity", "handoff-write"):
+        return _continuity_command(args)
     if args.verb == "skill-start":
         from .host_codex import record_skill_start
 

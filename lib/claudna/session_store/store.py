@@ -32,6 +32,7 @@ from .project import (
     by_segment,
     fold_boundary,
     load_lifecycle,
+    load_activity,
     next_segment_index,
     read_projection,
     rebuild,
@@ -50,6 +51,41 @@ class NotAppendable(StoreError):
     """The event has nowhere to go: no segment yet, or a closed session. Expected for async activity hooks."""
 
 
+def capture_state(paths: SessionPaths) -> str:
+    """Classify capture evidence without changing the physical ``exists`` predicate.
+
+    A valid opening in a parseable lifecycle is the capture authority. Before
+    that opening, store-shaped remnants remain partial/corrupt; directories
+    containing only owner artifacts are artifact-only. Captured sessions do
+    not scan activity logs or projections on metadata-only paths.
+    """
+    if not paths.dir.is_dir():
+        return "absent"
+    lifecycle = load_lifecycle(paths)
+    opened = any(event["kind"] == "session.opened" for event in lifecycle.events)
+    if opened and lifecycle.projected_from["skipped"] == 0:
+        return "captured"
+    malformed = lifecycle.projected_from["skipped"] > 0
+    remnants = paths.lifecycle.exists()
+    projections = [paths.session_json, paths.dir / "summary.json"]
+    for index in paths.segment_indices():
+        segment = paths.segment(index)
+        remnants |= segment.events.exists()
+        projections.extend((segment.segment_json, segment.summary))
+        activity = load_activity(paths, index)
+        malformed |= activity.projected_from["skipped"] > 0
+    projections.extend(paths.archived_summary(i) for i in paths.archived_indices())
+    for path in projections:
+        if path.exists():
+            remnants = True
+            projection = read_json(path)
+            if not isinstance(projection, dict):
+                malformed = True
+    if malformed:
+        return "corrupt"
+    return "partial" if remnants else "artifact-only"
+
+
 class SessionHandle:
     """All reads and writes for one session id."""
 
@@ -62,6 +98,10 @@ class SessionHandle:
 
     def exists(self) -> bool:
         return self.paths.dir.is_dir()
+
+    def capture_state(self) -> str:
+        """Return the lifecycle evidence state; ``exists`` remains physical."""
+        return capture_state(self.paths)
 
     def current_segment(self) -> int | None:
         """The highest existing segment index — the only one that can be open.
@@ -519,5 +559,37 @@ class SessionStore:
         return SessionHandle(session_paths(sid, self.root))
 
     def session_ids(self) -> list[str]:
+        # Preserve the physical enumeration contract. Each caller that needs
+        # captured sessions applies capture_state explicitly.
         return session_ids(self.root)
+
+
+
+def owned_session(store: SessionStore, sid: str, host: str) -> SessionHandle:
+    """Validate an explicit native owner before manual artifact access.
+
+    The caller obtains the native ID through its qualified host surface. A CLI
+    argument is not itself evidence of that delivery. Available native process
+    identity and retained lifecycle metadata must agree; neither cwd nor an
+    operation allocation is a substitute. This function performs no writes.
+    """
+    from .project import load_lifecycle, session_facts
+
+    handle = store.session(sid)  # exact component validation, never normalization
+    if host not in ("claude", "codex", "cursor"):
+        raise ValueError("unsupported artifact owner provider")
+    if sid in ("SID", "SESSION_ID", "native-sid", "native-session-id"):
+        raise ValueError("a verified native session ID is required")
+    variables = {"claude": ("CLAUDE_SESSION_ID",),
+                 "codex": ("CODEX_THREAD_ID", "CODEX_SESSION_ID"), "cursor": ()}[host]
+    if any(os.environ.get(key) and os.environ[key] != sid for key in variables):
+        raise ValueError("conflicting native session identity")
+    if handle.exists():
+        lifecycle = load_lifecycle(handle.paths)
+        opened = any(event["kind"] == "session.opened" for event in lifecycle.events)
+        if opened and session_facts(lifecycle.events).agent_cli != host:
+            raise ValueError("provider does not match recorded session owner")
+        if handle.capture_state() not in ("artifact-only", "captured"):
+            raise ValueError("session lifecycle is partial or corrupt; preserve it for inspection")
+    return handle
 

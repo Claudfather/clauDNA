@@ -20,7 +20,7 @@
 #
 # Env vars:
 #   CLAUDNA_PRECOMPACT_REFLECT  — "0" to disable (default: enabled)
-#   CLAUDE_SESSION_ID           — session identifier (set by Claude Code)
+#   session_id                  — native identifier in the hook event payload
 
 set -euo pipefail
 
@@ -141,39 +141,27 @@ fi
 # ── clauDNA owns the prompt (no engine hook, or engine too old to trust) ──
 
 # Extract session ID for the marker file
+. "${BASH_SOURCE[0]%/*}/lib/state-dir.sh"
 SESSION_ID=""
 if command -v jq &>/dev/null; then
-    SESSION_ID=$(printf '%s' "$EVENT" | jq -r '.session_id // empty' 2>/dev/null || true)
+    SESSION_ID=$(printf '%s' "$EVENT" | claudna_event_session_id 2>/dev/null) || SESSION_ID=""
 fi
-SESSION_ID="${SESSION_ID:-${CLAUDE_SESSION_ID:-}}"
+case "$SESSION_ID" in SID|SESSION_ID|native-sid|native-session-id|CLAUDE_SESSION_ID) SESSION_ID="" ;; esac
 
-# Validate before the id becomes part of a filesystem path below. A value
-# bearing '/' (or other path metacharacters) could point the marker outside
-# the marker dir. Claude Code generates a UUID here, so a value outside this
-# charset is malformed — treat it like a missing id and fail-open.
-case "$SESSION_ID" in
-    *[!A-Za-z0-9._-]*) SESSION_ID="" ;;
-esac
+# Validate with the same path resolver used by the runtime. Missing or malformed
+# event identity fails open and never redirects an attributable marker globally.
+SESSION_DIR="$(claudna_session_dir "$SESSION_ID")"
 
 # No stable session ID available — fail-open to avoid infinite block loop
 # ($$ changes per subprocess invocation, so marker files would never match)
-if [ -z "$SESSION_ID" ]; then
+if [ -z "$SESSION_DIR" ]; then
     exit 0
 fi
 
-# The marker lives in clauDNA's state directory, which no other user can write,
-# so nobody else can plant or remove it.
-# shellcheck source=lib/state-dir.sh
-. "${BASH_SOURCE[0]%/*}/lib/state-dir.sh"
-STATE_DIR="$(claudna_state_dir)"
-# Nowhere private to keep the marker: fail open, as for a missing session id.
-if [ -z "$STATE_DIR" ]; then
-    exit 0
-fi
-# 077: if this hook creates the state root first, it must still be 0700 (SETUP_GUIDE §3.7).
+# The marker lives in the already-owned session hooks directory.
 umask 077
-MARKER_DIR="${STATE_DIR}/hooks"
-MARKER="${MARKER_DIR}/reflected-${SESSION_ID}"
+MARKER_DIR="${SESSION_DIR}/hooks"
+MARKER="${MARKER_DIR}/reflected"
 
 if [ -f "$MARKER" ]; then
     # Capture already ran this session — allow compaction

@@ -1,11 +1,11 @@
-# Handoff File Format — `<cwd>/.claude/session.md`
+# Handoff content format — native session-owned continuity
 
-Schema version: 2. Written by `/claudna:session` handoff and checkpoint modes, read by resume mode. Optimized for agent consumption. This file has a small **stable surface** for readers outside clauDNA — declared at the bottom.
+Schema version: 2. The durable file belongs to the verified native session at `R/sessions/<native-sid>/handoff.md`. `handoff-write` accepts complete content on stdin; the runtime validates the v2 schema, absolute cwd, UTC timestamp, and 1 MiB bound, then persists atomically. The current artifact path is separate from source-session identity. This is the source contract; native-host and downstream consumer acceptance remain pending.
 
 ```markdown
 ---
-cwd: <absolute path to current working directory>
-last_updated: <ISO-8601 UTC, e.g. 2026-05-15T14:30:00Z>
+cwd: <absolute path to the session working directory>
+last_updated: <ISO-8601 UTC, e.g. 2026-11-11T14:30:00Z>
 schema_version: 2
 ---
 
@@ -42,15 +42,17 @@ in_flight_branches:
 
 ## Migration from schema_version: 1
 
-Legacy files at `~/.claude/notes/projects/<slug>/context-resume.md` use schema_version: 1 (no per-item timestamps; bullets in plain `- text` form; frontmatter with `session_date` only).
-
-When resume mode imports a v1 file, it assigns the file's `session_date` as the timestamp for every imported item, then runs the reaper. Most v1 items will hard-drop on first reap because they exceed TTL (Activity > 7d, etc.) — which is the correct behavior.
+Legacy project and personal files may use schema_version: 1 (no per-item timestamps; plain bullets; frontmatter with `session_date`). Import only an explicitly selected project file, or the exact authorized slug-based personal path. Preserve the source unchanged. Bind selected source bytes with their SHA-256 and verify the hash before mutation. Assign `session_date` as the timestamp for every imported item in the v2 copy, then reap that copy in memory. An immutable receipt records the source fingerprint and makes repeated imports idempotent across targets; changed content requires explicit `reimport`. A missing/corrupt receipt or stale pointer stops resolution without fallback.
 
 ## Stable surface
 
-This file is read outside clauDNA, so two things are promised and the rest is not:
+The source contract declares only these guarantees; broader compatibility remains unaccepted by downstream readers:
 
-- **The file exists** at `<cwd>/.claude/session.md` after handoff or checkpoint, and a reader sees a complete file or none.
-- **`last_updated:`** is an ISO-8601 UTC timestamp in the frontmatter — the freshness signal.
+- On successful handoff/checkpoint persistence, the runtime returns an absolute `handoff_path` owned by the verified native session SID, with durable filename `handoff.md`. This path is not the source SID for a resumed predecessor.
+- `last_updated:` is an ISO-8601 UTC timestamp.
+- Persistence is atomic. If identity or storage is unavailable, the structured result uses `handoff_path: null`; a guessed location is not evidence of a write.
 
-Everything else — section names, ordering, `schema_version`, every field below the frontmatter — is **informal and may change without notice**. Changing either promise is a breaking change and gets a CHANGELOG entry under a breaking heading.
+Section names, ordering, `schema_version`, and other fields are informal and may change without notice. Changing a declared guarantee is a breaking change and requires a `CHANGELOG.md` entry under a breaking heading. These source-level promises do not establish native host or external consumer acceptance.
+
+
+Complete content is submitted through `session-store handoff-write`; do not use shell temp files or `mv`. Handoff publishes a scoped reference only after the write succeeds and only when effective privacy permits discovery. Checkpoint writes the current owner and retains any existing pointer without advancing a predecessor.

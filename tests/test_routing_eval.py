@@ -8,7 +8,9 @@ free. The live run is ``make routing-eval``, on demand or by PR label.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import stat
 import sys
 from pathlib import Path
@@ -19,6 +21,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import routing_eval as re_  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def private_store_root(tmp_path, monkeypatch):
+    monkeypatch.setenv("CLAUDNA_STATE_DIR", str(tmp_path / "relocated state root"))
+    for key in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
+        monkeypatch.delenv(key, raising=False)
 
 
 def stream(*skills, cost=0.02, subtype="error_max_turns", is_error=True) -> str:
@@ -54,7 +63,8 @@ CONTROL = re_.Case("what is 17 times 23?", None)
 
 def _evaluate(cases, runner, *, runs=3, need=2, budget=10.0, env=None):
     return re_.evaluate(cases, runs=runs, need=need, model="m", claude_bin="claude", budget_usd=budget,
-                        runner=runner, base_env=env or {"HOME": "/h", "PATH": "/bin"}, log=lambda _: None)
+                        runner=runner, base_env=env or {"HOME": "/h", "PATH": "/bin"}, log=lambda _: None,
+                        standalone=True)
 
 
 # --- parsing -------------------------------------------------------------------------------------------
@@ -170,7 +180,8 @@ def test_repeated_errors_stop_the_run_and_name_the_childs_stderr():
 
     logs = []
     verdicts, _, stopped = re_.evaluate([MODAL, MODAL], runs=3, need=2, model="m", claude_bin="claude",
-                                        budget_usd=10, runner=broken, base_env={}, log=logs.append)
+                                        budget_usd=10, runner=broken, base_env={}, log=logs.append,
+                                        standalone=True)
     assert stopped and len(calls) == re_.MAX_ERRORS_IN_A_ROW and verdicts == []
     assert "Invalid API key" in logs[-1]
 
@@ -179,7 +190,7 @@ def test_each_verdict_is_handed_over_as_it_finishes():
     seen = []
     runner = scripted(*[stream("claudna:modal")] * 3, *[stream("claudna:neon", cost=5)] * 3)
     re_.evaluate([MODAL, MODAL], runs=3, need=2, model="m", claude_bin="claude", budget_usd=1.0, runner=runner,
-                 base_env={}, log=lambda _: None, on_verdict=seen.append)
+                 base_env={}, log=lambda _: None, on_verdict=seen.append, standalone=True)
     assert len(seen) == 1 and seen[0].passed  # the second case hit the budget; the first was kept
 
 
@@ -236,13 +247,24 @@ def test_main_writes_results_and_exits_by_verdict(tmp_path, monkeypatch, capsys)
     matrix.write_text("rows:\n  - {utterance: a, keywords: [a], expect: modal, phase: P2, eval: true}\n")
     monkeypatch.setattr(re_, "MATRIX", matrix)
     out = tmp_path / "results.jsonl"
-    assert re_.main(["--claude-bin", str(_fake_claude(tmp_path, stream("claudna:modal"))), "--out", str(out)]) == 0
+    assert re_.main(["--claude-bin", str(_fake_claude(tmp_path, stream("claudna:modal"))), "--out", str(out),
+                     "--standalone"]) == 0
     row = json.loads(out.read_text())
     assert row["claude"] == "9.9.9 (Claude Code)" and row["passed"] is True and len(row["attempts"]) == 3
+    assert out.stat().st_mode & 0o777 == 0o600
+    root = Path(os.environ["CLAUDNA_STATE_DIR"])
+    [receipt_path] = list(root.glob("operations/*/artifacts/routing-eval-*.json"))
+    receipt = json.loads(receipt_path.read_text())
+    assert receipt["owner"]["kind"] == "operation" and receipt["owner"]["provider"] is None
+    assert receipt["export_path"] == str(out.resolve())
+    assert receipt["report_sha256"] == hashlib.sha256(out.read_bytes()).hexdigest()
+    assert receipt["source_script_sha256"] == hashlib.sha256(Path(re_.__file__).read_bytes()).hexdigest()
     assert "1 PASS;" in capsys.readouterr().out
-    assert re_.main(["--claude-bin", str(_fake_claude(tmp_path, stream("claudna:neon")))]) == 1
+    assert re_.main(["--claude-bin", str(_fake_claude(tmp_path, stream("claudna:neon"))),
+                     "--standalone"]) == 1
     matrix.write_text(matrix.read_text().replace("eval: true}", "eval: true, known_failure: why}"))
-    assert re_.main(["--claude-bin", str(_fake_claude(tmp_path, stream("claudna:neon")))]) == 0  # XFAIL
+    assert re_.main(["--claude-bin", str(_fake_claude(tmp_path, stream("claudna:neon"))),
+                     "--standalone"]) == 0  # XFAIL
     assert "1 XFAIL" in capsys.readouterr().out
 
 
@@ -252,10 +274,10 @@ def test_k_filters_by_utterance_or_skill(tmp_path, monkeypatch, capsys):
                       "  - {utterance: query it, keywords: [b], expect: neon, phase: P2, eval: true}\n")
     monkeypatch.setattr(re_, "MATRIX", matrix)
     fake = str(_fake_claude(tmp_path, stream("claudna:neon")))
-    assert re_.main(["--claude-bin", fake, "-k", "ne"]) == 0
+    assert re_.main(["--claude-bin", fake, "-k", "ne", "--standalone"]) == 0
     assert "1 cases" in capsys.readouterr().out
     with pytest.raises(SystemExit):
-        re_.main(["--claude-bin", fake, "-k", "nothing-matches"])
+        re_.main(["--claude-bin", fake, "-k", "nothing-matches", "--standalone"])
 
 
 def test_main_exits_2_when_claude_cannot_run(capsys):
@@ -266,6 +288,60 @@ def test_main_exits_2_when_claude_cannot_run(capsys):
 def test_main_rejects_a_pass_rule_it_cannot_meet():
     with pytest.raises(SystemExit):
         re_.main(["--runs", "2", "--pass", "3"])
+
+
+def test_existing_or_dangling_report_path_is_refused_before_claude_probe(tmp_path, capsys):
+    marker = tmp_path / "provider-called"
+    fake = tmp_path / "fake claude"
+    fake.write_text(f"#!/usr/bin/env python3\nfrom pathlib import Path\nPath({str(marker)!r}).write_text('called')\n")
+    fake.chmod(fake.stat().st_mode | 0o111)
+    existing = tmp_path / "existing report.jsonl"
+    existing.write_text("preserve")
+    existing.chmod(0o640)
+    assert re_.main(["--claude-bin", str(fake), "--out", str(existing), "--standalone"]) == 2
+    assert "already exists" in capsys.readouterr().err
+    assert existing.read_text() == "preserve" and existing.stat().st_mode & 0o777 == 0o640
+    assert not marker.exists()
+
+    dangling = tmp_path / "dangling report.jsonl"
+    dangling.symlink_to(tmp_path / "missing target")
+    assert re_.main(["--claude-bin", str(fake), "--out", str(dangling), "--standalone"]) == 2
+    assert dangling.is_symlink() and not marker.exists()
+
+
+def test_main_requires_explicit_standalone_when_native_identity_is_absent(tmp_path, monkeypatch, capsys):
+    state = Path(os.environ["CLAUDNA_STATE_DIR"])
+    fake = str(_fake_claude(tmp_path, stream("claudna:modal")))
+    assert re_.main(["--claude-bin", fake, "--runs", "1", "--pass", "1"]) == 2
+    assert "native identity required" in capsys.readouterr().err
+    assert not state.exists()
+
+
+def test_main_without_report_keeps_only_a_private_summary_receipt(tmp_path):
+    fake = str(_fake_claude(tmp_path, stream("claudna:modal")))
+    assert re_.main(["--claude-bin", fake, "--runs", "1", "--pass", "1", "-k", "modal", "--standalone"]) == 0
+    root = Path(os.environ["CLAUDNA_STATE_DIR"])
+    [receipt_path] = list(root.glob("operations/*/artifacts/routing-eval-*.json"))
+    receipt = json.loads(receipt_path.read_text())
+    assert receipt["export_path"] is None and len(receipt["report_sha256"]) == 64
+    assert "utterance" not in receipt and receipt_path.stat().st_mode & 0o777 == 0o600
+
+
+def test_main_uses_verified_native_owner_and_rejects_conflicting_identity(tmp_path, monkeypatch, capsys):
+    sid = "native-eval-session"
+    monkeypatch.setenv("CLAUDE_SESSION_ID", sid)
+    fake = str(_fake_claude(tmp_path, stream("claudna:modal")))
+    assert re_.main(["--claude-bin", fake, "--runs", "1", "--pass", "1", "-k", "modal", "--session", sid,
+                     "--host", "claude"]) == 0
+    state = Path(os.environ["CLAUDNA_STATE_DIR"])
+    [receipt_path] = list(state.glob(f"sessions/{sid}/artifacts/routing-eval-*.json"))
+    receipt = json.loads(receipt_path.read_text())
+    assert receipt["owner"] == {"kind": "session", "owner_id": sid, "provider": "claude"}
+
+    assert re_.main(["--claude-bin", fake, "--runs", "1", "--pass", "1", "--session", "other-session",
+                     "--host", "claude"]) == 2
+    assert "conflicts" in capsys.readouterr().err
+    assert not list(state.glob("sessions/other-session/artifacts/*"))
 
 
 def test_a_spend_cap_stop_keeps_the_pick():
@@ -279,7 +355,7 @@ def test_a_timeout_reason_survives_a_multiline_stderr():
 
     logs = []
     verdicts, _, _ = re_.evaluate([MODAL], runs=1, need=1, model="m", claude_bin="claude", budget_usd=1,
-                                  runner=slow, base_env={}, log=logs.append)
+                                  runner=slow, base_env={}, log=logs.append, standalone=True)
     assert "timed out after 90s" in verdicts[0].attempts[0].error
 
 
@@ -287,12 +363,15 @@ def test_attempts_run_in_a_scratch_git_repo():
     seen = []
 
     def look(argv, env, cwd):
-        seen.append((cwd / ".git").is_dir())
+        seen.append(((cwd / ".git").is_dir(), cwd))
         return stream("claudna:modal"), ""
 
     re_.evaluate([MODAL], runs=1, need=1, model="m", claude_bin="claude", budget_usd=1, runner=look,
-                 base_env={}, log=lambda _: None)
-    assert seen == [True]  # so the SessionStart briefing runs, as in a user's project
+                 base_env={}, log=lambda _: None, standalone=True)
+    assert len(seen) == 1 and seen[0][0]  # so the SessionStart briefing runs, as in a user's project
+    cwd = seen[0][1]
+    assert cwd.is_relative_to(Path(os.environ["CLAUDNA_STATE_DIR"]) / "operations")
+    assert not cwd.exists()  # TemporaryDirectory cleanup happened after the child runner returned
 
 
 def test_empty_rows_or_controls_keys_load_as_none_and_are_skipped(tmp_path):

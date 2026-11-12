@@ -18,6 +18,7 @@ fix would spuriously prompt on the single most common shell idiom there is.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import json
 import subprocess
 from pathlib import Path
@@ -239,16 +240,20 @@ class TestProjectSpecsRejectEveryGlobMetachar:
 
 
 class TestTheLogIsPerUserAndPrivate:
-    """The log holds whole command lines. It lives in the user's own state
-    directory, readable by the user alone, never at a fixed path in /tmp."""
+    """The log holds whole command lines under the event's session owner."""
 
     @staticmethod
-    def _run(tmp_path: Path, extra_env: dict | None = None) -> subprocess.CompletedProcess:
+    def _run(
+        tmp_path: Path,
+        extra_env: dict | None = None,
+        session_id: str = "permission-session",
+        command: str = "git status",
+    ) -> subprocess.CompletedProcess:
         claude = tmp_path / ".claude"
-        claude.mkdir(exist_ok=True)
+        claude.mkdir(parents=True, exist_ok=True)
         (claude / "settings.json").write_text(json.dumps({"permissions": {"allow": ALLOW}}))
-        payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "git status"}})
-        env = {"HOME": str(tmp_path), "PATH": "/usr/bin:/bin", **(extra_env or {})}
+        payload = json.dumps({"session_id": session_id, "tool_name": "Bash", "tool_input": {"command": command}})
+        env = {"HOME": str(tmp_path), "PATH": "/usr/bin:/bin", "CLAUDE_SESSION_ID": "", **(extra_env or {})}
         return subprocess.run(
             ["bash", str(HOOK)], input=payload, capture_output=True, text=True, cwd=tmp_path, env=env, timeout=10
         )
@@ -256,20 +261,53 @@ class TestTheLogIsPerUserAndPrivate:
     def test_the_log_is_in_the_users_state_dir_and_readable_by_the_user_alone(self, tmp_path):
         proc = self._run(tmp_path)
         assert '"permissionDecision":"allow"' in proc.stdout, proc.stdout + proc.stderr
-        log = tmp_path / ".claudna" / "hooks" / "permissions.log"
+        log = tmp_path / ".claudna" / "sessions" / "permission-session" / "hooks" / "permissions.log"
         assert log.is_file(), proc.stderr
         assert log.stat().st_mode & 0o077 == 0, oct(log.stat().st_mode)
+        assert log.parent.stat().st_mode & 0o077 == 0, oct(log.parent.stat().st_mode)
         assert "git status" in log.read_text()
+        assert not (tmp_path / ".claudna" / "hooks").exists()
 
     def test_claudna_state_dir_decides_where_it_goes(self, tmp_path):
         state = tmp_path / "state"
         self._run(tmp_path, {"CLAUDNA_STATE_DIR": str(state)})
-        assert (state / "hooks" / "permissions.log").is_file()
+        assert (state / "sessions" / "permission-session" / "hooks" / "permissions.log").is_file()
 
     def test_a_relative_state_dir_keeps_no_log(self, tmp_path):
         proc = self._run(tmp_path, {"CLAUDNA_STATE_DIR": "relative/state"})
         assert '"permissionDecision":"allow"' in proc.stdout, proc.stderr
         assert not (tmp_path / "relative").exists()
+
+    def test_logs_are_separated_by_native_session_and_missing_identity_writes_nothing(self, tmp_path):
+        self._run(tmp_path, session_id="permission-one")
+        self._run(tmp_path, session_id="permission-two")
+        state = tmp_path / ".claudna" / "sessions"
+        assert (state / "permission-one" / "hooks" / "permissions.log").is_file()
+        assert (state / "permission-two" / "hooks" / "permissions.log").is_file()
+        missing_root = tmp_path / "missing-id-home"
+        proc = self._run(missing_root, session_id="")
+        assert '"permissionDecision":"allow"' in proc.stdout
+        assert not (missing_root / ".claudna").exists()
+
+    def test_concurrent_sessions_write_only_their_own_logs(self, tmp_path):
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [
+                pool.submit(self._run, tmp_path, None, "permission-alpha", "git status --short"),
+                pool.submit(self._run, tmp_path, None, "permission-beta", "git diff --stat"),
+            ]
+            procs = [future.result(timeout=15) for future in futures]
+        assert all('"permissionDecision":"allow"' in proc.stdout for proc in procs)
+        sessions = tmp_path / ".claudna" / "sessions"
+        alpha = (sessions / "permission-alpha" / "hooks" / "permissions.log").read_text()
+        beta = (sessions / "permission-beta" / "hooks" / "permissions.log").read_text()
+        assert "git status --short" in alpha and "git diff --stat" not in alpha
+        assert "git diff --stat" in beta and "git status --short" not in beta
+
+    @pytest.mark.parametrize("sid", ["../escape", "sid\n", "sid\0"])
+    def test_invalid_event_identity_never_falls_back_to_ambient_or_global_log(self, tmp_path, sid):
+        proc = self._run(tmp_path, {"CLAUDE_SESSION_ID": "ambient-session"}, session_id=sid)
+        assert '"permissionDecision":"allow"' in proc.stdout
+        assert not (tmp_path / ".claudna").exists()
 
     def test_the_hook_names_no_path_in_tmp(self):
         assert "/tmp" not in HOOK.read_text()

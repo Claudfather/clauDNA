@@ -2,7 +2,7 @@
 name: development-retro
 user-invocable: true
 description: "Use when a PR has been merged, a development session is ending, or the user asks what else you noticed — surfaces journey-specific observations, systemic patterns, and friction points from the implementation process."
-argument-hint: "[--output github|session]"
+argument-hint: "[--output artifacts|session|github|docs]"
 allowed-tools: Bash(git log *), Bash(git diff *), Bash(git status *), Read, Glob, Grep
 ---
 
@@ -17,10 +17,12 @@ Surface observations from the implementation journey — things you noticed *whi
 ## Arguments
 
 Parse `$ARGUMENTS` at invocation:
-- `--output github`: Write findings and plans as GitHub Issues. See output guide (`../_shared/output-guide.md`).
-- `--output session`: Present findings in chat only, no persistence.
+- `--output artifacts` (default): retain the final retro report under the current native session's canonical artifacts directory.
+- `--output session`: present findings in chat only, with no file persistence.
+- `--output github`: explicitly export selected findings as GitHub Issues. See output guide (`../_shared/output-guide.md`).
+- `--output docs`: explicitly export a selected canonical retro to the project documentation tree.
 
-Default (no flag): Present retro in chat (session-only by default).
+Default (no flag): write the canonical retro report to the current native session's artifacts, then present its path and summary. Research inputs remain in the current workflow's `<scratch>`; resolve both paths and the actual owning SID/provider through `../_shared/orchestration-guide.md` §1. If identity is missing or unverified, do not persist or fall back to OS temp; present only in chat.
 
 ## When to Use
 
@@ -146,12 +148,13 @@ Omit any section that genuinely has nothing — but challenge yourself before sk
 
 ## Output Targets
 
-This skill supports `--output github` and `--output session` in addition to the default `session` target.
+This skill supports the default `artifacts` destination and explicit `session`, `github`, and `docs` destinations.
 
 Follow the output guide at `../_shared/output-guide.md`:
-- For `github`: write each finding as a doc (frontmatter + the Section 4 body skeleton) and delegate to `/claudna:publish <file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Create one issue per systemic pattern or breadcrumb trail that warrants follow-up work. Label with `auto-audit` and `tech-debt` or `enhancement` as appropriate.
-- For `session` (default): produce the doc, then `/claudna:publish <file> --to session` prints it to chat (Section 5)
-- For `docs`: author the retro as a publishable doc in `<scratch>` (`../_shared/orchestration-guide.md` §1) named `00_RETRO.md` (master-class: no §4.1 skeleton required — publish Step 1b), then `/claudna:publish <file> --to docs --dir documentation/planning/retros/<session_name>_<YYYY-MM-DD>/`
+- For `github`: write each selected finding doc under `<artifacts>/development-retro/` (frontmatter + the Section 4 body skeleton), then delegate to `/claudna:publish <artifact-file> --to github-issue --repo <repo>` — publish validates, dedups, and applies labels from `tags:`. Keep each canonical source and the canonical retro report. Create one issue per systemic pattern or breadcrumb trail that warrants follow-up work. Label with `auto-audit` and `tech-debt` or `enhancement` as appropriate.
+- For `artifacts` (default): author `<artifacts>/development-retro/00_RETRO.md` in the family supplied by the shared orchestration contract and route it with `/claudna:publish <file> --to artifacts`. Preserve it on every outcome.
+- For `session`: present the retro in chat only; do not write a report file.
+- For `docs`: explicitly export a selected canonical retro with `/claudna:publish <artifacts-file> --to docs --dir documentation/planning/retros/<session_name>_<YYYY-MM-DD>/`; keep the canonical source.
 
 ---
 

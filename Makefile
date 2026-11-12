@@ -18,33 +18,69 @@
 #                    (CI forwards PR labels via this env var; consumed
 #                    by scripts/skill_checks.py)
 
-.PHONY: routing-eval-codex check deps deps-runtime deps-eval deps-contract test-contract test-contract-floor test-runtime routing-eval check-skills check-integration check-agents check-manifest check-changelog lint test
+.PHONY: routing-eval-codex check deps deps-runtime deps-eval deps-contract test-contract test-contract-floor test-runtime routing-eval check-skills check-integration check-agents check-manifest check-package-support check-changelog lint test test-package check-release package qualify-package qualify-release tag-release publish-release
 
-check: routing-eval-codex check-skills check-integration check-agents check-manifest check-changelog lint test
+# Native callers supply --session/--host when the host does not expose identity in the environment.
+# Standalone CLI/CI explicitly passes STORAGE_OWNER_ARGS=--standalone. No fallback from missing native IDs.
+STORAGE_OWNER_ARGS ?=
+
+check: routing-eval-codex check-skills check-integration check-agents check-manifest check-package-support check-changelog lint test
 
 deps:
 	python3 -m pip install -r requirements-dev.txt
 
 check-skills:
-	python3 scripts/validate-skills.py
+	PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate-skills.py
 
 check-integration:
-	python3 scripts/integration-test.py
+	PYTHONDONTWRITEBYTECODE=1 python3 scripts/integration-test.py
 
 check-agents:
-	python3 scripts/validate-agents.py
+	PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate-agents.py
 
 check-manifest:
-	python3 scripts/validate-manifest.py
+	PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate-manifest.py
+
+check-package-support:
+	PYTHONDONTWRITEBYTECODE=1 python3 scripts/generate_package_support.py --check
+
+# Explicit refs prevent a dirty checkout or a moving branch from becoming an
+# implicit release input. Outputs must be new directories owned by this run.
+package:
+	@test -n "$(PACKAGE_REF)" && test -n "$(PACKAGE_OUTPUT)" || { echo "PACKAGE_REF and PACKAGE_OUTPUT are required" >&2; exit 2; }
+	PYTHONDONTWRITEBYTECODE=1 python3 scripts/package_release.py --ref "$(PACKAGE_REF)" --output "$(PACKAGE_OUTPUT)" $(STORAGE_OWNER_ARGS)
+
+qualify-package:
+	@test -n "$(PACKAGE_REF)" && test -n "$(PACKAGE_OUTPUT)" || { echo "PACKAGE_REF and PACKAGE_OUTPUT are required" >&2; exit 2; }
+	PYTHONDONTWRITEBYTECODE=1 python3 scripts/package_release.py --ref "$(PACKAGE_REF)" --output "$(PACKAGE_OUTPUT)" --qualify $(STORAGE_OWNER_ARGS)
+
+qualify-release:
+	@test -n "$(RELEASE_REF)" && test -n "$(RELEASE_OUTPUT)" || { echo "RELEASE_REF and RELEASE_OUTPUT are required" >&2; exit 2; }
+	PYTHONDONTWRITEBYTECODE=1 python3 scripts/release_candidate.py --ref "$(RELEASE_REF)" --output "$(RELEASE_OUTPUT)" $(STORAGE_OWNER_ARGS)
+
+tag-release:
+	@test -n "$(RELEASE_REF)" && test -n "$(RELEASE_OUTPUT)" || { echo "RELEASE_REF and RELEASE_OUTPUT are required" >&2; exit 2; }
+	PYTHONDONTWRITEBYTECODE=1 python3 scripts/release_candidate.py --ref "$(RELEASE_REF)" --output "$(RELEASE_OUTPUT)" --tag $(STORAGE_OWNER_ARGS)
+
+RELEASE_REMOTE ?= origin
+publish-release:
+	@test -n "$(RELEASE_REF)" && test -n "$(RELEASE_OUTPUT)" && test -n "$(RELEASE_REPO)" || { echo "RELEASE_REF, RELEASE_OUTPUT and RELEASE_REPO are required" >&2; exit 2; }
+	PYTHONDONTWRITEBYTECODE=1 python3 scripts/release_candidate.py --ref "$(RELEASE_REF)" --output "$(RELEASE_OUTPUT)" --publish --remote "$(RELEASE_REMOTE)" --repo "$(RELEASE_REPO)" $(STORAGE_OWNER_ARGS)
 
 check-changelog:
 	bash scripts/check-changelog.sh
 
 lint:
-	python3 -m ruff check lib/ scripts/ tests/
+	PYTHONDONTWRITEBYTECODE=1 python3 -m ruff check --no-cache lib/ scripts/ tests/
 
 test:
-	python3 -m pytest tests/
+	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider tests/
+
+check-release:
+	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider tests/test_release_candidate.py tests/test_changelog.py tests/test_validate_manifest.py
+
+test-package:
+	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider tests/test_package_release.py
 
 # The runtime floor: hooks and the session store run under the user's own
 # python3, which is 3.9 on stock macOS. CI runs these suites on 3.9 too; they
@@ -55,7 +91,7 @@ RUNTIME_TESTS = tests/test_delegation.py tests/test_session_store.py tests/test_
 	tests/test_session_store_activity.py tests/test_session_store_readers.py \
 	tests/test_session_store_export.py tests/test_session_store_digest.py \
 	tests/test_session_store_ops.py \
-	tests/test_session_store_health.py \
+	tests/test_session_store_health.py tests/test_session_continuity.py tests/test_package_doctor.py \
 	tests/test_redact.py tests/test_screen.py tests/test_runtime_layout.py tests/test_precompact_defer.py \
 	tests/test_session_start_hook.py
 
@@ -63,7 +99,7 @@ deps-runtime:
 	python3 -m pip install -r requirements-runtime-test.txt
 
 test-runtime:
-	python3 -m pytest $(RUNTIME_TESTS)
+	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider $(RUNTIME_TESTS)
 
 # The contract leg: clauDNA's Claudron door and harvest against the real engine,
 # at the release contracts/claudron.ref names (tests/test_claudron_live.py).
@@ -77,7 +113,7 @@ deps-contract:
 	python3 -m pip install -r requirements-dev.txt "claudron @ git+https://github.com/Claudfather/Claudron.git@$(CLAUDRON_REF)"
 
 test-contract:
-	CLAUDNA_CONTRACT=exact python3 -m pytest tests/test_claudron_live.py
+	CLAUDNA_CONTRACT=exact PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider tests/test_claudron_live.py
 
 # The floor leg: harvest against an engine older than memory homes, one per
 # code path it keeps for them. CI installs each (make deps-contract
@@ -85,7 +121,7 @@ test-contract:
 # the oldest the skills declare (`requires: claudron>=0.2`).
 CLAUDRON_FLOOR_REFS = v0.2.0 v0.6.1 v0.7.0 v0.7.1
 test-contract-floor:
-	CLAUDNA_CONTRACT=floor python3 -m pytest tests/test_claudron_live.py
+	CLAUDNA_CONTRACT=floor PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider tests/test_claudron_live.py
 
 # Live routing evals (scripts/routing_eval.py): paid, so not in `make check`.
 # The Claude Code CI evals on is pinned: an upgrade can change the picker or the
@@ -98,9 +134,9 @@ deps-eval:
 
 ROUTING_EVAL_ARGS ?=
 routing-eval:
-	python3 scripts/routing_eval.py $(ROUTING_EVAL_ARGS)
+	PYTHONDONTWRITEBYTECODE=1 python3 scripts/routing_eval.py $(ROUTING_EVAL_ARGS) $(STORAGE_OWNER_ARGS)
 
 # Codex catalog-choice floor is deterministic. --live explicitly opts into inference.
 ROUTING_CODEX_ARGS ?=
 routing-eval-codex:
-	python3 scripts/routing_eval_codex.py $(ROUTING_CODEX_ARGS)
+	PYTHONDONTWRITEBYTECODE=1 python3 scripts/routing_eval_codex.py $(ROUTING_CODEX_ARGS) $(STORAGE_OWNER_ARGS)
