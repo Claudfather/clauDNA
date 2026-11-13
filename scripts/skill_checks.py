@@ -1386,7 +1386,7 @@ def get_touched_skills() -> set[str] | None:
         print("validator or contract input changed: running full blocking validation", file=sys.stderr)
         return None
     touched: set[str] = set()
-    for path in result.stdout.strip().splitlines():
+    for path in changed:
         # Match skills/<name>/... but not skills/_shared/...
         if path.startswith("skills/") and "/" in path[len("skills/") :]:
             skill_name = path.split("/")[1]
@@ -1398,7 +1398,7 @@ def get_touched_skills() -> set[str] | None:
     # Full validation is the safe default — don't "optimize" this to only validate
     # skills that textually reference the changed _shared/ file, because the
     # dependency graph is implicit and hard to trace statically.
-    for path in result.stdout.strip().splitlines():
+    for path in changed:
         if path.startswith("skills/_shared/"):
             return None  # validate everything as blocking
     return touched
