@@ -162,8 +162,7 @@ built:
   it alone (to `hooks`, `description` or `keywords`) stops there with "nothing to
   release": no source check, qualification, tag or publication.
 
-Otherwise it runs `make publish-release` for the pushed commit, which refuses to
-move an existing `v<version>` tag away from the qualified commit. The workflow has
+Otherwise it runs `make publish-release` for the pushed commit. The workflow has
 no manual trigger. To publish a commit it did not, run the `make publish-release`
 target above from a checkout of that commit whose local `origin/main` is the tip the
 commit replaced, which is the relation the workflow pins.

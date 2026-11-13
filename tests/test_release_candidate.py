@@ -522,7 +522,6 @@ def test_release_lookup_error_is_not_treated_as_absent(repo, monkeypatch):
         release.release_info(repo, "fixture/repo", "v1.0.1")
 
 
-
 def test_changelog_gate_rejects_a_release_commit_once_main_has_moved_past_it(repo):
     """The case release-tag.yml pins origin/main to avoid: the moving tip of a main that advanced
     past the release commit has newer [Unreleased] content than the commit does."""
