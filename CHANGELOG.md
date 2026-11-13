@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - The PreToolUse permissions hook's quote tracking now parses `$'...'` words the way the shell does, and prompts when it cannot tell (an unterminated `$'...'` or an ambiguous `$$'`).
 - `using-claudna`'s Finding Skills step now says a person can run `/claudna:skill-scaffold` on Claude Code: the skill sets `disable-model-invocation: true`, so the model does not start it on its own.
+- The SessionStart briefing reads the legacy `.claude/session.md` only when the resolver reports no canonical pointer; a resolver crash is logged as `session_store_runtime` in `hooks/bootstrap.log` and the legacy file stays unread.
 - Reject existing release output entries, including dangling symlinks, before resolving destinations or allocating qualification state.
 - Route report-only audits and retained reviews through standalone artifact validation, and post metadata-free review editions while preserving canonical reports and hashes.
 - Keep summary-only capture remnants visible as partial or corrupt sessions, including retained segment summaries, without treating manual artifacts as captured data.
