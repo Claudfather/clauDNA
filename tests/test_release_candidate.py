@@ -520,3 +520,18 @@ def test_release_lookup_error_is_not_treated_as_absent(repo, monkeypatch):
                         subprocess.CompletedProcess(args, 1, "", "HTTP 503 service unavailable"))
     with pytest.raises(release.ReleaseError, match="could not inspect release"):
         release.release_info(repo, "fixture/repo", "v1.0.1")
+
+
+
+def test_changelog_gate_rejects_a_release_commit_once_main_has_moved_past_it(repo):
+    """The case release-tag.yml pins origin/main to avoid: the moving tip of a main that advanced
+    past the release commit has newer [Unreleased] content than the commit does."""
+    release_sha = git(repo, "rev-parse", "HEAD")
+    (repo / "CHANGELOG.md").write_text(
+        "# Changelog\n\n## [Unreleased]\n- A later merge.\n\n## [1.0.1]\n- New release.\n\n## [1.0.0]\n- Existing release.\n")
+    git(repo, "update-ref", "refs/remotes/origin/main", commit(repo, "a later merge"))
+    git(repo, "reset", "-q", "--hard", release_sha)
+    gate = subprocess.run([sys.executable, "scripts/release_candidate.py", "--check-changelog"], cwd=repo,
+                          capture_output=True, text=True)
+    assert gate.returncode != 0
+    assert "needs new meaningful [Unreleased] content" in gate.stdout + gate.stderr

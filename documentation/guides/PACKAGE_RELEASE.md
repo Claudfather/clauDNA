@@ -146,6 +146,39 @@ package artifacts plus `source-check.json`. Tagging and publishing are separate
 owner-authorized actions. Existing tags and attached artifacts must match the
 candidate; the controller does not rewrite or clobber them.
 
+### The `release-tag` workflow
+
+`.github/workflows/release-tag.yml` runs on a push to `main` that touches
+`.claude-plugin/plugin.json`. Its first step does two things before anything is
+built:
+
+- It pins `origin/main` in the runner's checkout to the tip that push replaced
+  (`github.event.before`, or the pushed commit's parent when that commit is not in
+  the fetched history). The changelog gate in `make check` compares the candidate
+  with `origin/main`, and the moving tip of a `main` that has since advanced would
+  reject a correct release commit: its own `[Unreleased]` section no longer adds
+  anything to the newer one.
+- It compares the manifest `version` before and after the push. An edit that left
+  it alone (to `hooks`, `description` or `keywords`) stops there with "nothing to
+  release": no source check, qualification, tag or publication.
+
+Otherwise it runs `make publish-release` for the pushed commit, which refuses to
+move an existing `v<version>` tag away from the qualified commit. The workflow has
+no manual trigger. To publish a commit it did not, run the `make publish-release`
+target above from a checkout of that commit whose local `origin/main` is the tip the
+commit replaced, which is the relation the workflow pins.
+
+What follows from that, so it is not rediscovered:
+
+- The changelog gate and skill validation in the release run's `make check` now see the
+  push's own changes. The release notes must land in the same push as the version bump
+  (as `scripts/release.sh` does), and errors in skills that push touches block it.
+- Only a change to the manifest `version` starts a release, including a revert or a
+  downgrade, which fails at the tag-identity check once qualification runs. A later push
+  that leaves the version alone does not retry a failed release: re-run the failed
+  workflow run for the release commit (a re-run reuses the same push event, so the same
+  pin) or use the manual route above.
+
 The generated Claude descriptor uses the documented plugin source shape:
 
 ```json
