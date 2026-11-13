@@ -46,7 +46,9 @@ branches) and pushes to `main`. Add validation commands to Makefile targets, not
 standalone validation workflows; all use `requirements-dev.txt`.
 Main pushes set `FULL_VALIDATE=1`, so an empty diff against `origin/main` cannot
 demote skill errors to warnings. PRs retain touched-skill scoping and the
-`full-validate` label override.
+`full-validate` label override, except that a diff touching `scripts/`,
+`contracts/`, `SKILL_CONTRACT.md` or `AGENT_CONTRACT.md` runs full validation,
+because a changed rule can change the verdict on every skill.
 
 ### Cloud Agents
 
