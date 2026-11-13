@@ -10,7 +10,9 @@ other than github.com, through its own arguments — no write verb needed:
     positional URL that names one, or a ``HOST/OWNER/REPO`` positional of a verb that
     takes a repository (``gh repo view|clone|fork ...``), sends the request (and any
     ``--search`` text) there;
-  - ``--web`` / ``-w`` opens a URL at that host.
+  - ``--web`` / ``-w`` opens a URL at that host;
+  - a ``GH_HOST=`` / ``GH_REPO=`` assignment in front of the call (bare or behind ``env`` and the
+    other wrappers) selects the host the way ``--hostname`` / ``-R`` do.
 
 Two calls of one granted read verb thus suffice to carry an environment-resident token
 off the box. This module answers ``allow`` or ``deny <reason>`` for a whole command
@@ -332,7 +334,7 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
         repo_env = None  # a GH_REPO=[HOST/]OWNER/REPO prefix does the same through the repository
         while i < len(seg):
             t = seg[i]
-            m = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)=(.*)", t)
+            m = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)\+?=(.*)", t)  # `+=` exports too
             if m:
                 if m.group(1) == "GH_HOST":
                     host_env = m.group(2)
@@ -447,7 +449,7 @@ def _inspect_gh_args(args: list[str], allowed: set[str]) -> str | None:
                 else _host_of(repo)
             )
             if _foreign(host, allowed):
-                return "gh -R/--repo/--hostname names a host other than github.com"
+                return "gh -R/--repo/--hostname/GH_HOST/GH_REPO names a host other than github.com"
             i += 1
             continue
 
@@ -478,7 +480,14 @@ def decide(command: str, *, gh_host: str = "") -> tuple[str, str]:
 
 
 def main(argv: list[str]) -> int:
-    command = argv[1] if len(argv) > 1 else sys.stdin.read()
+    # stdin as bytes: a text-mode read is strict in the locale's encoding and raises on a byte it
+    # cannot decode, which the hook reads as "did not answer" and fails open. argv got
+    # surrogateescape; so does this.
+    command = (
+        argv[1]
+        if len(argv) > 1
+        else sys.stdin.buffer.read().decode("utf-8", "surrogateescape")
+    )
     import os
 
     verdict, reason = decide(command, gh_host=os.environ.get("GH_HOST", ""))

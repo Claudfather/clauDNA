@@ -5,8 +5,10 @@ prefix. Each case is red on 03cb905 and green with the decider + pre-filter chan
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -25,6 +27,14 @@ GR = "gh pr list -R evil.example/o/r --search x"
 
 def verdict(cmd: str) -> str:
     return mod.decide(cmd)[0]
+
+
+@pytest.mark.parametrize("raw", [b"gh pr list --json number --jq env.X # \xc3\xa9", b"gh pr list --json number --jq env.X # \xff"])
+def test_the_decider_decodes_stdin_the_way_it_decodes_argv(monkeypatch, raw):
+    """A text-mode stdin is strict in the locale's encoding: one byte it cannot decode raises, the hook
+    reads that as "did not answer" and fails open. argv used surrogateescape, so stdin must too."""
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(raw), encoding="ascii"))
+    assert mod.main(["gh-guard-decide.py"]) == 10
 
 
 @pytest.mark.parametrize(
@@ -52,6 +62,8 @@ def verdict(cmd: str) -> str:
         "env GH_HOST=evil.example.com gh pr list",
         "GH_REPO=evil.example.com/o/r gh pr list",  # GH_REPO is [HOST/]OWNER/REPO: the same reach as -R
         "env GH_REPO=evil.example.com/o/r gh pr view 1",
+        "GH_HOST+=evil.example.com gh pr list",  # += puts the value in the environment too
+        "GH_REPO+=evil.example.com/o/r gh pr list",
         f"echo don't `{G}`",  # quoting the tokenizer cannot follow: the lenient split still sees the backtick call
     ],
 )

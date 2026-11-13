@@ -138,7 +138,8 @@ eval "$JQ_RESULT"
 # shapes and nothing else — the fleet's `--json`/`--jq '.field'` reads pass through.
 # It runs before the bare-Bash and allow-pattern approvals, because a hook "deny"
 # is the only decision that overrides an allow grant. Zero-fork prefilter: python3
-# is spawned only for a command that names `gh` alongside one of the trigger flags.
+# is spawned only for a command that names `gh` alongside one of the trigger flags, or a
+# GH_HOST=/GH_REPO= assignment (`=` or `+=`: both put the value in the child's environment).
 # A verb that takes a repository (gh repo view|clone|fork ...) is read when a word
 # after it has two slashes: HOST/OWNER/REPO names its host like -R does.
 # The shell removes quotes and backslashes before gh runs, so a flag spelled --j"q" or
@@ -150,7 +151,7 @@ NOQ=${NOQ//[\"\'\\]/}
 case "$NOQ" in
     *gh*)
         case "$NOQ" in
-            *--jq*|*--template*|*--repo*|*--web*|*--hostname*|*GH_HOST=*|*GH_REPO=*|*[[:space:]]-q*|*[[:space:]]-t*|*[[:space:]]-R*|*[[:space:]]-w*|*[[:space:]]-[[:alnum:]]*[qtRw]*|*"://"*|*@*:*|*gh[[:space:]]*repo[[:space:]]*/*/*|*gh[[:space:]]*label[[:space:]]*/*/*|*gh[[:space:]]*ext*/*/*|*gh[[:space:]]*skill*/*/*)
+            *--jq*|*--template*|*--repo*|*--web*|*--hostname*|*GH_HOST=*|*GH_REPO=*|*GH_HOST+=*|*GH_REPO+=*|*[[:space:]]-q*|*[[:space:]]-t*|*[[:space:]]-R*|*[[:space:]]-w*|*[[:space:]]-[[:alnum:]]*[qtRw]*|*"://"*|*@*:*|*gh[[:space:]]*repo[[:space:]]*/*/*|*gh[[:space:]]*label[[:space:]]*/*/*|*gh[[:space:]]*ext*/*/*|*gh[[:space:]]*skill*/*/*)
                 if command -v python3 &>/dev/null; then
                     # errexit-safe: the decider exits 10 to deny, and an
                     # assignment that inherits that would end the hook here.

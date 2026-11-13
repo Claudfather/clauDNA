@@ -420,6 +420,8 @@ class TestGhReadGuard:
         "env GH_HOST=evil.example.com gh pr list",
         "GH_REPO=evil.example.com/o/r gh pr list",
         "env GH_REPO=evil.example.com/o/r gh pr view 1",
+        "GH_HOST+=evil.example.com gh pr list",
+        "GH_REPO+=evil.example.com/o/r gh pr list",
     ])
     def test_an_environment_named_foreign_host_is_denied(self, tmp_path, command):
         assert decision(tmp_path, command, ["Bash"]) == "deny"
