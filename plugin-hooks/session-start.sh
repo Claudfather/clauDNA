@@ -92,7 +92,18 @@ if [ -n "$SESSION_DIR" ] && [ -n "$HOST" ] && command -v python3 >/dev/null 2>&1
     RESOLVED=$?
     case "$RESOLVED" in
         0) ;; # one validated canonical path, never a latest-session guess
-        1) HANDOFF="${CWD}/.claude/session.md" ;; # absent canonical pointer: read-only compatibility
+        1)
+            # Exit 1 means "no canonical pointer" only when the resolver says so: an uncaught
+            # import or interpreter failure also exits 1, and must not open the legacy file.
+            # The match is anchored to the start of the JSON and pins the CLI's json.dumps spacing;
+            # the no-pointer test in tests/test_session_start_hook.py guards it.
+            if python3 -B "${BASH_SOURCE[0]%/*}/../lib/claudna/session_store" \
+                "${RESOLVE_ARGS[@]}" --json 2>/dev/null | grep -q '^{"status": "none"'; then
+                HANDOFF="${CWD}/.claude/session.md" # read-only compatibility
+            else
+                HANDOFF=""; claudna_bootstrap_error session_store_runtime
+            fi
+            ;;
         *) HANDOFF="" ;; # ambiguous, stale, private or invalid evidence blocks fallback
     esac
 fi

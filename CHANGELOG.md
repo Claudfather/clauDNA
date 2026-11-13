@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - `using-claudna`'s Finding Skills step now says a person can run `/claudna:skill-scaffold` on Claude Code: the skill sets `disable-model-invocation: true`, so the model does not start it on its own.
+- The SessionStart briefing now reads the legacy `.claude/session.md` only when the session-store resolver reports that no canonical handoff pointer exists. A resolver that crashes (for example an import failure in the runtime) no longer reads as "no pointer": the legacy file stays unread and the failure is logged once as `session_store_runtime` in `hooks/bootstrap.log`.
 - Reject existing release output entries, including dangling symlinks, before resolving destinations or allocating qualification state.
 - Route report-only audits and retained reviews through standalone artifact validation, and post metadata-free review editions while preserving canonical reports and hashes.
 - Keep summary-only capture remnants visible as partial or corrupt sessions, including retained segment summaries, without treating manual artifacts as captured data.
