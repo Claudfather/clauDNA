@@ -327,12 +327,15 @@ def _is_redirect(tok: str) -> bool:
     return bool(tok) and set(tok) <= set("<>&|") and ("<" in tok or ">" in tok)
 
 
+_SEP_THEN_REDIRECT = re.compile(r"([;&|()`\n]+)([<>][<>&|]*)")
+
+
 def _split_sep_redirect(tokens: list[str]) -> list[str]:
     """The lexer fuses adjacent punctuation, so ``;>f`` is one token that is neither a separator nor a
     redirection. Split a separator run from the redirection operator after it."""
     out: list[str] = []
     for tok in tokens:
-        m = re.fullmatch(r"([;&|()`\n]+)([<>][<>&|]*)", tok)
+        m = _SEP_THEN_REDIRECT.fullmatch(tok) if "<" in tok or ">" in tok else None
         out.extend(m.groups() if m else [tok])
     return out
 
@@ -354,8 +357,7 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
     out: list[list[str]] = []
     for seg in segments:
         i = 0
-        host_env = None  # a GH_HOST=<host> prefix names the host this gh call talks to
-        repo_env = None  # a GH_REPO=[HOST/]OWNER/REPO prefix does the same through the repository
+        env: dict[str, str] = {}  # GH_HOST=<host> / GH_REPO=[HOST/]OWNER/REPO prefixes name the host this call talks to
         while i < len(seg):
             t = seg[i]
             # a redirection before the command word (`2>&1 gh ...`, `>/dev/null gh ...`) is opened by
@@ -370,10 +372,8 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
             m = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)(?:\[[^\]]*\])?(\+?)=(.*)", t, re.S)
             if m:
                 # `+=` appends to what an earlier prefix set, so `GH_HOST=evil GH_HOST+=x` is still evil
-                if m.group(1) == "GH_HOST":
-                    host_env = (host_env or "") + m.group(3) if m.group(2) else m.group(3)
-                elif m.group(1) == "GH_REPO":
-                    repo_env = (repo_env or "") + m.group(3) if m.group(2) else m.group(3)
+                if m.group(1) in ("GH_HOST", "GH_REPO"):
+                    env[m.group(1)] = env.get(m.group(1), "") + m.group(3) if m.group(2) else m.group(3)
                 i += 1
                 continue
             base = t.lstrip("\\")
@@ -387,10 +387,9 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
             break
         if i < len(seg) and seg[i].lstrip("\\").rsplit("/", 1)[-1] == "gh":
             args = seg[i + 1 :]
-            if host_env:
-                args = args + ["--hostname", host_env]
-            if repo_env:
-                args = args + ["-R", repo_env]
+            for name, flag in (("GH_HOST", "--hostname"), ("GH_REPO", "-R")):
+                if env.get(name):
+                    args = args + [flag, env[name]]
             out.append(args)
     return out
 
