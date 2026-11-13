@@ -344,14 +344,14 @@ def test_startup_never_uses_legacy_to_bypass_unavailable_canonical_context(tmp_p
     assert "canonical next action" not in output
 
 
-def _broken_package(tmp_path):
-    """The hooks beside a session_store entry point that dies on import: every verb exits 1 with a traceback."""
+def _broken_hook(tmp_path):
+    """The session-start hook beside a session_store entry point that dies on import: every verb exits 1 with a traceback."""
     pkg = tmp_path / "pkg"
-    shutil.copytree(REPO_ROOT / "plugin-hooks", pkg / "plugin-hooks", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    shutil.copytree(REPO_ROOT / "plugin-hooks", pkg / "plugin-hooks")
     entry = pkg / "lib" / "claudna" / "session_store" / "__main__.py"
     entry.parent.mkdir(parents=True)
     entry.write_text("raise ImportError('injected')\n")
-    return pkg
+    return pkg / "plugin-hooks" / "session-start.sh"
 
 
 def test_a_broken_runtime_never_reaches_the_legacy_file(tmp_path, monkeypatch):
@@ -359,7 +359,7 @@ def test_a_broken_runtime_never_reaches_the_legacy_file(tmp_path, monkeypatch):
     legacy = tmp_path / ".claude" / "session.md"
     legacy.parent.mkdir()
     legacy.write_text("## Next Steps\n- forbidden fallback\n")
-    monkeypatch.setattr(sys.modules[__name__], "HOOK", _broken_package(tmp_path) / "plugin-hooks" / "session-start.sh")
+    monkeypatch.setattr(sys.modules[__name__], "HOOK", _broken_hook(tmp_path))
     code, output, _ = run_hook(tmp_path)
     assert code == 0 and "forbidden fallback" not in output
     log = tmp_path / "claudna-state" / "hooks" / "bootstrap.log"
