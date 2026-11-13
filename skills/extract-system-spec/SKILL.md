@@ -1,6 +1,7 @@
 ---
 name: extract-system-spec
 user-invocable: true
+disable-model-invocation: true
 description: "Use when you need a portable, anonymized reconstruction spec for a whole system (or a single wing or targeted slice) — a standalone rebuild blueprint an independent team could implement in a fresh session without the original repo. Exhaustive and expensive by design: reserve it for when a full rebuild spec is genuinely worth the token spend. For finding problems in a system you are keeping, use /claudna:audit; this instead extracts a portable spec to rebuild the system elsewhere."
 argument-hint: "[full-system | wing <name> | targeted <scope>] [--budget <tokens>] [--depth standard|exhaustive] [--out <path>]"
 ---

@@ -1,6 +1,7 @@
 ---
 name: skill-scaffold
 user-invocable: true
+disable-model-invocation: true
 description: "Use when you want to scaffold a new clauDNA skill directory with correct structure, valid frontmatter, and a starter body that passes validation."
 requires-context: repo-clone
 argument-hint: "[skill-name]"
