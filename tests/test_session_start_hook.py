@@ -344,13 +344,13 @@ def test_startup_never_uses_legacy_to_bypass_unavailable_canonical_context(tmp_p
     assert "canonical next action" not in output
 
 
-def _broken_hook(tmp_path):
-    """The session-start hook beside a session_store entry point that dies on import: every verb exits 1 with a traceback."""
+def _broken_hook(tmp_path, body="raise ImportError('injected')\n"):
+    """The session-start hook beside a session_store entry point that fails: by default it dies on import, so every verb exits 1 with a traceback."""
     pkg = tmp_path / "pkg"
     shutil.copytree(REPO_ROOT / "plugin-hooks", pkg / "plugin-hooks")
     entry = pkg / "lib" / "claudna" / "session_store" / "__main__.py"
     entry.parent.mkdir(parents=True)
-    entry.write_text("raise ImportError('injected')\n")
+    entry.write_text(body)
     return pkg / "plugin-hooks" / "session-start.sh"
 
 
@@ -366,6 +366,19 @@ def test_a_broken_runtime_never_reaches_the_legacy_file(tmp_path, monkeypatch):
     assert code == 0 and "forbidden fallback" not in output
     log = tmp_path / "claudna-state" / "hooks" / "bootstrap.log"
     assert log.is_file() and "session_store_runtime" in log.read_text()
+
+
+def test_a_runtime_that_prints_a_path_and_then_fails_is_not_believed(tmp_path, monkeypatch):
+    """The first answer's stdout is kept in HANDOFF; after a failure it must not be read as a handoff path."""
+    assert shutil.which("jq", path=_no_gh_path(tmp_path)), "jq must resolve for this test to be meaningful"
+    _canonical_handoff(tmp_path, "previous")
+    legacy = tmp_path / ".claude" / "session.md"
+    legacy.parent.mkdir()
+    legacy.write_text("## Next Steps\n- forbidden fallback\n")
+    stub = f"print({str(legacy)!r})\nraise SystemExit(1)\n"
+    monkeypatch.setattr(sys.modules[__name__], "HOOK", _broken_hook(tmp_path, stub))
+    code, output, _ = run_hook(tmp_path)
+    assert code == 0 and "forbidden fallback" not in output
 
 
 def test_a_healthy_runtime_with_no_pointer_still_reads_the_legacy_file(tmp_path):
