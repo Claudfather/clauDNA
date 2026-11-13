@@ -29,8 +29,6 @@ import session_canary as canary  # noqa: E402
 @pytest.fixture(autouse=True)
 def private_store_root(tmp_path, monkeypatch):
     monkeypatch.setenv("CLAUDNA_STATE_DIR", str(tmp_path / "relocated state root"))
-    for key in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
-        monkeypatch.delenv(key, raising=False)
 
 PARENT = {"claude_pid_env": 100, "claude_pid_walked": 100, "entrypoint": "cli"}
 

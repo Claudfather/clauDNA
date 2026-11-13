@@ -23,8 +23,6 @@ import re
 import sys
 from pathlib import Path
 
-import pytest
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SKILL_DIR = REPO_ROOT / "skills" / "claudron"
 SKILL = SKILL_DIR / "SKILL.md"
@@ -255,13 +253,10 @@ class TestNoAllowRuleApprovesTheWrite:
             assert not [r for r in rules if approves(r, cmd)], cmd
 
     def test_the_grant_allowlist_accepts_the_guides_doctor_rule_and_no_wildcard(self):
-        # The guide and the grant allowlist (#360) name one doctor form, whichever of
-        # the two lands second.
+        # The guide and the grant allowlist (#360) name one doctor form.
         import skill_checks
 
-        check = getattr(skill_checks, "check_settings_grants", None)
-        if check is None:
-            pytest.skip("the grant allowlist (#360) is not on this tree")
+        check = skill_checks.check_settings_grants
         doctor_rules = [r for r in claudron_allow_rules() if "claudron doctor" in r]
         assert doctor_rules == ["Bash(claudron doctor --json)"]
         assert check(doctor_rules) == []

@@ -26,8 +26,6 @@ import routing_eval as re_  # noqa: E402
 @pytest.fixture(autouse=True)
 def private_store_root(tmp_path, monkeypatch):
     monkeypatch.setenv("CLAUDNA_STATE_DIR", str(tmp_path / "relocated state root"))
-    for key in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
-        monkeypatch.delenv(key, raising=False)
 
 
 def stream(*skills, cost=0.02, subtype="error_max_turns", is_error=True) -> str:

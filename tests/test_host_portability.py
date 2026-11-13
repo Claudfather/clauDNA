@@ -160,7 +160,6 @@ def test_a_file_using_the_placeholder_points_at_its_definition(skills: Path) -> 
 
 def _findings(tree: Path) -> list[str]:
     env = {k: v for k, v in os.environ.items() if k != "GITHUB_ACTIONS"}
-    env["SCHEMA_DRIFT_OFFLINE"] = "1"
     run = subprocess.run(
         [sys.executable, str(tree / "scripts" / "validate-skills.py")], capture_output=True, text=True, env=env
     )

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -279,18 +280,90 @@ class TestSessionStartHook:
 
 
 # ─── automatic git reads disable the fsmonitor code path ─────────────────────
+#
+# A repository's own .git/config can set `core.fsmonitor` to a command, and git runs that command on some
+# reads. Every automatic `git` read in the hooks passes `-c core.fsmonitor=` so a workspace whose .git the
+# user did not create cannot run one. Measured on git 2.50.1 (Apple Git): of the subcommands the hooks use,
+# only `status` runs the configured command (`rev-parse`, `branch`, `symbolic-ref` and `cat-file` do not).
+# So running a hook can show the flag missing only for session-start.sh's `git status`; the other reads
+# are held by the census below, because no executable test of them can fail on this git.
 
-def test_git_reads_disable_fsmonitor():
-    """Every automatic `git` read in the session-start and statusline hooks runs
-    with `-c core.fsmonitor=`, so a workspace whose .git/config sets fsmonitor to
-    a command cannot run on a git read in a workspace whose .git it did not create."""
-    ss = HOOK.read_text()
-    import re
-    # each `git <subcommand>` (not `git -C ...` alone) carries the flag
-    for m in re.finditer(r"\bgit(?: -C [^\n]*?)? ((?:-c core\.fsmonitor= )?)(rev-parse|branch|status|symbolic-ref)", ss):
-        assert m.group(1) == "-c core.fsmonitor= ", f"unguarded git {m.group(2)} in session-start.sh"
-    statusline = (REPO_ROOT / "plugin-hooks" / "statusline.sh").read_text()
-    assert "-c core.fsmonitor=" in statusline, "statusline git read is unguarded"
+def _git_in(cwd: Path, *args: str) -> None:
+    # Built from scratch: a pytest started by a git hook inherits GIT_DIR, and the fixture's git must not follow it
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(cwd), "GIT_CONFIG_NOSYSTEM": "1",
+           "GIT_CONFIG_GLOBAL": os.devnull}
+    subprocess.run(["git", "-C", str(cwd), *args], env=env, check=True, capture_output=True)
+
+
+def test_session_start_git_status_runs_no_fsmonitor_command_the_repo_names(tmp_path):
+    """Executable guard: the hook's `git status` must not run the command `core.fsmonitor` names."""
+    _git_in(tmp_path, "init", "-q", "-b", "main")
+    marker = tmp_path / "fsmonitor-ran"
+    command = tmp_path / "fsmonitor-command"
+    command.write_text(f"#!/bin/sh\ntouch '{marker}'\nexit 1\n")
+    command.chmod(0o755)
+    _git_in(tmp_path, "config", "core.fsmonitor", str(command))
+
+    # Positive control: an unguarded status runs the command, so an absent marker below means something.
+    _git_in(tmp_path, "status", "--porcelain")
+    assert marker.exists(), "this git no longer runs a configured fsmonitor command on `status`: rework this guard"
+    marker.unlink()
+
+    code, out, _ = run_hook(tmp_path)
+    assert code == 0
+    assert "Repo state: branch main · tree dirty" in out, out  # the hook reached its git reads
+    assert not marker.exists(), "session-start.sh ran the fsmonitor command the repository's config names"
+
+
+# Every `git <subcommand>` the hooks run on their own. A new read is added here deliberately, so its guard is
+# looked at when it is added.
+_AUTOMATIC_GIT_READS = {
+    ("session-start.sh", "rev-parse"),
+    ("session-start.sh", "branch"),
+    ("session-start.sh", "status"),
+    ("statusline.sh", "symbolic-ref"),
+    ("auto-format.sh", "cat-file"),
+}
+_GIT_WORD = re.compile(r"(?<![\w.-])git(?![\w./-])")
+_GIT_OPTIONS_AND_SUBCOMMAND = re.compile(r"\s+((?:-C\s+(?:\"[^\"]*\"|\S+)\s+|-c\s+\S+\s+|--[a-z-]+\s+)*)([a-z][a-z-]*)\b")
+
+
+def _git_reads() -> tuple[set[tuple[str, str]], list[str]]:
+    """Every `git <subcommand>` in the hook scripts (plugin-hooks/*.sh and lib/) outside whole-line comments, and
+    those whose own options lack `-c core.fsmonitor=`. A line holding two `git` words is two reads, so the flag
+    on one cannot vouch for the other. A `git` the pattern cannot parse (`git --git-dir=. rev-parse`) counts as
+    unguarded: a guard must not skip what it cannot read, and a line that only mentions git in prose must be
+    reworded."""
+    found: set[tuple[str, str]] = set()
+    unguarded: list[str] = []
+    for script in sorted((REPO_ROOT / "plugin-hooks").rglob("*.sh")):
+        for line in script.read_text().splitlines():
+            if line.lstrip().startswith("#"):
+                continue
+            for segment in _GIT_WORD.split(line)[1:]:
+                m = _GIT_OPTIONS_AND_SUBCOMMAND.match(segment)
+                if not m:
+                    unguarded.append(f"{script.name}: a `git` this census cannot parse  <-  {line.strip()}")
+                    continue
+                found.add((script.name, m.group(2)))
+                if "-c core.fsmonitor= " not in m.group(1):
+                    unguarded.append(f"{script.name}: git {m.group(2)}  <-  {line.strip()}")
+    return found, unguarded
+
+
+def test_every_automatic_git_read_clears_fsmonitor():
+    """Text guard over plugin-hooks/*.sh (the Python reads in lib/ and scripts/ are not covered here). It is
+    the only guard for `symbolic-ref` (statusline.sh) and `cat-file` (auto-format.sh): git does not run a
+    configured fsmonitor command for either, so no executable test of them can fail. It also keeps `rev-parse`
+    and `branch` guarded, for a git that starts to, and it sees a new read in any hook script."""
+    found, unguarded = _git_reads()
+    assert not unguarded, (
+        "a git read without `-c core.fsmonitor=` (a non-comment line that only mentions git in prose must be "
+        "reworded):\n" + "\n".join(unguarded))
+    assert found == _AUTOMATIC_GIT_READS, (
+        f"the hooks' automatic git reads changed: new {sorted(found - _AUTOMATIC_GIT_READS)}, "
+        f"gone {sorted(_AUTOMATIC_GIT_READS - found)}. Update _AUTOMATIC_GIT_READS; the new read is guarded "
+        "above or it would have failed already.")
 
 
 def _canonical_handoff(tmp_path, sid, workflow="default", *, private=False):

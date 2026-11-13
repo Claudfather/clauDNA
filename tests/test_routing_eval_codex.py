@@ -15,8 +15,6 @@ import routing_eval_codex as evaluator
 @pytest.fixture(autouse=True)
 def private_store_root(tmp_path, monkeypatch):
     monkeypatch.setenv('CLAUDNA_STATE_DIR', str(tmp_path / 'relocated state root'))
-    for key in ('CLAUDE_SESSION_ID', 'CODEX_THREAD_ID', 'CODEX_SESSION_ID'):
-        monkeypatch.delenv(key, raising=False)
 
 
 def test_floor_covers_every_selected_skill_and_preserves_source_rows():

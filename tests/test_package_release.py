@@ -20,8 +20,6 @@ from qualify_package import fixture_environment, qualify, verify_package  # noqa
 
 @pytest.fixture(autouse=True)
 def isolated_maintainer_owner(tmp_path, monkeypatch):
-    for key in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
-        monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("CLAUDNA_STATE_DIR", str(tmp_path / "owned state"))
 
 
