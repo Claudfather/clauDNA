@@ -151,7 +151,7 @@ NOQ=${NOQ//[\"\'\\]/}
 case "$NOQ" in
     *gh*)
         case "$NOQ" in
-            *--jq*|*--template*|*--repo*|*--web*|*--hostname*|*GH_HOST=*|*GH_REPO=*|*GH_HOST+=*|*GH_REPO+=*|*[[:space:]]-q*|*[[:space:]]-t*|*[[:space:]]-R*|*[[:space:]]-w*|*[[:space:]]-[[:alnum:]]*[qtRw]*|*"://"*|*@*:*|*gh[[:space:]]*repo[[:space:]]*/*/*|*gh[[:space:]]*label[[:space:]]*/*/*|*gh[[:space:]]*ext*/*/*|*gh[[:space:]]*skill*/*/*)
+            *--jq*|*--template*|*--repo*|*--web*|*--hostname*|*GH_HOST=*|*GH_REPO=*|*GH_HOST+=*|*GH_REPO+=*|*GH_HOST\[*|*GH_REPO\[*|*[[:space:]]-q*|*[[:space:]]-t*|*[[:space:]]-R*|*[[:space:]]-w*|*[[:space:]]-[[:alnum:]]*[qtRw]*|*"://"*|*@*:*|*gh[[:space:]]*repo[[:space:]]*/*/*|*gh[[:space:]]*label[[:space:]]*/*/*|*gh[[:space:]]*ext*/*/*|*gh[[:space:]]*skill*/*/*)
                 if command -v python3 &>/dev/null; then
                     # errexit-safe: the decider exits 10 to deny, and an
                     # assignment that inherits that would end the hook here.

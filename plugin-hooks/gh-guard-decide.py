@@ -322,6 +322,7 @@ def _is_separator(tok: str) -> bool:
 # A host nothing allows. A subscripted `GH_HOST[i]=` / `GH_REPO[i]=` prefix means different strings in bash
 # (an array element) and zsh (an edit of the string), so the guard reads it as this.
 _UNKNOWN_HOST = "unknown-host.invalid"
+_MAX_READINGS = 16
 
 # The descriptor in front of a redirection operator: `2` in `2>&1`, `{fd}` in `{fd}>file`.
 _FD_WORD = re.compile(r"[0-9]+|\{[A-Za-z_][A-Za-z0-9_]*\}")
@@ -334,6 +335,9 @@ def _is_redirect(tok: str) -> bool:
 
 
 _SEP_THEN_REDIRECT = re.compile(r"([;&|()`\n]+)([<>][<>&|]*)")
+# `&>file` redirects both streams (zsh adds the clobber forms); the shell does not read it as a `&` separator
+# followed by `>`. Splitting it would end the gh segment there and hide every later flag from the inspection.
+_AMP_REDIRECTS = ("&>", "&>>", "&>|", "&>>|")
 
 
 def _split_sep_redirect(tokens: list[str]) -> list[str]:
@@ -341,6 +345,9 @@ def _split_sep_redirect(tokens: list[str]) -> list[str]:
     redirection. Split a separator run from the redirection operator after it."""
     out: list[str] = []
     for tok in tokens:
+        if tok in _AMP_REDIRECTS:
+            out.append(tok)
+            continue
         m = _SEP_THEN_REDIRECT.fullmatch(tok) if "<" in tok or ">" in tok else None
         out.extend(m.groups() if m else [tok])
     return out
@@ -384,7 +391,12 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
                 if m and m.group(1) in ("GH_HOST", "GH_REPO"):
                     name, subscript, plus, value = m.groups()
                     seen = readings.setdefault(name, [])
-                    if subscript:
+                    if len(seen) >= _MAX_READINGS:
+                        # more prefixes of one name than any real call carries: a doubt denies, and the
+                        # work stays linear however long the flood is
+                        seen[:] = [_UNKNOWN_HOST if name == "GH_HOST" else f"{_UNKNOWN_HOST}/o/r"]
+                        held[name] = ""
+                    elif subscript:
                         seen.append(_UNKNOWN_HOST if name == "GH_HOST" else f"{_UNKNOWN_HOST}/o/r")
                     else:
                         # `+=` appends to what an earlier prefix set (`GH_HOST=evil GH_HOST+=x` is still evil).

