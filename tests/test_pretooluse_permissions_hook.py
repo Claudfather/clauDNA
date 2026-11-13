@@ -80,6 +80,39 @@ class TestKnownSeparatorsStillGate:
         assert not approves(tmp_path, "git status | rm -rf /tmp/pwn")
 
 
+class TestAnsiCQuotingCannotHideACommand:
+    """`$'...'` ends only at an unescaped `'`: a `\\'` inside it is a literal quote, so a second
+    command placed after one is a real second command and must gate like `;`."""
+
+    @pytest.mark.parametrize("command", [
+        "git status $'\\'' ; touch /tmp/pwn ; echo \\'",
+        "echo $'\\'' ; touch /tmp/pwn ; echo \\'",
+        "echo $'\\'' && touch /tmp/pwn && echo \\'",
+    ])
+    def test_a_command_hidden_behind_an_escaped_quote_prompts(self, tmp_path, command):
+        assert not approves(tmp_path, command)
+
+    @pytest.mark.parametrize("command", [
+        "echo $'a b'", "echo $'a;b'", "echo $$", "echo $$ $'a b'", "echo $'it\\'s' ; echo done", "echo $'tab\\there'",
+        "echo \"$'x'\"", "echo '$'\"'\"'x'",
+    ])
+    def test_ordinary_ansi_c_strings_still_approve(self, tmp_path, command):
+        assert approves(tmp_path, command)
+
+    @pytest.mark.parametrize("command", ["echo $'abc", "echo $'abc\\'"])
+    def test_an_unterminated_ansi_c_string_prompts(self, tmp_path, command):
+        assert not approves(tmp_path, command)
+
+    @pytest.mark.parametrize("command", [
+        "git status $$'\\' ; touch /tmp/pwn ; echo '\\'",
+        "echo $$'\\' ; touch /tmp/pwn ; echo '\\'",
+        "echo $$$'\\' ; touch /tmp/pwn ; echo '\\'",
+    ])
+    def test_a_quote_after_the_pid_variable_prompts(self, tmp_path, command):
+        # bash reads `$$` (the PID) and then a plain quote that `\\'` ends; zsh reads an ANSI-C string.
+        assert not approves(tmp_path, command)
+
+
 class TestLegitimateCommandsStillApprove:
     """The fix must not turn safe, allowed commands into prompts."""
 

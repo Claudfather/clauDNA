@@ -195,14 +195,20 @@ split_commands() {
     local cmd="$1"
     local len=${#cmd}
     local i=0 char
-    local sq=false dq=false
+    local sq=false dq=false ansi=false
     local current=""
 
     while (( i < len )); do
         char="${cmd:i:1}"
 
         if $sq; then
-            [[ "$char" == "'" ]] && sq=false
+            # $'...' (ANSI-C quoting) is a single-quote form in which a backslash
+            # escapes the next character, so \' does not end the string.
+            if $ansi && [[ "$char" == "\\" ]] && (( i + 1 < len )); then
+                current+="$char${cmd:i+1:1}"
+                i=$((i + 2)); continue
+            fi
+            [[ "$char" == "'" ]] && { sq=false; ansi=false; }
             current+="$char"
         elif $dq; then
             if [[ "$char" == "\\" ]] && (( i + 1 < len )); then
@@ -215,6 +221,16 @@ split_commands() {
             case "$char" in
                 "'") sq=true; current+="$char" ;;
                 '"') dq=true; current+="$char" ;;
+                '$')
+                    if [[ "${cmd:i+1:1}" == "'" ]]; then
+                        sq=true; ansi=true; current+="$char'"
+                        i=$((i + 2)); continue
+                    fi
+                    # $$'...': bash reads the PID and then a plain quote, zsh an ANSI-C string.
+                    # No parse is right for both, so this prompts.
+                    [[ "${cmd:i+1:2}" == '$'"'" ]] && return 1
+                    current+="$char"
+                    ;;
                 "\\")
                     if (( i + 1 < len )); then
                         current+="$char${cmd:i+1:1}"
