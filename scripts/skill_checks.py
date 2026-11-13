@@ -1366,7 +1366,9 @@ def get_touched_skills() -> set[str] | None:
     try:
         result = subprocess.run(
             # --no-renames: a moved file lists both paths, so moving one out of skills/ still touches its skill.
-            ["git", "diff", "--name-only", "--no-renames", "origin/main...HEAD"],
+            # -z: NUL-separated and never quoted; git otherwise C-quotes a path with non-ASCII, `"` or `\\`,
+            # which no prefix below would match.
+            ["git", "diff", "--name-only", "--no-renames", "-z", "origin/main...HEAD"],
             capture_output=True,
             text=True,
             cwd=Path(__file__).resolve().parent.parent,
@@ -1382,7 +1384,7 @@ def get_touched_skills() -> set[str] | None:
             file=sys.stderr,
         )
         return None
-    changed = result.stdout.strip().splitlines()
+    changed = [path for path in result.stdout.split("\0") if path]
     if any(p.startswith(VALIDATOR_INPUT_PREFIXES) or p in VALIDATOR_INPUT_FILES for p in changed):
         print("validator or contract input changed: running full blocking validation", file=sys.stderr)
         return None

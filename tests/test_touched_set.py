@@ -8,6 +8,7 @@ the merge push gets with FULL_VALIDATE=1). These tests pin that decision without
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -34,12 +35,40 @@ def ci(monkeypatch):
             calls.append({"cmd": cmd, **kwargs})
             if raises is not None:
                 raise raises
-            return SimpleNamespace(returncode=returncode, stdout="\n".join(paths) + "\n", stderr="boom")
+            return SimpleNamespace(returncode=returncode, stdout="\0".join(paths) + "\0", stderr="boom")
 
         monkeypatch.setattr(subprocess, "run", fake_run)
         return calls
 
     return diff
+
+
+@pytest.fixture
+def real_repo(ci, tmp_path, monkeypatch):
+    """A throwaway repo whose `origin/main` is a base commit holding skills/foo/guide.md.
+
+    The real `git diff` that `get_touched_skills` runs is pointed at it, and the ambient git
+    environment cannot reach it: no global `commit.gpgsign`, no inherited GIT_DIR or GIT_WORK_TREE.
+    Returns (git, root).
+    """
+    for name in [name for name in os.environ if name.startswith("GIT_")]:
+        monkeypatch.delenv(name)
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    real_run = subprocess.run
+
+    def git(*args):
+        real_run(["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", *args],
+                 cwd=tmp_path, check=True, capture_output=True)
+
+    git("init", "-q", "-b", "main")
+    (tmp_path / "skills" / "foo").mkdir(parents=True)
+    (tmp_path / "skills" / "foo" / "guide.md").write_text("".join(f"line {n} of a guide\n" for n in range(40)))
+    git("add", "-A")
+    git("commit", "-q", "-m", "base")
+    git("update-ref", "refs/remotes/origin/main", "HEAD")
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **kwargs: real_run(cmd, **{**kwargs, "cwd": tmp_path}))
+    return git, tmp_path
 
 
 class TestEscapeHatches:
@@ -63,25 +92,24 @@ class TestSkillScoping:
         ci("skills/foo/SKILL.md", "skills/bar/notes/x.md", "README.md")
         assert get_touched_skills() == {"foo", "bar"}
 
-    def test_moving_a_file_out_of_a_skill_still_touches_that_skill(self, ci, tmp_path, monkeypatch):
+    def test_moving_a_file_out_of_a_skill_still_touches_that_skill(self, real_repo):
         """git pairs a rename and, by default, lists only the new path; the old path is the skill's."""
-        real_run = subprocess.run
-
-        def git(*args):
-            real_run(["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", *args],
-                     cwd=tmp_path, check=True, capture_output=True)
-
-        git("init", "-q", "-b", "main")
-        (tmp_path / "skills" / "foo").mkdir(parents=True)
-        (tmp_path / "skills" / "foo" / "guide.md").write_text("".join(f"line {n} of a guide\n" for n in range(40)))
-        git("add", "-A")
-        git("commit", "-q", "-m", "base")
-        git("update-ref", "refs/remotes/origin/main", "HEAD")
-        (tmp_path / "documentation").mkdir()
+        git, root = real_repo
+        (root / "documentation").mkdir()
         git("mv", "skills/foo/guide.md", "documentation/guide.md")
         git("commit", "-q", "-m", "move the guide out of the skill")
-        monkeypatch.setattr(subprocess, "run", lambda cmd, **kwargs: real_run(cmd, **{**kwargs, "cwd": tmp_path}))
         assert get_touched_skills() == {"foo"}
+
+    @pytest.mark.parametrize("name", ["r\u00e9sum\u00e9.py", 'quo"te.py', "back\\slash.py"],
+                             ids=["non-ascii", "double-quote", "backslash"])
+    def test_a_validator_input_whose_name_git_would_quote_still_runs_full_validation(self, real_repo, name):
+        """Without -z git prints such a path C-quoted (in double quotes, escapes inside), and no prefix matches it."""
+        git, root = real_repo
+        (root / "scripts").mkdir()
+        (root / "scripts" / name).write_text("x = 1\n")
+        git("add", "-A")
+        git("commit", "-q", "-m", "add a validator input with a name git quotes")
+        assert get_touched_skills() is None
 
     def test_a_change_touching_no_skill_and_no_validator_input_is_empty(self, ci):
         ci("README.md", "tests/test_something.py", "documentation/guides/X.md")
@@ -140,6 +168,7 @@ class TestUnreadableDiffFallsBackToFullValidation:
         get_touched_skills()
         assert Path(calls[0]["cwd"]) == REPO_ROOT
         assert calls[0]["cmd"][:3] == ["git", "diff", "--name-only"]
+        assert "-z" in calls[0]["cmd"], "paths must be NUL-separated: git quotes some names otherwise"
 
 
 class TestPartitionErrors:
