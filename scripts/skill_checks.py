@@ -1365,7 +1365,8 @@ def get_touched_skills() -> set[str] | None:
 
     try:
         result = subprocess.run(
-            ["git", "diff", "--name-only", "origin/main...HEAD"],
+            # --no-renames: a moved file lists both paths, so moving one out of skills/ still touches its skill.
+            ["git", "diff", "--name-only", "--no-renames", "origin/main...HEAD"],
             capture_output=True,
             text=True,
             cwd=Path(__file__).resolve().parent.parent,
@@ -1414,14 +1415,10 @@ def partition_errors(
     Cross-skill errors (e.g. duplicate names) block if ANY participant is touched, so
     alphabetical attribution to one skill cannot silently demote an error a touched skill took part in.
     """
-    if touched is None:
-        blocking = {name: list(errors) for name, errors in all_errors.items()}
-        for _participants, target, msg in cross_skill_errors:
-            blocking.setdefault(target, []).append(msg)
-        return blocking, {}
-    blocking, demoted = {}, {}
+    blocking: dict[str, list[str]] = {}
+    demoted: dict[str, list[str]] = {}
     for name, errors in all_errors.items():
-        (blocking if name in touched else demoted)[name] = errors
+        (blocking if touched is None or name in touched else demoted)[name] = list(errors)
     for participants, target, msg in cross_skill_errors:
-        (blocking if participants & touched else demoted).setdefault(target, []).append(msg)
+        (blocking if touched is None or participants & touched else demoted).setdefault(target, []).append(msg)
     return blocking, demoted

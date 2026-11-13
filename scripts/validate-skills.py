@@ -252,11 +252,7 @@ def main() -> int:
 
     total_skills = len(skill_dirs) - len(SKIP_SKILLS)
 
-    # In CI mode, partition errors into blocking (touched) vs warnings (untouched).
-    # Cross-skill errors (e.g. duplicate names) block if ANY participant is touched,
-    # preventing the bug where alphabetical ordering attributes the error to only
-    # one skill — if that skill happens to be untouched, the error silently demotes.
-    # Local mode (touched is None) blocks everything, cross-skill errors included.
+    # Blocking vs demoted under touched-set scoping; see partition_errors.
     blocking_errors, demoted_warnings = partition_errors(all_errors, cross_skill_errors, touched)
 
     # Removed-name hits block in BOTH modes — the touched-set partition never

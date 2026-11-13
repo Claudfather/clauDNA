@@ -63,6 +63,26 @@ class TestSkillScoping:
         ci("skills/foo/SKILL.md", "skills/bar/notes/x.md", "README.md")
         assert get_touched_skills() == {"foo", "bar"}
 
+    def test_moving_a_file_out_of_a_skill_still_touches_that_skill(self, ci, tmp_path, monkeypatch):
+        """git pairs a rename and, by default, lists only the new path; the old path is the skill's."""
+        real_run = subprocess.run
+
+        def git(*args):
+            real_run(["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", *args],
+                     cwd=tmp_path, check=True, capture_output=True)
+
+        git("init", "-q", "-b", "main")
+        (tmp_path / "skills" / "foo").mkdir(parents=True)
+        (tmp_path / "skills" / "foo" / "guide.md").write_text("".join(f"line {n} of a guide\n" for n in range(40)))
+        git("add", "-A")
+        git("commit", "-q", "-m", "base")
+        git("update-ref", "refs/remotes/origin/main", "HEAD")
+        (tmp_path / "documentation").mkdir()
+        git("mv", "skills/foo/guide.md", "documentation/guide.md")
+        git("commit", "-q", "-m", "move the guide out of the skill")
+        monkeypatch.setattr(subprocess, "run", lambda cmd, **kwargs: real_run(cmd, **{**kwargs, "cwd": tmp_path}))
+        assert get_touched_skills() == {"foo"}
+
     def test_a_change_touching_no_skill_and_no_validator_input_is_empty(self, ci):
         ci("README.md", "tests/test_something.py", "documentation/guides/X.md")
         assert get_touched_skills() == set()
