@@ -490,7 +490,7 @@ STATE_DIR_SH = REPO_ROOT / "plugin-hooks" / "lib" / "state-dir.sh"
 
 
 class TestStateRootParity:
-    """plugin-hooks/lib/state-dir.sh and paths.state_root must agree on every input."""
+    """plugin-hooks/lib/state-dir.sh and paths.state_root must agree on every absolute root."""
 
     @pytest.mark.parametrize(
         "override",
@@ -498,6 +498,7 @@ class TestStateRootParity:
             None, "/abs/state", "~/state", "~", "~someuser/state", "relative/state", "",
             # absolute but not canonical: Python's Path normalizes these, so the shell must too
             "/abs/state/", "/abs//state", "/abs/./state", "/abs/state/.", "~/state/", "//abs/state", "/",
+            "/.", "/./", "//",
         ],
     )
     def test_bash_and_python_resolve_the_same_root(self, tmp_path, monkeypatch, override):
@@ -514,7 +515,7 @@ class TestStateRootParity:
         assert bash == python
 
     @pytest.mark.parametrize("home", ["/", "//", "///", "/h/", "/h//", "/h/."])
-    @pytest.mark.parametrize("override", [None, "~", "~/state"])
+    @pytest.mark.parametrize("override", [None, "~", "~/state", "~//state", "~//"])
     def test_a_home_with_extra_slashes_spells_the_root_like_python(self, home, override):
         env = {"HOME": home, "PATH": os.environ["PATH"]}
         if override is not None:
@@ -567,7 +568,7 @@ class TestStateRootParity:
         assert scratch.is_dir() and list(scratch.iterdir()) == []  # ...and its scratch was removed, not orphaned
 
     @pytest.mark.parametrize("sid", [SID, "a" * 128, "../escape", "é", "sid\n", ""])
-    @pytest.mark.parametrize("override", [None, "/relocated/state"])
+    @pytest.mark.parametrize("override", [None, "/relocated/state", "/", "//"])
     def test_bash_session_path_matches_python_validation(self, tmp_path, sid, override):
         env = {"HOME": str(tmp_path), "PATH": os.environ["PATH"], "SID": sid}
         if override is not None:

@@ -8,12 +8,15 @@
 # because hooks run inside the user's project and a relative root would put
 # private state in a repository that can be committed.
 
-# claudna_canonical_path <absolute-path>: the spelling pathlib gives the same text
+# claudna_canonical_path <absolute-path>: the spelling pathlib gives that text
 # (repeated "/" collapsed, "." segments and a trailing "/" dropped, ".." kept, exactly two
 # leading slashes kept), with no filesystem access and no fork. Hooks compare the
 # Python-allocated scratch path with a path built from this root, so both sides must
-# spell the root the same way. The replacement text is held in $sl: written inline as
-# \/ it leaves a literal backslash in the result on bash 3.2 and 5.
+# spell the root the same way. The replacement text is held in $sl: the double-quoted
+# form "${p//\/\//\/}" leaves a literal backslash in the result on bash 3.2, and $sl
+# is the spelling that does not depend on that.
+# ".." is kept, as pathlib keeps it. Python 3.12+ tempfile.mkdtemp resolves it lexically,
+# so a root that contains ".." still degrades the hooks that compare scratch paths.
 claudna_canonical_path() {
     local p="$1" lead="" sl="/"
     case "$p" in //|//[!/]*) lead="/" ;; esac
@@ -32,7 +35,11 @@ claudna_state_dir() {
     local root="${CLAUDNA_STATE_DIR:-${HOME:+${HOME%/}/.claudna}}"
     case "$root" in
         "~") root="${HOME:-~}" ;;
-        "~/"*) root="${HOME:+${HOME%/}/${root#"~/"}}" ;;
+        "~/"*)
+            # Python drops the repeated slashes after "~/" before it joins, so do the same here
+            root="${root#"~/"}"
+            while [[ "$root" == /* ]]; do root="${root#/}"; done
+            root="${HOME:+${HOME%/}/$root}" ;;
     esac
     case "$root" in
         /*) claudna_canonical_path "$root" ;;
@@ -51,7 +58,7 @@ claudna_session_dir() {
     fi
     root="$(claudna_state_dir)"
     [[ "$root" == /* ]] || return 0
-    printf '%s/sessions/%s' "$root" "$sid"
+    printf '%s/sessions/%s' "${root%/}" "$sid"  # a root of "/" or "//" already ends in the slash
 }
 
 # Validate JSON before command substitution: shells strip trailing newlines and
