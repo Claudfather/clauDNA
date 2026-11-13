@@ -365,7 +365,7 @@ def test_a_broken_runtime_never_reaches_the_legacy_file(tmp_path, monkeypatch):
     code, output, _ = run_hook(tmp_path)
     assert code == 0 and "forbidden fallback" not in output
     log = tmp_path / "claudna-state" / "hooks" / "bootstrap.log"
-    assert log.is_file() and "session_store_runtime" in log.read_text()
+    assert log.is_file() and log.read_text().count("session_store_runtime") == 1
 
 
 def test_a_runtime_that_prints_a_path_and_then_fails_is_not_believed(tmp_path, monkeypatch):

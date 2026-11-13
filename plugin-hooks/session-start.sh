@@ -94,7 +94,8 @@ if [ -n "$SESSION_DIR" ] && [ -n "$HOST" ] && command -v python3 >/dev/null 2>&1
         0) ;; # one validated canonical path, never a latest-session guess
         1)
             # Legacy fallback only on an explicit "none": an import or interpreter crash also exits 1.
-            # The anchored match pins the CLI's json.dumps spacing; the no-pointer test guards it.
+            # The anchored match pins the CLI's json.dumps spacing and `status` being the first field; the
+            # no-pointer test guards both.
             if python3 -B "${BASH_SOURCE[0]%/*}/../lib/claudna/session_store" \
                 "${RESOLVE_ARGS[@]}" --json 2>/dev/null | grep -q '^{"status": "none"'; then
                 HANDOFF="${CWD}/.claude/session.md" # read-only compatibility
