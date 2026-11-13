@@ -20,14 +20,41 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.sha }}
 
+      # Qualification reads origin/main as the changelog gate's baseline. Pin it to the tip this
+      # push replaced (the moving tip of main is newer whenever another merge lands first), and
+      # stop here when plugin.json changed without a version bump. When the replaced tip is not in
+      # the fetched history (a force-push or a first push) there is nothing to compare: origin/main
+      # is left as fetched and a release is attempted, so a failure is red, not a quiet skip.
+      - name: Pin the baseline and detect a version bump
+        id: bump
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            git update-ref refs/remotes/origin/main "$BEFORE"
+            before_version="$(git show "${BEFORE}:.claude-plugin/plugin.json" | jq -r .version)"
+            after_version="$(jq -r .version .claude-plugin/plugin.json)"
+            if [ "$before_version" = "$after_version" ]; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+              echo "plugin.json changed without a version bump; nothing to release"
+              exit 0
+            fi
+          else
+            echo "::warning::github.event.before is not in the fetched history (a force-push or a first push); origin/main is left as fetched and a release is attempted"
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-python@v7
+        if: steps.bump.outputs.changed == 'true'
         with:
           python-version: "3.12"
 
       - name: Install check toolchain
+        if: steps.bump.outputs.changed == 'true'
         run: make deps
 
       - name: Qualify and publish this exact candidate
+        if: steps.bump.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: CLAUDNA_STATE_DIR="$RUNNER_TEMP/claudna-state" make publish-release STORAGE_OWNER_ARGS=--standalone RELEASE_REF="$GITHUB_SHA" RELEASE_OUTPUT="$RUNNER_TEMP/claudna-release" RELEASE_REPO="$GITHUB_REPOSITORY"
