@@ -8,7 +8,8 @@ Run: python scripts/integration-test.py
 Exits non-zero on errors. Warnings are printed but don't block.
 
 In CI (GITHUB_ACTIONS set), only errors from PR-touched skills block.
-Untouched skill errors are reported as warnings for visibility.
+Untouched skill errors are reported as warnings for visibility. A diff that touches a
+validator input (scripts/, contracts/, SKILL_CONTRACT.md, AGENT_CONTRACT.md) blocks on every skill.
 """
 
 from __future__ import annotations
