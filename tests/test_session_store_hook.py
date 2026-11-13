@@ -513,6 +513,20 @@ class TestStateRootParity:
             python = ""
         assert bash == python
 
+    @pytest.mark.parametrize("home", ["/", "//", "///", "/h/", "/h//", "/h/."])
+    @pytest.mark.parametrize("override", [None, "~", "~/state"])
+    def test_a_home_with_extra_slashes_spells_the_root_like_python(self, home, override):
+        env = {"HOME": home, "PATH": os.environ["PATH"]}
+        if override is not None:
+            env["CLAUDNA_STATE_DIR"] = override
+        bash = subprocess.run(["bash", "-c", f". {STATE_DIR_SH}; claudna_state_dir"], env=env,
+                              capture_output=True, text=True, check=True).stdout
+        try:
+            python = str(paths.state_root(env))
+        except ValueError:
+            python = ""
+        assert bash == python
+
     def test_bash_and_python_agree_over_a_generated_corpus_of_absolute_roots(self, tmp_path):
         """The hand list above is how the gap survived: quantify over generated spellings instead.
         Seeded, so a failure reproduces; one bash process handles the whole corpus."""

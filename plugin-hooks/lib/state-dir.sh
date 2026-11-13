@@ -29,10 +29,10 @@ claudna_canonical_path() {
 # HOME, or a relative override). Callers treat nothing as "keep no state" and
 # fail open.
 claudna_state_dir() {
-    local root="${CLAUDNA_STATE_DIR:-${HOME:+$HOME/.claudna}}"
+    local root="${CLAUDNA_STATE_DIR:-${HOME:+${HOME%/}/.claudna}}"
     case "$root" in
         "~") root="${HOME:-~}" ;;
-        "~/"*) root="${HOME:+$HOME/${root#"~/"}}" ;;
+        "~/"*) root="${HOME:+${HOME%/}/${root#"~/"}}" ;;
     esac
     case "$root" in
         /*) claudna_canonical_path "$root" ;;
