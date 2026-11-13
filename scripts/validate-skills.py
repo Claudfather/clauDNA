@@ -252,7 +252,6 @@ def main() -> int:
 
     total_skills = len(skill_dirs) - len(SKIP_SKILLS)
 
-    # Blocking vs demoted under touched-set scoping; see partition_errors.
     blocking_errors, demoted_warnings = partition_errors(all_errors, cross_skill_errors, touched)
 
     # Removed-name hits block in BOTH modes — the touched-set partition never

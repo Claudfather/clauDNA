@@ -1418,7 +1418,9 @@ def partition_errors(
     blocking: dict[str, list[str]] = {}
     demoted: dict[str, list[str]] = {}
     for name, errors in all_errors.items():
-        (blocking if touched is None or name in touched else demoted)[name] = list(errors)
+        bucket = blocking if touched is None or name in touched else demoted
+        bucket[name] = list(errors)
     for participants, target, msg in cross_skill_errors:
-        (blocking if touched is None or participants & touched else demoted).setdefault(target, []).append(msg)
+        bucket = blocking if touched is None or participants & touched else demoted
+        bucket.setdefault(target, []).append(msg)
     return blocking, demoted

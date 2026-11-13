@@ -486,7 +486,6 @@ def main() -> int:
     total = len(skill_dirs)
     warning_count = sum(len(v) for v in all_warnings.values())
 
-    # Blocking vs demoted under touched-set scoping; see partition_errors.
     blocking_errors, demoted_warnings = partition_errors(all_errors, cross_skill_errors, touched)
 
     # Print advisory warnings (never blocking)
