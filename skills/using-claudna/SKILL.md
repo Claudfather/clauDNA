@@ -19,7 +19,7 @@ The orientation skill: how to find the right installed skill for a task, and how
 1. Resolve the loaded plugin root per `../_shared/claudna-root.md`. Use that installed copy, never a newer cache inferred from the project cwd.
 2. Enumerate the host's declared set: on Codex read `.codex-plugin/plugin.json`'s explicit `skills` paths; on Claude Code enumerate the canonical skill directories. Derive counts from this installation, not a remembered release. `_shared` is supporting material.
 3. Match intent against frontmatter descriptions. Read the complete matching SKILL.md before action. Infra engines carry verbs, `audit` carries lenses, `session` carries modes, and `review-work` carries review modes; preserve arguments.
-4. Nothing fits → use `find-skills` for third-party discovery. On Codex, a new executable procedure belongs in a clauDNA source checkout and its contribution workflow; the repo-clone-only `skill-scaffold` is excluded from this installed catalog. Claude Code can use `/claudna:skill-scaffold` from its required source context.
+4. Nothing fits → use `find-skills` for third-party discovery. On Codex, a new executable procedure belongs in a clauDNA source checkout and its contribution workflow; the repo-clone-only `skill-scaffold` is excluded from this installed catalog. On Claude Code, a person can run `/claudna:skill-scaffold` from its required source context.
 
 Newly installed names may require a catalog refresh or session restart on the execution host. Readback from the current session is the test; an updated cache alone is not registration evidence. This skill does not impose skill-first invocation before every response.
 
