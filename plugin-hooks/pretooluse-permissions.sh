@@ -228,7 +228,7 @@ split_commands() {
                     fi
                     # $$'...': bash reads the PID and then a plain quote, zsh an ANSI-C string.
                     # No parse is right for both, so this prompts.
-                    [[ "${cmd:i+1:2}" == '$'"'" ]] && return 1
+                    [[ "${cmd:i+1:2}" == "\$'" ]] && return 1
                     current+="$char"
                     ;;
                 "\\")
@@ -421,7 +421,7 @@ has_write_redirection() {
 # ─── Main logic ───────────────────────────────────────────────────────
 
 SPLIT_OUTPUT=$(split_commands "$COMMAND") || {
-    log "PASS: $COMMAND (unmatched quotes)"
+    log "PASS: $COMMAND (unparseable quoting)"
     exit 0
 }
 
