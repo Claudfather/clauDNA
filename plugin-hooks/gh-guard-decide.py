@@ -334,7 +334,8 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
         repo_env = None  # a GH_REPO=[HOST/]OWNER/REPO prefix does the same through the repository
         while i < len(seg):
             t = seg[i]
-            m = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)\+?=(.*)", t)  # `+=` exports too
+            # NAME=, NAME+= and NAME[i]= (bash runs a call behind any of them) are assignment prefixes
+            m = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)(?:\[[^\]\s]*\])?\+?=(.*)", t)
             if m:
                 if m.group(1) == "GH_HOST":
                     host_env = m.group(2)
