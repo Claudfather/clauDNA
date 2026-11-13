@@ -88,6 +88,9 @@ class TestAnsiCQuotingCannotHideACommand:
         "git status $'\\'' ; touch /tmp/pwn ; echo \\'",
         "echo $'\\'' ; touch /tmp/pwn ; echo \\'",
         "echo $'\\'' && touch /tmp/pwn && echo \\'",
+        "echo \\$$'\\'' ; touch /tmp/pwn ; echo \\'",  # an escaped `$` is a literal; the `$'` after it opens a string
+        "echo a$'\\'' ; touch /tmp/pwn ; echo \\'",  # a `$'` inside a word opens a string too
+        "echo ${x:-$'\\''} ; touch /tmp/pwn ; echo \\'",
     ])
     def test_a_command_hidden_behind_an_escaped_quote_prompts(self, tmp_path, command):
         assert not approves(tmp_path, command)
@@ -98,7 +101,7 @@ class TestAnsiCQuotingCannotHideACommand:
 
     @pytest.mark.parametrize("command", [
         "echo $'a b'", "echo $'a;b'", "echo $$", "echo $$ $'a b'", "echo $'it\\'s' ; echo done", "echo $'tab\\there'",
-        "echo \"$'x'\"", "echo '$'\"'\"'x'",
+        "echo \"$'x'\"", "echo '$'\"'\"'x'", "echo $'a'$'b'", "echo $''", "git log --format=$'%H\\t%s' -1",
     ])
     def test_ordinary_ansi_c_strings_still_approve(self, tmp_path, command):
         assert approves(tmp_path, command)
@@ -113,7 +116,8 @@ class TestAnsiCQuotingCannotHideACommand:
         "echo $$$'\\' ; touch /tmp/pwn ; echo '\\'",
     ])
     def test_a_quote_after_the_pid_variable_prompts(self, tmp_path, command):
-        # bash reads `$$` (the PID) and then a plain quote that `\\'` ends; zsh reads an ANSI-C string.
+        # $$': bash reads the PID then a plain quote, zsh an ANSI-C string. $$$' is ANSI-C in both shells;
+        # prompting there is the conservative side.
         assert not approves(tmp_path, command)
 
 
