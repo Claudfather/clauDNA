@@ -1,6 +1,7 @@
 ---
 name: init-project
 user-invocable: true
+disable-model-invocation: true
 description: "Use when setting up a new project or adding shared project instructions (CLAUDE.md or AGENTS.md), CHANGELOG.md and documentation to an existing project."
 allowed-tools: Read(*), Write(*), Edit(*), Glob(*), Grep(*), Bash(git log *), Bash(git tag *), Bash(ls *), Bash(mkdir *), Bash(command -v *), Bash(claudron status *)
 requires:

@@ -1,6 +1,7 @@
 ---
 name: github-activity-report
 user-invocable: true
+disable-model-invocation: true
 description: "Use when the user asks for GitHub activity stats (PRs authored, commits, top contributors, top repos) across an organization or their personal account over a time window. Iterates per-repo to avoid the search API's 1,000-result cap."
 requires:
   - cli: gh
