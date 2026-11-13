@@ -58,6 +58,10 @@ _WRAPPERS = {
     "env",
     "xargs",
     "timeout",
+    "noglob",
+    "nocorrect",
+    "coproc",
+    "repeat",
     "do",
     "then",
     "else",
@@ -318,9 +322,19 @@ _FD_WORD = re.compile(r"[0-9]+|\{[A-Za-z_][A-Za-z0-9_]*\}")
 
 
 def _is_redirect(tok: str) -> bool:
-    """A redirection operator token: ``>``, ``>>``, ``<``, ``<<<``, ``>&``, ``&>``. The lexer splits
-    it from its target, which is the next token."""
-    return bool(tok) and set(tok) <= set("<>&") and ("<" in tok or ">" in tok)
+    """A redirection operator token: ``>``, ``>>``, ``<``, ``<<<``, ``>&``, ``&>``, ``>|``. The lexer
+    splits it from its target, which is the next token."""
+    return bool(tok) and set(tok) <= set("<>&|") and ("<" in tok or ">" in tok)
+
+
+def _split_sep_redirect(tokens: list[str]) -> list[str]:
+    """The lexer fuses adjacent punctuation, so ``;>f`` is one token that is neither a separator nor a
+    redirection. Split a separator run from the redirection operator after it."""
+    out: list[str] = []
+    for tok in tokens:
+        m = re.fullmatch(r"([;&|()`\n]+)([<>][<>&|]*)", tok)
+        out.extend(m.groups() if m else [tok])
+    return out
 
 
 def _gh_command_words(tokens: list[str]) -> list[list[str]]:
@@ -329,7 +343,7 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
     path ending in ``gh``)."""
     segments: list[list[str]] = []
     current: list[str] = []
-    for tok in tokens:
+    for tok in _split_sep_redirect(tokens):
         if _is_separator(tok):
             segments.append(current)
             current = []
@@ -353,12 +367,13 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
                 i += 1
                 continue
             # NAME=, NAME+= and NAME[i]= (bash runs a call behind any of them) are assignment prefixes
-            m = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)(?:\[[^\]\s]*\])?\+?=(.*)", t)
+            m = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)(?:\[[^\]]*\])?(\+?)=(.*)", t, re.S)
             if m:
+                # `+=` appends to what an earlier prefix set, so `GH_HOST=evil GH_HOST+=x` is still evil
                 if m.group(1) == "GH_HOST":
-                    host_env = m.group(2)
+                    host_env = (host_env or "") + m.group(3) if m.group(2) else m.group(3)
                 elif m.group(1) == "GH_REPO":
-                    repo_env = m.group(2)
+                    repo_env = (repo_env or "") + m.group(3) if m.group(2) else m.group(3)
                 i += 1
                 continue
             base = t.lstrip("\\")

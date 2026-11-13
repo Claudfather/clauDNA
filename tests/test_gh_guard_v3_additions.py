@@ -74,6 +74,20 @@ def test_the_decider_decodes_stdin_the_way_it_decodes_argv(monkeypatch, raw):
         f"&>/dev/null {G}",
         f"{{fd}}>/dev/null {G}",
         f">/dev/null {GR}",
+        f"true;>f {G}",  # the lexer fuses `;>` into one token
+        f"true&&>f {G}",
+        f"(>f {G})",
+        f">|f {G}",  # clobber redirect
+        f"2>|f {G}",
+        f"A='x\ny' {G}",  # a newline inside a quoted assignment value
+        f'A["x y"]=1 {G}',  # whitespace in a subscript
+        f"noglob {G}",  # words zsh (and bash 4) run the next word behind
+        f"nocorrect noglob {G}",
+        f"repeat 1 {G}",
+        f"coproc {G}",
+        "GH_HOST=evil.example.com GH_HOST+= gh pr list",  # += appends: the host stays evil
+        "GH_HOST=evil.example.com GH_HOST+=github.com gh pr list",
+        "GH_REPO=evil.example.com/o/r GH_REPO+= gh pr list",
         f"echo don't `{G}`",  # quoting the tokenizer cannot follow: the lenient split still sees the backtick call
     ],
 )
@@ -93,6 +107,9 @@ def test_spellings_the_shell_reads_differently_are_denied(cmd):
         "2>&1 gh pr list --json number --jq .[].number",
         ">/dev/null gh pr list --json number",
         "gh pr list --json number >/dev/null 2>&1",
+        "GH_HOST=github.com GH_HOST+= gh pr list",
+        "noglob gh pr list --json number --jq .[].number",
+        "true;>f gh pr list --json number",
         "gh pr list --json title --jq '.[] | select(.title | test(\"#12\")) | .title'",  # a hash inside a string
         "gh pr comment 5 -R o/r --body-file - <<'EOF'\nuse --jq env.X and -R evil.example/o/r here\nEOF",
     ],
