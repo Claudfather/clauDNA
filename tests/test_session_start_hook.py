@@ -290,18 +290,14 @@ class TestSessionStartHook:
 
 def _git_in(cwd: Path, *args: str) -> None:
     env = dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
-    subprocess.run(["git", "-C", str(cwd), "-c", "user.name=T", "-c", "user.email=t@example.invalid", *args],
-                   env=env, check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(cwd), *args], env=env, check=True, capture_output=True)
 
 
 def test_session_start_git_status_runs_no_fsmonitor_command_the_repo_names(tmp_path):
     """Executable guard: the hook's `git status` must not run the command `core.fsmonitor` names."""
     _git_in(tmp_path, "init", "-q", "-b", "main")
-    (tmp_path / "tracked.txt").write_text("hello\n")
-    _git_in(tmp_path, "add", "tracked.txt")
-    _git_in(tmp_path, "commit", "-q", "-m", "first")
-    marker = tmp_path.parent / f"{tmp_path.name}-fsmonitor-ran"
-    command = tmp_path.parent / f"{tmp_path.name}-fsmonitor-command"
+    marker = tmp_path / "fsmonitor-ran"
+    command = tmp_path / "fsmonitor-command"
     command.write_text(f"#!/bin/sh\ntouch '{marker}'\nexit 1\n")
     command.chmod(0o755)
     _git_in(tmp_path, "config", "core.fsmonitor", str(command))

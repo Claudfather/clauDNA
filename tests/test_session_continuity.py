@@ -171,7 +171,7 @@ def test_reference_cas_ambiguity_and_explicit_workflow_selection(store, tmp_path
     assert current.capture_state() == "captured"
 
 
-def test_concurrent_same_identity_publication_has_one_cas_winner(store, tmp_path, monkeypatch):
+def test_concurrent_same_identity_publication_has_one_cas_winner(store, tmp_path):
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     scope = canonical_scope(f"workspace:{workspace}")
