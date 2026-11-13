@@ -329,7 +329,9 @@ _GIT_OPTIONS_AND_SUBCOMMAND = re.compile(r"\s+((?:-C\s+(?:\"[^\"]*\"|\S+)\s+|-c\
 def _git_reads() -> tuple[set[tuple[str, str]], list[str]]:
     """Every `git <subcommand>` in plugin-hooks/*.sh outside comments, and those whose own options lack
     `-c core.fsmonitor=`. A line holding two `git` words is two reads, so the flag on one cannot vouch for
-    the other; a comment (whole-line or trailing) that names the flag vouches for nothing."""
+    the other; a comment (whole-line or trailing) that names the flag vouches for nothing. A `git` the
+    pattern cannot parse (`git --git-dir=. rev-parse`) counts as unguarded: a guard must not skip what it
+    cannot read."""
     found: set[tuple[str, str]] = set()
     unguarded: list[str] = []
     for script in sorted((REPO_ROOT / "plugin-hooks").glob("*.sh")):
@@ -339,10 +341,12 @@ def _git_reads() -> tuple[set[tuple[str, str]], list[str]]:
             line = re.sub(r"\s#\s.*$", "", line)
             for segment in _GIT_WORD.split(line)[1:]:
                 m = _GIT_OPTIONS_AND_SUBCOMMAND.match(segment)
-                if m:
-                    found.add((script.name, m.group(2)))
-                    if "-c core.fsmonitor= " not in m.group(1):
-                        unguarded.append(f"{script.name}: git {m.group(2)}  <-  {line.strip()}")
+                if not m:
+                    unguarded.append(f"{script.name}: a `git` this census cannot parse  <-  {line.strip()}")
+                    continue
+                found.add((script.name, m.group(2)))
+                if "-c core.fsmonitor= " not in m.group(1):
+                    unguarded.append(f"{script.name}: git {m.group(2)}  <-  {line.strip()}")
     return found, unguarded
 
 
