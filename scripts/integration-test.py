@@ -394,7 +394,7 @@ def check_code_blocks(skill_name: str, body: str) -> tuple[list[str], list[str]]
 
 
 def main() -> int:
-    from skill_checks import get_touched_skills
+    from skill_checks import get_touched_skills, partition_errors
 
     if not SKILLS_DIR.is_dir():
         print(f"FAIL: skills directory not found at {SKILLS_DIR}", file=sys.stderr)
@@ -488,24 +488,7 @@ def main() -> int:
 
     # In CI mode, partition errors into blocking (touched) vs warnings (untouched).
     # Cross-skill errors block if ANY participant is touched.
-    if ci_mode:
-        blocking_errors: dict[str, list[str]] = {}
-        demoted_warnings: dict[str, list[str]] = {}
-        for name, errors in all_errors.items():
-            if name in touched:
-                blocking_errors[name] = errors
-            else:
-                demoted_warnings[name] = errors
-        for participants, target_skill, msg in cross_skill_errors:
-            if participants & touched:
-                blocking_errors.setdefault(target_skill, []).append(msg)
-            else:
-                demoted_warnings.setdefault(target_skill, []).append(msg)
-    else:
-        blocking_errors = all_errors
-        demoted_warnings = {}
-        for _participants, target_skill, msg in cross_skill_errors:
-            blocking_errors.setdefault(target_skill, []).append(msg)
+    blocking_errors, demoted_warnings = partition_errors(all_errors, cross_skill_errors, touched)
 
     # Print advisory warnings (never blocking)
     if all_warnings:

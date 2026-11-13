@@ -1324,12 +1324,20 @@ def warn_skill_md(skill_md: Path) -> list[str]:
     return warnings
 
 
+# Paths whose change can alter the verdict on ANY skill, not only on skills the PR touches:
+# the rules themselves, their data files, and the contracts they enforce.
+VALIDATOR_INPUT_PREFIXES = ("scripts/", "contracts/")
+VALIDATOR_INPUT_FILES = ("SKILL_CONTRACT.md", "AGENT_CONTRACT.md")
+
+
 def get_touched_skills() -> set[str] | None:
     """Return skill dir names touched in this PR, or None if not in CI.
 
     In CI (GITHUB_ACTIONS set), diffs against origin/main to find which
     skill directories were modified. Returns None when running locally
-    so callers can treat all errors as blocking.
+    so callers can treat all errors as blocking. Also returns None (full
+    blocking validation) when the diff touches a validator or contract
+    input (see VALIDATOR_INPUT_PREFIXES / VALIDATOR_INPUT_FILES).
 
     Escape hatches for full validation in CI:
     - Set env var FULL_VALIDATE=1
@@ -1355,11 +1363,16 @@ def get_touched_skills() -> set[str] | None:
         print("[full-validate] label detected: running full blocking validation", file=sys.stderr)
         return None
 
-    result = subprocess.run(
-        ["git", "diff", "--name-only", "origin/main...HEAD"],
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--name-only", "origin/main...HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=Path(__file__).resolve().parent.parent,
+        )
+    except FileNotFoundError:
+        print("WARNING: git is not installed, falling back to full blocking validation.", file=sys.stderr)
+        return None
     if result.returncode != 0:
         print(
             f"WARNING: git diff failed (exit {result.returncode}), falling back to full "
@@ -1367,6 +1380,10 @@ def get_touched_skills() -> set[str] | None:
             f"origin/main ref. stderr: {result.stderr.strip()}",
             file=sys.stderr,
         )
+        return None
+    changed = result.stdout.strip().splitlines()
+    if any(p.startswith(VALIDATOR_INPUT_PREFIXES) or p in VALIDATOR_INPUT_FILES for p in changed):
+        print("validator or contract input changed: running full blocking validation", file=sys.stderr)
         return None
     touched: set[str] = set()
     for path in result.stdout.strip().splitlines():
@@ -1385,3 +1402,26 @@ def get_touched_skills() -> set[str] | None:
         if path.startswith("skills/_shared/"):
             return None  # validate everything as blocking
     return touched
+
+
+def partition_errors(
+    all_errors: dict[str, list[str]],
+    cross_skill_errors: list[tuple[set[str], str, str]],
+    touched: set[str] | None,
+) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    """(blocking, demoted) under CI scoping; touched=None (local, or full validation) blocks everything.
+
+    Cross-skill errors (e.g. duplicate names) block if ANY participant is touched, so
+    alphabetical attribution to one skill cannot silently demote an error a touched skill took part in.
+    """
+    if touched is None:
+        blocking = {name: list(errors) for name, errors in all_errors.items()}
+        for _participants, target, msg in cross_skill_errors:
+            blocking.setdefault(target, []).append(msg)
+        return blocking, {}
+    blocking, demoted = {}, {}
+    for name, errors in all_errors.items():
+        (blocking if name in touched else demoted)[name] = errors
+    for participants, target, msg in cross_skill_errors:
+        (blocking if participants & touched else demoted).setdefault(target, []).append(msg)
+    return blocking, demoted
