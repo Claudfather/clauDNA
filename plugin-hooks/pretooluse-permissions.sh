@@ -27,6 +27,7 @@ set -eo pipefail
 # Compound-command splitting scope:
 #   Handled (split + each part validated independently):
 #     &&   ||   |   ;   &   (lone & = background operator, splits like ;)
+#     $'...'    ANSI-C words: a backslash escapes the next character, so \' stays inside the word
 #
 #   `&` stays literal inside a redirection (2>&1, >&, <&, &>) — there it is
 #   fd-duplication, not a control operator, so it is not a split point.
@@ -37,7 +38,8 @@ set -eo pipefail
 #     <( ) >( )  process substitution
 #     <<  <<<    here-docs and here-strings
 #     { ; }      brace groups (not detected — falls through via match failure)
-#     nested quoting edge cases beyond basic single/double quote tracking
+#     nested quoting edge cases beyond single, double and $'...' quote tracking
+#     an unquoted $$'  bash reads the PID then a plain quote, zsh an ANSI-C string; prompts
 #     a gh sub-command in which an expansion can form or change an option
 #                word ($'..', ${X-..}, {a,b}, --j${Z}q); see gh_option_expansion
 
@@ -195,14 +197,20 @@ split_commands() {
     local cmd="$1"
     local len=${#cmd}
     local i=0 char
-    local sq=false dq=false
+    local sq=false dq=false ansi=false
     local current=""
 
     while (( i < len )); do
         char="${cmd:i:1}"
 
         if $sq; then
-            [[ "$char" == "'" ]] && sq=false
+            # $'...' (ANSI-C quoting) is a single-quote form in which a backslash
+            # escapes the next character, so \' does not end the string.
+            if $ansi && [[ "$char" == "\\" ]] && (( i + 1 < len )); then
+                current+="$char${cmd:i+1:1}"
+                i=$((i + 2)); continue
+            fi
+            [[ "$char" == "'" ]] && { sq=false; ansi=false; }
             current+="$char"
         elif $dq; then
             if [[ "$char" == "\\" ]] && (( i + 1 < len )); then
@@ -215,6 +223,16 @@ split_commands() {
             case "$char" in
                 "'") sq=true; current+="$char" ;;
                 '"') dq=true; current+="$char" ;;
+                '$')
+                    if [[ "${cmd:i+1:1}" == "'" ]]; then
+                        sq=true; ansi=true; current+="$char'"
+                        i=$((i + 2)); continue
+                    fi
+                    # $$'...': bash reads the PID and then a plain quote, zsh an ANSI-C string.
+                    # No parse is right for both, so this prompts.
+                    [[ "${cmd:i+1:2}" == "\$'" ]] && return 1
+                    current+="$char"
+                    ;;
                 "\\")
                     if (( i + 1 < len )); then
                         current+="$char${cmd:i+1:1}"
@@ -405,7 +423,7 @@ has_write_redirection() {
 # ─── Main logic ───────────────────────────────────────────────────────
 
 SPLIT_OUTPUT=$(split_commands "$COMMAND") || {
-    log "PASS: $COMMAND (unmatched quotes)"
+    log "PASS: $COMMAND (unparseable quoting)"
     exit 0
 }
 

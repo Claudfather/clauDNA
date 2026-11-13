@@ -80,6 +80,47 @@ class TestKnownSeparatorsStillGate:
         assert not approves(tmp_path, "git status | rm -rf /tmp/pwn")
 
 
+class TestAnsiCQuotingCannotHideACommand:
+    """`$'...'` ends only at an unescaped `'`: a `\\'` inside it is a literal quote, so a second
+    command placed after one is a real second command and must gate like `;`."""
+
+    @pytest.mark.parametrize("command", [
+        "git status $'\\'' ; touch /tmp/pwn ; echo \\'",
+        "echo $'\\'' ; touch /tmp/pwn ; echo \\'",
+        "echo $'\\'' && touch /tmp/pwn && echo \\'",
+        "echo \\$$'\\'' ; touch /tmp/pwn ; echo \\'",  # an escaped `$` is a literal; the `$'` after it opens a string
+        "echo a$'\\'' ; touch /tmp/pwn ; echo \\'",  # a `$'` inside a word opens a string too
+        "echo ${x:-$'\\''} ; touch /tmp/pwn ; echo \\'",
+    ])
+    def test_a_command_hidden_behind_an_escaped_quote_prompts(self, tmp_path, command):
+        assert not approves(tmp_path, command)
+
+    def test_a_plain_quoted_string_after_an_ansi_c_one_is_plain_again(self, tmp_path):
+        # `'\\'` is a complete plain string, so the `;` after it separates a real second command.
+        assert not approves(tmp_path, "echo $'a' '\\' ; touch /tmp/pwn ; echo '\\'")
+
+    @pytest.mark.parametrize("command", [
+        "echo $'a b'", "echo $'a;b'", "echo $$", "echo $$ $'a b'", "echo $'it\\'s' ; echo done", "echo $'tab\\there'",
+        "echo \"$'x'\"", "echo '$'\"'\"'x'", "echo $'a'$'b'", "echo $''", "git log --format=$'%H\\t%s' -1",
+    ])
+    def test_ordinary_ansi_c_strings_still_approve(self, tmp_path, command):
+        assert approves(tmp_path, command)
+
+    @pytest.mark.parametrize("command", ["echo $'abc", "echo $'abc\\'"])
+    def test_an_unterminated_ansi_c_string_prompts(self, tmp_path, command):
+        assert not approves(tmp_path, command)
+
+    @pytest.mark.parametrize("command", [
+        "git status $$'\\' ; touch /tmp/pwn ; echo '\\'",
+        "echo $$'\\' ; touch /tmp/pwn ; echo '\\'",
+        "echo $$$'\\' ; touch /tmp/pwn ; echo '\\'",
+    ])
+    def test_a_quote_after_the_pid_variable_prompts(self, tmp_path, command):
+        # $$': bash reads the PID then a plain quote, zsh an ANSI-C string. $$$' is ANSI-C in both shells;
+        # prompting there is the conservative side.
+        assert not approves(tmp_path, command)
+
+
 class TestLegitimateCommandsStillApprove:
     """The fix must not turn safe, allowed commands into prompts."""
 

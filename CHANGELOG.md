@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Session handoffs are owned by verified native sessions, not a shared per-cwd `.claude/session.md`. Resume uses scoped references; legacy sources are read-only and require a source hash plus explicit reimport for changed content. This staged source change is not a release or proof of consumer acceptance.
 
 ### Fixed
+- The PreToolUse permissions hook's quote tracking now parses `$'...'` words the way the shell does, and prompts when it cannot tell (an unterminated `$'...'` or an ambiguous `$$'`).
 - `using-claudna`'s Finding Skills step now says a person can run `/claudna:skill-scaffold` on Claude Code: the skill sets `disable-model-invocation: true`, so the model does not start it on its own.
 - Reject existing release output entries, including dangling symlinks, before resolving destinations or allocating qualification state.
 - Route report-only audits and retained reviews through standalone artifact validation, and post metadata-free review editions while preserving canonical reports and hashes.
