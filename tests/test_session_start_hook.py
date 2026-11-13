@@ -286,7 +286,7 @@ class TestSessionStartHook:
 # user did not create cannot run one. Measured on git 2.50.1 (Apple Git): of the subcommands the hooks use,
 # only `status` runs the configured command (`rev-parse`, `branch`, `symbolic-ref` and `cat-file` do not).
 # So running a hook can show the flag missing only for session-start.sh's `git status`; the other reads
-# are held by the text assertion below, because no executable test of them can fail on this git.
+# are held by the census below, because no executable test of them can fail on this git.
 
 def _git_in(cwd: Path, *args: str) -> None:
     env = dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
@@ -313,30 +313,50 @@ def test_session_start_git_status_runs_no_fsmonitor_command_the_repo_names(tmp_p
     assert not marker.exists(), "session-start.sh ran the fsmonitor command the repository's config names"
 
 
-def _code_lines(script: str) -> str:
-    """A hook's source without its comment lines: the flag named only in prose (statusline.sh's explanatory
-    comment sits beside the command it explains) cannot satisfy an assertion about the command."""
-    lines = (REPO_ROOT / "plugin-hooks" / script).read_text().splitlines()
-    return "\n".join(line for line in lines if not line.lstrip().startswith("#"))
-
-
-@pytest.mark.parametrize(("script", "subcommand"), [
+# Every `git <subcommand>` the hooks run on their own. A new read is added here deliberately, so its guard is
+# looked at when it is added.
+_AUTOMATIC_GIT_READS = {
     ("session-start.sh", "rev-parse"),
     ("session-start.sh", "branch"),
     ("session-start.sh", "status"),
     ("statusline.sh", "symbolic-ref"),
     ("auto-format.sh", "cat-file"),
-])
-def test_every_automatic_git_read_clears_fsmonitor(script, subcommand):
-    """Text guard, comment lines stripped. It is the only guard for `symbolic-ref` (statusline.sh) and
-    `cat-file` (auto-format.sh): git does not run a configured fsmonitor command for either, so no executable
-    test of them can fail. It also keeps `rev-parse` and `branch` guarded, for a git that starts to."""
-    code = _code_lines(script)
-    reads = [line for line in code.splitlines() if re.search(rf"\bgit\b.*\s{re.escape(subcommand)}\b", line)]
-    assert reads, f"no `git {subcommand}` read in {script}: update this guard with the script"
-    for line in reads:
-        assert re.search(rf"\bgit\b.*\s-c core\.fsmonitor=\s(?:.*\s)?{re.escape(subcommand)}\b", line), (
-            f"unguarded `git {subcommand}` in {script}: {line.strip()}")
+}
+_GIT_WORD = re.compile(r"(?<![\w./-])git(?![\w./-])")
+_GIT_OPTIONS_AND_SUBCOMMAND = re.compile(r"\s+((?:-C\s+(?:\"[^\"]*\"|\S+)\s+|-c\s+\S+\s+|--[a-z-]+\s+)*)([a-z][a-z-]*)\b")
+
+
+def _git_reads() -> tuple[set[tuple[str, str]], list[str]]:
+    """Every `git <subcommand>` in plugin-hooks/*.sh outside comments, and those whose own options lack
+    `-c core.fsmonitor=`. A line holding two `git` words is two reads, so the flag on one cannot vouch for
+    the other; a comment (whole-line or trailing) that names the flag vouches for nothing."""
+    found: set[tuple[str, str]] = set()
+    unguarded: list[str] = []
+    for script in sorted((REPO_ROOT / "plugin-hooks").glob("*.sh")):
+        for line in script.read_text().splitlines():
+            if line.lstrip().startswith("#"):
+                continue
+            line = re.sub(r"\s#\s.*$", "", line)
+            for segment in _GIT_WORD.split(line)[1:]:
+                m = _GIT_OPTIONS_AND_SUBCOMMAND.match(segment)
+                if m:
+                    found.add((script.name, m.group(2)))
+                    if "-c core.fsmonitor= " not in m.group(1):
+                        unguarded.append(f"{script.name}: git {m.group(2)}  <-  {line.strip()}")
+    return found, unguarded
+
+
+def test_every_automatic_git_read_clears_fsmonitor():
+    """Text guard over plugin-hooks/*.sh (the Python reads in lib/ and scripts/ are not covered here). It is
+    the only guard for `symbolic-ref` (statusline.sh) and `cat-file` (auto-format.sh): git does not run a
+    configured fsmonitor command for either, so no executable test of them can fail. It also keeps `rev-parse`
+    and `branch` guarded, for a git that starts to, and it sees a new read in any hook script."""
+    found, unguarded = _git_reads()
+    assert not unguarded, "a git read without `-c core.fsmonitor=`:\n" + "\n".join(unguarded)
+    assert found == _AUTOMATIC_GIT_READS, (
+        f"the hooks' automatic git reads changed: new {sorted(found - _AUTOMATIC_GIT_READS)}, "
+        f"gone {sorted(_AUTOMATIC_GIT_READS - found)}. Update _AUTOMATIC_GIT_READS; the new read is guarded "
+        "above or it would have failed already.")
 
 
 def _canonical_handoff(tmp_path, sid, workflow="default", *, private=False):
