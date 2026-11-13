@@ -289,7 +289,9 @@ class TestSessionStartHook:
 # are held by the census below, because no executable test of them can fail on this git.
 
 def _git_in(cwd: Path, *args: str) -> None:
-    env = dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
+    # Built from scratch: a pytest started by a git hook inherits GIT_DIR, and the fixture's git must not follow it
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(cwd), "GIT_CONFIG_NOSYSTEM": "1",
+           "GIT_CONFIG_GLOBAL": os.devnull}
     subprocess.run(["git", "-C", str(cwd), *args], env=env, check=True, capture_output=True)
 
 
@@ -322,23 +324,22 @@ _AUTOMATIC_GIT_READS = {
     ("statusline.sh", "symbolic-ref"),
     ("auto-format.sh", "cat-file"),
 }
-_GIT_WORD = re.compile(r"(?<![\w./-])git(?![\w./-])")
+_GIT_WORD = re.compile(r"(?<![\w.-])git(?![\w./-])")
 _GIT_OPTIONS_AND_SUBCOMMAND = re.compile(r"\s+((?:-C\s+(?:\"[^\"]*\"|\S+)\s+|-c\s+\S+\s+|--[a-z-]+\s+)*)([a-z][a-z-]*)\b")
 
 
 def _git_reads() -> tuple[set[tuple[str, str]], list[str]]:
-    """Every `git <subcommand>` in plugin-hooks/*.sh outside comments, and those whose own options lack
-    `-c core.fsmonitor=`. A line holding two `git` words is two reads, so the flag on one cannot vouch for
-    the other; a comment (whole-line or trailing) that names the flag vouches for nothing. A `git` the
-    pattern cannot parse (`git --git-dir=. rev-parse`) counts as unguarded: a guard must not skip what it
-    cannot read."""
+    """Every `git <subcommand>` in the hook scripts (plugin-hooks/*.sh and lib/) outside whole-line comments, and
+    those whose own options lack `-c core.fsmonitor=`. A line holding two `git` words is two reads, so the flag
+    on one cannot vouch for the other. A `git` the pattern cannot parse (`git --git-dir=. rev-parse`) counts as
+    unguarded: a guard must not skip what it cannot read, and a line that only mentions git in prose must be
+    reworded."""
     found: set[tuple[str, str]] = set()
     unguarded: list[str] = []
-    for script in sorted((REPO_ROOT / "plugin-hooks").glob("*.sh")):
+    for script in sorted((REPO_ROOT / "plugin-hooks").rglob("*.sh")):
         for line in script.read_text().splitlines():
             if line.lstrip().startswith("#"):
                 continue
-            line = re.sub(r"\s#\s.*$", "", line)
             for segment in _GIT_WORD.split(line)[1:]:
                 m = _GIT_OPTIONS_AND_SUBCOMMAND.match(segment)
                 if not m:
@@ -356,7 +357,9 @@ def test_every_automatic_git_read_clears_fsmonitor():
     configured fsmonitor command for either, so no executable test of them can fail. It also keeps `rev-parse`
     and `branch` guarded, for a git that starts to, and it sees a new read in any hook script."""
     found, unguarded = _git_reads()
-    assert not unguarded, "a git read without `-c core.fsmonitor=`:\n" + "\n".join(unguarded)
+    assert not unguarded, (
+        "a git read without `-c core.fsmonitor=` (a non-comment line that only mentions git in prose must be "
+        "reworded):\n" + "\n".join(unguarded))
     assert found == _AUTOMATIC_GIT_READS, (
         f"the hooks' automatic git reads changed: new {sorted(found - _AUTOMATIC_GIT_READS)}, "
         f"gone {sorted(_AUTOMATIC_GIT_READS - found)}. Update _AUTOMATIC_GIT_READS; the new read is guarded "

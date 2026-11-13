@@ -69,7 +69,8 @@ def _no_real_claudron_status(monkeypatch):
 def _no_ambient_native_identity(monkeypatch):
     """No test inherits the developer's native session identity: ``owned_session()`` raises on a conflict
     between these three names and the id under test. A test that needs one sets it in its own body, which
-    runs after this fixture; one that starts a subprocess builds that child's environment explicitly."""
+    runs after this fixture. A subprocess a test starts inherits the cleaned environment, so one that needs an
+    identity in the child sets it in the environment it passes."""
     for name in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
         monkeypatch.delenv(name, raising=False)
 
