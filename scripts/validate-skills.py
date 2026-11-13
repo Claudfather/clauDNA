@@ -5,7 +5,8 @@ Run: python scripts/validate-skills.py
 Exits non-zero on any violation; prints a structured report.
 
 In CI (GITHUB_ACTIONS set), only errors from PR-touched skills block.
-Untouched skill errors are reported as warnings for visibility.
+Untouched skill errors are reported as warnings for visibility. A diff that touches a
+validator input (scripts/, contracts/, SKILL_CONTRACT.md, AGENT_CONTRACT.md) blocks on every skill.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from skill_checks import (
     invokes_claudron,
     load_removed_skills,
     parse_frontmatter,
+    partition_errors,
     validate_skill_md,
     walk_gate_files,
     warn_skill_md,
@@ -251,30 +253,7 @@ def main() -> int:
 
     total_skills = len(skill_dirs) - len(SKIP_SKILLS)
 
-    # In CI mode, partition errors into blocking (touched) vs warnings (untouched).
-    # Cross-skill errors (e.g. duplicate names) block if ANY participant is touched,
-    # preventing the bug where alphabetical ordering attributes the error to only
-    # one skill — if that skill happens to be untouched, the error silently demotes.
-    if ci_mode:
-        blocking_errors: dict[str, list[str]] = {}
-        demoted_warnings: dict[str, list[str]] = {}
-        for name, errors in all_errors.items():
-            if name in touched:
-                blocking_errors[name] = errors
-            else:
-                demoted_warnings[name] = errors
-        # Cross-skill errors: block if any participant is touched
-        for participants, target_skill, msg in cross_skill_errors:
-            if participants & touched:
-                blocking_errors.setdefault(target_skill, []).append(msg)
-            else:
-                demoted_warnings.setdefault(target_skill, []).append(msg)
-    else:
-        blocking_errors = all_errors
-        demoted_warnings = {}
-        # In local mode, cross-skill errors are always blocking
-        for _participants, target_skill, msg in cross_skill_errors:
-            blocking_errors.setdefault(target_skill, []).append(msg)
+    blocking_errors, demoted_warnings = partition_errors(all_errors, cross_skill_errors, touched)
 
     # Removed-name hits block in BOTH modes — the touched-set partition never
     # applies to this class (see scan_removed_names).
