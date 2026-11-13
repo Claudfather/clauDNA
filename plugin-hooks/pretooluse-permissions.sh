@@ -27,6 +27,7 @@ set -eo pipefail
 # Compound-command splitting scope:
 #   Handled (split + each part validated independently):
 #     &&   ||   |   ;   &   (lone & = background operator, splits like ;)
+#     $'...'    ANSI-C words: a backslash escapes the next character, so \' stays inside the word
 #
 #   `&` stays literal inside a redirection (2>&1, >&, <&, &>) — there it is
 #   fd-duplication, not a control operator, so it is not a split point.
@@ -37,7 +38,8 @@ set -eo pipefail
 #     <( ) >( )  process substitution
 #     <<  <<<    here-docs and here-strings
 #     { ; }      brace groups (not detected — falls through via match failure)
-#     nested quoting edge cases beyond basic single/double quote tracking
+#     nested quoting edge cases beyond single, double and $'...' quote tracking
+#     an unquoted $$'  bash reads the PID then a plain quote, zsh an ANSI-C string; prompts
 #     a gh sub-command in which an expansion can form or change an option
 #                word ($'..', ${X-..}, {a,b}, --j${Z}q); see gh_option_expansion
 
