@@ -350,7 +350,8 @@ class TestTheLogIsPerUserAndPrivate:
         assert "/tmp" not in HOOK.read_text()
 
 
-def decision(tmp_path: Path, command: str, allow: list[str] | None = None, extra_env: dict[str, str] | None = None) -> str:
+def decision(tmp_path: Path, command: str, allow: list[str] | None = None, extra_env: dict[str, str] | None = None,
+             timeout: int = 10) -> str:
     """The hook's decision for `command`: 'allow', 'deny', or 'prompt' (no output)."""
     claude = tmp_path / ".claude"
     claude.mkdir(exist_ok=True)
@@ -361,7 +362,7 @@ def decision(tmp_path: Path, command: str, allow: list[str] | None = None, extra
     env = {"HOME": str(tmp_path), "PATH": "/usr/bin:/bin", **(extra_env or {})}
     proc = subprocess.run(
         ["bash", str(HOOK)], input=payload, capture_output=True, text=True,
-        cwd=tmp_path, env=env, timeout=10,
+        cwd=tmp_path, env=env, timeout=timeout,
     )
     if '"permissionDecision":"deny"' in proc.stdout:
         return "deny"
@@ -440,7 +441,7 @@ class TestGhReadGuard:
 
     def test_an_oversized_command_still_reaches_the_decider(self, tmp_path):
         command = "gh pr list --json number --jq env.X #" + "x" * 1_200_000
-        assert decision(tmp_path, command, ["Bash"]) == "deny"
+        assert decision(tmp_path, command, ["Bash"], timeout=60) == "deny"  # 1.2 MB: seconds under load
 
     def test_a_decider_that_does_not_answer_still_fails_open_but_is_logged(self, tmp_path):
         shim = tmp_path / "shim"

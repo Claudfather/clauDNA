@@ -88,6 +88,14 @@ def test_the_decider_decodes_stdin_the_way_it_decodes_argv(monkeypatch, raw):
         "GH_HOST=evil.example.com GH_HOST+= gh pr list",  # += appends: the host stays evil
         "GH_HOST=evil.example.com GH_HOST+=github.com gh pr list",
         "GH_REPO=evil.example.com/o/r GH_REPO+= gh pr list",
+        "GH_HOST=evil.example.com GH_HOST[0]=github.com gh pr list",  # a subscript write must not launder it
+        "GH_REPO=evil.example.com/o/r GH_REPO[0]=github.com/o/r gh pr list",
+        "GH_HOST[0]=github.com gh pr list",  # bash and zsh read a subscripted GH_HOST differently: denied
+        "GH_HOST=git GH_HOST+=hub.com gh pr list",  # zsh reads github.com, bash 3.2 reads hub.com: `git` is foreign
+        "GH_HOST=evil.example.com GH_HOST=github.com gh pr list",  # a later prefix does not launder an earlier one
+        "A[$(true)]=1 gh pr list --json number --jq env.X",  # the lexer splits a subscript at `$(`
+        f"repeat $n {G}",  # zsh `repeat` takes any count word
+        f"repeat 1+1 {G}",
         f"echo don't `{G}`",  # quoting the tokenizer cannot follow: the lenient split still sees the backtick call
     ],
 )
@@ -108,6 +116,8 @@ def test_spellings_the_shell_reads_differently_are_denied(cmd):
         ">/dev/null gh pr list --json number",
         "gh pr list --json number >/dev/null 2>&1",
         "GH_HOST=github.com GH_HOST+= gh pr list",
+        "GH_HOST+=github.com gh pr list",
+        "repeat 2 gh pr list --json number --jq .[].number",
         "noglob gh pr list --json number --jq .[].number",
         "true;>f gh pr list --json number",
         "gh pr list --json title --jq '.[] | select(.title | test(\"#12\")) | .title'",  # a hash inside a string

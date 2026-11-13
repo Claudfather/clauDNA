@@ -24,6 +24,8 @@ refuses only the shapes above; every other ``gh`` call — including the fleet's
 text, so a value the shell assembles at run time (a variable, a ``$'...'`` form) is
 invisible to it; those are the hook's approver's to gate, not the decider's (the approver
 does not approve a gh command in which an expansion can form or change an option word).
+That includes a command substitution inside a ``GH_HOST=`` / ``GH_REPO=`` prefix value:
+``GH_HOST=$(echo evil.example.com) gh pr list`` is read as the literal text.
 """
 
 from __future__ import annotations
@@ -317,6 +319,10 @@ def _is_separator(tok: str) -> bool:
     return bool(tok) and all(ch in _SEPARATOR_CHARS for ch in tok)
 
 
+# A host nothing allows. A subscripted `GH_HOST[i]=` / `GH_REPO[i]=` prefix means different strings in bash
+# (an array element) and zsh (an edit of the string), so the guard reads it as this.
+_UNKNOWN_HOST = "unknown-host.invalid"
+
 # The descriptor in front of a redirection operator: `2` in `2>&1`, `{fd}` in `{fd}>file`.
 _FD_WORD = re.compile(r"[0-9]+|\{[A-Za-z_][A-Za-z0-9_]*\}")
 
@@ -357,7 +363,10 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
     out: list[list[str]] = []
     for seg in segments:
         i = 0
-        env: dict[str, str] = {}  # GH_HOST=<host> / GH_REPO=[HOST/]OWNER/REPO prefixes name the host this call talks to
+        # GH_HOST=<host> / GH_REPO=[HOST/]OWNER/REPO prefixes name the host this call talks to. `held` is what
+        # each holds if `+=` appends; `readings` is every value a prefix gave it, and any foreign one denies.
+        held: dict[str, str] = {}
+        readings: dict[str, list[str]] = {}
         while i < len(seg):
             t = seg[i]
             # a redirection before the command word (`2>&1 gh ...`, `>/dev/null gh ...`) is opened by
@@ -368,17 +377,26 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
             if _FD_WORD.fullmatch(t) and i + 1 < len(seg) and _is_redirect(seg[i + 1]):
                 i += 1
                 continue
-            # NAME=, NAME+= and NAME[i]= (bash runs a call behind any of them) are assignment prefixes
-            m = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)(?:\[[^\]]*\])?(\+?)=(.*)", t, re.S)
-            if m:
-                # `+=` appends to what an earlier prefix set, so `GH_HOST=evil GH_HOST+=x` is still evil
-                if m.group(1) in ("GH_HOST", "GH_REPO"):
-                    env[m.group(1)] = env.get(m.group(1), "") + m.group(3) if m.group(2) else m.group(3)
+            # NAME=, NAME+= and NAME[i]= (bash runs a call behind any of them) are assignment prefixes; a
+            # token that opens with `]=` is the tail of a subscript the lexer split at a `$(`
+            m = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)(\[[^\]]*\])?(\+?)=(.*)", t, re.S)
+            if m or re.fullmatch(r"\]\+?=.*", t, re.S):
+                if m and m.group(1) in ("GH_HOST", "GH_REPO"):
+                    name, subscript, plus, value = m.groups()
+                    seen = readings.setdefault(name, [])
+                    if subscript:
+                        seen.append(_UNKNOWN_HOST if name == "GH_HOST" else f"{_UNKNOWN_HOST}/o/r")
+                    else:
+                        # `+=` appends to what an earlier prefix set (`GH_HOST=evil GH_HOST+=x` is still evil).
+                        # A later prefix never launders an earlier one, whichever way a shell resolves them
+                        # (bash 3.2 assigns where zsh appends): every earlier reading stays.
+                        held[name] = held.get(name, "") + value if plus else value
+                        seen.append(held[name])
                 i += 1
                 continue
             base = t.lstrip("\\")
             if base in _WRAPPERS:
-                i += 1
+                i += 2 if base == "repeat" else 1  # zsh `repeat` takes a count word: `repeat $n gh ...`
                 while i < len(seg) and (
                     seg[i].startswith("-") or re.fullmatch(r"[0-9]+[smhd]?", seg[i])
                 ):
@@ -388,8 +406,9 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
         if i < len(seg) and seg[i].lstrip("\\").rsplit("/", 1)[-1] == "gh":
             args = seg[i + 1 :]
             for name, flag in (("GH_HOST", "--hostname"), ("GH_REPO", "-R")):
-                if env.get(name):
-                    args = args + [flag, env[name]]
+                for value in readings.get(name, []):
+                    if value:
+                        args = args + [flag, value]
             out.append(args)
     return out
 
