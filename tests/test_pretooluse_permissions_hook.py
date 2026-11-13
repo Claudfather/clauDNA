@@ -92,6 +92,10 @@ class TestAnsiCQuotingCannotHideACommand:
     def test_a_command_hidden_behind_an_escaped_quote_prompts(self, tmp_path, command):
         assert not approves(tmp_path, command)
 
+    def test_a_plain_quoted_string_after_an_ansi_c_one_is_plain_again(self, tmp_path):
+        # `'\\'` is a complete plain string, so the `;` after it separates a real second command.
+        assert not approves(tmp_path, "echo $'a' '\\' ; touch /tmp/pwn ; echo '\\'")
+
     @pytest.mark.parametrize("command", [
         "echo $'a b'", "echo $'a;b'", "echo $$", "echo $$ $'a b'", "echo $'it\\'s' ; echo done", "echo $'tab\\there'",
         "echo \"$'x'\"", "echo '$'\"'\"'x'",
