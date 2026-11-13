@@ -153,12 +153,13 @@ candidate; the controller does not rewrite or clobber them.
 built:
 
 - It pins `origin/main` in the runner's checkout to the tip that push replaced
-  (`github.event.before`, or the pushed commit's parent when that commit is not in
-  the fetched history, with a warning in the log: a version bump earlier in a force-pushed
-  range is then not seen). The changelog gate in `make check` compares the candidate
+  (`github.event.before`). The changelog gate in `make check` compares the candidate
   with `origin/main`, and the moving tip of a `main` that has since advanced would
   reject a correct release commit: its own `[Unreleased]` section no longer adds
-  anything to the newer one.
+  anything to the newer one. When that tip is not in the fetched history (a force-push
+  or a first push) there is nothing to compare: `origin/main` is left as fetched, a
+  warning is logged, the version comparison is skipped and a release is attempted, as
+  before the pin existed, so a failure is red rather than a quiet skip.
 - It compares the manifest `version` before and after the push. An edit that left
   it alone (to `hooks`, `description` or `keywords`) stops there with "nothing to
   release": no source check, qualification, tag or publication.
@@ -166,7 +167,12 @@ built:
 Otherwise it runs `make publish-release` for the pushed commit. The workflow has
 no manual trigger. To publish a commit it did not, run the `make publish-release`
 target above from a checkout of that commit whose local `origin/main` is the tip the
-commit replaced, which is the relation the workflow pins.
+commit replaced (`git update-ref refs/remotes/origin/main <sha-the-commit-replaced>`;
+the next `git fetch` overwrites it), which is the relation the workflow pins.
+
+A direct push of the `release.sh` commit may carry its local tag. When a release arrives
+by a squash or rebase merge, do not push that local tag: the workflow creates the tag at
+the merged commit and refuses to retag.
 
 What follows from that, so it is not rediscovered:
 
@@ -178,6 +184,9 @@ What follows from that, so it is not rediscovered:
   that leaves the version alone does not retry a failed release: re-run the failed
   workflow run for the release commit (a re-run reuses the same push event, so the same
   pin) or use the manual route above.
+- When `github.event.before` is not in the fetched history the version comparison is
+  skipped, so a force-pushed edit that leaves the version alone also runs the full path
+  and fails (red) at the tag-identity check.
 
 The generated Claude descriptor uses the documented plugin source shape:
 

@@ -44,6 +44,12 @@ class TestStructure:
     def test_publishing_runs_only_when_the_version_changed(self):
         assert publish_step()["if"] == "steps.bump.outputs.changed == 'true'"
 
+    def test_the_checkout_is_the_pushed_commit_with_its_full_history(self):
+        """The pin and the version comparison read commits that only a full-history checkout has."""
+        checkout = next(step for step in steps() if str(step.get("uses", "")).startswith("actions/checkout"))
+        assert checkout["with"]["ref"] == "${{ github.sha }}"
+        assert checkout["with"]["fetch-depth"] == 0
+
 
 # ─── the step's script, run for real against a throwaway history ──────
 
@@ -120,12 +126,19 @@ class TestScript:
         assert (output, baseline) == ("changed=true", shas["before"])
 
     @pytest.mark.parametrize("before", [ZERO_SHA, "1" * 40, ""], ids=["all-zero", "not-in-history", "empty"])
-    def test_an_unusable_before_falls_back_to_the_pushed_commits_parent_and_says_so(self, history, tmp_path, before):
+    def test_an_unusable_before_attempts_a_release_and_leaves_origin_main_as_fetched(self, history, tmp_path, before):
+        """A force-push or first push has nothing to compare with: it is attempted (red on failure), not skipped."""
         root, shas = history
         output, stdout, baseline = run_bump(root, tmp_path, sha=shas["release"], before=before,
                                             moving_tip=shas["later"])
-        assert (output, baseline) == ("changed=true", shas["before"])
+        assert (output, baseline) == ("changed=true", shas["later"])
         assert "::warning::github.event.before is not in the fetched history" in stdout
+
+    def test_an_unusable_before_still_attempts_the_tip_when_the_bump_came_earlier_in_the_push(self, history, tmp_path):
+        """[release, reword] force-pushed: the bump is not the tip, and the tip is released as it was before the pin."""
+        root, shas = history
+        output, _, _ = run_bump(root, tmp_path, sha=shas["reword"], before=ZERO_SHA, moving_tip=shas["reword"])
+        assert output == "changed=true"
 
     def test_a_plugin_json_edit_without_a_version_change_releases_nothing(self, history, tmp_path):
         root, shas = history
