@@ -455,8 +455,6 @@ def test_release_bumps_all_three_manifests_together(tmp_path, qualification_pass
     state_root = (tmp_path / "release-state").resolve()
     assert state_root.is_absolute() and state_root.is_relative_to(tmp_path.resolve())
     env["CLAUDNA_STATE_DIR"] = str(state_root)
-    for key in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
-        env.pop(key, None)
     result = subprocess.run(["bash", "scripts/release.sh", "--dry-run", "patch"],
                             cwd=root, env=env, text=True, capture_output=True)
     assert result.returncode == 0, result.stdout + result.stderr

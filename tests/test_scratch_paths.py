@@ -500,8 +500,6 @@ def test_observed_child_exit_allows_only_its_exact_scratch_cleanup(tmp_path):
 
 @pytest.fixture
 def maintainer_state(tmp_path, monkeypatch):
-    for key in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
-        monkeypatch.delenv(key, raising=False)
     home = tmp_path / "private home"
     home.mkdir(mode=0o700)
     monkeypatch.setenv("HOME", str(home))

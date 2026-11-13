@@ -65,6 +65,15 @@ def _no_real_claudron_status(monkeypatch):
     monkeypatch.setattr(claudron, "vault_root", lambda cwd, vault, env: Path(vault) if vault else None)
 
 
+@pytest.fixture(autouse=True)
+def _no_ambient_native_identity(monkeypatch):
+    """No test inherits the developer's native session identity: ``owned_session()`` raises on a conflict
+    between these three names and the id under test. A test that needs one sets it in its own body, which
+    runs after this fixture; one that starts a subprocess builds that child's environment explicitly."""
+    for name in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
+        monkeypatch.delenv(name, raising=False)
+
+
 @pytest.fixture
 def store(tmp_path: Path) -> SessionStore:
     """An empty store rooted in the test's temp dir."""

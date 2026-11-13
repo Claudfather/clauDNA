@@ -107,8 +107,7 @@ def repo(tmp_path):
 
 
 def controller(root, output, *args, native_sid=None):
-    env = {key: value for key, value in os.environ.items()
-           if key not in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID")}
+    env = dict(os.environ)
     env["CLAUDNA_STATE_DIR"] = str(output.parent / "state")
     if native_sid:
         env["CODEX_THREAD_ID"] = native_sid
@@ -121,8 +120,6 @@ def controller(root, output, *args, native_sid=None):
 
 
 def test_maintainer_owner_requires_identity_or_explicit_standalone(tmp_path, monkeypatch):
-    for key in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
-        monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("CLAUDNA_STATE_DIR", str(tmp_path / "state root with spaces"))
     with pytest.raises(ValueError, match="native identity required"):
         release.maintainer_paths("release-candidate")
@@ -146,8 +143,6 @@ def test_maintainer_owner_rejects_blank_or_conflicting_native_aliases(tmp_path, 
 
 def test_maintainer_owner_uses_matching_native_codex_identity(tmp_path, monkeypatch):
     sid = FIXTURE_SID
-    for key in ("CLAUDE_SESSION_ID", "CODEX_SESSION_ID"):
-        monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("CODEX_THREAD_ID", sid)
     monkeypatch.setenv("CLAUDNA_STATE_DIR", str(tmp_path / "native-state"))
     owner = release.maintainer_paths("release-candidate")
@@ -185,8 +180,7 @@ def test_dangling_output_link_is_rejected_before_allocation_or_tag(repo, tmp_pat
 
 def test_missing_owner_identity_has_clean_diagnostic_before_output_or_allocation(repo, tmp_path):
     output = tmp_path / "unowned-output"
-    env = {key: value for key, value in os.environ.items()
-           if key not in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID")}
+    env = dict(os.environ)
     env["CLAUDNA_STATE_DIR"] = str(tmp_path / "unowned-state")
     result = subprocess.run([sys.executable, "scripts/release_candidate.py", "--ref", "HEAD",
                              "--output", str(output)], cwd=repo, env=env, capture_output=True, text=True)
@@ -474,8 +468,6 @@ def test_correct_push_remote_cannot_authorize_wrong_publication_repository(
 
 
 def test_publication_tag_must_peel_to_a_commit(repo, fake_gh, tmp_path, monkeypatch):
-    for key in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
-        monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("CLAUDNA_STATE_DIR", str(tmp_path / "state"))
     owner = release.maintainer_paths("release-fixture", standalone=True)
     git(repo, "tag", "v1.0.1", "HEAD^{tree}")
@@ -493,8 +485,6 @@ def test_nested_annotated_publication_tag_is_peeled(repo, fake_gh):
 
 
 def test_publication_tag_changed_during_final_upload_is_not_reported_successful(repo, tmp_path, fake_gh, monkeypatch):
-    for key in ("CLAUDE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
-        monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("CLAUDNA_STATE_DIR", str(tmp_path / "state"))
     owner = release.maintainer_paths("release-fixture", standalone=True)
     candidate = git(repo, "rev-parse", "HEAD")
