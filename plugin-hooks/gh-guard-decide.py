@@ -313,6 +313,16 @@ def _is_separator(tok: str) -> bool:
     return bool(tok) and all(ch in _SEPARATOR_CHARS for ch in tok)
 
 
+# The descriptor in front of a redirection operator: `2` in `2>&1`, `{fd}` in `{fd}>file`.
+_FD_WORD = re.compile(r"[0-9]+|\{[A-Za-z_][A-Za-z0-9_]*\}")
+
+
+def _is_redirect(tok: str) -> bool:
+    """A redirection operator token: ``>``, ``>>``, ``<``, ``<<<``, ``>&``, ``&>``. The lexer splits
+    it from its target, which is the next token."""
+    return bool(tok) and set(tok) <= set("<>&") and ("<" in tok or ">" in tok)
+
+
 def _gh_command_words(tokens: list[str]) -> list[list[str]]:
     """Split a token stream on shell operators into segments, and return the argument
     lists of the segments whose command word is ``gh`` (bare, ``\\gh``, wrapped, or a
@@ -334,6 +344,14 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
         repo_env = None  # a GH_REPO=[HOST/]OWNER/REPO prefix does the same through the repository
         while i < len(seg):
             t = seg[i]
+            # a redirection before the command word (`2>&1 gh ...`, `>/dev/null gh ...`) is opened by
+            # the shell, which then runs the call: skip the operator and its target
+            if _is_redirect(t):
+                i += 2
+                continue
+            if _FD_WORD.fullmatch(t) and i + 1 < len(seg) and _is_redirect(seg[i + 1]):
+                i += 1
+                continue
             # NAME=, NAME+= and NAME[i]= (bash runs a call behind any of them) are assignment prefixes
             m = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)(?:\[[^\]\s]*\])?\+?=(.*)", t)
             if m:

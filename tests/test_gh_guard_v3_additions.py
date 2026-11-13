@@ -67,6 +67,13 @@ def test_the_decider_decodes_stdin_the_way_it_decodes_argv(monkeypatch, raw):
         "A+=1 gh pr list --json number --jq env.X",  # a += prefix on any name must not hide the call
         "A[0]=1 gh pr list --json number --jq env.X",  # bash runs a subscripted prefix too
         "A[0]+=1 gh pr list --json number --jq env.X",
+        f">/dev/null {G}",  # the shell opens a redirection before the command word, then runs the call
+        f"2>&1 {G}",
+        f"</dev/null {G}",
+        f"A=1 2>/dev/null {G}",
+        f"&>/dev/null {G}",
+        f"{{fd}}>/dev/null {G}",
+        f">/dev/null {GR}",
         f"echo don't `{G}`",  # quoting the tokenizer cannot follow: the lenient split still sees the backtick call
     ],
 )
@@ -83,6 +90,9 @@ def test_spellings_the_shell_reads_differently_are_denied(cmd):
         "GH_REPO=o/r gh pr list",
         "GH_REPO=github.com/o/r gh pr list",
         "A+=1 gh pr list --json number --jq .[].number",
+        "2>&1 gh pr list --json number --jq .[].number",
+        ">/dev/null gh pr list --json number",
+        "gh pr list --json number >/dev/null 2>&1",
         "gh pr list --json title --jq '.[] | select(.title | test(\"#12\")) | .title'",  # a hash inside a string
         "gh pr comment 5 -R o/r --body-file - <<'EOF'\nuse --jq env.X and -R evil.example/o/r here\nEOF",
     ],
