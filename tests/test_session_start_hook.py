@@ -355,6 +355,8 @@ def _broken_hook(tmp_path):
 
 
 def test_a_broken_runtime_never_reaches_the_legacy_file(tmp_path, monkeypatch):
+    # Without jq the hook never asks the resolver, so the arm under test is not reached.
+    assert shutil.which("jq", path=_no_gh_path(tmp_path)), "jq must resolve for this test to be meaningful"
     _canonical_handoff(tmp_path, "previous")
     legacy = tmp_path / ".claude" / "session.md"
     legacy.parent.mkdir()
