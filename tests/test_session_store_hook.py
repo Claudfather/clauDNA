@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import subprocess
 import sys
 from pathlib import Path
@@ -491,7 +492,14 @@ STATE_DIR_SH = REPO_ROOT / "plugin-hooks" / "lib" / "state-dir.sh"
 class TestStateRootParity:
     """plugin-hooks/lib/state-dir.sh and paths.state_root must agree on every input."""
 
-    @pytest.mark.parametrize("override", [None, "/abs/state", "~/state", "~", "~someuser/state", "relative/state", ""])
+    @pytest.mark.parametrize(
+        "override",
+        [
+            None, "/abs/state", "~/state", "~", "~someuser/state", "relative/state", "",
+            # absolute but not canonical: Python's Path normalizes these, so the shell must too
+            "/abs/state/", "/abs//state", "/abs/./state", "/abs/state/.", "~/state/", "//abs/state", "/",
+        ],
+    )
     def test_bash_and_python_resolve_the_same_root(self, tmp_path, monkeypatch, override):
         monkeypatch.setenv("HOME", str(tmp_path))  # Path.expanduser reads the process's HOME
         env = {"HOME": str(tmp_path), "PATH": os.environ["PATH"]}
@@ -504,6 +512,45 @@ class TestStateRootParity:
         except ValueError:
             python = ""
         assert bash == python
+
+    def test_bash_and_python_agree_over_a_generated_corpus_of_absolute_roots(self, tmp_path):
+        """The hand list above is how the gap survived: quantify over generated spellings instead.
+        Seeded, so a failure reproduces; one bash process handles the whole corpus."""
+        rng = random.Random(20261113)
+        pieces = ["", ".", "a", "b", "..", "a.b", "x y"]
+        corpus = ["/", "//", "///x", "//x", "/.", "/./", "/a/..", "/a/../b", "/a//./b/"]
+        for _ in range(200):
+            body = "/".join(rng.choice(pieces) for _ in range(rng.randint(1, 6)))
+            corpus.append("/" + body + rng.choice(["", "/", "/."]))
+        env = {"HOME": str(tmp_path), "PATH": os.environ["PATH"]}
+        script = (
+            f". {STATE_DIR_SH}; while IFS= read -r -d '' p; do "
+            'CLAUDNA_STATE_DIR="$p" claudna_state_dir; printf "\\0"; done'
+        )
+        out = subprocess.run(
+            ["bash", "-c", script], input="\0".join(corpus) + "\0", env=env, capture_output=True, text=True, check=True
+        ).stdout
+        bash_roots = out.split("\0")[:-1]
+        assert len(bash_roots) == len(corpus)
+        expected = [str(paths.state_root({**env, "CLAUDNA_STATE_DIR": spelling})) for spelling in corpus]
+        assert [(c, got, want) for c, got, want in zip(corpus, bash_roots, expected) if got != want] == []
+
+    @pytest.mark.parametrize("spelling", ["{tmp}/state/", "{tmp}/./state", "{tmp}//state"])
+    def test_a_non_canonical_root_still_lets_a_hook_allocate_and_remove_its_scratch(self, tmp_path, spelling):
+        """The consequence of the parity gap: auto-format.sh compares the Python-allocated scratch path with one
+        built from the shell's spelling of the root. A mismatch skipped every formatter and orphaned the scratch."""
+        from test_auto_format_hook import _bin_dir, _payload, _run, _shim, compact
+
+        tools = _bin_dir(tmp_path, with_jq=True)
+        _shim(tools, "prettier", '#!/bin/sh\nfor a in "$@"; do f=$a; done\nprintf "added\\n" >> "$f"\n')
+        target = tmp_path / "notes.md"
+        target.write_text("# notes\n")
+        proc = _run(tmp_path, tools, compact(_payload(str(target))), CLAUDNA_STATE_DIR=spelling.format(tmp=tmp_path))
+        assert proc.returncode == 0, proc.stderr
+        assert "prettier changed" in proc.stdout  # the formatter ran: the scratch path was accepted
+        assert target.read_text() == "# notes\nadded\n"
+        scratch = tmp_path / "state" / "sessions" / "s-1" / "scratch"
+        assert scratch.is_dir() and list(scratch.iterdir()) == []  # ...and its scratch was removed, not orphaned
 
     @pytest.mark.parametrize("sid", [SID, "a" * 128, "../escape", "é", "sid\n", ""])
     @pytest.mark.parametrize("override", [None, "/relocated/state"])

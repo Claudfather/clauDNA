@@ -7,7 +7,24 @@
 # leading ~ expands, and a relative CLAUDNA_STATE_DIR is rejected,
 # because hooks run inside the user's project and a relative root would put
 # private state in a repository that can be committed.
-#
+
+# claudna_canonical_path <absolute-path>: the spelling pathlib gives the same text
+# (repeated "/" collapsed, "." segments and a trailing "/" dropped, ".." kept, exactly two
+# leading slashes kept), with no filesystem access and no fork. Hooks compare the
+# Python-allocated scratch path with a path built from this root, so both sides must
+# spell the root the same way. The replacement text is held in $sl: written inline as
+# \/ it leaves a literal backslash in the result on bash 3.2 and 5.
+claudna_canonical_path() {
+    local p="$1" lead="" sl="/"
+    case "$p" in //|//[!/]*) lead="/" ;; esac
+    while [[ "$p" == *//* ]]; do p=${p//\/\//$sl}; done
+    while [[ "$p" == */./* ]]; do p=${p//\/.\//$sl}; done
+    while [[ "$p" == */. ]]; do p=${p%/.}; done
+    while [[ "$p" == ?*/ ]]; do p=${p%/}; done
+    [[ -n "$p" ]] || p="/"
+    printf '%s' "$lead$p"
+}
+
 # claudna_state_dir prints the root, or nothing when there is no safe one (no
 # HOME, or a relative override). Callers treat nothing as "keep no state" and
 # fail open.
@@ -18,7 +35,7 @@ claudna_state_dir() {
         "~/"*) root="${HOME:+$HOME/${root#"~/"}}" ;;
     esac
     case "$root" in
-        /*) printf '%s' "$root" ;;
+        /*) claudna_canonical_path "$root" ;;
         *) return 0 ;;
     esac
 }
