@@ -329,12 +329,15 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
     for seg in segments:
         i = 0
         host_env = None  # a GH_HOST=<host> prefix names the host this gh call talks to
+        repo_env = None  # a GH_REPO=[HOST/]OWNER/REPO prefix does the same through the repository
         while i < len(seg):
             t = seg[i]
             m = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)=(.*)", t)
             if m:
                 if m.group(1) == "GH_HOST":
                     host_env = m.group(2)
+                elif m.group(1) == "GH_REPO":
+                    repo_env = m.group(2)
                 i += 1
                 continue
             base = t.lstrip("\\")
@@ -348,7 +351,11 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
             break
         if i < len(seg) and seg[i].lstrip("\\").rsplit("/", 1)[-1] == "gh":
             args = seg[i + 1 :]
-            out.append(args + ["--hostname", host_env] if host_env else args)
+            if host_env:
+                args = args + ["--hostname", host_env]
+            if repo_env:
+                args = args + ["-R", repo_env]
+            out.append(args)
     return out
 
 

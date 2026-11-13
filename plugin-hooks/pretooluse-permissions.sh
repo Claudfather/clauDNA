@@ -150,15 +150,19 @@ NOQ=${NOQ//[\"\'\\]/}
 case "$NOQ" in
     *gh*)
         case "$NOQ" in
-            *--jq*|*--template*|*--repo*|*--web*|*--hostname*|*[[:space:]]-q*|*[[:space:]]-t*|*[[:space:]]-R*|*[[:space:]]-w*|*[[:space:]]-[[:alnum:]]*[qtRw]*|*"://"*|*@*:*|*gh[[:space:]]*repo[[:space:]]*/*/*|*gh[[:space:]]*label[[:space:]]*/*/*|*gh[[:space:]]*ext*/*/*|*gh[[:space:]]*skill*/*/*)
+            *--jq*|*--template*|*--repo*|*--web*|*--hostname*|*GH_HOST=*|*GH_REPO=*|*[[:space:]]-q*|*[[:space:]]-t*|*[[:space:]]-R*|*[[:space:]]-w*|*[[:space:]]-[[:alnum:]]*[qtRw]*|*"://"*|*@*:*|*gh[[:space:]]*repo[[:space:]]*/*/*|*gh[[:space:]]*label[[:space:]]*/*/*|*gh[[:space:]]*ext*/*/*|*gh[[:space:]]*skill*/*/*)
                 if command -v python3 &>/dev/null; then
                     # errexit-safe: the decider exits 10 to deny, and an
                     # assignment that inherits that would end the hook here.
-                    if GH_GUARD_REASON="$(python3 -B "$HOOK_DIR/gh-guard-decide.py" "$COMMAND" 2>/dev/null)"; then
-                        : # exit 0 → allow this shape; fall through to normal matching
-                    elif [[ $? -eq 10 ]]; then
-                        deny "$GH_GUARD_REASON"
-                    fi
+                    # The command goes in on stdin: an argv entry is capped (ARG_MAX; 128 KiB
+                    # per argument on Linux), and a failed spawn must not read as "allow".
+                    GH_RC=0
+                    GH_GUARD_REASON="$(printf '%s' "$COMMAND" | python3 -B "$HOOK_DIR/gh-guard-decide.py" 2>/dev/null)" || GH_RC=$?
+                    case "$GH_RC" in
+                        0) : ;; # allow this shape; fall through to normal matching
+                        10) deny "$GH_GUARD_REASON" ;;
+                        *) log "PASS: $COMMAND (gh guard did not answer, exit $GH_RC)" ;;
+                    esac
                 else
                     log "PASS: $COMMAND (gh guard skipped, no python3)"
                 fi

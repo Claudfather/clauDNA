@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `using-claudna`'s Finding Skills step now says a person can run `/claudna:skill-scaffold` on Claude Code: the skill sets `disable-model-invocation: true`, so the model does not start it on its own.
 - Reject existing release output entries, including dangling symlinks, before resolving destinations or allocating qualification state.
 - Route report-only audits and retained reviews through standalone artifact validation, and post metadata-free review editions while preserving canonical reports and hashes.
+- The PreToolUse `gh` read guard now also covers environment-prefixed host selection (`GH_HOST=` and `GH_REPO=`, with or without `env`) and commands too large to pass as a process argument. It reads the command from stdin, and a guard that exits without an answer is logged; a non-answer still lets the command continue to the normal allow-list match.
 - Keep summary-only capture remnants visible as partial or corrupt sessions, including retained segment summaries, without treating manual artifacts as captured data.
 - Session resume now preserves legacy personal handoffs during both automatic and interactive imports. Timestamp conversion and reaping apply only to the project copy; existing project handoffs skip the fallback.
 

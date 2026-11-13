@@ -48,6 +48,10 @@ def verdict(cmd: str) -> str:
         "gh repo view git@evil.example:o/r",
         "GH_HOST=evil.example gh pr list -R o/r --search x",  # a GH_HOST prefix names the host
         "env GH_HOST=evil.example gh pr list -R o/r --search x",
+        "GH_HOST=evil.example.com gh pr list",  # the host alone, with no -R beside it
+        "env GH_HOST=evil.example.com gh pr list",
+        "GH_REPO=evil.example.com/o/r gh pr list",  # GH_REPO is [HOST/]OWNER/REPO: the same reach as -R
+        "env GH_REPO=evil.example.com/o/r gh pr view 1",
         f"echo don't `{G}`",  # quoting the tokenizer cannot follow: the lenient split still sees the backtick call
     ],
 )
@@ -61,6 +65,8 @@ def test_spellings_the_shell_reads_differently_are_denied(cmd):
         f"# {G}",  # a comment that only mentions the shape runs nothing
         "gh pr list -R git@github.com:o/r.git --json number",
         "GH_HOST=github.com gh pr list -R o/r --json number",
+        "GH_REPO=o/r gh pr list",
+        "GH_REPO=github.com/o/r gh pr list",
         "gh pr list --json title --jq '.[] | select(.title | test(\"#12\")) | .title'",  # a hash inside a string
         "gh pr comment 5 -R o/r --body-file - <<'EOF'\nuse --jq env.X and -R evil.example/o/r here\nEOF",
     ],
