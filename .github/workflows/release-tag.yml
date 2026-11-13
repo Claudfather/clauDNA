@@ -29,7 +29,10 @@ jobs:
           BEFORE: ${{ github.event.before }}
         run: |
           base="$BEFORE"
-          git cat-file -e "${base}^{commit}" 2>/dev/null || base="$(git rev-parse "${GITHUB_SHA}^")"
+          if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            base="$(git rev-parse "${GITHUB_SHA}^")"
+            echo "::warning::github.event.before is not in the fetched history (a force-push or a first push); compared against the pushed commit's parent, so a version bump earlier in the push is not seen"
+          fi
           git update-ref refs/remotes/origin/main "$base"
           before_version="$(git show "${base}:.claude-plugin/plugin.json" | jq -r .version)"
           after_version="$(jq -r .version .claude-plugin/plugin.json)"

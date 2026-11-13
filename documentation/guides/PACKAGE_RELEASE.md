@@ -154,7 +154,8 @@ built:
 
 - It pins `origin/main` in the runner's checkout to the tip that push replaced
   (`github.event.before`, or the pushed commit's parent when that commit is not in
-  the fetched history). The changelog gate in `make check` compares the candidate
+  the fetched history, with a warning in the log: a version bump earlier in a force-pushed
+  range is then not seen). The changelog gate in `make check` compares the candidate
   with `origin/main`, and the moving tip of a `main` that has since advanced would
   reject a correct release commit: its own `[Unreleased]` section no longer adds
   anything to the newer one.

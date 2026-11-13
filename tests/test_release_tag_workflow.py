@@ -47,7 +47,9 @@ class TestStructure:
 
 # ─── the step's script, run for real against a throwaway history ──────
 
-needs_jq = pytest.mark.skipif(shutil.which("jq") is None, reason="the step reads versions with jq (present on ubuntu-latest)")
+# jq is on ubuntu-latest; where CI is set a missing jq fails these tests instead of skipping them.
+needs_jq = pytest.mark.skipif(shutil.which("jq") is None and not os.environ.get("CI"),
+                              reason="the step reads versions with jq")
 
 CHANGELOG_PRERELEASE = "# Changelog\n\n## [Unreleased]\n\n## [1.0.0]\n- Existing release.\n"
 CHANGELOG_RELEASED = "# Changelog\n\n## [Unreleased]\n\n## [1.0.1]\n- New release.\n\n## [1.0.0]\n- Existing release.\n"
@@ -110,11 +112,20 @@ class TestScript:
                                        moving_tip=shas["later"])
         assert (output, baseline) == ("changed=true", shas["before"])
 
-    @pytest.mark.parametrize("before", [ZERO_SHA, "1" * 40, ""], ids=["all-zero", "not-in-history", "empty"])
-    def test_an_unusable_before_falls_back_to_the_pushed_commits_parent(self, history, tmp_path, before):
+    def test_a_push_of_several_commits_compares_against_the_tip_it_replaced(self, history, tmp_path):
+        """[release, reword] arrive together: the pushed tip's parent is the bump itself, not the baseline."""
         root, shas = history
-        output, _, baseline = run_bump(root, tmp_path, sha=shas["release"], before=before, moving_tip=shas["later"])
+        output, _, baseline = run_bump(root, tmp_path, sha=shas["reword"], before=shas["before"],
+                                       moving_tip=shas["later"])
         assert (output, baseline) == ("changed=true", shas["before"])
+
+    @pytest.mark.parametrize("before", [ZERO_SHA, "1" * 40, ""], ids=["all-zero", "not-in-history", "empty"])
+    def test_an_unusable_before_falls_back_to_the_pushed_commits_parent_and_says_so(self, history, tmp_path, before):
+        root, shas = history
+        output, stdout, baseline = run_bump(root, tmp_path, sha=shas["release"], before=before,
+                                            moving_tip=shas["later"])
+        assert (output, baseline) == ("changed=true", shas["before"])
+        assert "::warning::github.event.before is not in the fetched history" in stdout
 
     def test_a_plugin_json_edit_without_a_version_change_releases_nothing(self, history, tmp_path):
         root, shas = history
