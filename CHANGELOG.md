@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Session handoffs are owned by verified native sessions, not a shared per-cwd `.claude/session.md`. Resume uses scoped references; legacy sources are read-only and require a source hash plus explicit reimport for changed content. This staged source change is not a release or proof of consumer acceptance.
 
 ### Fixed
+- A release run's candidate checks no longer inherit the variables of the release that started them (`RELEASE_*`, `PACKAGE_*`, `STORAGE_OWNER_ARGS`, `MAKEFLAGS`). `make tag-release RELEASE_OUTPUT=...`, and the `release-tag` workflow's `make publish-release`, exported them into the candidate's `make check`, where the test that runs `release.sh` wrote its fixture package into the release's real output and failed the release on it. A test now starts a release through `make` to hold that.
 - The PreToolUse permissions hook's quote tracking now parses `$'...'` words the way the shell does, and prompts when it cannot tell (an unterminated `$'...'` or an ambiguous `$$'`).
 - `using-claudna`'s Finding Skills step now says a person can run `/claudna:skill-scaffold` on Claude Code: the skill sets `disable-model-invocation: true`, so the model does not start it on its own.
 - The SessionStart briefing reads the legacy `.claude/session.md` only when the resolver reports no canonical pointer; a resolver crash is logged as `session_store_runtime` in `hooks/bootstrap.log` and the legacy file stays unread.

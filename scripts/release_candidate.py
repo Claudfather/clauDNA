@@ -247,6 +247,13 @@ def _qualify_in_work(root, candidate, output, owner, version, notes, baseline, w
                CLAUDNA_STATE_DIR=str(owner.directory.parent.parent.resolve()))
     for key in ("PYTHONPATH", "PYTHONHOME", "CLAUDNA_ROOT", "CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT"):
         env.pop(key, None)
+    # The candidate's checks run as if started by hand. `make tag-release RELEASE_OUTPUT=...` exports its
+    # variables and records them in MAKEFLAGS, where the nested make reads them again; a test that runs
+    # release.sh would then write its fixture package into this release's real output.
+    for key in [key for key in env if key.startswith(("RELEASE_", "PACKAGE_"))]:
+        del env[key]
+    for key in ("STORAGE_OWNER_ARGS", "MAKEFLAGS", "MFLAGS", "MAKELEVEL"):
+        env.pop(key, None)
     env = isolated_python_env(work, env)
     run(["git", "clone", "--no-hardlinks", "--no-checkout", str(root), str(checkout)], root, env=env)
     run(["git", "checkout", "--detach", candidate], checkout, env=env)
