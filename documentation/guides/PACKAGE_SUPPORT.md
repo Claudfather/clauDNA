@@ -83,7 +83,7 @@ stale while another process changes package or store files.
 
 <!-- BEGIN GENERATED PACKAGE SUPPORT -->
 
-Source package version: **0.34.12**. Generated declarations; native certification is **unknown**.
+Source package version: **0.35.0**. Generated declarations; native certification is **unknown**.
 
 | Host | Selected skills | Agent policy | Declared hook handlers | Baseline checks |
 |---|---:|---|---|---|

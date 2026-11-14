@@ -222,9 +222,9 @@ Owned checks disable Ruff/pytest/bytecode caches; dependency installation and
 native host/tool cache policy remain unchanged. Use the pinned toolchain through
 `python3 -m`; run fresh checks in isolated exports with private HOME/TMP and state.
 
-The five-PR storage stack remains held outside main and the release path. Phase04
-supplies native-session artifact defaults on the held draft stack; native
-identity/write acceptance gates merge/release, with one smoke per materially
+The five-PR storage stack landed on main through #477 and shipped in v0.35.0. Phase04
+supplies native-session artifact defaults; native
+identity/write acceptance gates release, with one smoke per materially
 different identity-delivery mechanism. Static Markdown checks, executable fixtures, actual
 native skill/publication execution and named external-consumer acceptance are
 separate evidence. A fixture pass is not a complete package storage or cutover
@@ -233,5 +233,6 @@ protocol before writer cutover. A specific recovery artifact must read retained
 new layout and write only under R, with native/consumer acceptance; otherwise an
 approved forward-recovery plan is required. An arbitrary older package is not
 qualified rollback. D6 requires a major release or an owner-approved exception,
-and release/installation still need their own authorization. No intermediate
-version bump or release is permitted.
+and release/installation still need their own authorization. v0.35.0 was released
+under an owner-approved D6 exception on 2026-11-14; native-host and external-consumer
+acceptance were not run for it and stay in the owner queue.
