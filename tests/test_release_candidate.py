@@ -318,6 +318,26 @@ def test_local_tag_is_only_created_after_successful_qualification(repo, tmp_path
     assert release.remote_tag(repo, "publish", "v1.0.1") is None
 
 
+def test_qualified_work_tree_with_read_only_exports_is_removed(repo, tmp_path):
+    """A package export is 0o555 by design, and the candidate's tests leave some in the private temp directory.
+    Qualification that passed everything must not then fail on cleaning them up."""
+    check = repo / "scripts/fixture_check.py"
+    check.write_text(
+        check.read_text()
+        + "export = Path(os.environ['TMPDIR']) / 'export' / 'package'\n"
+        + "export.mkdir(parents=True)\n"
+        + "(export / 'file').write_text('x')\n"
+        + "(export / 'file').chmod(0o444)\n"
+        + "export.chmod(0o555)\n"
+        + "export.parent.chmod(0o555)\n"
+    )
+    commit(repo)
+    result = controller(repo, tmp_path / "artifacts", "--tag")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert not list((tmp_path / "state/operations").glob("*/scratch/release-candidate.*"))
+    assert git(repo, "rev-parse", "v1.0.1^{commit}") == git(repo, "rev-parse", "HEAD")
+
+
 @pytest.mark.parametrize("annotated", [False, True])
 def test_wrong_remote_tag_is_rejected_even_with_correct_local_tag(repo, annotated):
     candidate = git(repo, "rev-parse", "HEAD")
