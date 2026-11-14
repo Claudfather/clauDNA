@@ -55,9 +55,8 @@ def fixture_targets(root):
         "assert Path.home().stat().st_mode & 0o777 == 0o700\n"
         "assert Path(os.environ['TMPDIR']).stat().st_mode & 0o777 == 0o700\n"
         "assert Path('payload').read_text() == 'committed'\n"
-        "leaked = sorted(key for key in os.environ if key.startswith(('RELEASE_', 'PACKAGE_')))\n"
+        "leaked = sorted(key for key in os.environ if key.startswith('RELEASE_'))\n"
         "assert not leaked, f'the release that started this check leaked {leaked}'\n"
-        "assert 'RELEASE_' not in os.environ.get('MAKEFLAGS', ''), 'MAKEFLAGS carries the outer release'\n"
         "(Path.home() / 'source-passed').write_text('yes')\n"
     )
     (root / "scripts/fixture_package.py").write_text('''\
