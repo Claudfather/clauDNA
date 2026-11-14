@@ -147,6 +147,14 @@ def verify_github_tag(root, repo, tag, candidate):
     raise ReleaseError(f"GitHub tag {repo}:{tag} exceeds the annotated-tag depth limit")
 
 
+def remove_work_tree(path):
+    """Remove the qualification's private work tree. A package export is 0o555 by design and the candidate's
+    tests leave some in its temp directory, which plain shutil.rmtree cannot delete."""
+    for directory, _, _ in os.walk(path):
+        os.chmod(directory, 0o700)
+    shutil.rmtree(path)
+
+
 def owner_make_arg(owner):
     args = (['--session', owner.owner_id, '--host', owner.provider]
             if owner.kind == 'session' else ['--standalone'])
@@ -296,7 +304,7 @@ def _qualify_in_work(root, candidate, output, owner, version, notes, baseline, w
     }
     receipt_path = owner.artifacts / f"release-source-check-{candidate}-{uuid.uuid4().hex}.json"
     atomic_write_json(receipt_path, receipt, durable=True)
-    shutil.rmtree(work)
+    remove_work_tree(work)
     return version, notes, assets
 
 
