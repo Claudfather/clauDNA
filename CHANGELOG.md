@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-11-14
 ### Added
 - Default generated workflow output to private native-session artifacts, including non-interactive planning; keep chat-only output file-free and repository/vault/GitHub editions explicit. Shared allocation, scoped plan discovery, retained canonical sources, private export receipts and exact-owner scratch cleanup now cover the workflow inventory. Fixtures qualify these filesystem effects; native-host acceptance (a live install, hook trust and context delivery) and external consumers have not been verified.
 - Native-session path/scratch allocation and exclusive standalone operation directories under the effective clauDNA root. Artifact-only ownership is distinct from captured, partial and corrupt lifecycle state; manual allocation creates no capture events. Fixtures qualify these filesystem effects; native-host qualification is separate and has not been run.
