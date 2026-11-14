@@ -450,7 +450,8 @@ def test_release_bumps_all_three_manifests_together(tmp_path, qualification_pass
                    cwd=root, check=True)
     private_home = tmp_path / "release-home"
     private_home.mkdir(mode=0o700)
-    env = os.environ.copy()
+    # release.sh honors RELEASE_OUTPUT: a release that runs this suite must not hand its own to the synthetic one.
+    env = {key: value for key, value in os.environ.items() if not key.startswith("RELEASE_")}
     env["HOME"] = str(private_home.resolve())
     state_root = (tmp_path / "release-state").resolve()
     assert state_root.is_absolute() and state_root.is_relative_to(tmp_path.resolve())

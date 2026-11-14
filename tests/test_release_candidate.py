@@ -55,6 +55,8 @@ def fixture_targets(root):
         "assert Path.home().stat().st_mode & 0o777 == 0o700\n"
         "assert Path(os.environ['TMPDIR']).stat().st_mode & 0o777 == 0o700\n"
         "assert Path('payload').read_text() == 'committed'\n"
+        "leaked = sorted(key for key in os.environ if key.startswith('RELEASE_'))\n"
+        "assert not leaked, f'the release that started this check leaked {leaked}'\n"
         "(Path.home() / 'source-passed').write_text('yes')\n"
     )
     (root / "scripts/fixture_package.py").write_text('''\
@@ -187,6 +189,19 @@ def test_missing_owner_identity_has_clean_diagnostic_before_output_or_allocation
     assert result.returncode != 0
     assert result.stderr.startswith("error: maintainer ownership unavailable: native identity required")
     assert not output.exists() and not (tmp_path / "unowned-state" / "operations").exists()
+
+
+def test_candidate_checks_do_not_inherit_the_release_that_started_them(repo, tmp_path):
+    """`make tag-release RELEASE_OUTPUT=...` exports its variables and records them in MAKEFLAGS, where a nested
+    make reads them again. The candidate's own `make check` sees neither: a test that runs release.sh would
+    otherwise write its fixture package into this release's real output and fail the release on that debris."""
+    output = tmp_path / "release-output"
+    env = dict(os.environ, CLAUDNA_STATE_DIR=str(tmp_path / "state"))
+    result = subprocess.run(["make", "tag-release", "RELEASE_REF=HEAD", f"RELEASE_OUTPUT={output}",
+                             "STORAGE_OWNER_ARGS=--standalone"], cwd=repo, env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (output / "receipt.json").is_file()
+    assert git(repo, "tag", "--list", "v1.0.1") == "v1.0.1"
 
 
 def test_exact_committed_candidate_checked_before_package_and_default_does_not_tag(repo, tmp_path):
