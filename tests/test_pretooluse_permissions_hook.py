@@ -354,7 +354,8 @@ class TestTheLogIsPerUserAndPrivate:
         assert "/tmp" not in HOOK.read_text()
 
 
-def decision(tmp_path: Path, command: str, allow: list[str] | None = None) -> str:
+def decision(tmp_path: Path, command: str, allow: list[str] | None = None, extra_env: dict[str, str] | None = None,
+             timeout: int = 10) -> str:
     """The hook's decision for `command`: 'allow', 'deny', or 'prompt' (no output)."""
     claude = tmp_path / ".claude"
     claude.mkdir(exist_ok=True)
@@ -362,10 +363,10 @@ def decision(tmp_path: Path, command: str, allow: list[str] | None = None) -> st
         json.dumps({"permissions": {"allow": allow if allow is not None else ALLOW}})
     )
     payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
-    env = {"HOME": str(tmp_path), "PATH": "/usr/bin:/bin"}
+    env = {"HOME": str(tmp_path), "PATH": "/usr/bin:/bin", **(extra_env or {})}
     proc = subprocess.run(
         ["bash", str(HOOK)], input=payload, capture_output=True, text=True,
-        cwd=tmp_path, env=env, timeout=10,
+        cwd=tmp_path, env=env, timeout=timeout,
     )
     if '"permissionDecision":"deny"' in proc.stdout:
         return "deny"
@@ -418,3 +419,46 @@ class TestGhReadGuard:
 
     def test_a_non_gh_command_is_unaffected(self, tmp_path):
         assert decision(tmp_path, "git status", self.GH_ALLOW + ["Bash(git *)"]) == "allow"
+
+    @pytest.mark.parametrize("command", [
+        "GH_HOST=evil.example.com gh pr list",
+        "env GH_HOST=evil.example.com gh pr list",
+        "GH_REPO=evil.example.com/o/r gh pr list",
+        "env GH_REPO=evil.example.com/o/r gh pr view 1",
+        "GH_HOST+=evil.example.com gh pr list",
+        "GH_REPO+=evil.example.com/o/r gh pr list",
+    ])
+    def test_an_environment_named_foreign_host_is_denied(self, tmp_path, command):
+        assert decision(tmp_path, command, ["Bash"]) == "deny"
+
+    @pytest.mark.parametrize("command", [
+        "GH_HOST=github.com gh pr list", "GH_REPO=o/r gh pr list",
+        "GH_REPO=github.com/o/r gh pr list", "gh pr list",
+    ])
+    def test_github_com_and_plain_owner_repo_still_pass(self, tmp_path, command):
+        assert decision(tmp_path, command, ["Bash"]) == "allow"
+
+    def test_an_enterprise_host_the_environment_already_names_still_passes(self, tmp_path):
+        command = "GH_HOST=ghe.example.com gh pr list"
+        assert decision(tmp_path, command, ["Bash"], {"GH_HOST": "ghe.example.com"}) == "allow"
+        assert decision(tmp_path, command, ["Bash"]) == "deny"
+
+    def test_an_oversized_command_still_reaches_the_decider(self, tmp_path):
+        command = "gh pr list --json number --jq env.X #" + "x" * 1_200_000
+        assert decision(tmp_path, command, ["Bash"], timeout=60) == "deny"  # 1.2 MB: seconds under load
+
+    def test_a_decider_that_does_not_answer_still_fails_open_but_is_logged(self, tmp_path):
+        shim = tmp_path / "shim"
+        shim.mkdir()
+        (shim / "python3").write_text("#!/bin/sh\nexit 7\n")
+        (shim / "python3").chmod(0o755)
+        (tmp_path / ".claude").mkdir(exist_ok=True)
+        (tmp_path / ".claude" / "settings.json").write_text(json.dumps({"permissions": {"allow": ["Bash"]}}))
+        payload = json.dumps({"session_id": "decider-silent", "tool_name": "Bash",
+                              "tool_input": {"command": "gh pr list --json number --jq env.X"}})
+        env = {"HOME": str(tmp_path), "PATH": f"{shim}:/usr/bin:/bin", "CLAUDNA_STATE_DIR": str(tmp_path / "state")}
+        proc = subprocess.run(["bash", str(HOOK)], input=payload, capture_output=True, text=True,
+                              cwd=tmp_path, env=env, timeout=10)
+        assert '"permissionDecision":"allow"' in proc.stdout
+        log = (tmp_path / "state" / "sessions" / "decider-silent" / "hooks" / "permissions.log").read_text()
+        assert "gh guard did not answer, exit 7" in log

