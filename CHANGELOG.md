@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- For a compatibility window, `session-store handoff-write`, the write behind handoff, checkpoint and resume, also writes the same bytes over an existing `<cwd>/.claude/session.md` and reports the outcome as `legacy_copy` in its result. That is the per-cwd file 0.34.x wrote, which readers outside clauDNA still read: Claudlobby's handoff check, fresh-session resume and self restart ([Claudlobby#2924](https://github.com/Claudfather/Claudlobby/issues/2924)). The copy is atomic and refreshes only an existing regular file in a real `<cwd>/.claude/` directory. It never creates the file or the directory, since a repository can track `.claude/` without ignoring `session.md` and no writer manages `.gitignore`; it never follows a symlink at either, and never fails the session-owned write, which stays the source of truth. A captured private session's handoff is never copied: a private session publishes no pointer, so the next session in its directory would read the copy. A capture-off session's handoff is copied, since a fleet that turned capture off needs it for its readers. It is on by default; `CLAUDNA_HANDOFF_LEGACY_COPY=0` turns it off. Resume and the SessionStart briefing still prefer the scoped pointer and read the per-cwd file only when none resolves.
+
+### Deprecated
+- The `<cwd>/.claude/session.md` compatibility copy above. Once Claudlobby reads the session-owned path (Claudlobby#2924), a later release removes it, announced under Breaking Changes.
+
 ## [0.35.0] - 2026-11-14
 ### Added
 - Default generated workflow output to private native-session artifacts, including non-interactive planning; keep chat-only output file-free and repository/vault/GitHub editions explicit. Shared allocation, scoped plan discovery, retained canonical sources, private export receipts and exact-owner scratch cleanup now cover the workflow inventory. Fixtures qualify these filesystem effects; native-host acceptance (a live install, hook trust and context delivery) and external consumers have not been verified.
