@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- For a compatibility window, `session-store handoff-write`, the write behind handoff, checkpoint and resume, also writes the same bytes to `<cwd>/.claude/session.md` and reports it as `legacy_copy` in its result. That is the per-cwd file 0.34.x wrote, which readers outside clauDNA still read: Claudlobby's handoff check, fresh-session resume and self restart ([Claudlobby#2924](https://github.com/Claudfather/Claudlobby/issues/2924)). The copy is atomic and goes only into an existing `<cwd>/.claude/` directory: it never creates one, never writes through a symlinked one, never manages `.gitignore`, and never fails the session-owned write, which stays the source of truth. It is on by default; `CLAUDNA_HANDOFF_LEGACY_COPY=0` turns it off. Resume still prefers the scoped pointer and reads the per-cwd file only when none resolves.
+
+### Deprecated
+- The `<cwd>/.claude/session.md` compatibility copy above. Once Claudlobby reads the session-owned path (Claudlobby#2924), a later release removes it, announced under Breaking Changes.
+
 ## [0.35.0] - 2026-11-14
 ### Added
 - Default generated workflow output to private native-session artifacts, including non-interactive planning; keep chat-only output file-free and repository/vault/GitHub editions explicit. Shared allocation, scoped plan discovery, retained canonical sources, private export receipts and exact-owner scratch cleanup now cover the workflow inventory. Fixtures qualify these filesystem effects; native-host acceptance (a live install, hook trust and context delivery) and external consumers have not been verified.

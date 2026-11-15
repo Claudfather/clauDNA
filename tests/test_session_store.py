@@ -1236,6 +1236,112 @@ def test_manual_handoff_cli_capture_off_persists_v2_without_lifecycle(store, mon
     assert store.session("manual-cli").paths.handoff.read_bytes() == before
 
 
+def _legacy_copy_cli(store, monkeypatch, capsys, content, *extra):
+    """One handoff-write through the CLI, as the session skill runs it; returns (code, JSON result)."""
+    import io
+
+    monkeypatch.setenv("CODEX_THREAD_ID", "copy-cli")
+    monkeypatch.setattr(sys, "stdin", io.StringIO(content))
+    code = main(["handoff-write", "--session", "copy-cli", "--host", "codex",
+                 "--root", str(store.root), "--json", *extra])
+    return code, json.loads(capsys.readouterr().out)
+
+
+def _v2_handoff(cwd, updated="2026-11-15T09:30:00Z"):
+    return (f"---\ncwd: {cwd}\nlast_updated: {updated}\nschema_version: 2\n---\n\n"
+            "## Next Steps\n- 2026-11-15T09:30:00Z \u2014 continue the work\n")
+
+
+def test_handoff_write_copies_the_handoff_to_the_legacy_path(store, tmp_path, monkeypatch, capsys):
+    """For the compatibility window the per-cwd file 0.34.x wrote gets the same bytes, atomically."""
+    workspace = tmp_path / "workspace"
+    (workspace / ".claude").mkdir(parents=True)
+    legacy = workspace / ".claude" / "session.md"
+    legacy.write_text("---\nlast_updated: 2026-11-01T00:00:00Z\n---\nan older capture\n")
+    older = legacy.stat().st_ino
+    monkeypatch.delenv("CLAUDNA_HANDOFF_LEGACY_COPY", raising=False)
+    content = _v2_handoff(workspace)
+
+    code, result = _legacy_copy_cli(store, monkeypatch, capsys, content)
+
+    assert code == 0
+    assert result["legacy_copy"] == {"status": "written", "path": str(legacy), "reason": None}
+    owned = store.session("copy-cli").paths.handoff
+    assert result["handoff_path"] == str(owned)
+    assert legacy.read_bytes() == owned.read_bytes() == content.encode("utf-8")
+    assert "\nlast_updated: 2026-11-15T09:30:00Z\n" in legacy.read_text()
+    assert legacy.stat().st_ino != older  # replaced by a rename, never rewritten in place
+    assert [p.name for p in legacy.parent.iterdir()] == ["session.md"]  # no temporary file is left
+    assert legacy.stat().st_mode & 0o777 == 0o600
+
+
+def test_handoff_write_legacy_copy_switch_turns_only_the_copy_off(store, tmp_path, monkeypatch, capsys):
+    workspace = tmp_path / "workspace"
+    (workspace / ".claude").mkdir(parents=True)
+    legacy = workspace / ".claude" / "session.md"
+    legacy.write_text("kept\n")
+    monkeypatch.setenv("CLAUDNA_HANDOFF_LEGACY_COPY", "0")
+
+    code, result = _legacy_copy_cli(store, monkeypatch, capsys, _v2_handoff(workspace))
+
+    assert code == 0
+    assert result["legacy_copy"] == {"status": "off", "path": None, "reason": "CLAUDNA_HANDOFF_LEGACY_COPY=0"}
+    assert legacy.read_text() == "kept\n"
+    assert store.session("copy-cli").paths.handoff.read_text() == _v2_handoff(workspace)
+    # Only 0 is off: any other value leaves the default.
+    monkeypatch.setenv("CLAUDNA_HANDOFF_LEGACY_COPY", "1")
+    content = _v2_handoff(workspace, updated="2026-11-15T09:31:00Z")
+    code, result = _legacy_copy_cli(store, monkeypatch, capsys, content)
+    assert code == 0 and result["legacy_copy"]["status"] == "written" and legacy.read_text() == content
+
+
+@pytest.mark.parametrize("shape", ["absent", "symlink", "file", "occupied"])
+def test_handoff_write_legacy_copy_never_creates_follows_or_fails_the_write(store, tmp_path, monkeypatch,
+                                                                            capsys, shape):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    claude = workspace / ".claude"
+    if shape == "symlink":
+        claude.symlink_to(elsewhere, target_is_directory=True)
+    elif shape == "file":
+        claude.write_text("not a directory\n")
+    elif shape == "occupied":
+        (claude / "session.md").mkdir(parents=True)  # a directory where the copy would land
+    monkeypatch.delenv("CLAUDNA_HANDOFF_LEGACY_COPY", raising=False)
+    content = _v2_handoff(workspace)
+
+    code, result = _legacy_copy_cli(store, monkeypatch, capsys, content)
+
+    assert code == 0 and store.session("copy-cli").paths.handoff.read_text() == content
+    assert result["legacy_copy"]["status"] == ("failed" if shape == "occupied" else "skipped")
+    assert list(elsewhere.iterdir()) == []
+    if shape == "absent":
+        assert not claude.exists()
+    if shape == "occupied":
+        assert [p.name for p in claude.iterdir()] == ["session.md"] and (claude / "session.md").is_dir()
+        import io
+
+        monkeypatch.setattr(sys, "stdin", io.StringIO(content))
+        assert main(["handoff-write", "--session", "copy-cli", "--host", "codex", "--root", str(store.root)]) == 0
+        out, err = capsys.readouterr()
+        assert out.strip() == str(store.session("copy-cli").paths.handoff)
+        assert "legacy handoff copy failed" in err
+
+
+def test_a_refused_background_checkpoint_writes_no_legacy_copy(store, tmp_path, monkeypatch, capsys):
+    workspace = tmp_path / "workspace"
+    (workspace / ".claude").mkdir(parents=True)
+    monkeypatch.delenv("CLAUDNA_HANDOFF_LEGACY_COPY", raising=False)
+    monkeypatch.setenv("CLAUDNA_SESSION_STORE", "0")
+
+    code, result = _legacy_copy_cli(store, monkeypatch, capsys, _v2_handoff(workspace), "--background")
+
+    assert code == 2 and result["handoff_path"] is None and "legacy_copy" not in result
+    assert not (workspace / ".claude" / "session.md").exists()
+
+
 def test_continuity_cli_rejects_conflicting_owner_before_read_or_write(store, monkeypatch, capsys):
     monkeypatch.setenv("CODEX_THREAD_ID", "actual-cli")
     assert main(["continuity", "resolve", "--session", "different-cli", "--host", "codex",

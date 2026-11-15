@@ -22,7 +22,7 @@ Run `git status --porcelain` and `git branch --show-current` (parallel, separate
 
 ### 4. Write atomically
 
-Use the v2 format in [`templates.md`](./templates.md) and submit the complete content to `session-store handoff-write --session <native-sid> --host <host> [--background] --json`. Let the runtime atomically write the current session's handoff. Do not create shell temp files or use `mv`. If an existing scoped pointer belongs to the current owner, retain it; do not advance or replace a predecessor pointer during checkpoint. Publish a current-owner pointer only when this workflow explicitly continues that scope and supplies the existing ref hash for compare-and-swap.
+Use the v2 format in [`templates.md`](./templates.md) and submit the complete content to `session-store handoff-write --session <native-sid> --host <host> [--background] --json`. Let the runtime atomically write the current session's handoff; for a compatibility window it also copies the write to `<cwd>/.claude/session.md`, as [`templates.md`](./templates.md) states. Do not create shell temp files or use `mv`. If an existing scoped pointer belongs to the current owner, retain it; do not advance or replace a predecessor pointer during checkpoint. Publish a current-owner pointer only when this workflow explicitly continues that scope and supplies the existing ref hash for compare-and-swap.
 
 ### 5. Confirm
 

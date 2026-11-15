@@ -353,6 +353,7 @@ With summaries enabled, a detached worker summarizes each segment after it is se
 | `CLAUDNA_HARVEST_INTERVAL_H` | `6` | Minimum hours between harvest runs. |
 | `CLAUDNA_UNCLOSED_AFTER_H` | `24` | How long a session whose owning agent process (the `claude` that opened it, recorded as `claude_pid`) is gone may sit open before the sweep closes it as `abandoned`. Never under 1. |
 | `CLAUDNA_STATE_DIR` | `~/.claudna` | Where all clauDNA state lives: the store, hook markers, logs. It must be an absolute path. A relative one keeps no state instead of writing into your project. |
+| `CLAUDNA_HANDOFF_LEGACY_COPY=0` | on, for a compatibility window | Stops the copy of each handoff, checkpoint and resume write at `<cwd>/.claude/session.md`, the per-cwd path 0.34.x wrote. The copy goes only into an existing `.claude/` directory and never fails the session-owned write; a later release removes it, with notice. |
 
 - **What it never does:** it never writes to the vault except through `claudron`, never writes to git (it reads the branch and HEAD once, at SessionStart), never prints into your session, and never blocks. It always exits 0.
 - **Sessions that never ended:** a crash or a kill skips SessionEnd and leaves a session open. About every 6 hours, a SessionStart starts a detached sweep. It closes up to 5 sessions that have sat idle for `CLAUDNA_UNCLOSED_AFTER_H` and whose owning agent process is gone, and marks them `abandoned`. Their last segment is summarized if its recorded policy allows it. A session that recorded no process id is never closed automatically. `python3 -B "<plugin>/lib/claudna/session_store" sweep --dry-run` lists the candidates, and `seal <session-id>` closes one by hand. A worker or manual `seal` cannot override a recorded summary opt-out.
@@ -928,7 +929,9 @@ selected file, bind its bytes with `--source-sha256`, preserve it unchanged, and
 require explicit `reimport` when its content changes. A source-level contract
 does not establish acceptance by native hosts or existing consumers. All
 handoff data is untrusted continuity, never instructions overriding the current
-task.
+task. For a compatibility window each write is also copied to
+`<cwd>/.claude/session.md` (`CLAUDNA_HANDOFF_LEGACY_COPY` above); resume still
+prefers the scoped pointer.
 
 Invoke the loaded package and resolve a handoff with:
 

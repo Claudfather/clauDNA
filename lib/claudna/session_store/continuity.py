@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import stat
 import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
@@ -20,6 +22,8 @@ INDEX_LIMIT = 64 * 1024
 REFERENCE_LIMIT = 256
 HANDOFF_LIMIT = 1024 * 1024
 CONTEXT_PATH = "artifacts/artifact-context.json"
+# Set to 0 to stop the compatibility copy at <cwd>/.claude/session.md (write_legacy_copy).
+LEGACY_COPY_ENV = "CLAUDNA_HANDOFF_LEGACY_COPY"
 _SHA256_RE = re.compile(r"[0-9a-f]{64}", re.ASCII)
 _HANDOFF_TIME_RE = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z", re.ASCII)
 _CONTEXT_PROVIDERS = frozenset((*AGENT_CLIS, "cursor"))
@@ -525,7 +529,7 @@ def write_context(store: SessionStore, *, current_sid: str, host: str, scope: st
     return path
 
 
-def _validate_handoff(content: str) -> None:
+def _validate_handoff(content: str) -> dict[str, str]:
     if not isinstance(content, str) or len(content.encode("utf-8")) > HANDOFF_LIMIT or "\x00" in content:
         raise ContinuityError("handoff must be text no larger than 1 MiB")
     if not content.startswith("---\n"):
@@ -553,6 +557,7 @@ def _validate_handoff(content: str) -> None:
         raise ContinuityError("handoff last_updated is not a valid timestamp") from exc
     if parsed.utcoffset() is None or parsed.utcoffset().total_seconds() != 0:
         raise ContinuityError("handoff last_updated must be UTC")
+    return fields
 
 
 def write_handoff(store: SessionStore, *, current_sid: str, host: str, content: str) -> Path:
@@ -567,6 +572,38 @@ def write_handoff(store: SessionStore, *, current_sid: str, host: str, content: 
         _session_path(handle, "handoff.md", must_exist=False)
         atomic_write_text(target, content, durable=True)
     return target
+
+
+def write_legacy_copy(content: str, env=None) -> dict:
+    """Copy a written v2 handoff to ``<cwd>/.claude/session.md`` for a compatibility window.
+
+    Readers outside clauDNA still read the per-cwd file that 0.34.x wrote
+    (Claudfather/Claudlobby#2924). The same bytes, and so the same
+    ``last_updated``, go to that path atomically, but only when ``<cwd>/.claude``
+    is an existing directory: this never creates it and never writes through a
+    symlink to it. ``CLAUDNA_HANDOFF_LEGACY_COPY=0`` turns the copy off. The
+    outcome is returned and never fails the session-owned write it follows.
+    A later release removes the copy, with notice.
+    """
+    env = os.environ if env is None else env
+    if env.get(LEGACY_COPY_ENV) == "0":
+        return {"status": "off", "path": None, "reason": f"{LEGACY_COPY_ENV}=0"}
+    directory = Path(_validate_handoff(content)["cwd"]) / ".claude"
+    target = directory / "session.md"
+    try:
+        info = directory.lstat()
+    except FileNotFoundError:
+        return {"status": "skipped", "path": str(target), "reason": "the handoff cwd has no .claude directory"}
+    except OSError as exc:
+        return {"status": "failed", "path": str(target), "reason": str(exc)}
+    if not stat.S_ISDIR(info.st_mode):
+        reason = ".claude is not a directory; a symlink is never followed"
+        return {"status": "skipped", "path": str(target), "reason": reason}
+    try:
+        atomic_write_text(target, content, durable=True)
+    except OSError as exc:
+        return {"status": "failed", "path": str(target), "reason": str(exc)}
+    return {"status": "written", "path": str(target), "reason": None}
 
 
 def publish_reference(store: SessionStore, *, current_sid: str, host: str, scope: str | dict,

@@ -124,8 +124,14 @@ def _continuity_command(args) -> int:
         if args.verb == "handoff-write":
             if args.background and os.environ.get("CLAUDNA_SESSION_STORE") == "0":
                 raise ValueError("background checkpoint disabled with session capture")
-            target = continuity.write_handoff(store, **owner, content=sys.stdin.read(1048577))
-            result = {"status": "found", "source_sid": args.session, "handoff_path": str(target)}
+            content = sys.stdin.read(1048577)
+            target = continuity.write_handoff(store, **owner, content=content)
+            # The compatibility copy follows only a verified write and never fails it.
+            copy = continuity.write_legacy_copy(content)
+            result = {"status": "found", "source_sid": args.session, "handoff_path": str(target),
+                      "legacy_copy": copy}
+            if copy["status"] == "failed" and not args.json:
+                print(f"legacy handoff copy failed: {copy['reason']}", file=sys.stderr)
         elif args.action == "context":
             target = continuity.write_context(store, **owner, scope=args.scope, privacy=args.privacy)
             result = {"status": "found", "source_sid": args.session, "context_path": str(target)}
