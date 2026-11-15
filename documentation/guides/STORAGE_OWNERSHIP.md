@@ -131,14 +131,19 @@ create lifecycle records. Capture-off suppresses background writes; an explicit
 manual user request may still write when native identity is verified. No writer
 manages `.gitignore`.
 
-For a compatibility window, `handoff-write` also copies each verified write to
-`<cwd>/.claude/session.md`, the per-cwd path 0.34.x wrote, so readers outside
-clauDNA that still read it keep working (Claudfather/Claudlobby#2924). The copy is
-the same bytes, written atomically, and only into an existing `<cwd>/.claude/`
-directory: it never creates one, never writes through a symlinked one, and never
-fails the session-owned write. The result reports it as `legacy_copy`.
-`CLAUDNA_HANDOFF_LEGACY_COPY=0` turns it off. Once Claudlobby reads the
-session-owned path, a later release removes the copy, with notice.
+For a compatibility window, `handoff-write` also refreshes the per-cwd file
+0.34.x wrote, `<cwd>/.claude/session.md`, with each verified write, so readers
+outside clauDNA that still read it keep working (Claudfather/Claudlobby#2924).
+The copy is the same bytes, written atomically, and only over an existing
+regular file in a real `<cwd>/.claude/` directory. It never creates the file or
+the directory, because a repository can track `.claude/` without ignoring
+`session.md`; it never follows a symlink at either, and never fails the
+session-owned write. A captured private session's handoff is never copied; a
+capture-off session's is. The result reports the outcome as `legacy_copy`.
+`CLAUDNA_HANDOFF_LEGACY_COPY=0` turns it off. Resume and the SessionStart
+briefing read the per-cwd file only when no scoped pointer resolves. Once
+Claudlobby reads the session-owned path, a later release removes the copy, with
+notice.
 
 Scoped continuity pointers are indexed under
 `R/continuity/<sha256-canonical-scope>/index.json`. Scope is an absolute realpath

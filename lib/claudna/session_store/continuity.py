@@ -574,22 +574,39 @@ def write_handoff(store: SessionStore, *, current_sid: str, host: str, content: 
     return target
 
 
-def write_legacy_copy(content: str, env=None) -> dict:
-    """Copy a written v2 handoff to ``<cwd>/.claude/session.md`` for a compatibility window.
+def captured_private(store: SessionStore, *, current_sid: str, host: str) -> bool:
+    """Whether the owner's recorded lifecycle marks it private; only a captured session has one."""
+    handle = store.session(current_sid)
+    _validate_session_location(handle)
+    owned_session(store, current_sid, host)
+    with handle._locked():
+        _, state, facts, _ = _owner_locked(store, current_sid, host)
+    return state == "captured" and bool(facts.private)
+
+
+def write_legacy_copy(content: str, *, private: bool = False, env=None) -> dict:
+    """Refresh an existing ``<cwd>/.claude/session.md`` with a written v2 handoff, for a compatibility window.
 
     Readers outside clauDNA still read the per-cwd file that 0.34.x wrote
     (Claudfather/Claudlobby#2924). The same bytes, and so the same
-    ``last_updated``, go to that path atomically, but only when ``<cwd>/.claude``
-    is an existing directory: this never creates it and never writes through a
-    symlink to it. ``CLAUDNA_HANDOFF_LEGACY_COPY=0`` turns the copy off. The
-    outcome is returned and never fails the session-owned write it follows.
-    A later release removes the copy, with notice.
+    ``last_updated``, replace that file atomically, but only when it already
+    exists as a regular file in a real ``<cwd>/.claude`` directory: this never
+    creates the file or the directory and never follows a symlink at either. A
+    repository can track ``.claude/`` without ignoring ``session.md``, and no
+    writer manages ``.gitignore``, so a created file could be committed. A
+    captured private session's handoff (``private``) is never copied; a
+    capture-off session's is. ``CLAUDNA_HANDOFF_LEGACY_COPY=0`` turns the copy
+    off. The outcome is returned and never fails the session-owned write it
+    follows. A later release removes the copy, with notice.
     """
     env = os.environ if env is None else env
     if env.get(LEGACY_COPY_ENV) == "0":
         return {"status": "off", "path": None, "reason": f"{LEGACY_COPY_ENV}=0"}
     directory = Path(_validate_handoff(content)["cwd"]) / ".claude"
     target = directory / "session.md"
+    if private:
+        reason = "a captured private session's handoff is never copied"
+        return {"status": "skipped", "path": str(target), "reason": reason}
     try:
         info = directory.lstat()
     except FileNotFoundError:
@@ -598,6 +615,16 @@ def write_legacy_copy(content: str, env=None) -> dict:
         return {"status": "failed", "path": str(target), "reason": str(exc)}
     if not stat.S_ISDIR(info.st_mode):
         reason = ".claude is not a directory; a symlink is never followed"
+        return {"status": "skipped", "path": str(target), "reason": reason}
+    try:
+        info = target.lstat()
+    except FileNotFoundError:
+        reason = "there is no session.md to refresh; the copy never creates one"
+        return {"status": "skipped", "path": str(target), "reason": reason}
+    except OSError as exc:
+        return {"status": "failed", "path": str(target), "reason": str(exc)}
+    if not stat.S_ISREG(info.st_mode):
+        reason = "session.md is not a regular file; a symlink is never followed"
         return {"status": "skipped", "path": str(target), "reason": reason}
     try:
         atomic_write_text(target, content, durable=True)
