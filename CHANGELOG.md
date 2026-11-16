@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.35.2] - 2026-11-16
 ### Changed
 - **CI's `runtime on Python 3.9` job runs on `ubuntu-24.04` again.** `ubuntu-latest` moved to Ubuntu 26.04, where `actions/setup-python` has no Python 3.9 build, so the job failed at setup and ran no test ([#498](https://github.com/Claudfather/clauDNA/issues/498)). The job is pinned to the image it last passed on. The 3.9 floor is unchanged, and the other jobs stay on `ubuntu-latest`.
 - Clarify `/claudna:delegate` as one entry point for independent opinions, bounded execution and simplification in either provider direction. Add compact assignment/result recipes and capability-based model selection; distinguish authorized generic cleanup from actual native Claude `/simplify`, which remains unavailable through the current helper. Native transport and lifecycle are unchanged.
