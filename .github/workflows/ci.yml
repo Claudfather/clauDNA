@@ -53,7 +53,9 @@ jobs:
     # Hooks and lib/claudna run under the user's python3: 3.9 on stock macOS.
     # The check-set is still the Makefile's; this leg only picks the interpreter.
     name: runtime on Python 3.9
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: that is Ubuntu 26.04 now, and setup-python has
+    # no 3.9 build for it. 24.04 has one (#498).
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 

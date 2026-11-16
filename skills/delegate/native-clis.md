@@ -1,5 +1,29 @@
 # Native execution and cleanup
 
+## Route independently of the lens
+
+Both Claude→Codex and Codex→Claude support consult, execute and generic simplify assignments. Choose the lens for the desired result, then choose an authorized destination and model for the work. Neither provider has a permanent coordinator or worker role.
+
+Explicit provider, model, native account and billing choices take precedence. Within authorized unpinned choices, use currently available model names from the destination's exposed model selection/help or account information, then choose the least costly capable option supported by that evidence:
+
+| Task complexity | Capability to select |
+|---|---|
+| Clear mechanical work, such as literal replacements with a decisive existing check | A smaller/economy worker that can follow the bounded brief reliably. Batch related replacements into one assignment. |
+| Bounded implementation or a focused opinion with familiar evidence | A suitable general worker; the native default is valid when no supported explicit selection is established. |
+| Difficult design, ambiguous tradeoffs or evidence that needs substantial reasoning | A stronger reasoning worker when the task warrants it and access permits. An opinion can need this tier even though it makes no edits. |
+
+These are capability tiers, not CLI model aliases or price claims. Use verified available names for explicit selection; `model: null` means native default, not cheapest. Current quota/access evidence can narrow the authorized choices. Missing quota, served-model or comparative cost information remains unknown; a model label alone establishes no saving. Report measured savings only with attributable usage/billing evidence and a stated comparison.
+
+Keep outcomes distinct: **unavailable/unknown model or quota** is a routing/access limitation; **native failure** is an incomplete execution; **a denied required task action** prevents acceptance without an independently verified permitted result. Honor a pinned unavailable model by reporting the blocker, not substituting. A completed opinion with a real evidence gap can receive one bounded clarification/correction when authorized; a disagreement or refusal is not grounds to shop models. Preserve existing authorization and native controls throughout.
+
+## Simplification capability
+
+Name the requested procedure and actual execution shape: **native Claude `/simplify`**, **clauDNA's equivalent generic cleanup procedure**, or an ordinary bounded cleanup assignment. Equivalent describes the cleanup goal, not proof of native command execution or independent review.
+
+The current helper accepts a generic task prompt and prefixes it with `No subagents`; it has no qualified native-command route. Putting `/simplify` in that prompt does not prove command expansion. Therefore actual native Claude `/simplify` is unavailable through this helper, and an explicit request for it remains unsatisfied. An authorized generic cleanup assignment is still useful when labeled as such. It cannot replace a separately required independent review. The caller retains its existing diff threshold, isolation and review/verify/ship pipeline once.
+
+## Native compatibility evidence
+
 V1 supports Claude-to-Codex and Codex-to-Claude. The launcher uses `codex exec --sandbox workspace-write --json -` or `claude --print --output-format json --permission-prompts none`, adding `--model` only when supplied. Native authentication, configured permission mode, settings and project/user policy remain loaded. Read-only Codex work uses its local read-only sandbox; read-only Claude work restricts built-in tools to Read, Glob and Grep. MCP servers, connectors and hooks remain subject to native policy, outside that local restriction. This flag supplies no external read-only guarantee; stronger isolation must already be supplied by native policy or the task is unsupported. Tests/builds are not inherently read-only. No settings/rules/hook-trust bypass.
 
 Compatibility measured 2026-10-20: Claude Code 2.1.304 with an existing Max login and Codex CLI 0.162.1 with an existing ChatGPT login each supplied a native ID, completion envelope and exit 0 for no-edit and bounded-edit probes. The supplied normalization test failed before and passed after; only normalize.py changed. No account override or policy bypass. This proves native compatibility, not deterministic model correctness or every configuration/version.
