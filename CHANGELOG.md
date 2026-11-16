@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **CI's `runtime on Python 3.9` job runs on `ubuntu-24.04` again.** `ubuntu-latest` moved to Ubuntu 26.04, where `actions/setup-python` has no Python 3.9 build, so the job failed at setup and ran no test ([#498](https://github.com/Claudfather/clauDNA/issues/498)). The job is pinned to the image it last passed on. The 3.9 floor is unchanged, and the other jobs stay on `ubuntu-latest`.
+
 ## [0.35.1] - 2026-11-15
 ### Added
 - For a compatibility window, `session-store handoff-write`, the write behind handoff, checkpoint and resume, also writes the same bytes over an existing `<cwd>/.claude/session.md` and reports the outcome as `legacy_copy` in its result. That is the per-cwd file 0.34.x wrote, which readers outside clauDNA still read: Claudlobby's handoff check, fresh-session resume and self restart ([Claudlobby#2924](https://github.com/Claudfather/Claudlobby/issues/2924)). The copy is atomic and refreshes only an existing regular file in a real `<cwd>/.claude/` directory. It never creates the file or the directory, since a repository can track `.claude/` without ignoring `session.md` and no writer manages `.gitignore`; it never follows a symlink at either, and never fails the session-owned write, which stays the source of truth. A captured private session's handoff is never copied: a private session publishes no pointer, so the next session in its directory would read the copy. A capture-off session's handoff is copied, since a fleet that turned capture off needs it for its readers. It is on by default; `CLAUDNA_HANDOFF_LEGACY_COPY=0` turns it off. Resume and the SessionStart briefing still prefer the scoped pointer and read the per-cwd file only when none resolves.
