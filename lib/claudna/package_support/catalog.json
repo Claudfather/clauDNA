@@ -337,7 +337,7 @@
       "requires_context": null
     },
     "delegate": {
-      "description": "Use when delegating a bounded task between Claude Code and native Codex. For same-provider work or isolation, use /claudna:worktree.",
+      "description": "Use when seeking other-provider opinions, execution or cleanup. For same-provider work or isolation, use /claudna:worktree.",
       "hosts": [
         "claude-code",
         "codex"
@@ -794,7 +794,7 @@
     "skills/claudron/SKILL.md": "c71d9523af39e2a71a58f86e4e711aa44d9c2742091b825fa413a1df5752a5ae",
     "skills/cleanup-legacy-install/SKILL.md": "a65f292d370a895903dfb35526aa3e3cce6a03d55df605f86a1ab119744bf541",
     "skills/dbt/SKILL.md": "6849c0dd19677018fced69a54464b7af72950dd94976618e4f0e740ba821d1a8",
-    "skills/delegate/SKILL.md": "4025c7ff48de005d3dc35e623212c043f33c434c6e69cf6ac46bd98ffe0dc9c7",
+    "skills/delegate/SKILL.md": "4a0fd3833f803c2373ece3fd4ed7c4bf46319aeade32623cab722797fa97f6a8",
     "skills/development-retro/SKILL.md": "ab54362ba4323b893336ed09681f58b87456164c5eb260ac199210fbcd3d27cd",
     "skills/extract-system-spec/SKILL.md": "3e308fc22eca1df850c04d7adeb526a5f962743112d52aaf1a09473b30edbef0",
     "skills/file-github-issue/SKILL.md": "f9d0e676ae71de72dff596ac961401e45e246d108262161ed79c2ce08dc68601",
