@@ -130,10 +130,15 @@ def _continuity_command(args) -> int:
             target = continuity.write_handoff(store, **owner, content=content)
             # The compatibility copy follows only a verified write and never fails it.
             copy = continuity.write_legacy_copy(content, private=private)
+            # So does the pointer, in the same command, so it cannot lag the write (#496); a checkpoint keeps it.
+            publish = (continuity.unpublished("--no-publish leaves the pointer where it is") if args.no_publish
+                       else continuity.publish_handoff(store, **owner))
             result = {"status": "found", "source_sid": args.session, "handoff_path": str(target),
-                      "legacy_copy": copy}
+                      "legacy_copy": copy, "publish": publish}
             if copy["status"] == "failed" and not args.json:
                 print(f"legacy handoff copy failed: {copy['reason']}", file=sys.stderr)
+            if publish["status"] in ("conflict", "unavailable") and not args.json:
+                print(f"handoff pointer not moved ({publish['status']}): {publish['reason']}", file=sys.stderr)
         elif args.action == "context":
             target = continuity.write_context(store, **owner, scope=args.scope, privacy=args.privacy)
             result = {"status": "found", "source_sid": args.session, "context_path": str(target)}
@@ -478,6 +483,8 @@ def main(argv: list[str] | None = None) -> int:
     handoff.add_argument("--session", required=True)
     handoff.add_argument("--host", required=True, choices=("claude", "codex", "cursor"))
     handoff.add_argument("--background", action="store_true", help="honor disabled capture for background checkpoints")
+    handoff.add_argument("--no-publish", action="store_true",
+                         help="leave the scope's pointer where it is (a checkpoint); by default the write publishes it")
     handoff.add_argument("--json", action="store_true")
     continuity = sub.add_parser("continuity", help="explicit scoped handoff and artifact pointers")
     actions = continuity.add_subparsers(dest="action", required=True)

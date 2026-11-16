@@ -173,6 +173,13 @@ def _session_start(handle: SessionHandle, payload: dict, env: Mapping[str, str],
         unclosed.mark_swept(root)
         spawn_sweep(root, env)
     write_entrypoint(root, agent_cli=host.name)
+    if source != "resume":  # a new session: which handoff its workspace names as it opens (#496)
+        from . import continuity
+
+        try:
+            continuity.record_start(SessionStore(root), handle)
+        except continuity.ContinuityError:
+            pass  # an unreadable index or scope: no record, so the session's handoff replaces no other's pointer
     return f"session opened ({source})"
 
 
