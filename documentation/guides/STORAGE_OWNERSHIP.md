@@ -159,6 +159,21 @@ captured private lifecycle privacy remains authoritative. Context publication
 does not open a session or emit lifecycle events. `continuity artifact-path`
 resolves artifact references separately from handoff references.
 
+After a verified write, `handoff-write` publishes the session's own handoff
+reference in the same command, so the pointer cannot lag the save it names
+(#496). A non-private captured session publishes for the workspace its recorded
+cwd binds, under the `session` workflow; private and capture-off sessions stay
+local. The compare-and-swap expects the reference recorded when the session
+opened: the store's opening SessionStart (startup, clear or fork, never resume)
+writes `artifacts/continuity-start.json` in the new session, holding that
+workspace's `session` handoff reference hash, or null when it had none. The
+write then replaces that reference, fills an empty slot, or keeps the session's
+own. A reference another session published after this one opened, or any other
+session's when there is no record, stays in place and is reported as `conflict`.
+The result's `publish` reads `published`, `local`, `conflict`, `unavailable` or
+`kept` and never changes the write's own outcome. A checkpoint passes
+`--no-publish` to keep the pointer where it is. Resolution only reads.
+
 Legacy import reads only an explicitly selected source. The caller binds the
 selected bytes with `--source-sha256 <hex>`; import verifies that digest before
 mutating state. The source remains read-only. The importer converts a copy to

@@ -56,4 +56,4 @@ The source contract declares only these guarantees; broader compatibility remain
 Section names, ordering, `schema_version`, and other fields are informal and may change without notice. Changing a declared guarantee is a breaking change and requires a `CHANGELOG.md` entry under a breaking heading. These source-level promises do not establish native host or external consumer acceptance.
 
 
-Complete content is submitted through `session-store handoff-write`; do not use shell temp files or `mv`. Handoff publishes a scoped reference only after the write succeeds and only when effective privacy permits discovery. Checkpoint writes the current owner and retains any existing pointer without advancing a predecessor.
+Complete content is submitted through `session-store handoff-write`; do not use shell temp files or `mv`. After a successful write, handoff publishes its scoped reference in the same command, only when effective privacy permits discovery. Checkpoint passes `--no-publish`: it writes the current owner and retains any existing pointer without advancing a predecessor.

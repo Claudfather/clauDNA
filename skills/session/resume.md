@@ -31,7 +31,7 @@ Apply the rules in `../_shared/reaper-rules.md` to the loaded content in memory.
 
 ### 4. Write back if reaped
 
-If continuing work in the same scope, persist the transferred context to the current session through `session-store handoff-write`, even when reaping did not change it; never write back to the predecessor. Publish the current owner's pointer only after verified persistence and only when authorized by effective privacy: captured sessions follow recorded lifecycle privacy, private sessions skip global publication, and artifact-only/capture-off sessions require explicit public context for that scope. Use the existing reference hash for compare-and-swap. A read-only briefing need not create a current-session copy.
+If continuing work in the same scope, persist the transferred context to the current session through `session-store handoff-write`, even when reaping did not change it; never write back to the predecessor. That write publishes the current owner's pointer itself, as handoff step 7 describes: captured sessions follow recorded lifecycle privacy, private sessions skip global publication, and a `conflict` is reported, not overridden. Artifact-only/capture-off sessions still require explicit public context for that scope and an explicit `continuity publish`, with the existing reference hash for compare-and-swap. A read-only briefing need not create a current-session copy: the pointer then stays on the predecessor until this session's first handoff moves it.
 
 ### 5. Present briefing
 

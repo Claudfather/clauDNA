@@ -22,6 +22,10 @@ INDEX_LIMIT = 64 * 1024
 REFERENCE_LIMIT = 256
 HANDOFF_LIMIT = 1024 * 1024
 CONTEXT_PATH = "artifacts/artifact-context.json"
+# The handoff reference a fresh session's own workspace named as it opened (record_start).
+START_PATH = "artifacts/continuity-start.json"
+# The workflow a handoff publishes under (publish_handoff; skills/session/handoff.md, step 7).
+HANDOFF_WORKFLOW = "session"
 # Set to 0 to stop the compatibility copy at <cwd>/.claude/session.md (write_legacy_copy).
 LEGACY_COPY_ENV = "CLAUDNA_HANDOFF_LEGACY_COPY"
 _SHA256_RE = re.compile(r"[0-9a-f]{64}", re.ASCII)
@@ -681,6 +685,141 @@ def publish_reference(store: SessionStore, *, current_sid: str, host: str, scope
 
         _, published = _index_transaction(store, canonical, mutate)
     return _selection("found", ref=published, path=path, candidates=(current_sid,))
+
+
+def _origin_scope(origin: object) -> dict | None:
+    """The workspace scope a captured session's recorded cwd binds (as :func:`_origin_binds` tests), or None."""
+    cwd = origin.get("cwd") if isinstance(origin, dict) else None
+    if not isinstance(cwd, str) or not Path(cwd).is_absolute():
+        return None
+    try:
+        return canonical_scope(f"workspace:{cwd}")
+    except ContinuityError:
+        return None
+
+
+def _handoff_slot(index: dict) -> dict | None:
+    """The scope's handoff reference under :data:`HANDOFF_WORKFLOW`: the one a handoff publishes."""
+    return next((ref for ref in index["refs"]
+                 if (ref["kind"], ref["workflow_selector"]) == ("handoff", HANDOFF_WORKFLOW)), None)
+
+
+def record_start(store: SessionStore, handle: SessionHandle) -> Path | None:
+    """Record which handoff reference a fresh captured session's own workspace names as it opens.
+
+    The store's opening SessionStart calls this for a new session (startup,
+    clear, fork) once the opening is recorded. :func:`publish_handoff` later
+    replaces only the reference recorded here: the reference hash, or null when
+    the slot was empty. The index is read, never created or written, and a
+    record already there is kept, so it stays the pointer as the session first
+    opened. Returns the record's path, or None when nothing was recorded.
+    """
+    state, _, origin = _lifecycle(handle)
+    scope = _origin_scope(origin) if state == "captured" else None
+    if scope is None:
+        return None
+    path = handle.paths.dir / START_PATH
+    with handle._locked():
+        if path.exists() or path.is_symlink():
+            return None
+        slot = _handoff_slot(_read_index(store, scope))
+        record = {"version": 1, "native_sid": handle.sid, "scope": scope, "workflow_selector": HANDOFF_WORKFLOW,
+                  "reference_hash": reference_hash(slot) if slot else None}
+        ensure_dir(path.parent)
+        _session_path(handle, START_PATH, must_exist=False)
+        atomic_write_json(path, record)
+    return path
+
+
+def _read_start(handle: SessionHandle, scope: dict) -> tuple[bool, str | None]:
+    """``(recorded, reference_hash)`` from the session's start record for ``scope``; a bad record is no record."""
+    path = handle.paths.dir / START_PATH
+    try:
+        if path.is_symlink() or path.stat().st_size > INDEX_LIMIT:
+            return False, None
+        value = read_json(_session_path(handle, START_PATH, must_exist=True))
+    except (OSError, ContinuityError):
+        return False, None
+    if (not isinstance(value, dict)
+            or set(value) != {"version", "native_sid", "scope", "workflow_selector", "reference_hash"}
+            or type(value["version"]) is not int or value["version"] != 1 or value["native_sid"] != handle.sid
+            or value["scope"] != scope or value["workflow_selector"] != HANDOFF_WORKFLOW):
+        return False, None
+    recorded = value["reference_hash"]
+    if recorded is not None and not (isinstance(recorded, str) and _SHA256_RE.fullmatch(recorded)):
+        return False, None
+    return True, recorded
+
+
+def _handoff_outcome(status: str, *, scope: dict | None = None, source_sid: str | None = None,
+                     ref_hash: str | None = None, reason: str | None = None) -> dict:
+    return {"status": status, "scope": f"{scope['kind']}:{scope['value']}" if scope else None,
+            "source_sid": source_sid, "reference_hash": ref_hash, "reason": reason}
+
+
+def unpublished(reason: str) -> dict:
+    """The outcome of a write that leaves the scope's pointer where it is by request (a checkpoint)."""
+    return _handoff_outcome("kept", reason=reason)
+
+
+def publish_handoff(store: SessionStore, *, current_sid: str, host: str) -> dict:
+    """Point the session's own workspace at the ``handoff.md`` it just wrote, when the session may publish.
+
+    ``handoff-write`` calls this after a verified write, so the pointer no longer
+    waits for a second command the model can skip (#496). A non-private captured
+    session publishes for the workspace its recorded cwd binds, under
+    :data:`HANDOFF_WORKFLOW`; private and capture-off sessions stay local
+    (``local``). The swap is :func:`publish_reference`'s compare-and-swap, with
+    the expected reference read from the session's start record
+    (:func:`record_start`): it replaces that reference, fills an empty slot, or
+    keeps the session's own. A reference another session published after this one
+    opened, or any other session's when there is no record, is left in place and
+    returned as ``conflict`` with that session's ID. Never raises: the outcome
+    goes beside the write, which it never undoes.
+    """
+    try:
+        return _publish_handoff(store, current_sid=current_sid, host=host)
+    except (OSError, ValueError, RuntimeError) as exc:
+        return _handoff_outcome("unavailable", reason=str(exc))
+
+
+def _publish_handoff(store: SessionStore, *, current_sid: str, host: str) -> dict:
+    handle = store.session(current_sid)
+    _validate_session_location(handle)
+    owned_session(store, current_sid, host)
+    with handle._locked():
+        handle, state, facts, origin = _owner_locked(store, current_sid, host)
+        if state != "captured":
+            return _handoff_outcome("local", reason="a capture-off session's handoff stays local")
+        if facts.private:
+            return _handoff_outcome("local", reason="a private session's handoff is never indexed")
+        scope = _origin_scope(origin)
+        if scope is None:
+            return _handoff_outcome("unavailable", reason="the session's recorded cwd is not an available workspace")
+        if _session_scope_privacy(handle, scope) != "public":
+            return _handoff_outcome("unavailable", scope=scope,
+                                    reason="resolvers could not read this save: its artifact context is unverifiable")
+        _session_path(handle, "handoff.md", must_exist=True)
+        recorded, start = _read_start(handle, scope)
+        ref = {"kind": "handoff", "native_sid": current_sid, "relative_path": "handoff.md",
+               "workflow_selector": HANDOFF_WORKFLOW}
+
+        def mutate(index):
+            existing = _handoff_slot(index)
+            if existing is not None and existing != ref and not (recorded and reference_hash(existing) == start):
+                return existing  # another session's save since this one opened: never replaced here
+            if existing is None:
+                index["refs"].append(ref)
+            else:
+                index["refs"][index["refs"].index(existing)] = ref
+            return None
+
+        _, kept = _index_transaction(store, scope, mutate)
+    if kept is None:
+        return _handoff_outcome("published", scope=scope, source_sid=current_sid, ref_hash=reference_hash(ref))
+    reason = ("another session published its save here after this session opened" if recorded
+              else "this session has no record of the pointer as it opened")
+    return _handoff_outcome("conflict", scope=scope, source_sid=kept["native_sid"], reason=reason)
 
 
 def _legacy_source(source: Path, store: SessionStore, fingerprint: str) -> Path:
