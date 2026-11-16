@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.35.3] - 2026-11-16
 ### Fixed
 - **The agent instruction files agree with the code.** `AGENTS.md` names every step of `make check`, `check-package-support` and the `lib/` lint scope included, and says that on a branch the changelog gate asks for new `[Unreleased]` content. `lib/CLAUDE.md` gives the session store's import layers as `tests/test_runtime_layout.py` ranks them, and the directory form the hooks run. `PROJECT_MISSION.md` dates its v0.6.1 note and calls what should replace its sprint list an open question.
 - **A handoff moves its workspace's pointer itself, so the next fresh session resumes the newest save** ([#496](https://github.com/Claudfather/clauDNA/issues/496)). `session-store handoff-write` wrote the save and left the scoped pointer to a second command, `continuity publish`, so a handoff that skipped it left the pointer on its predecessor and the next resume read the older save with no warning. The write now publishes in the same command and reports the outcome as `publish` in its result. A non-private captured session publishes for its own workspace; private and capture-off sessions stay local. The compare-and-swap expects the reference that workspace named when the session opened, which the store's SessionStart now records in the session (`artifacts/continuity-start.json`), so a reference another session published since is left in place and reported as `conflict`. A checkpoint passes the new `--no-publish` and keeps the pointer where it is, as before. `continuity resolve` is unchanged.
