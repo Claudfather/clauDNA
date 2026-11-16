@@ -2,7 +2,7 @@
 name: delegate
 user-invocable: true
 hosts: [claude-code, codex]
-description: "Use when delegating a bounded task between Claude Code and native Codex. For same-provider work or isolation, use /claudna:worktree."
+description: "Use when seeking other-provider opinions, execution or cleanup. For same-provider work or isolation, use /claudna:worktree."
 argument-hint: "[run|status] [task]"
 requires:
   - cli: python3
@@ -11,15 +11,29 @@ requires:
 
 # Delegate
 
-Hand one authorized task to the other provider's native CLI; retain judgment and acceptance in the parent. Preserve native permissions and settings. Do not relax controls or retry until a model happens to comply.
+Get an independent opinion or hand bounded work to the other provider's native CLI; retain judgment and acceptance in the parent. Either Claude or Codex can coordinate. Preserve native permissions and settings. Do not relax controls or retry until a model happens to comply.
 
 > **Codex:** Read `../_shared/codex-tools.md` first. Same-host subagents do not cross providers.
+
+## Choose the lens
+
+Infer the lens from ordinary intent and announce it; the user need not write a delegation spec. Lens and provider/model selection are separate decisions. Independent perspective is useful in its own right; savings are not a prerequisite.
+
+| Lens | Assignment and returned result |
+|---|---|
+| **Consult** | Read-only independent answer or critique. Return answer/verdict first, then source-backed reasons and actionable findings, alternatives/tradeoffs, and uncertainties or missing evidence. Check the opinion against the supplied sources and question. |
+| **Execute** | Bounded implementation in exact owned paths. Return changed paths, behavior, actual check results and remaining limitations. |
+| **Simplify** | Behavior-preserving cleanup of an exact owned diff. Name the requested procedure; return findings adopted/rejected, edits and verification. The current helper supports a generic cleanup assignment, **not verified execution of native Claude `/simplify`**. An actual-native request remains unsatisfied here; see `native-clis.md`. |
+
+Derive a compact five-part brief from the conversation and inspected source: **objective; source/base and owned scope; preservation constraints; expected output and evidence/check; time bound**. Fill known details yourself; clarify only a material ambiguity that blocks authorized work.
+
+For example: “Consult via Codex, native default, read-only cache design and its two call sites; return a recommendation with source evidence, tradeoffs and uncertainties.” Choose a capable available model using the routing guidance in `native-clis.md`; a tiny job can stay local when handoff adds no useful value.
 
 ## Procedure
 
 1. Resolve the actual plugin root per `../_shared/claudna-root.md` and read `native-clis.md`. Honor the user's provider, model, native account and billing mode; reuse standing authorization. No automatic account/model substitution, API billing, permission widening or provider retry.
 2. Identify the current parent's actual recorded `(agent_cli, session_id)` from its host receipt; confirm with `/claudna:session show`. Never choose the latest session or infer identity from cwd. Missing identity/history blocks delegation; continue locally if authorized. For `status`, run `scripts/delegate.py status --parent <sid>` through the bundled entry point below; no provider call.
-3. Assign one objective, workspace-relative owned paths and a meaningful existing check. Hand off an absolute task-owned workspace and pause parent writes until observed exit. Edits require a clean baseline. Dirty prerequisites and concurrent work remain with the caller; `/claudna:worktree` can prepare isolation before delegation. Delegate never creates/removes a workspace.
+3. Use the lens's brief and result recipe: one objective, workspace-relative owned paths and a meaningful evidence/output contract or existing implementation check. Hand off an absolute task-owned workspace and pause parent writes until observed exit. Edits require a clean baseline. Dirty prerequisites and concurrent work remain with the caller; `/claudna:worktree` can prepare isolation before delegation. Delegate never creates/removes a workspace.
 4. Feed one JSON request to `python3 -B -S <claudna-root>/scripts/delegate.py run --request -`: `parent_sid`, `parent_provider`, `provider`, `cwd`, `owned_paths` (list), `task`, `model` (explicit name or null for native default), `deadline_seconds` (1–3600), `workspace_owned: true`, `read_only` (boolean). Use the host transport below; serialize task data as JSON, never interpolate it into an executable shell command. State provider/model, owned paths and check before launch. The host's actual process timeout must exceed `deadline_seconds`; a tool yield must retain the process handle. Preserve required controls; denied required actions block acceptance.
 5. Keep the actual process handle and wait. A tool yield/timeout does not prove exit; do not start a replacement. `completed` means native completion only. Inspect **all** changes, including untracked files, and verify scope and behavior. Inspect returned `permission_denials`: an optional diagnostic denial can coexist with completed work; a denied required action with no independently verified permitted result means rejection. Include the disposition of denials in acceptance evidence. Do not classify command text or accept worker prose as proof. Reuse fresh worker check evidence only when it matches the tested source. Do not add tests merely to pin implementation text.
 6. Automatically record the parent decision using `scripts/delegate.py settle --request -` and the JSON transport below, with concrete check evidence. Worker prose is not approval. Failed/partial edits stay in the same workspace; rejection never resets/deletes them.
