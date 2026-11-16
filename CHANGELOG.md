@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **The agent instruction files agree with the code.** `AGENTS.md` names every step of `make check`, `check-package-support` and the `lib/` lint scope included, and says that on a branch the changelog gate asks for new `[Unreleased]` content. `lib/CLAUDE.md` gives the session store's import layers as `tests/test_runtime_layout.py` ranks them, and the directory form the hooks run. `PROJECT_MISSION.md` dates its v0.6.1 note and calls what should replace its sprint list an open question.
 
 ## [0.35.1] - 2026-11-15
 ### Added
