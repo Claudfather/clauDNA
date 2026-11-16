@@ -227,7 +227,7 @@
       ]
     }
   },
-  "package_version": "0.35.2",
+  "package_version": "0.35.3",
   "schema": "claudna.package-support/1",
   "skills": {
     "adversarial-review": {
@@ -779,10 +779,10 @@
   "sources": {
     ".agents/plugins/marketplace.json": "b537c39cf727d44c93da3c55892daf382394e163dd26f3aeabcc12d21d36163e",
     ".claude-plugin/marketplace.json": "951282634d5c2369fcd5b1904c45821ac5a0dfcd365377074fd34f706018d6d1",
-    ".claude-plugin/plugin.json": "38004df6c6ca8ac745d7d2e914538d74b92da704fc2b37f71884070599119f7d",
-    ".codex-plugin/plugin.json": "418187b8428d9800638122249be208a8b6fa299a4d9046491e62bed187e457d1",
+    ".claude-plugin/plugin.json": "8523699641ccd272e9dcc2baec539099dbe3b9e01242bfffc34e0497b4c101ad",
+    ".codex-plugin/plugin.json": "c829c11fd6b3b1049a91b9534cb7e6824c8d3aa6ac1650b81c8aa4d1fe0edbe3",
     ".cursor-plugin/marketplace.json": "bf37d8df35f18fcdb1d6b677a7ac5551d1873a378603ad649da97a2d3495e852",
-    ".cursor-plugin/plugin.json": "64b3863aa237709ffecee1d42fd35ab4371210e08d3583528a34451a5056ff82",
+    ".cursor-plugin/plugin.json": "7a02389f3cbdbf4a363e3bfcb8929b722794718be44e003c9a62d8eb7cbe96a8",
     "lib/claudna/package_support/host-policy.json": "6da6b14b449044cb4c98f17b49bcb81f21039b175bd7391d6646d3ba24079e1d",
     "plugin-hooks/codex-hooks.json": "da9fa60d3dcd3f583b0cef4ea67685073f3eeecf0aa3238dffe7daffb4177e9c",
     "plugin-hooks/hooks.json": "d64bf123e5c8a8faab67f8f7d2061b7c8a81d94e842d018f921b35a35d961a4e",
