@@ -49,6 +49,9 @@ _ALLOWED_HOSTS = {
 }
 # Leading words that may sit in front of the real command word, plus shell keywords a
 # segment can open with; used to find a `gh` invocation that is wrapped rather than bare.
+# It holds every wrapper the permission hook's `is_gh_command` names
+# (`plugin-hooks/pretooluse-permissions.sh`), so a gh call the hook reads as wrapped is
+# inspected here too; a test keeps the two lists in step.
 _WRAPPERS = {
     "command",
     "builtin",
@@ -60,6 +63,8 @@ _WRAPPERS = {
     "env",
     "xargs",
     "timeout",
+    "sudo",
+    "doas",
     "noglob",
     "nocorrect",
     "coproc",
@@ -412,20 +417,16 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
                 wrapped = True
                 i += 2 if base == "repeat" else 1  # zsh `repeat` takes a count word: `repeat $n gh ...`
                 continue
-            break
-        if wrapped:
-            # A skip-list wrapper's own options and their values — `env -u X`,
-            # `timeout -s KILL 5`, `xargs -I {}` — sit between it and the command word,
-            # and the option that takes the next word as its value is not known here
-            # (it varies by wrapper). Find the gh command word the way the bash hook's
-            # `is_gh_command` does: the first following word whose base name is `gh`
-            # (an `=` word is an `env NAME=value` argument, not the command). A superset
-            # — a non-gh command's tail can be read as gh args — but every reading only
-            # adds denials, so a doubt is inspected, not skipped.
-            while i < len(seg) and (
-                "=" in seg[i] or seg[i].lstrip("\\").rsplit("/", 1)[-1] != "gh"
-            ):
+            if wrapped and base.rsplit("/", 1)[-1] != "gh":
+                # A wrapper's own option or its value (`env -u X`, `timeout -s KILL 5`,
+                # `xargs -I {}`, `sudo -u x`): which option takes the next word varies by
+                # wrapper, so keep reading words until the gh command word, the way the
+                # hook's `is_gh_command` finds it. Each word still goes through the
+                # assignment, redirection and wrapper handling above, so a GH_HOST= or
+                # GH_REPO= prefix after an option is recorded as it is before one.
                 i += 1
+                continue
+            break
         if i < len(seg) and seg[i].lstrip("\\").rsplit("/", 1)[-1] == "gh":
             args = seg[i + 1 :]
             for name, flag in (("GH_HOST", "--hostname"), ("GH_REPO", "-R")):

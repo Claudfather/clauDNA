@@ -1,25 +1,34 @@
 """The gh read-guard inspects a gh call behind a wrapper's options and their values, and
 the permission hook refuses a triggering gh command the guard could not check.
 
-Two behaviors are covered here:
+Four behaviors are covered here:
 
 1. `plugin-hooks/gh-guard-decide.py` skipped a leading wrapper's words only while each was a
    dash-option or a bare number, so the value word of a value-taking option ended the skip and
    the gh call behind it was read as a different command and never inspected: `env -u X`,
    `timeout -s KILL 5`, `xargs -I {}`. `env` alone and `nice -n 5` (a bare number) already
-   reached the decider; the guard now finds the gh command word past any wrapper's options.
+   reached the decider; the guard now reads every word past a wrapper up to the gh word.
 2. `plugin-hooks/pretooluse-permissions.sh` sent a guard exit other than 0 or 10, and a missing
    python3, to the allow patterns, which could approve the unchecked command — against the
    comment that a failed spawn must not read as allow. A hook deny is the only decision that
    overrides an allow grant, so the hook now refuses a command that matched the gh trigger and
    could not be checked.
+3. Each word past a wrapper still goes through the decider's assignment handling, so a GH_HOST=
+   or GH_REPO= prefix after a wrapper's options (`env -i GH_HOST=... gh ...`) names the host as
+   one in front of them does. After a dash-option or a number e0ef4b4 already denies it, and
+   fea265d (this branch before the fix) allowed it; after a value-taking option both allowed it.
+4. `sudo` and `doas` are in the hook's `is_gh_command` wrapper list but were not in the
+   decider's, so a gh call behind them was never inspected. The decider's list now holds every
+   wrapper the hook names, and a test reads the hook's list to keep the two in step.
 
-Each deny case is red on e0ef4b4 (main before this change) and green with it. Fake values only."""
+Each deny case is red on e0ef4b4 (main before this change), at fea265d, or on both, and green
+with this change; the allow cases are green on all three. Fake values only."""
 
 from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -178,3 +187,115 @@ def test_a_guard_that_allows_still_lets_normal_matching_run(tmp_path):
     (shim / "python3").write_text("#!/bin/sh\nexit 0\n")
     (shim / "python3").chmod(0o755)
     assert _hook(tmp_path, ENV_READ, ["Bash(gh pr list *)"], path=f"{shim}:/usr/bin:/bin") == "allow"
+
+
+# -- 3. A GH_HOST= or GH_REPO= prefix after a wrapper's options names the host -------------
+# The decider reads every word between a wrapper and the gh word, so a prefix after the
+# wrapper's options goes through the same assignment handling as one in front of them. Each
+# form puts one kind of option in front of the prefix ({P}): a dash-option, a number, or a
+# value-taking option. The gh tail is a clean read, so only the prefix can deny.
+PREFIX_FORMS = [
+    "env -i {P}",  # a dash-option
+    "env -i 2>&1 {P}",  # a dash-option, then a redirection
+    "time -p env {P}",  # another wrapper's dash-option, then env
+    "timeout 5 env {P}",  # a number
+    "nice -n 5 env {P}",  # an option and its number
+    "env -u X {P}",  # a value-taking option
+    "timeout -s KILL 5 env {P}",  # a value-taking option, then a number
+    "xargs -I {{}} env {P}",  # a value-taking option
+]
+CLEAN = "gh pr list --json number"
+
+
+@pytest.mark.parametrize("prefix", ["GH_HOST=other.example", "GH_REPO=other.example/o/r", "GH_HOST+=x"])
+@pytest.mark.parametrize("form", PREFIX_FORMS)
+def test_a_host_prefix_after_a_wrappers_options_is_read(form, prefix):
+    cmd = f"{form.format(P=prefix)} {CLEAN}"
+    assert verdict(cmd) == "deny", cmd
+
+
+@pytest.mark.parametrize("prefix", ["GH_HOST=github.com", "GH_REPO=o/r"])
+@pytest.mark.parametrize("form", PREFIX_FORMS)
+def test_a_github_com_prefix_after_a_wrappers_options_stays_allowed(form, prefix):
+    cmd = f"{form.format(P=prefix)} {CLEAN}"
+    assert verdict(cmd) == "allow", cmd
+
+
+@pytest.mark.parametrize("prefix", ["GH_HOST=other.example", "GH_REPO=other.example/o/r"])
+@pytest.mark.parametrize("form", ["env -i {P}", "timeout 5 env {P}", "env -u X {P}"])
+def test_the_hook_denies_a_host_prefix_after_a_wrappers_options(tmp_path, form, prefix):
+    cmd = f"{form.format(P=prefix)} {CLEAN}"
+    for allow in ([f"Bash({cmd.split()[0]} *)"], ["Bash"]):
+        assert _hook(tmp_path, cmd, allow) == "deny", (allow, cmd)
+
+
+@pytest.mark.parametrize("form", ["env -i {P}", "timeout 5 env {P}", "env -u X {P}"])
+def test_the_hook_allows_a_github_com_prefix_after_a_wrappers_options(tmp_path, form):
+    cmd = f"{form.format(P='GH_HOST=github.com')} {CLEAN}"
+    for allow in ([f"Bash({cmd.split()[0]} *)"], ["Bash"]):
+        assert _hook(tmp_path, cmd, allow) == "allow", (allow, cmd)
+
+
+# -- 4. sudo and doas are wrappers to the decider, as they are to the hook ------------------
+def _hook_wrappers() -> set[str]:
+    """The wrapper words of the hook's `is_gh_command`: its one `word|word...) ;;` case arm."""
+    body = HOOK.read_text().split("is_gh_command() {", 1)[1].split("\n}\n", 1)[0]
+    arms = re.findall(r"^\s*([A-Za-z|]+)\) ;;$", body, re.M)
+    assert len(arms) == 1, arms
+    return set(arms[0].split("|"))
+
+
+def test_the_deciders_wrapper_list_holds_every_wrapper_the_hook_names():
+    hook = _hook_wrappers()
+    assert {"env", "timeout", "sudo", "doas"} <= hook  # the arm was found and read
+    assert hook <= mod._WRAPPERS, sorted(hook - mod._WRAPPERS)
+
+
+@pytest.mark.parametrize(
+    "cmd",
+    [
+        f"sudo {ENV}",
+        f"sudo -u x {ENV}",  # -u takes the user name
+        f"sudo -u x {HOST}",
+        f"sudo -E -u x {ENV}",
+        "sudo -u x GH_HOST=other.example gh pr list --json number",  # sudo's own NAME=value
+        f"doas {ENV}",
+        f"doas -u x {ENV}",
+        f"doas -u x {HOST}",
+    ],
+)
+def test_a_gh_call_behind_sudo_or_doas_is_inspected(cmd):
+    assert verdict(cmd) == "deny", cmd
+
+
+@pytest.mark.parametrize(
+    "cmd",
+    [
+        "sudo gh pr list --json number",
+        "sudo -u x gh pr list --json title --jq .title",
+        "sudo -u x GH_HOST=github.com gh pr list --json number",
+        "doas -u x gh pr view 5 --json title",
+        "sudo -u x ls -la",  # a non-gh command behind sudo is not a gh call
+    ],
+)
+def test_an_ordinary_call_behind_sudo_or_doas_stays_allowed(cmd):
+    assert verdict(cmd) == "allow", cmd
+
+
+@pytest.mark.parametrize(
+    "cmd",
+    [
+        "sudo -u x gh pr list --json number --jq env.X",
+        "doas -u x gh pr list --json number --jq env.X",
+        "sudo gh pr list -R evil.example/o/r --search x",
+    ],
+)
+def test_the_hook_denies_a_gh_call_behind_sudo_or_doas_under_a_narrow_and_a_bare_grant(tmp_path, cmd):
+    for allow in ([f"Bash({cmd.split()[0]} *)"], ["Bash"]):
+        assert _hook(tmp_path, cmd, allow) == "deny", (allow, cmd)
+
+
+def test_the_hook_allows_a_clean_gh_read_behind_sudo(tmp_path):
+    cmd = "sudo -u x gh pr list --json number --jq .title"
+    for allow in (["Bash(sudo *)"], ["Bash"]):
+        assert _hook(tmp_path, cmd, allow) == "allow", (allow, cmd)
