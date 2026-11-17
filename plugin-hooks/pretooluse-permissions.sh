@@ -18,9 +18,11 @@ set -eo pipefail
 #   - Loads patterns from ~/.claude/settings.json, .claude/settings.json,
 #     and .claude/settings.local.json
 #   - Falls through (no output) for unrecognized or unparseable commands
-#   - Returns "deny" only for the gh read-guard shapes (a granted gh read that
-#     would read the environment or reach a host other than github.com); every
-#     other command is "allow" or silent pass-through
+#   - Returns "deny" for the gh read-guard shapes (a granted gh read that would
+#     read the environment or reach a host other than github.com), and for a
+#     command that matched the gh trigger but the guard could not check (its
+#     error, an unknown exit code, or no python3) — that is refused, not approved
+#     by the allow patterns. Every other command is "allow" or silent pass-through
 #   - Debug log: ${CLAUDNA_STATE_DIR:-~/.claudna}/hooks/permissions.log,
 #     readable by the user alone
 #
@@ -162,12 +164,19 @@ case "$NOQ" in
                     GH_RC=0
                     GH_GUARD_REASON="$(printf '%s' "$COMMAND" | python3 -B "$HOOK_DIR/gh-guard-decide.py" 2>/dev/null)" || GH_RC=$?
                     case "$GH_RC" in
-                        0) : ;; # allow this shape; fall through to normal matching
+                        0) : ;; # this shape is clear; fall through to normal matching
                         10) deny "$GH_GUARD_REASON" ;;
-                        *) log "PASS: $COMMAND (gh guard did not answer, exit $GH_RC)" ;;
+                        # Any other exit (a guard error, an unknown code) means the guard
+                        # did not answer. A hook deny is the only decision that overrides
+                        # an allow grant, so a command that matched the gh trigger and
+                        # could not be checked is refused here, never handed to the allow
+                        # patterns that would approve it unseen.
+                        *) deny "the gh read-guard could not check this command (exit $GH_RC)" ;;
                     esac
                 else
-                    log "PASS: $COMMAND (gh guard skipped, no python3)"
+                    # No python3, so the guard cannot run. Refuse the command that matched
+                    # the gh trigger rather than let the allow patterns approve it unchecked.
+                    deny "the gh read-guard needs python3 and it is not available"
                 fi
                 ;;
         esac

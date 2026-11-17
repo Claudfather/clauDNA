@@ -49,6 +49,9 @@ _ALLOWED_HOSTS = {
 }
 # Leading words that may sit in front of the real command word, plus shell keywords a
 # segment can open with; used to find a `gh` invocation that is wrapped rather than bare.
+# It holds every wrapper the permission hook's `is_gh_command` names
+# (`plugin-hooks/pretooluse-permissions.sh`), so a gh call the hook reads as wrapped is
+# inspected here too; a test keeps the two lists in step.
 _WRAPPERS = {
     "command",
     "builtin",
@@ -60,6 +63,8 @@ _WRAPPERS = {
     "env",
     "xargs",
     "timeout",
+    "sudo",
+    "doas",
     "noglob",
     "nocorrect",
     "coproc",
@@ -370,6 +375,7 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
     out: list[list[str]] = []
     for seg in segments:
         i = 0
+        wrapped = False
         # GH_HOST=<host> / GH_REPO=[HOST/]OWNER/REPO prefixes name the host this call talks to. `held` is what
         # each holds if `+=` appends; `readings` is every value a prefix gave it, and any foreign one denies.
         held: dict[str, str] = {}
@@ -408,11 +414,17 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
                 continue
             base = t.lstrip("\\")
             if base in _WRAPPERS:
+                wrapped = True
                 i += 2 if base == "repeat" else 1  # zsh `repeat` takes a count word: `repeat $n gh ...`
-                while i < len(seg) and (
-                    seg[i].startswith("-") or re.fullmatch(r"[0-9]+[smhd]?", seg[i])
-                ):
-                    i += 1
+                continue
+            if wrapped and base.rsplit("/", 1)[-1] != "gh":
+                # A wrapper's own option or its value (`env -u X`, `timeout -s KILL 5`,
+                # `xargs -I {}`, `sudo -u x`): which option takes the next word varies by
+                # wrapper, so keep reading words until the gh command word, the way the
+                # hook's `is_gh_command` finds it. Each word still goes through the
+                # assignment, redirection and wrapper handling above, so a GH_HOST= or
+                # GH_REPO= prefix after an option is recorded as it is before one.
+                i += 1
                 continue
             break
         if i < len(seg) and seg[i].lstrip("\\").rsplit("/", 1)[-1] == "gh":
