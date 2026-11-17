@@ -1,7 +1,7 @@
 """The gh read-guard inspects a gh call behind a wrapper's options and their values, and
 the permission hook refuses a triggering gh command the guard could not check.
 
-Two findings held from the clauDNA tech-debt audit:
+Two behaviors are covered here:
 
 1. `plugin-hooks/gh-guard-decide.py` skipped a leading wrapper's words only while each was a
    dash-option or a bare number, so the value word of a value-taking option ended the skip and
@@ -117,7 +117,7 @@ def _hook(tmp_path: Path, cmd: str, allow: list[str], *, path: str = "/usr/bin:/
         "timeout 5 env -u X gh pr list --json number --jq env.X",
     ],
 )
-def test_the_hook_denies_a_wrapped_leak_under_a_narrow_and_a_bare_grant(tmp_path, cmd):
+def test_the_hook_denies_a_wrapped_environment_read_under_a_narrow_and_a_bare_grant(tmp_path, cmd):
     for allow in (["Bash(gh pr list *)"], ["Bash"]):
         assert _hook(tmp_path, cmd, allow) == "deny", (allow, cmd)
 
@@ -143,15 +143,15 @@ def _python3_shim(tmp_path: Path, exit_code: int) -> str:
     return f"{shim}:/usr/bin:/bin"
 
 
-LEAK = "gh pr list --json number --jq env.X"
+ENV_READ = "gh pr list --json number --jq env.X"  # a --jq expression that reads the process environment
 CLEAN_TRIGGER = "gh pr list --json number --jq .title"  # a field read, but it matched the trigger
 
 
 def test_no_python3_refuses_a_triggering_gh_command(tmp_path):
-    # Both a leaking and a clean-but-triggering command are refused: with the guard unable to
+    # Both an environment-reading and a clean-but-triggering command are refused: with the guard unable to
     # run, the hook cannot tell them apart and will not approve either.
     path = _bin_without_python3(tmp_path)
-    for cmd in (LEAK, CLEAN_TRIGGER):
+    for cmd in (ENV_READ, CLEAN_TRIGGER):
         for allow in (["Bash(gh pr list *)"], ["Bash"]):
             assert _hook(tmp_path, cmd, allow, path=path) == "deny", (cmd, allow)
 
@@ -168,7 +168,7 @@ def test_a_guard_error_or_unknown_exit_refuses_a_triggering_gh_command(tmp_path,
     # refuses rather than fall through to the allow patterns.
     path = _python3_shim(tmp_path, exit_code)
     for allow in (["Bash(gh pr list *)"], ["Bash"]):
-        assert _hook(tmp_path, LEAK, allow, path=path) == "deny", (exit_code, allow)
+        assert _hook(tmp_path, ENV_READ, allow, path=path) == "deny", (exit_code, allow)
 
 
 def test_a_guard_that_allows_still_lets_normal_matching_run(tmp_path):
@@ -177,4 +177,4 @@ def test_a_guard_that_allows_still_lets_normal_matching_run(tmp_path):
     shim.mkdir()
     (shim / "python3").write_text("#!/bin/sh\nexit 0\n")
     (shim / "python3").chmod(0o755)
-    assert _hook(tmp_path, LEAK, ["Bash(gh pr list *)"], path=f"{shim}:/usr/bin:/bin") == "allow"
+    assert _hook(tmp_path, ENV_READ, ["Bash(gh pr list *)"], path=f"{shim}:/usr/bin:/bin") == "allow"
