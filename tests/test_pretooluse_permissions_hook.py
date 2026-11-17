@@ -447,7 +447,10 @@ class TestGhReadGuard:
         command = "gh pr list --json number --jq env.X #" + "x" * 1_200_000
         assert decision(tmp_path, command, ["Bash"], timeout=60) == "deny"  # 1.2 MB: seconds under load
 
-    def test_a_decider_that_does_not_answer_still_fails_open_but_is_logged(self, tmp_path):
+    def test_a_decider_that_does_not_answer_is_refused_and_logged(self, tmp_path):
+        # A guard exit other than 0 or 10 means it did not answer. A hook deny is the only
+        # decision that overrides an allow grant, so the command that matched the gh trigger
+        # is refused here, not handed to the allow patterns that would approve it unchecked.
         shim = tmp_path / "shim"
         shim.mkdir()
         (shim / "python3").write_text("#!/bin/sh\nexit 7\n")
@@ -459,6 +462,6 @@ class TestGhReadGuard:
         env = {"HOME": str(tmp_path), "PATH": f"{shim}:/usr/bin:/bin", "CLAUDNA_STATE_DIR": str(tmp_path / "state")}
         proc = subprocess.run(["bash", str(HOOK)], input=payload, capture_output=True, text=True,
                               cwd=tmp_path, env=env, timeout=10)
-        assert '"permissionDecision":"allow"' in proc.stdout
+        assert '"permissionDecision":"deny"' in proc.stdout
         log = (tmp_path / "state" / "sessions" / "decider-silent" / "hooks" / "permissions.log").read_text()
-        assert "gh guard did not answer, exit 7" in log
+        assert "exit 7" in log

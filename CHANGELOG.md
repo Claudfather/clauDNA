@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **The `gh` read-guard inspects a `gh` call behind a wrapper's options, and the permission hook refuses a `gh` command it cannot check.** The PreToolUse permissions hook's guard (`plugin-hooks/gh-guard-decide.py`) skipped a leading wrapper's words only while each was a dash-option or a bare number, so a wrapper option that takes the next word as its value — `env -u X`, `timeout -s KILL 5`, `xargs -I {}` — ended the skip and the `gh` call behind it was read as a different command and never inspected (`env` alone and `nice -n 5` already reached the guard). The guard now finds the `gh` command word past any skip-list wrapper's options and their values, the way the hook's own `is_gh_command` does. And when the guard cannot run — it exits with neither the allow (0) nor the deny (10) code, or `python3` is absent — `plugin-hooks/pretooluse-permissions.sh` now refuses a command that matched the `gh` trigger instead of handing it to the allow patterns, which could have approved it unchecked; a hook `deny` is the only decision that overrides an allow grant, so only a `deny` closes that path. Ordinary `gh` reads, including the fleet's `--json`/`--jq '.field'` reads behind these same wrappers, are untouched. Tests: `tests/test_gh_guard_wrapper_options.py`, `tests/test_pretooluse_permissions_hook.py`.
 
 ## [0.35.3] - 2026-11-16
 ### Fixed

@@ -370,6 +370,7 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
     out: list[list[str]] = []
     for seg in segments:
         i = 0
+        wrapped = False
         # GH_HOST=<host> / GH_REPO=[HOST/]OWNER/REPO prefixes name the host this call talks to. `held` is what
         # each holds if `+=` appends; `readings` is every value a prefix gave it, and any foreign one denies.
         held: dict[str, str] = {}
@@ -408,13 +409,23 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
                 continue
             base = t.lstrip("\\")
             if base in _WRAPPERS:
+                wrapped = True
                 i += 2 if base == "repeat" else 1  # zsh `repeat` takes a count word: `repeat $n gh ...`
-                while i < len(seg) and (
-                    seg[i].startswith("-") or re.fullmatch(r"[0-9]+[smhd]?", seg[i])
-                ):
-                    i += 1
                 continue
             break
+        if wrapped:
+            # A skip-list wrapper's own options and their values — `env -u X`,
+            # `timeout -s KILL 5`, `xargs -I {}` — sit between it and the command word,
+            # and the option that takes the next word as its value is not known here
+            # (it varies by wrapper). Find the gh command word the way the bash hook's
+            # `is_gh_command` does: the first following word whose base name is `gh`
+            # (an `=` word is an `env NAME=value` argument, not the command). A superset
+            # — a non-gh command's tail can be read as gh args — but every reading only
+            # adds denials, so a doubt is inspected, not skipped.
+            while i < len(seg) and (
+                "=" in seg[i] or seg[i].lstrip("\\").rsplit("/", 1)[-1] != "gh"
+            ):
+                i += 1
         if i < len(seg) and seg[i].lstrip("\\").rsplit("/", 1)[-1] == "gh":
             args = seg[i + 1 :]
             for name, flag in (("GH_HOST", "--hostname"), ("GH_REPO", "-R")):
