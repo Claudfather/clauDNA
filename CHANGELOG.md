@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **The `python3` stand-in in a wrapper-options test reads its input before it exits** ([#515](https://github.com/Claudfather/clauDNA/issues/515)). `test_a_guard_that_allows_still_lets_normal_matching_run` in `tests/test_gh_guard_wrapper_options.py` replaced `python3` with a script that exited at once, so under the hook's `pipefail` the `printf` that feeds it could end on SIGPIPE (exit 141) and the hook refused: the test failed at random. The script now drains its input first. Test-only: the hook and the guard are unchanged.
 
 ## [0.35.4] - 2026-11-17
 ### Fixed

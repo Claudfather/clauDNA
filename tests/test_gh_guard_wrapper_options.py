@@ -184,7 +184,7 @@ def test_a_guard_that_allows_still_lets_normal_matching_run(tmp_path):
     # exit 0 = this shape is clear; the command then matches its allow pattern and is approved.
     shim = tmp_path / "shim0"
     shim.mkdir()
-    (shim / "python3").write_text("#!/bin/sh\nexit 0\n")
+    (shim / "python3").write_text("#!/bin/sh\ncat >/dev/null\nexit 0\n")
     (shim / "python3").chmod(0o755)
     assert _hook(tmp_path, ENV_READ, ["Bash(gh pr list *)"], path=f"{shim}:/usr/bin:/bin") == "allow"
 
