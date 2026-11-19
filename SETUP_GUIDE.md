@@ -825,6 +825,8 @@ Run that directly to see if the script itself errors. If it does, your shell env
 
 This is by design — these constructs are too complex to split reliably. If you're seeing prompts for a compound form you use often, consider adding the full command as a single `Bash(...)` pattern in your allow list.
 
+**Refused outright?** Whatever your allow list says, the hook denies a `gh` read that would read the environment or reach a host other than github.com, and a `git` command that would write a file through `--output` (or `-o` on `format-patch` and `archive`). Run the command without that flag and read its output.
+
 ### Plugin not auto-updating
 
 Third-party marketplaces don't auto-update by default. Run updates explicitly:

@@ -19,10 +19,12 @@ set -eo pipefail
 #     and .claude/settings.local.json
 #   - Falls through (no output) for unrecognized or unparseable commands
 #   - Returns "deny" for the gh read-guard shapes (a granted gh read that would
-#     read the environment or reach a host other than github.com), and for a
-#     command that matched the gh trigger but the guard could not check (its
-#     error, an unknown exit code, or no python3) — that is refused, not approved
-#     by the allow patterns. Every other command is "allow" or silent pass-through
+#     read the environment or reach a host other than github.com), for a git
+#     command that would write a file through an output flag (--output, or -o
+#     on format-patch and archive), and for a command that matched either
+#     trigger but the guard could not check (its error, an unknown exit code,
+#     or no python3) — that is refused, not approved by the allow patterns.
+#     Every other command is "allow" or silent pass-through
 #   - Debug log: ${CLAUDNA_STATE_DIR:-~/.claudna}/hooks/permissions.log,
 #     readable by the user alone
 #
@@ -42,8 +44,8 @@ set -eo pipefail
 #     { ; }      brace groups (not detected — falls through via match failure)
 #     nested quoting edge cases beyond single, double and $'...' quote tracking
 #     an unquoted $$'  bash reads the PID then a plain quote, zsh an ANSI-C string; prompts
-#     a gh sub-command in which an expansion can form or change an option
-#                word ($'..', ${X-..}, {a,b}, --j${Z}q); see gh_option_expansion
+#     a gh or git sub-command in which an expansion can form or change an
+#                option word ($'..', ${X-..}, {a,b}, --j${Z}q); see gh_option_expansion
 
 # The log holds whole command lines: it lives in clauDNA's state directory,
 # and every file the hook creates is readable by the user alone.
@@ -152,32 +154,49 @@ eval "$JQ_RESULT"
 NL=$'\n'
 NOQ=${COMMAND//\\"$NL"/}   # bash joins a backslash-newline before it splits words
 NOQ=${NOQ//[\"\'\\]/}
+
+# Run the guards' decider on the command; $1 names the guard in a refusal. It exits 0 to allow
+# and 10 to deny. errexit-safe: an assignment that inherits exit 10 would end the hook here. The
+# command goes in on stdin: an argv entry is capped (ARG_MAX; 128 KiB per argument on Linux), and a
+# failed spawn must not read as "allow". Any other exit (a guard error, an unknown code) means the
+# guard did not answer. A hook deny is the only decision that overrides an allow grant, so a command
+# that matched a trigger and could not be checked is refused here, never handed to the allow
+# patterns that would approve it unseen. So is one with no python3 to check it.
+run_guard() {
+    local rc=0 reason
+    command -v python3 &>/dev/null || deny "the $1 needs python3 and it is not available"
+    reason="$(printf '%s' "$COMMAND" | python3 -B "$HOOK_DIR/gh-guard-decide.py" 2>/dev/null)" || rc=$?
+    case "$rc" in
+        0) : ;; # this shape is clear; fall through to normal matching
+        10) deny "$reason" ;;
+        *) deny "the $1 could not check this command (exit $rc)" ;;
+    esac
+}
+
 case "$NOQ" in
     *gh*)
         case "$NOQ" in
-            *--jq*|*--template*|*--repo*|*--web*|*--hostname*|*GH_HOST=*|*GH_REPO=*|*GH_HOST+=*|*GH_REPO+=*|*GH_HOST\[*|*GH_REPO\[*|*[[:space:]]-q*|*[[:space:]]-t*|*[[:space:]]-R*|*[[:space:]]-w*|*[[:space:]]-[[:alnum:]]*[qtRw]*|*"://"*|*@*:*|*gh[[:space:]]*repo[[:space:]]*/*/*|*gh[[:space:]]*label[[:space:]]*/*/*|*gh[[:space:]]*ext*/*/*|*gh[[:space:]]*skill*/*/*)
-                if command -v python3 &>/dev/null; then
-                    # errexit-safe: the decider exits 10 to deny, and an
-                    # assignment that inherits that would end the hook here.
-                    # The command goes in on stdin: an argv entry is capped (ARG_MAX; 128 KiB
-                    # per argument on Linux), and a failed spawn must not read as "allow".
-                    GH_RC=0
-                    GH_GUARD_REASON="$(printf '%s' "$COMMAND" | python3 -B "$HOOK_DIR/gh-guard-decide.py" 2>/dev/null)" || GH_RC=$?
-                    case "$GH_RC" in
-                        0) : ;; # this shape is clear; fall through to normal matching
-                        10) deny "$GH_GUARD_REASON" ;;
-                        # Any other exit (a guard error, an unknown code) means the guard
-                        # did not answer. A hook deny is the only decision that overrides
-                        # an allow grant, so a command that matched the gh trigger and
-                        # could not be checked is refused here, never handed to the allow
-                        # patterns that would approve it unseen.
-                        *) deny "the gh read-guard could not check this command (exit $GH_RC)" ;;
-                    esac
-                else
-                    # No python3, so the guard cannot run. Refuse the command that matched
-                    # the gh trigger rather than let the allow patterns approve it unchecked.
-                    deny "the gh read-guard needs python3 and it is not available"
-                fi
+            *--jq*|*--template*|*--repo*|*--web*|*--hostname*|*GH_HOST=*|*GH_REPO=*|*GH_HOST+=*|*GH_REPO+=*|*GH_HOST\[*|*GH_REPO\[*|*[[:space:]]-q*|*[[:space:]]-t*|*[[:space:]]-R*|*[[:space:]]-w*|*[[:space:]]-[[:alnum:]]*[qtRw]*|*"://"*|*@*:*|*gh[[:space:]]*repo[[:space:]]*/*/*|*gh[[:space:]]*label[[:space:]]*/*/*|*gh[[:space:]]*ext*/*/*|*gh[[:space:]]*skill*/*/*) run_guard "gh read-guard" ;;
+        esac
+        ;;
+esac
+
+# ─── git output guard → deny before any approve ───────────────────────
+# git reads --output in its diff and revision options, and format-patch and archive also take -o,
+# so a granted git read can write a file: `git log --output=PATH` writes PATH. The redirection
+# guard below looks for `>` only, and a shipped `Bash(git log:*)` grant is a native rule this hook's
+# glob never matches, so only a hook deny stops it, under any grant. The decider reads the command
+# the way the shell will; this zero-fork prefilter spawns it only for a git command whose text,
+# without quotes and backslashes, has --ou, a word that starts -o, or a short-option cluster with an
+# o on format-patch or archive.
+case "$NOQ" in
+    *git*)
+        case "$NOQ" in
+            *--ou*|*[[:space:]]-o*) run_guard "git output guard" ;;
+            *format-patch*|*archive*)
+                case "$NOQ" in
+                    *[[:space:]]-[[:alnum:]]*o*) run_guard "git output guard" ;;
+                esac
                 ;;
         esac
         ;;
@@ -317,12 +336,14 @@ matches_any() {
     return 1
 }
 
-# ─── An expansion that can form a gh option → fall through ────────────
+# ─── An expansion that can form a gh or git option → fall through ─────
 # The shell expands a word before gh reads it: `$'--jq'`, `${X---jq}`,
 # `--j${Z}q` and `{--jq,x}` all reach gh as --jq, while the gh guard above reads
 # the unexpanded text. Approving such a command here would put it past Claude
 # Code's own permission check, so a gh sub-command is not approved when an
-# expansion in it can form or change an option word:
+# expansion in it can form or change an option word, and neither is a git one
+# (`git log --out${Z}put=F` reaches git as --output, which the git output
+# guard above reads only as written):
 #   - ANSI-C or locale quoting, $'...' or $"...";
 #   - a ${...} whose operator puts text from the command into the word
 #     (${X-..}, ${X:=..}, ${X+..}, ${X/../..}, ${X@..}); a strip, a substring or
@@ -348,6 +369,23 @@ is_gh_command() {
     esac
     for x in "${w[@]:k+1}"; do
         [[ "$x" == gh || "$x" == */gh ]] && return 0
+    done
+    return 1
+}
+
+# The same for git, behind the same wrappers; a test keeps the two lists equal.
+is_git_command() {
+    local -a w
+    local k=0 x
+    read -ra w <<< "${1//[\"\'\\]/}"
+    while [[ "${w[k]:-}" == [A-Za-z_]*=* ]]; do k=$((k + 1)); done
+    case "${w[k]:-}" in
+        git|*/git) return 0 ;;
+        command|builtin|exec|nohup|nice|stdbuf|time|env|xargs|timeout|sudo|doas) ;;
+        *) return 1 ;;
+    esac
+    for x in "${w[@]:k+1}"; do
+        [[ "$x" == git || "$x" == */git ]] && return 0
     done
     return 1
 }
@@ -459,6 +497,10 @@ for sub in "${SUBCMDS[@]}"; do
     fi
     if is_gh_command "$sub" && gh_option_expansion "$sub"; then
         log "PASS: $COMMAND (an expansion can form a gh option, prompt kept: $sub)"
+        exit 0
+    fi
+    if is_git_command "$sub" && gh_option_expansion "$sub"; then
+        log "PASS: $COMMAND (an expansion can form a git option, prompt kept: $sub)"
         exit 0
     fi
     if ! matches_any "$sub" "${SPECS[@]}"; then
