@@ -1,12 +1,10 @@
 """The permissions hook refuses a git command that writes a file through an output flag.
 
-git reads ``--output`` in its diff and revision options, so every git command that takes them, a
-granted read such as ``git log``, ``git diff`` or ``git show`` included, writes the file that option
-names, and ``format-patch`` and ``archive`` also take ``-o``. The hook's redirection guard looks for
-``>`` only, and a shipped ``Bash(git log:*)`` grant is a native rule the hook's own matching never
-reaches, so the hook denies these shapes under any grant: a hook deny is the one decision that
-overrides an allow. The decider (``plugin-hooks/gh-guard-decide.py``) finds the git call the way the
-shell will.
+Under any grant, it denies ``--output`` (or a leading part of that name, or ``--output-directory``) on
+any verb and ``-o`` on ``diff``, ``log``, ``show``, ``format-patch``, ``archive`` and ``bundle``. The
+decider (``plugin-hooks/gh-guard-decide.py``) finds the git call the way the shell will, an option an
+expansion can form included; the shipped settings deny ``--output`` on the git reads they grant, and
+the skills grant git reads only in the forms their steps run.
 """
 
 from __future__ import annotations
@@ -181,13 +179,33 @@ def test_the_hook_still_approves_the_read_without_the_flag(tmp_path, verb):
     assert _hook(tmp_path, OUTPUT_VERBS[verb], [_narrow(verb)]) == "allow"
 
 
+EXPANSION_FORMS = [
+    "git log --out${Z}put=x",
+    "git log $'--output=x'",
+    "git log --out$'put'=x",
+    "git log --o$'utput'=x",
+    'git log --o$"utput"=x',
+    "git diff {--output=x,HEAD}",
+    "git log --o${Z:-utput}=x",
+    "git log --outpu?=x",
+    "git format-patch -1 -$'o' outdir",
+]
+GRANTS = ["Bash(git log *)", "Bash(git diff *)", "Bash(git format-patch *)"]
+
+
+@pytest.mark.parametrize("cmd", EXPANSION_FORMS)
+def test_an_option_an_expansion_can_form_is_refused(tmp_path, cmd):
+    # The shell hands git the expanded word, so the decider reads the words it can expand to.
+    assert verdict(cmd) == "deny", cmd
+    assert _hook(tmp_path, cmd, GRANTS) == "deny", cmd
+
+
 @pytest.mark.parametrize(
-    "cmd", ["git log --out${Z}put=x", "git log $'--output=x'", "git log --out$'put'=x", "git diff {--output=x,HEAD}"]
+    "cmd", ["git log --format=$'%H\\t%s' -1", "git log --oneline $BASE..HEAD", "git log --author=$USER -1"]
 )
-def test_the_hook_leaves_a_git_option_an_expansion_can_form_to_claude_code(tmp_path, cmd):
-    # The decider reads the text as written; the shell would hand git --output. The hook does not
-    # approve such a command, so Claude Code's own permission check decides it.
-    assert _hook(tmp_path, cmd, ["Bash(git log *)", "Bash(git diff *)"]) == "prompt", cmd
+def test_an_ordinary_expansion_in_a_git_read_is_still_approved(tmp_path, cmd):
+    assert verdict(cmd) == "allow", cmd
+    assert _hook(tmp_path, cmd, GRANTS) == "allow", cmd
 
 
 def test_every_form_the_decider_refuses_reaches_it_through_the_hook(tmp_path):
@@ -225,18 +243,6 @@ def test_a_guard_error_refuses_a_git_command_with_an_output_flag(tmp_path):
     (shim / "python3").write_text("#!/bin/sh\ncat >/dev/null\nexit 3\n")  # reads its input, then fails
     (shim / "python3").chmod(0o755)
     assert _hook(tmp_path, "git log --output=x", ["Bash(git log *)"], path=f"{shim}:/usr/bin:/bin") == "deny"
-
-
-def _wrapper_arm(function: str) -> str:
-    """The wrapper words of one of the hook's command-word readers: its one `word|word...) ;;` arm."""
-    body = HOOK.read_text().split(f"{function}() {{", 1)[1].split("\n}\n", 1)[0]
-    arms = re.findall(r"^\s*([A-Za-z|]+)\) ;;$", body, re.M)
-    assert len(arms) == 1, arms
-    return arms[0]
-
-
-def test_the_hook_reads_git_behind_the_same_wrappers_as_gh():
-    assert _wrapper_arm("is_git_command") == _wrapper_arm("is_gh_command")
 
 
 # -- the shipped grants ------------------------------------------------------------------------------

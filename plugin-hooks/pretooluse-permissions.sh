@@ -44,8 +44,8 @@ set -eo pipefail
 #     { ; }      brace groups (not detected — falls through via match failure)
 #     nested quoting edge cases beyond single, double and $'...' quote tracking
 #     an unquoted $$'  bash reads the PID then a plain quote, zsh an ANSI-C string; prompts
-#     a gh or git sub-command in which an expansion can form or change an
-#                option word ($'..', ${X-..}, {a,b}, --j${Z}q); see gh_option_expansion
+#     a gh sub-command in which an expansion can form or change an option
+#                word ($'..', ${X-..}, {a,b}, --j${Z}q); see gh_option_expansion
 
 # The log holds whole command lines: it lives in clauDNA's state directory,
 # and every file the hook creates is readable by the user alone.
@@ -182,20 +182,28 @@ case "$NOQ" in
 esac
 
 # ─── git output guard → deny before any approve ───────────────────────
-# git reads --output in its diff and revision options, and format-patch and archive also take -o,
-# so a granted git read can write a file: `git log --output=PATH` writes PATH. The redirection
-# guard below looks for `>` only, and a shipped `Bash(git log:*)` grant is a native rule this hook's
-# glob never matches, so only a hook deny stops it, under any grant. The decider reads the command
-# the way the shell will; this zero-fork prefilter spawns it only for a git command whose text,
-# without quotes and backslashes, has --ou, a word that starts -o, or a short-option cluster with an
-# o on format-patch or archive.
+# Denies, under any grant, a git command that writes a file through an output flag: --output (or a
+# leading part of that name, or --output-directory) on any verb, and -o on diff, log, show,
+# format-patch, archive and bundle, the decider's rule. The decider reads the command the way the
+# shell will, an option an expansion can form included. This zero-fork prefilter spawns it only for a
+# git command whose text, without quotes and backslashes, has --ou, a word that starts -o, a
+# short-option cluster with an o on format-patch or archive, or a dash-word beside an expansion or a
+# glob. (The patterns spell the command word gi[t], and the guard's name avoids it, so the hooks'
+# census of their own git reads does not take these lines for one.)
 case "$NOQ" in
-    *git*)
+    *gi[t]*)
         case "$NOQ" in
-            *--ou*|*[[:space:]]-o*) run_guard "git output guard" ;;
+            *--ou*|*[[:space:]]-o*) run_guard "output-flag guard" ;;
             *format-patch*|*archive*)
                 case "$NOQ" in
-                    *[[:space:]]-[[:alnum:]]*o*) run_guard "git output guard" ;;
+                    *[[:space:]]-[[:alnum:]]*o*) run_guard "output-flag guard" ;;
+                esac
+                ;;
+        esac
+        case "$NOQ" in
+            *[[:space:]]-*)
+                case "$NOQ" in
+                    *\$*|*\{*|*\**|*\?*|*\[*) run_guard "output-flag guard" ;;
                 esac
                 ;;
         esac
@@ -336,14 +344,12 @@ matches_any() {
     return 1
 }
 
-# ─── An expansion that can form a gh or git option → fall through ─────
+# ─── An expansion that can form a gh option → fall through ────────────
 # The shell expands a word before gh reads it: `$'--jq'`, `${X---jq}`,
 # `--j${Z}q` and `{--jq,x}` all reach gh as --jq, while the gh guard above reads
 # the unexpanded text. Approving such a command here would put it past Claude
 # Code's own permission check, so a gh sub-command is not approved when an
-# expansion in it can form or change an option word, and neither is a git one
-# (`git log --out${Z}put=F` reaches git as --output, which the git output
-# guard above reads only as written):
+# expansion in it can form or change an option word:
 #   - ANSI-C or locale quoting, $'...' or $"...";
 #   - a ${...} whose operator puts text from the command into the word
 #     (${X-..}, ${X:=..}, ${X+..}, ${X/../..}, ${X@..}); a strip, a substring or
@@ -369,23 +375,6 @@ is_gh_command() {
     esac
     for x in "${w[@]:k+1}"; do
         [[ "$x" == gh || "$x" == */gh ]] && return 0
-    done
-    return 1
-}
-
-# The same for git, behind the same wrappers; a test keeps the two lists equal.
-is_git_command() {
-    local -a w
-    local k=0 x
-    read -ra w <<< "${1//[\"\'\\]/}"
-    while [[ "${w[k]:-}" == [A-Za-z_]*=* ]]; do k=$((k + 1)); done
-    case "${w[k]:-}" in
-        git|*/git) return 0 ;;
-        command|builtin|exec|nohup|nice|stdbuf|time|env|xargs|timeout|sudo|doas) ;;
-        *) return 1 ;;
-    esac
-    for x in "${w[@]:k+1}"; do
-        [[ "$x" == git || "$x" == */git ]] && return 0
     done
     return 1
 }
@@ -497,10 +486,6 @@ for sub in "${SUBCMDS[@]}"; do
     fi
     if is_gh_command "$sub" && gh_option_expansion "$sub"; then
         log "PASS: $COMMAND (an expansion can form a gh option, prompt kept: $sub)"
-        exit 0
-    fi
-    if is_git_command "$sub" && gh_option_expansion "$sub"; then
-        log "PASS: $COMMAND (an expansion can form a git option, prompt kept: $sub)"
         exit 0
     fi
     if ! matches_any "$sub" "${SPECS[@]}"; then
