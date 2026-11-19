@@ -32,8 +32,8 @@ It answers for ``git`` too: it refuses a git call that writes a file through an 
 ``diff``, ``log``, ``show``, ``format-patch``, ``archive`` and ``bundle``, except one that names
 ``/dev/null``, ``/dev/stdout`` or ``/dev/stderr``. It finds the call the way it finds a gh call:
 past assignment prefixes, redirections and wrappers, and past git's own options (``git -C DIR
-log``). Unlike the gh rule, it also reads an option an expansion can form (``--out${Z}put``,
-``$'--output'``, a brace list), so the git rule does not rest on the approver.
+log``). Unlike the gh rule, it also reads an option word the shell can form from an expansion or a
+brace list, so the git rule does not rest on the approver.
 """
 
 from __future__ import annotations
@@ -555,12 +555,12 @@ def _inspect_gh_args(args: list[str], allowed: set[str]) -> str | None:
 # diff-tree, diff-index, diff-files, stash show and list, reflog, shortlog, rev-list, blame,
 # range-diff, format-patch and bundle (measured on git 2.39.5). format-patch's --output-directory
 # and archive's --output write too. git takes no abbreviation of either name, and no other option is a
-# leading part of one, so any long option that is (--ou, --outp, --output-d, ...) is read as one.
+# leading part of one, so any long option that is a leading part of either is read as one.
 _GIT_OUTPUT_NAME = "--output-directory"
 # -o is format-patch's --output-directory and archive's --output; git refuses it on diff, log, show
 # and bundle. On other verbs it means something else (grep -o, ls-files -o), so only these read it.
 _GIT_DASH_O = {"diff", "log", "show", "format-patch", "archive", "bundle"}
-# format-patch reads -o inside a cluster of short options (-ko DIR); archive's are read the same way.
+# format-patch reads -o inside a cluster of short options; archive's are read the same way.
 _GIT_DASH_O_CLUSTER = {"format-patch", "archive"}
 # git's own options that take the next word as their value (git -C DIR log ...).
 _GIT_OPTION_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix",

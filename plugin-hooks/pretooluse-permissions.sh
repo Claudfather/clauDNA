@@ -20,10 +20,11 @@ set -eo pipefail
 #   - Falls through (no output) for unrecognized or unparseable commands
 #   - Returns "deny" for the gh read-guard shapes (a granted gh read that would
 #     read the environment or reach a host other than github.com), for a git
-#     command that would write a file through an output flag (--output, or -o
-#     on format-patch and archive), and for a command that matched either
-#     trigger but the guard could not check (its error, an unknown exit code,
-#     or no python3) — that is refused, not approved by the allow patterns.
+#     command that would write a file through an output flag (--output on any
+#     verb, or -o on diff, log, show, format-patch, archive and bundle), and
+#     for a command that matched either trigger but the guard could not check
+#     (its error, an unknown exit code, or no python3) — that is refused, not
+#     approved by the allow patterns.
 #     Every other command is "allow" or silent pass-through
 #   - Debug log: ${CLAUDNA_STATE_DIR:-~/.claudna}/hooks/permissions.log,
 #     readable by the user alone
