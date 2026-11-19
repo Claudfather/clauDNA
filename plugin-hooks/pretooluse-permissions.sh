@@ -93,11 +93,11 @@ HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # The event's Bash command as a shell assignment, or `exit 0` for another tool, read without jq:
 # with python3, and from the event text when python3 is absent or its read fails. The text read
-# decodes JSON's escapes in two passes, each one linear in the text: sed takes the backslash off
-# each escaped quote (in valid JSON a backslash just before a quote is always that quote's escape),
-# then printf's %b reads the backslash escapes left to right, so an escaped backslash stays one. Only
-# the gh read-guard's trigger reads that text: the read also sets READ_EXACT=false, and the guard
-# refuses what its trigger matches rather than hand the decider a command python3 did not read.
+# decodes JSON's escapes in two passes: sed takes the backslash off each escaped quote (in valid
+# JSON a backslash just before a quote is always that quote's escape), then printf's %b reads the
+# backslash escapes left to right, so an escaped backslash stays one. Only the gh read-guard's
+# trigger reads that text: the read also sets READ_EXACT=false, and the guard refuses what its
+# trigger matches rather than hand the decider a command python3 did not read.
 read_event_without_jq() {
     local out re c q
     if command -v python3 &>/dev/null && out="$(printf '%s' "$INPUT" | python3 -I -c '
