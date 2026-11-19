@@ -32,8 +32,8 @@ It answers for ``git`` too: it refuses a git call that writes a file through an 
 ``diff``, ``log``, ``show``, ``format-patch``, ``archive`` and ``bundle``, except one that names
 ``/dev/null``, ``/dev/stdout`` or ``/dev/stderr``. It finds the call the way it finds a gh call:
 past assignment prefixes, redirections and wrappers, and past git's own options (``git -C DIR
-log``). Unlike the gh rule, it also reads an option word the shell can form from an expansion or a
-brace list, so the git rule does not rest on the approver.
+log``). Unlike the gh rule, it also reads a git word that holds a ``$`` or a brace in the forms
+``_git_spellings`` lists, and a long option name that is a glob as the names it matches.
 """
 
 from __future__ import annotations
@@ -567,10 +567,9 @@ _GIT_OPTION_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--s
                      "--config-env", "--attr-source"}
 # Output written here changes no file.
 _GIT_NO_FILE = {"/dev/null", "/dev/stdout", "/dev/stderr"}
-# The shell expands a word before git reads it, and the decider reads the text after quote removal, where
-# `$'...'` and `$"..."` have become `$...`. So a word with an expansion in it is read as written, without
-# its `$` signs, with every expansion taken as empty, and with a `${X-word}` form taken as its word; a
-# brace list gives each of its words.
+# The decider reads the text after quote removal. A git word with a `$` or a brace in it is read as
+# written, without its `$` signs, with each parameter expansion taken as empty, and with a `${X-word}`
+# form taken as its word; in each of those, the first brace list gives each of its words.
 _GIT_EXPANSION = re.compile(r"\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*|\$[0-9@*#?$!-]")
 _GIT_DEFAULT_WORD = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*:?[-=+?]([^}]*)\}")
 _GIT_BRACE_LIST = re.compile(r"\{([^{}]*,[^{}]*)\}")
@@ -611,7 +610,7 @@ def _git_command_words(tokens: list[str]) -> list[list[str]]:
 
 
 def _git_spellings(arg: str) -> set[str]:
-    """The words a git argument can reach git as once the shell expands it."""
+    """The words the decider reads a git argument as: the forms in the comment above."""
     if not _GIT_EXPANDS & set(arg):
         return {arg}
     forms = {arg, arg.replace("$", ""), _GIT_EXPANSION.sub("", arg), _GIT_DEFAULT_WORD.sub(lambda m: m.group(1), arg)}

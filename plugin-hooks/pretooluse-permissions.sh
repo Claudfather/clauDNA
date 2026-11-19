@@ -20,8 +20,8 @@ set -eo pipefail
 #   - Falls through (no output) for unrecognized or unparseable commands
 #   - Returns "deny" for the gh read-guard shapes (a granted gh read that would
 #     read the environment or reach a host other than github.com), for a git
-#     command that would write a file through an output flag (--output on any
-#     verb, or -o on diff, log, show, format-patch, archive and bundle), and
+#     output flag the decider reads (--output on any verb, or -o on diff, log,
+#     show, format-patch, archive and bundle), and
 #     for a command that matched either trigger but the guard could not check
 #     (its error, an unknown exit code, or no python3) — that is refused, not
 #     approved by the allow patterns.
@@ -183,10 +183,10 @@ case "$NOQ" in
 esac
 
 # ─── git output guard → deny before any approve ───────────────────────
-# Denies, under any grant, a git command that writes a file through an output flag: --output (or a
+# Denies, under any grant, the output flags the decider reads in a git command: --output (or a
 # leading part of that name, or --output-directory) on any verb, and -o on diff, log, show,
-# format-patch, archive and bundle, the decider's rule. The decider reads the command the way the
-# shell will, an option an expansion can form included. This zero-fork prefilter spawns it only for a
+# format-patch, archive and bundle. gh-guard-decide.py says how it reads a word with an expansion or
+# a brace list in it. This zero-fork prefilter spawns it only for a
 # git command whose text, without quotes and backslashes, has --ou, a word that starts -o, a
 # short-option cluster with an o on format-patch or archive, or a dash-word beside an expansion or a
 # glob. (The patterns spell the command word gi[t], and the guard's name avoids it, so the hooks'

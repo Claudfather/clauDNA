@@ -1,10 +1,10 @@
-"""The permissions hook refuses a git command that writes a file through an output flag.
+"""The permissions hook denies the git output flags it reads, under any grant.
 
 Under any grant, it denies ``--output`` (or a leading part of that name, or ``--output-directory``) on
-any verb and ``-o`` on ``diff``, ``log``, ``show``, ``format-patch``, ``archive`` and ``bundle``. The
-decider (``plugin-hooks/gh-guard-decide.py``) finds the git call the way the shell will, an option an
-expansion can form included; the shipped settings deny ``--output`` on the git reads they grant, and
-the skills grant git reads only in the forms their steps run.
+any verb and ``-o`` on ``diff``, ``log``, ``show``, ``format-patch``, ``archive`` and ``bundle``, in the
+forms these tests name. The decider (``plugin-hooks/gh-guard-decide.py``) finds the git call past
+wrappers, assignments, redirections and git's own options; the shipped settings deny ``--output`` on the
+git reads they grant, and the skills grant git reads only in the forms their steps run.
 """
 
 from __future__ import annotations
@@ -116,7 +116,7 @@ def test_the_directory_cluster_and_prefix_forms_are_refused(cmd):
         "git lg --output=x",  # an alias: git reads --output wherever its options reach
     ],
 )
-def test_a_git_call_is_read_where_the_shell_runs_it(cmd):
+def test_a_git_call_is_read_in_each_position_listed(cmd):
     assert verdict(cmd) == "deny", cmd
 
 
@@ -194,8 +194,8 @@ GRANTS = ["Bash(git log *)", "Bash(git diff *)", "Bash(git format-patch *)"]
 
 
 @pytest.mark.parametrize("cmd", EXPANSION_FORMS)
-def test_an_option_an_expansion_can_form_is_refused(tmp_path, cmd):
-    # The shell hands git the expanded word, so the decider reads the words it can expand to.
+def test_each_expansion_form_listed_is_refused(tmp_path, cmd):
+    # The shell hands git the expanded word; the decider reads each form listed here as git gets it.
     assert verdict(cmd) == "deny", cmd
     assert _hook(tmp_path, cmd, GRANTS) == "deny", cmd
 
@@ -208,7 +208,7 @@ def test_an_ordinary_expansion_in_a_git_read_is_still_approved(tmp_path, cmd):
     assert _hook(tmp_path, cmd, GRANTS) == "allow", cmd
 
 
-def test_every_form_the_decider_refuses_reaches_it_through_the_hook(tmp_path):
+def test_each_refused_form_listed_reaches_the_decider_through_the_hook(tmp_path):
     # The hook's prefilter spawns the decider only for some text; each refused form must pass it.
     forms = [f"{OUTPUT_VERBS[v]} --output=x" for v in OUTPUT_VERBS] + [
         "git format-patch -ko outdir -1", "git archive -vo out.tar HEAD", "git log --outp=x", 'git log --out"put"=x',
