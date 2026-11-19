@@ -102,7 +102,9 @@ def validate_allowed_tools(value) -> list[str]:
         pattern = m.group(2)
         if pattern and tool == "Bash":
             inner = pattern[1:-1]
-            if ":" in inner and "*" in inner:
+            # The old prefix form puts a colon directly before the star (`cmd:*`). A colon
+            # elsewhere is part of an exact command, as in a grep pattern such as "^type:".
+            if re.search(r":\s*\*", inner):
                 errors.append(
                     f"allowed-tools: deprecated colon syntax in {entry!r} -- use 'Bash(cmd *)' not 'Bash(cmd:*)'"
                 )

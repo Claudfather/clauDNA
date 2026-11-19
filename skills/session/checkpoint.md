@@ -12,7 +12,7 @@ Read only the current native session's `handoff.md` through the session-store CL
 
 ### 2. Capture new items since the last write
 
-From the session conversation, identify new **Activity**, **Decisions**, **Open Questions**, and **Next Steps** that are not already in the file (case-insensitive substring dedup, same rule as handoff step 6). Each new item gets the current ISO-8601 UTC timestamp. Existing items are left exactly as they are — no reaping, no pruning, no rewriting.
+From the session conversation, identify new **Activity**, **Decisions**, **Open Questions**, and **Next Steps** that are not already in the file (case-insensitive substring dedup, same rule as handoff step 6). Each new item gets the current ISO-8601 UTC timestamp, read with `date -u +%Y-%m-%dT%H:%M:%SZ`. Existing items are left exactly as they are — no reaping, no pruning, no rewriting.
 
 Capture silently — no approval round in either mode.
 
