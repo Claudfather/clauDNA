@@ -101,7 +101,7 @@ for cmd in jq gh git node npx; do
 done
 ```
 
-PASS when all baseline commands exist; WARN with the missing command names and manual install guidance otherwise. In particular, missing `jq` silently disables the Claude permission hook, so report that consequence. Optional formatters (`prettier`, `ruff`, `sqlfluff`) are informational; auto-format degrades when absent. Skills' own `requires` still apply. Do not install anything during health.
+PASS when all baseline commands exist; WARN with the missing command names and manual install guidance otherwise. In particular, without `jq` the Claude permission hook approves nothing (its gh read-guard still runs), so report that consequence. Optional formatters (`prettier`, `ruff`, `sqlfluff`) are informational; auto-format degrades when absent. Skills' own `requires` still apply. Do not install anything during health.
 
 These baseline diagnostics are not a single dependency gate: missing `gh`, `git`, `node` or `npx` does not disable the permission hook. Attribute each missing dependency to the particular workflow that uses it.
 

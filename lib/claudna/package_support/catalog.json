@@ -35,7 +35,7 @@
         },
         {
           "cli": "jq",
-          "reason": "Permission hook silently does nothing without jq"
+          "reason": "Permission hook allow patterns; without jq the hook approves nothing and its gh read-guard still runs"
         },
         {
           "cli": "git",
@@ -783,7 +783,7 @@
     ".codex-plugin/plugin.json": "d4b9391c83e8731674e544f6274aaf55fcc676e7502e50adbb593ec232945954",
     ".cursor-plugin/marketplace.json": "bf37d8df35f18fcdb1d6b677a7ac5551d1873a378603ad649da97a2d3495e852",
     ".cursor-plugin/plugin.json": "a94fc7e29b77bfb758d8475f53993160ee9f1a2578abcd32670572ee1916849e",
-    "lib/claudna/package_support/host-policy.json": "6da6b14b449044cb4c98f17b49bcb81f21039b175bd7391d6646d3ba24079e1d",
+    "lib/claudna/package_support/host-policy.json": "c2ca47458edf2ab561ed3590ff36dde889d7ad50657426497f841c72d8349398",
     "plugin-hooks/codex-hooks.json": "da9fa60d3dcd3f583b0cef4ea67685073f3eeecf0aa3238dffe7daffb4177e9c",
     "plugin-hooks/hooks.json": "d64bf123e5c8a8faab67f8f7d2061b7c8a81d94e842d018f921b35a35d961a4e",
     "skills/adversarial-review/SKILL.md": "3aa0b35950920df336a3c547b684f13ea9528d32033a4cd6d5896123c85e6dbc",
@@ -821,7 +821,7 @@
     "skills/ship/SKILL.md": "efb9cedd2de8b5130ad8bb0ecdfc5182d44e027578ffd52d31cb503c190a66dd",
     "skills/skill-scaffold/SKILL.md": "8b1e355533f37d73903a912fd20b59807d72416490e2219ad9417620e3d1e6b0",
     "skills/sync-branches/SKILL.md": "ee239925a37a71936497a6043b3c15e605037e9838baa37c319e25953f66aa04",
-    "skills/using-claudna/SKILL.md": "d06ce6e32d58d0fa59c6d4d65f708c7b10d91462de3398d7acd0c8b37344b0a9",
+    "skills/using-claudna/SKILL.md": "4c129b91b244ff94de14fb4f08503379b5384cbb2e8570faff9aa2729c06c89e",
     "skills/vercel/SKILL.md": "60c4641a94c521c4975d1c95db6af7a9715cd792aea3d8c887c59a7c361766fb",
     "skills/verify-completion/SKILL.md": "8ead1f37e9e0ee45cd317d75146b632eb94bc5d8f7d56cd5818aaedf1b778226",
     "skills/weigh-development-paths/SKILL.md": "75cc4f2cb50bc2cc9d00ebac9c6dea55eff222c26fd4fd33148d9f23df8eba04",

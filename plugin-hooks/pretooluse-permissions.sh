@@ -18,13 +18,15 @@ set -eo pipefail
 #   - Loads patterns from ~/.claude/settings.json, .claude/settings.json,
 #     and .claude/settings.local.json with jq. Without jq, or when that read
 #     fails, it reads the command with python3 (from the event text when
-#     python3 is absent too), runs the gh read-guard, and approves nothing
+#     python3 is absent or cannot read it), runs the gh read-guard, and
+#     approves nothing
 #   - Falls through (no output) for unrecognized or unparseable commands
 #   - Returns "deny" for the gh read-guard shapes (a granted gh read that would
 #     read the environment or reach a host other than github.com), and for a
 #     command that matched the gh trigger but the guard could not check (its
-#     error, an unknown exit code, or no python3) — that is refused, not approved
-#     by the allow patterns. Every other command is "allow" or silent pass-through
+#     error, an unknown exit code, no python3, or a command python3 could not
+#     read) — that is refused, not approved by the allow patterns. Every other
+#     command is "allow" or silent pass-through
 #   - Debug log: ${CLAUDNA_STATE_DIR:-~/.claudna}/hooks/permissions.log,
 #     readable by the user alone
 #
@@ -90,11 +92,14 @@ deny() {
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # The event's Bash command as a shell assignment, or `exit 0` for another tool, read without jq:
-# with python3, and from the event text when python3 is absent too. The text read keeps the rest of
-# JSON's escapes but turns \n, \t and \r into the whitespace they stand for, which is enough for
-# the gh read-guard's trigger; with no python3 the guard refuses what its trigger matches.
+# with python3, and from the event text when python3 is absent or its read fails. The text read
+# decodes JSON's escapes in two passes, each one linear in the text: sed takes the backslash off
+# each escaped quote (in valid JSON a backslash just before a quote is always that quote's escape),
+# then printf's %b reads the backslash escapes left to right, so an escaped backslash stays one. Only
+# the gh read-guard's trigger reads that text: the read also sets READ_EXACT=false, and the guard
+# refuses what its trigger matches rather than hand the decider a command python3 did not read.
 read_event_without_jq() {
-    local out re c
+    local out re c q
     if command -v python3 &>/dev/null && out="$(printf '%s' "$INPUT" | python3 -I -c '
 import json, shlex, sys
 sys.stdout.reconfigure(errors="surrogateescape")
@@ -109,11 +114,11 @@ print("COMMAND=" + shlex.quote(c) if isinstance(c, str) and c else "exit 0")' 2>
     re='"command"[[:space:]]*:[[:space:]]*"(([^"\\]|\\.)*)"'
     [[ $INPUT =~ $re ]] || { echo "exit 0"; return; }
     c=${BASH_REMATCH[1]}
-    c=${c//\\n/$'\n'}
-    c=${c//\\t/$'\t'}
-    c=${c//\\r/$'\r'}
+    # Without sed a quote keeps its backslash, which the trigger drops with the quote.
+    if q="$(printf '%s' "$c" | sed 's/\\"/"/g')"; then c=$q; fi
+    printf -v c '%b' "$c"
     [[ -n "$c" ]] || { echo "exit 0"; return; }
-    printf 'COMMAND=%q\n' "$c"
+    printf 'COMMAND=%q\nREAD_EXACT=false\n' "$c"
 }
 
 # ─── Parse input + load patterns (single jq call) ────────────────────
@@ -138,6 +143,7 @@ COMMAND=""
 HAS_BARE=false
 SPECS=()
 JQ_RESULT=""
+READ_EXACT=true   # false when the command came from the event text (read_event_without_jq)
 command -v jq &>/dev/null && JQ_RESULT="$(
   { printf '%s\n' "$INPUT"
     cat "$HOME/.claude/settings.json" 2>/dev/null || echo '{}'
@@ -190,7 +196,16 @@ case "$NOQ" in
     *gh*)
         case "$NOQ" in
             *--jq*|*--template*|*--repo*|*--web*|*--hostname*|*GH_HOST=*|*GH_REPO=*|*GH_HOST+=*|*GH_REPO+=*|*GH_HOST\[*|*GH_REPO\[*|*[[:space:]]-q*|*[[:space:]]-t*|*[[:space:]]-R*|*[[:space:]]-w*|*[[:space:]]-[[:alnum:]]*[qtRw]*|*"://"*|*@*:*|*gh[[:space:]]*repo[[:space:]]*/*/*|*gh[[:space:]]*label[[:space:]]*/*/*|*gh[[:space:]]*ext*/*/*|*gh[[:space:]]*skill*/*/*)
-                if command -v python3 &>/dev/null; then
+                if ! command -v python3 &>/dev/null; then
+                    # No python3, so the guard cannot run. Refuse the command that matched
+                    # the gh trigger rather than let the allow patterns approve it unchecked.
+                    deny "the gh read-guard needs python3 and it is not available"
+                elif [[ $READ_EXACT == false ]]; then
+                    # python3 is here but could not read the event, so the command is the
+                    # event text's: refuse what the trigger matched, as with no python3,
+                    # rather than hand the decider text python3 did not read.
+                    deny "the gh read-guard could not read this command (python3 could not read the event)"
+                else
                     # errexit-safe: the decider exits 10 to deny, and an
                     # assignment that inherits that would end the hook here.
                     # The command goes in on stdin: an argv entry is capped (ARG_MAX; 128 KiB
@@ -207,10 +222,6 @@ case "$NOQ" in
                         # patterns that would approve it unseen.
                         *) deny "the gh read-guard could not check this command (exit $GH_RC)" ;;
                     esac
-                else
-                    # No python3, so the guard cannot run. Refuse the command that matched
-                    # the gh trigger rather than let the allow patterns approve it unchecked.
-                    deny "the gh read-guard needs python3 and it is not available"
                 fi
                 ;;
         esac
