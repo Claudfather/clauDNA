@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- **The permissions hook checks a `gh` command without `jq`.** `plugin-hooks/pretooluse-permissions.sh` reads its allow patterns with `jq`. Without `jq`, or when that read fails (a settings file that is not valid JSON), it now reads the command with `python3`, or from the event text when `python3` is missing too, runs the gh read-guard as it does with `jq`, and approves nothing. A gh command the guard cannot check is refused. The setup guide lists `jq` and Python 3.9+ as required software, and `AGENTS.md` says what the hook does without `jq`. Tests: `tests/test_permissions_hook_without_jq.py`.
 - **The `python3` stand-in in a wrapper-options test reads its input before it exits** ([#515](https://github.com/Claudfather/clauDNA/issues/515)). `test_a_guard_that_allows_still_lets_normal_matching_run` in `tests/test_gh_guard_wrapper_options.py` replaced `python3` with a script that exited at once, so under the hook's `pipefail` the `printf` that feeds it could end on SIGPIPE (exit 141) and the hook refused: the test failed at random. The script now drains its input first. Test-only: the hook and the guard are unchanged.
 
 ## [0.35.4] - 2026-11-17

@@ -16,7 +16,9 @@ set -eo pipefail
 # Behavior:
 #   - Only processes Bash tool calls; other tools pass through
 #   - Loads patterns from ~/.claude/settings.json, .claude/settings.json,
-#     and .claude/settings.local.json
+#     and .claude/settings.local.json with jq. Without jq, or when that read
+#     fails, it reads the command with python3 (from the event text when
+#     python3 is absent too), runs the gh read-guard, and approves nothing
 #   - Falls through (no output) for unrecognized or unparseable commands
 #   - Returns "deny" for the gh read-guard shapes (a granted gh read that would
 #     read the environment or reach a host other than github.com), and for a
@@ -87,11 +89,38 @@ deny() {
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# ─── Require jq ───────────────────────────────────────────────────────
-
-command -v jq &>/dev/null || exit 0
+# The event's Bash command as a shell assignment, or `exit 0` for another tool, read without jq:
+# with python3, and from the event text when python3 is absent too. The text read keeps the rest of
+# JSON's escapes but turns \n, \t and \r into the whitespace they stand for, which is enough for
+# the gh read-guard's trigger; with no python3 the guard refuses what its trigger matches.
+read_event_without_jq() {
+    local out re c
+    if command -v python3 &>/dev/null && out="$(printf '%s' "$INPUT" | python3 -I -c '
+import json, shlex, sys
+sys.stdout.reconfigure(errors="surrogateescape")
+e = json.loads(sys.stdin.buffer.read().decode("utf-8", "surrogateescape"))
+c = (e.get("tool_input") or {}).get("command") if e.get("tool_name") == "Bash" else None
+print("COMMAND=" + shlex.quote(c) if isinstance(c, str) and c else "exit 0")' 2>/dev/null)"; then
+        printf '%s\n' "$out"
+        return
+    fi
+    re='"tool_name"[[:space:]]*:[[:space:]]*"Bash"'
+    [[ $INPUT =~ $re ]] || { echo "exit 0"; return; }
+    re='"command"[[:space:]]*:[[:space:]]*"(([^"\\]|\\.)*)"'
+    [[ $INPUT =~ $re ]] || { echo "exit 0"; return; }
+    c=${BASH_REMATCH[1]}
+    c=${c//\\n/$'\n'}
+    c=${c//\\t/$'\t'}
+    c=${c//\\r/$'\r'}
+    [[ -n "$c" ]] || { echo "exit 0"; return; }
+    printf 'COMMAND=%q\n' "$c"
+}
 
 # ─── Parse input + load patterns (single jq call) ────────────────────
+# jq reads the command and the allow patterns together. The gh read-guard below needs only the
+# command, so without jq, or when the jq call fails (a settings file that is not valid JSON),
+# read_event_without_jq reads it and the guard still runs; no allow pattern is loaded then, so the
+# hook approves nothing.
 
 INPUT=$(cat)
 SESSION_ID=""
@@ -105,7 +134,11 @@ if [[ -n "$SESSION_DIR" ]]; then
     LOG="$LOG_DIR/permissions.log"
 fi
 
-JQ_RESULT="$(
+COMMAND=""
+HAS_BARE=false
+SPECS=()
+JQ_RESULT=""
+command -v jq &>/dev/null && JQ_RESULT="$(
   { printf '%s\n' "$INPUT"
     cat "$HOME/.claude/settings.json" 2>/dev/null || echo '{}'
     cat ".claude/settings.json" 2>/dev/null || echo '{}'
@@ -130,8 +163,9 @@ JQ_RESULT="$(
       "\nSPECS=(" + ([$specs[] | @sh] | join(" ")) + ")"
     end
   ' 2>/dev/null
-)" || exit 0
+)" || JQ_RESULT=""
 
+[[ -n "$JQ_RESULT" ]] || JQ_RESULT="$(read_event_without_jq)"
 eval "$JQ_RESULT"
 
 # ─── gh read-guard → deny before any approve ──────────────────────────
