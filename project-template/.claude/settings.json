@@ -22,7 +22,10 @@
       "Bash(gh alias:*)",
       "Bash(gh auth token:*)",
       "Bash(git config:*)",
-      "Bash(git -c:*)"
+      "Bash(git -c:*)",
+      "Bash(git diff *--output*)",
+      "Bash(git log *--output*)",
+      "Bash(git show *--output*)"
     ]
   }
 }

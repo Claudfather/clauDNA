@@ -26,10 +26,20 @@ invisible to it; those are the hook's approver's to gate, not the decider's (the
 does not approve a gh command in which an expansion can form or change an option word).
 That includes a command substitution inside a ``GH_HOST=`` / ``GH_REPO=`` prefix value:
 ``GH_HOST=$(echo evil.example.com) gh pr list`` is read as the literal text.
+
+It answers for ``git`` too: it denies the git output flags it reads:
+``--output`` (or a leading part of that name, or ``--output-directory``) on any verb, except one
+that names ``/dev/null``, ``/dev/stdout`` or ``/dev/stderr``, and ``-o`` on ``diff``, ``log``,
+``show``, ``format-patch``, ``archive`` and ``bundle``, whatever it names. It finds the call the
+way it finds a gh call:
+past assignment prefixes, redirections and wrappers, and past git's own options (``git -C DIR
+log``). Unlike the gh rule, it also reads an option word the shell would form from an expansion,
+a brace list or a glob, in the forms its parser handles.
 """
 
 from __future__ import annotations
 
+import fnmatch
 import re
 import shlex
 import sys
@@ -358,10 +368,8 @@ def _split_sep_redirect(tokens: list[str]) -> list[str]:
     return out
 
 
-def _gh_command_words(tokens: list[str]) -> list[list[str]]:
-    """Split a token stream on shell operators into segments, and return the argument
-    lists of the segments whose command word is ``gh`` (bare, ``\\gh``, wrapped, or a
-    path ending in ``gh``)."""
+def _segments(tokens: list[str]) -> list[list[str]]:
+    """Split a token stream on shell operators into the segments the shell runs one by one."""
     segments: list[list[str]] = []
     current: list[str] = []
     for tok in _split_sep_redirect(tokens):
@@ -371,9 +379,15 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
         else:
             current.append(tok)
     segments.append(current)
+    return segments
 
+
+def _gh_command_words(tokens: list[str]) -> list[list[str]]:
+    """Split a token stream on shell operators into segments, and return the argument
+    lists of the segments whose command word is ``gh`` (bare, ``\\gh``, wrapped, or a
+    path ending in ``gh``)."""
     out: list[list[str]] = []
-    for seg in segments:
+    for seg in _segments(tokens):
         i = 0
         wrapped = False
         # GH_HOST=<host> / GH_REPO=[HOST/]OWNER/REPO prefixes name the host this call talks to. `held` is what
@@ -537,6 +551,112 @@ def _inspect_gh_args(args: list[str], allowed: set[str]) -> str | None:
     return None
 
 
+# git reads --output in its diff and revision options, so every git command that takes them writes
+# the file the option names, and opens it before it reads anything: diff, log, show, whatchanged,
+# diff-tree, diff-index, diff-files, stash show and list, reflog, shortlog, rev-list, blame,
+# range-diff, format-patch and bundle (measured on git 2.39.5). format-patch's --output-directory
+# and archive's --output write too. git takes no abbreviation of either name, and no other option is a
+# leading part of one, so any long option that is a leading part of either is read as one.
+_GIT_OUTPUT_NAME = "--output-directory"
+# -o is format-patch's --output-directory and archive's --output; git refuses it on diff, log, show
+# and bundle. On other verbs it means something else (grep -o, ls-files -o), so only these read it.
+_GIT_DASH_O = {"diff", "log", "show", "format-patch", "archive", "bundle"}
+# format-patch reads -o inside a cluster of short options; archive's are read the same way.
+_GIT_DASH_O_CLUSTER = {"format-patch", "archive"}
+# git's own options that take the next word as their value (git -C DIR log ...).
+_GIT_OPTION_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix",
+                     "--config-env", "--attr-source"}
+# Output written here changes no file.
+_GIT_NO_FILE = {"/dev/null", "/dev/stdout", "/dev/stderr"}
+# The decider reads the text after quote removal. It also reads an option word the shell would form
+# from an expansion, a brace list or a glob, in the forms its parser handles (`_git_spellings`).
+_GIT_EXPANSION = re.compile(r"\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*|\$[0-9@*#?$!-]")
+_GIT_DEFAULT_WORD = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*:?[-=+?]([^}]*)\}")
+_GIT_BRACE_LIST = re.compile(r"\{([^{}]*,[^{}]*)\}")
+_GIT_EXPANDS = set("${")
+_GIT_GLOB = set("*?[")
+
+
+def _git_command_words(tokens: list[str]) -> list[list[str]]:
+    """The argument lists of the segments whose command word is ``git`` (bare, ``\\git``, wrapped,
+    or a path ending in ``git``), found the way ``_gh_command_words`` finds a gh call."""
+    out: list[list[str]] = []
+    for seg in _segments(tokens):
+        i = 0
+        wrapped = False
+        while i < len(seg):
+            t = seg[i]
+            if _is_redirect(t):
+                i += 2
+                continue
+            if _FD_WORD.fullmatch(t) and i + 1 < len(seg) and _is_redirect(seg[i + 1]):
+                i += 1
+                continue
+            if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(\[[^\]]*\])?\+?=.*|\]\+?=.*", t, re.S):
+                i += 1
+                continue
+            base = t.lstrip("\\")
+            if base in _WRAPPERS:
+                wrapped = True
+                i += 2 if base == "repeat" else 1
+                continue
+            if wrapped and base.rsplit("/", 1)[-1] != "git":
+                i += 1  # a wrapper's own option or its value
+                continue
+            break
+        if i < len(seg) and seg[i].lstrip("\\").rsplit("/", 1)[-1] == "git":
+            out.append(seg[i + 1 :])
+    return out
+
+
+def _git_spellings(arg: str) -> set[str]:
+    """The words the decider reads a git argument as, in the forms its parser handles."""
+    if not _GIT_EXPANDS & set(arg):
+        return {arg}
+    forms = {arg, arg.replace("$", ""), _GIT_EXPANSION.sub("", arg), _GIT_DEFAULT_WORD.sub(lambda m: m.group(1), arg)}
+    out = set(forms)
+    for form in forms:
+        m = _GIT_BRACE_LIST.search(form)
+        if m:
+            out.update(form[: m.start()] + alt + form[m.end() :] for alt in m.group(1).split(","))
+    return out
+
+
+def _git_output_name(name: str) -> bool:
+    """Whether a long option's name is --output, --output-directory or a leading part of either, or a glob
+    that matches --output or --output-directory."""
+    if name.startswith("--ou") and _GIT_OUTPUT_NAME.startswith(name):
+        return True
+    return bool(_GIT_GLOB & set(name)) and any(fnmatch.fnmatchcase(n, name) for n in ("--output", _GIT_OUTPUT_NAME))
+
+
+def _inspect_git_args(args: list[str]) -> str | None:
+    """Return a deny reason for one git invocation's argument list, or ``None``."""
+    i = 0
+    while i < len(args) and args[i].startswith("-"):  # git's own options, before the verb
+        i += 2 if args[i] in _GIT_OPTION_VALUE else 1
+    verb = args[i] if i < len(args) else ""
+    rest = args[i + 1 :]
+    # a verb an expansion forms could be any verb, so it is read as the strictest one
+    known = verb if not (_GIT_EXPANDS | _GIT_GLOB) & set(verb) else "format-patch"
+    for k, arg in enumerate(rest):
+        if arg in ("--", "--end-of-options"):
+            break  # what follows is a path or a revision, not an option
+        for word in _git_spellings(arg):
+            name, eq, value = word.partition("=")
+            if _git_output_name(name):
+                target = value if eq else (rest[k + 1] if k + 1 < len(rest) else "")
+                if word == arg and target in _GIT_NO_FILE:
+                    continue
+                return f"git {verb} {name} writes its output to a file; run it without {name} and read the output"
+            if word.startswith("-") and not word.startswith("--"):
+                if (known in _GIT_DASH_O and word.startswith("-o")) or (
+                    known in _GIT_DASH_O_CLUSTER and "o" in word[1:]
+                ):
+                    return f"git {verb} -o writes its output to a file; run it without -o and read the output"
+    return None
+
+
 def decide(command: str, *, gh_host: str = "") -> tuple[str, str]:
     """``("allow", "")`` or ``("deny", reason)`` for a whole command line.
 
@@ -550,6 +670,10 @@ def decide(command: str, *, gh_host: str = "") -> tuple[str, str]:
     for tokens in _readings(command):
         for args in _gh_command_words(tokens):
             reason = _inspect_gh_args(args, allowed)
+            if reason:
+                return ("deny", reason)
+        for args in _git_command_words(tokens):
+            reason = _inspect_git_args(args)
             if reason:
                 return ("deny", reason)
     return ("allow", "")

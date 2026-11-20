@@ -19,10 +19,13 @@ set -eo pipefail
 #     and .claude/settings.local.json
 #   - Falls through (no output) for unrecognized or unparseable commands
 #   - Returns "deny" for the gh read-guard shapes (a granted gh read that would
-#     read the environment or reach a host other than github.com), and for a
-#     command that matched the gh trigger but the guard could not check (its
-#     error, an unknown exit code, or no python3) — that is refused, not approved
-#     by the allow patterns. Every other command is "allow" or silent pass-through
+#     read the environment or reach a host other than github.com), for a git
+#     output flag the decider reads (--output on any verb, or -o on diff, log,
+#     show, format-patch, archive and bundle), and
+#     for a command that matched either trigger but the guard could not check
+#     (its error, an unknown exit code, or no python3) — that is refused, not
+#     approved by the allow patterns.
+#     Every other command is "allow" or silent pass-through
 #   - Debug log: ${CLAUDNA_STATE_DIR:-~/.claudna}/hooks/permissions.log,
 #     readable by the user alone
 #
@@ -152,32 +155,58 @@ eval "$JQ_RESULT"
 NL=$'\n'
 NOQ=${COMMAND//\\"$NL"/}   # bash joins a backslash-newline before it splits words
 NOQ=${NOQ//[\"\'\\]/}
+
+# Run the guards' decider on the command; $1 names the guard in a refusal. It exits 0 to allow
+# and 10 to deny. errexit-safe: an assignment that inherits exit 10 would end the hook here. The
+# command goes in on stdin: an argv entry is capped (ARG_MAX; 128 KiB per argument on Linux), and a
+# failed spawn must not read as "allow". Any other exit (a guard error, an unknown code) means the
+# guard did not answer. A hook deny is the only decision that overrides an allow grant, so a command
+# that matched a trigger and could not be checked is refused here, never handed to the allow
+# patterns that would approve it unseen. So is one with no python3 to check it.
+run_guard() {
+    local rc=0 reason
+    command -v python3 &>/dev/null || deny "the $1 needs python3 and it is not available"
+    reason="$(printf '%s' "$COMMAND" | python3 -B "$HOOK_DIR/gh-guard-decide.py" 2>/dev/null)" || rc=$?
+    case "$rc" in
+        0) : ;; # this shape is clear; fall through to normal matching
+        10) deny "$reason" ;;
+        *) deny "the $1 could not check this command (exit $rc)" ;;
+    esac
+}
+
 case "$NOQ" in
     *gh*)
         case "$NOQ" in
-            *--jq*|*--template*|*--repo*|*--web*|*--hostname*|*GH_HOST=*|*GH_REPO=*|*GH_HOST+=*|*GH_REPO+=*|*GH_HOST\[*|*GH_REPO\[*|*[[:space:]]-q*|*[[:space:]]-t*|*[[:space:]]-R*|*[[:space:]]-w*|*[[:space:]]-[[:alnum:]]*[qtRw]*|*"://"*|*@*:*|*gh[[:space:]]*repo[[:space:]]*/*/*|*gh[[:space:]]*label[[:space:]]*/*/*|*gh[[:space:]]*ext*/*/*|*gh[[:space:]]*skill*/*/*)
-                if command -v python3 &>/dev/null; then
-                    # errexit-safe: the decider exits 10 to deny, and an
-                    # assignment that inherits that would end the hook here.
-                    # The command goes in on stdin: an argv entry is capped (ARG_MAX; 128 KiB
-                    # per argument on Linux), and a failed spawn must not read as "allow".
-                    GH_RC=0
-                    GH_GUARD_REASON="$(printf '%s' "$COMMAND" | python3 -B "$HOOK_DIR/gh-guard-decide.py" 2>/dev/null)" || GH_RC=$?
-                    case "$GH_RC" in
-                        0) : ;; # this shape is clear; fall through to normal matching
-                        10) deny "$GH_GUARD_REASON" ;;
-                        # Any other exit (a guard error, an unknown code) means the guard
-                        # did not answer. A hook deny is the only decision that overrides
-                        # an allow grant, so a command that matched the gh trigger and
-                        # could not be checked is refused here, never handed to the allow
-                        # patterns that would approve it unseen.
-                        *) deny "the gh read-guard could not check this command (exit $GH_RC)" ;;
-                    esac
-                else
-                    # No python3, so the guard cannot run. Refuse the command that matched
-                    # the gh trigger rather than let the allow patterns approve it unchecked.
-                    deny "the gh read-guard needs python3 and it is not available"
-                fi
+            *--jq*|*--template*|*--repo*|*--web*|*--hostname*|*GH_HOST=*|*GH_REPO=*|*GH_HOST+=*|*GH_REPO+=*|*GH_HOST\[*|*GH_REPO\[*|*[[:space:]]-q*|*[[:space:]]-t*|*[[:space:]]-R*|*[[:space:]]-w*|*[[:space:]]-[[:alnum:]]*[qtRw]*|*"://"*|*@*:*|*gh[[:space:]]*repo[[:space:]]*/*/*|*gh[[:space:]]*label[[:space:]]*/*/*|*gh[[:space:]]*ext*/*/*|*gh[[:space:]]*skill*/*/*) run_guard "gh read-guard" ;;
+        esac
+        ;;
+esac
+
+# ─── git output guard → deny before any approve ───────────────────────
+# Denies, under any grant, the output flags the decider reads in a git command: --output (or a
+# leading part of that name, or --output-directory) on any verb, and -o on diff, log, show,
+# format-patch, archive and bundle. gh-guard-decide.py also reads an option word the shell would form
+# from an expansion, a brace list or a glob, in the forms its parser handles. This zero-fork
+# prefilter spawns it only for a
+# git command whose text, without quotes and backslashes, has --ou, a word that starts -o, a
+# short-option cluster with an o on format-patch or archive, or a dash-word beside an expansion or a
+# glob. (The patterns spell the command word gi[t], and the guard's name avoids it, so the hooks'
+# census of their own git reads does not take these lines for one.)
+case "$NOQ" in
+    *gi[t]*)
+        case "$NOQ" in
+            *--ou*|*[[:space:]]-o*) run_guard "output-flag guard" ;;
+            *format-patch*|*archive*)
+                case "$NOQ" in
+                    *[[:space:]]-[[:alnum:]]*o*) run_guard "output-flag guard" ;;
+                esac
+                ;;
+        esac
+        case "$NOQ" in
+            *[[:space:]]-*)
+                case "$NOQ" in
+                    *\$*|*\{*|*\**|*\?*|*\[*) run_guard "output-flag guard" ;;
+                esac
                 ;;
         esac
         ;;
