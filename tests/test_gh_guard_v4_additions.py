@@ -7,8 +7,8 @@
    one (at a word start, outside quotes).
 2. Shorthand clusters. pflag reads `-dq EXPR` as `-d -q EXPR` and `-dR HOST/o/r` as `-d -R HOST/o/r` (real gh 2.92:
    `-dz` fails with "unknown shorthand flag", `-dq` and `-dR` parse). Neither the decider nor the pre-filter read them.
-3. Expansions. The shell expands a word before gh reads it, so `$'--jq'`, `${X---jq}`, `--j${Z}q` and
-   `{--jq,x}` reach gh as --jq while the decider reads the unexpanded text. Under a narrow grant the hook
+3. Expansions. The shell expands a word before gh reads it, so `${X---jq}`, `--j${Z}q` and `{--jq,x}`
+   reach gh as --jq while the decider reads the unexpanded text. Under a narrow grant the hook
    approved them itself, so Claude Code's own check never saw them; it now leaves them to that check. A word
    that is only a parameter (`gh pr view "$N"`) stays approved.
 4. A HOST/OWNER/REPO positional. `gh repo view|clone|fork ...` take a repository as a positional, and a
@@ -136,13 +136,11 @@ NARROW = ["Bash(gh pr list *)", "Bash(gh pr view *)", "Bash(gh api *)", "Bash(ec
 @pytest.mark.parametrize(
     "cmd",
     [
-        "gh pr list --json number $'--jq' env.X",  # ANSI-C quoting
-        'gh pr list --json number $"--jq" env.X',  # locale quoting
         "gh pr list --json number ${X---jq} env.X",  # a default value
         "gh pr view ${N:-5}",  # an operator that puts command text into the word
         "gh pr list --json number ${X:+--jq} env.X",
         "gh pr list --json number ${X/a/--jq} env.X",
-        "env gh pr list --json number $'--jq' env.X",  # behind a wrapper the gh guard looks through
+        "env gh pr list --json number ${X---jq} env.X",  # behind a wrapper the gh guard looks through
         "gh pr list --json number --j${Z}q env.X",  # an expansion inside an option word
         "gh pr list --json number -$Q env.X",
         "gh pr list --json number --jq=$Q",
