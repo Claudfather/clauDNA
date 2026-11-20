@@ -3,8 +3,9 @@
 bash pairs backslashes from the left, so a backslash continues its line only when no backslash in
 front of it escapes it, and a backslash in front of a carriage return escapes that character. A
 comment runs to the newline that ends it, a backslash at its end or not. A quoted string that runs
-across lines is text up to its closing quote, ``#`` and all. The decider reads each line that way,
-and the hook's trigger pairs backslashes the same way before it joins lines. Each command below is
+across lines is text up to its closing quote, ``#`` and all, and so is a ``$'...'`` string that
+holds an escaped quote on one line. The decider reads each line that way, and the hook's trigger
+pairs backslashes the same way before it joins lines. Each command below is
 first run by bash with a stand-in ``gh`` that records its words, so each case is what the shell
 does. Fake values only.
 """
@@ -43,6 +44,7 @@ RUNS_THE_CALL = [
     "gh pr view 1 --json body --template 'line one\n#two' --jq env.X",
     "gh pr view 1 --json body --template $'line one\n#two' --jq env.X",
     'gh pr view 1 --json body --template "one\nsee #2" -q env.X',
+    f"echo $'it\\'s #x'; {G}",  # one line too: a $'...' string runs past an escaped quote
 ]
 
 # bash runs no gh call that reads the environment in any of these
@@ -104,6 +106,11 @@ def test_the_decider_reads_each_line_as_bash_ends_it(cmd):
 @pytest.mark.parametrize("cmd", STAYS_ALLOWED)
 def test_ordinary_lines_stay_allowed(cmd):
     assert mod.decide(cmd)[0] == "allow", repr(cmd)
+
+
+def test_the_decider_denies_a_git_output_flag_after_such_a_string():
+    # the one-line case's string, then a git call that writes the file its --output names
+    assert mod.decide("echo $'it\\'s #x'; git log -1 --output=out.txt")[0] == "deny"
 
 
 def _hook(tmp_path: Path, cmd: str, allow: list[str]) -> str:

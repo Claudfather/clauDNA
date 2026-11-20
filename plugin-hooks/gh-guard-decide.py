@@ -395,16 +395,15 @@ def _readings(command: str) -> list[list[str]]:
     out = [_lex(text)]
     if len(lines) > 1:
         out.extend(_lex(ln) for ln in lines)
-    if "\n" in command:
-        shell = _shell_text(command)
-        if shell != text:
-            out.append(_lex(shell))
-            seen = set(lines)
-            for raw in shell.split("\n"):
-                ln = _strip_comment(raw)
-                if ln not in seen:
-                    seen.add(ln)
-                    out.append(_lex(ln))
+    shell = _shell_text(command)
+    if shell != text:
+        out.append(_lex(shell))
+        seen = set(lines)
+        for raw in shell.split("\n"):
+            ln = _strip_comment(raw)
+            if ln not in seen:
+                seen.add(ln)
+                out.append(_lex(ln))
     return out
 
 
