@@ -33,8 +33,8 @@ that names ``/dev/null``, ``/dev/stdout`` or ``/dev/stderr``, and ``-o`` on ``di
 ``show``, ``format-patch``, ``archive`` and ``bundle``, whatever it names. It finds the call the
 way it finds a gh call:
 past assignment prefixes, redirections and wrappers, and past git's own options (``git -C DIR
-log``). Unlike the gh rule, it also reads a git word that holds a ``$`` or a brace in the forms
-``_git_spellings`` lists, and a long option name that is a glob as the names it matches.
+log``). Unlike the gh rule, it also reads an option word the shell would form from an expansion,
+a brace list or a glob, in the forms its parser handles.
 """
 
 from __future__ import annotations
@@ -568,9 +568,8 @@ _GIT_OPTION_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--s
                      "--config-env", "--attr-source"}
 # Output written here changes no file.
 _GIT_NO_FILE = {"/dev/null", "/dev/stdout", "/dev/stderr"}
-# The decider reads the text after quote removal. A git word with a `$` or a brace in it is read as
-# written, without its `$` signs, with each parameter expansion taken as empty, and with a `${X-word}`
-# form taken as its word; in each of those, the first brace list gives each of its words.
+# The decider reads the text after quote removal. It also reads an option word the shell would form
+# from an expansion, a brace list or a glob, in the forms its parser handles (`_git_spellings`).
 _GIT_EXPANSION = re.compile(r"\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*|\$[0-9@*#?$!-]")
 _GIT_DEFAULT_WORD = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*:?[-=+?]([^}]*)\}")
 _GIT_BRACE_LIST = re.compile(r"\{([^{}]*,[^{}]*)\}")
@@ -611,7 +610,7 @@ def _git_command_words(tokens: list[str]) -> list[list[str]]:
 
 
 def _git_spellings(arg: str) -> set[str]:
-    """The words the decider reads a git argument as: the forms in the comment above."""
+    """The words the decider reads a git argument as, in the forms its parser handles."""
     if not _GIT_EXPANDS & set(arg):
         return {arg}
     forms = {arg, arg.replace("$", ""), _GIT_EXPANSION.sub("", arg), _GIT_DEFAULT_WORD.sub(lambda m: m.group(1), arg)}
@@ -625,7 +624,7 @@ def _git_spellings(arg: str) -> set[str]:
 
 def _git_output_name(name: str) -> bool:
     """Whether a long option's name is --output, --output-directory or a leading part of either, or a glob
-    the shell could match to one."""
+    that matches --output or --output-directory."""
     if name.startswith("--ou") and _GIT_OUTPUT_NAME.startswith(name):
         return True
     return bool(_GIT_GLOB & set(name)) and any(fnmatch.fnmatchcase(n, name) for n in ("--output", _GIT_OUTPUT_NAME))

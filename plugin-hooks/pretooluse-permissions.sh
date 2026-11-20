@@ -185,8 +185,9 @@ esac
 # ─── git output guard → deny before any approve ───────────────────────
 # Denies, under any grant, the output flags the decider reads in a git command: --output (or a
 # leading part of that name, or --output-directory) on any verb, and -o on diff, log, show,
-# format-patch, archive and bundle. gh-guard-decide.py says how it reads a word with an expansion or
-# a brace list in it. This zero-fork prefilter spawns it only for a
+# format-patch, archive and bundle. gh-guard-decide.py also reads an option word the shell would form
+# from an expansion, a brace list or a glob, in the forms its parser handles. This zero-fork
+# prefilter spawns it only for a
 # git command whose text, without quotes and backslashes, has --ou, a word that starts -o, a
 # short-option cluster with an o on format-patch or archive, or a dash-word beside an expansion or a
 # glob. (The patterns spell the command word gi[t], and the guard's name avoids it, so the hooks'
