@@ -42,7 +42,7 @@ def _dependency(entry: dict, scope: str, env: Mapping[str, str]) -> dict:
     if scope == "baseline":
         detail += " Limits only workflows that use this tool."
         if name == "jq":
-            detail += " The Claude permission hook silently does nothing without jq."
+            detail += " Without jq the Claude permission hook approves nothing; its gh read-guard still runs."
     return row(f"{scope}.cli.{name}", status, detail)
 
 

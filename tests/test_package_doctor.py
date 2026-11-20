@@ -86,7 +86,7 @@ def test_absent_tools_are_scoped_attention_not_global_failure(package, tmp_path)
     for name in ("bash", "jq", "gh", "git", "node", "npx"):
         assert checks[f"baseline.cli.{name}"]["status"] == "warn"
         assert "only workflows" in checks[f"baseline.cli.{name}"]["summary"]
-    assert "silently does nothing" in checks["baseline.cli.jq"]["summary"]
+    assert "approves nothing" in checks["baseline.cli.jq"]["summary"]
 
 
 def test_versioned_binary_is_never_executed_or_certified(package, tmp_path):

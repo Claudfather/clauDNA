@@ -16,16 +16,19 @@ set -eo pipefail
 # Behavior:
 #   - Only processes Bash tool calls; other tools pass through
 #   - Loads patterns from ~/.claude/settings.json, .claude/settings.json,
-#     and .claude/settings.local.json
+#     and .claude/settings.local.json with jq. Without jq, or when that read
+#     fails, it reads the command with python3 (from the event text when
+#     python3 is absent or cannot read it), runs the gh read-guard, and
+#     approves nothing
 #   - Falls through (no output) for unrecognized or unparseable commands
 #   - Returns "deny" for the gh read-guard shapes (a granted gh read that would
 #     read the environment or reach a host other than github.com), for a git
 #     output flag the decider reads (--output on any verb, or -o on diff, log,
-#     show, format-patch, archive and bundle), and
-#     for a command that matched either trigger but the guard could not check
-#     (its error, an unknown exit code, or no python3) — that is refused, not
-#     approved by the allow patterns.
-#     Every other command is "allow" or silent pass-through
+#     show, format-patch, archive and bundle), and for a command that matched
+#     either trigger but the guard could not check (its error, an unknown exit
+#     code, no python3, or a command python3 could not read) — that is refused,
+#     not approved by the allow patterns. Every other command is "allow" or
+#     silent pass-through
 #   - Debug log: ${CLAUDNA_STATE_DIR:-~/.claudna}/hooks/permissions.log,
 #     readable by the user alone
 #
@@ -90,11 +93,41 @@ deny() {
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# ─── Require jq ───────────────────────────────────────────────────────
-
-command -v jq &>/dev/null || exit 0
+# The event's Bash command as a shell assignment, or `exit 0` for another tool, read without jq:
+# with python3, and from the event text when python3 is absent or its read fails. The text read
+# decodes JSON's escapes in two passes: sed takes the backslash off each escaped quote (in valid
+# JSON a backslash just before a quote is always that quote's escape), then printf's %b reads the
+# backslash escapes left to right, so an escaped backslash stays one. Only the guards' triggers
+# read that text: the read also sets READ_EXACT=false, and each guard refuses what its trigger
+# matches rather than hand the decider a command python3 did not read.
+read_event_without_jq() {
+    local out re c q
+    if command -v python3 &>/dev/null && out="$(printf '%s' "$INPUT" | python3 -I -c '
+import json, shlex, sys
+sys.stdout.reconfigure(errors="surrogateescape")
+e = json.loads(sys.stdin.buffer.read().decode("utf-8", "surrogateescape"))
+c = (e.get("tool_input") or {}).get("command") if e.get("tool_name") == "Bash" else None
+print("COMMAND=" + shlex.quote(c) if isinstance(c, str) and c else "exit 0")' 2>/dev/null)"; then
+        printf '%s\n' "$out"
+        return
+    fi
+    re='"tool_name"[[:space:]]*:[[:space:]]*"Bash"'
+    [[ $INPUT =~ $re ]] || { echo "exit 0"; return; }
+    re='"command"[[:space:]]*:[[:space:]]*"(([^"\\]|\\.)*)"'
+    [[ $INPUT =~ $re ]] || { echo "exit 0"; return; }
+    c=${BASH_REMATCH[1]}
+    # Without sed a quote keeps its backslash, which the trigger drops with the quote.
+    if q="$(printf '%s' "$c" | sed 's/\\"/"/g')"; then c=$q; fi
+    printf -v c '%b' "$c"
+    [[ -n "$c" ]] || { echo "exit 0"; return; }
+    printf 'COMMAND=%q\nREAD_EXACT=false\n' "$c"
+}
 
 # ─── Parse input + load patterns (single jq call) ────────────────────
+# jq reads the command and the allow patterns together. The gh read-guard below needs only the
+# command, so without jq, or when the jq call fails (a settings file that is not valid JSON),
+# read_event_without_jq reads it and the guard still runs; no allow pattern is loaded then, so the
+# hook approves nothing.
 
 INPUT=$(cat)
 SESSION_ID=""
@@ -108,7 +141,12 @@ if [[ -n "$SESSION_DIR" ]]; then
     LOG="$LOG_DIR/permissions.log"
 fi
 
-JQ_RESULT="$(
+COMMAND=""
+HAS_BARE=false
+SPECS=()
+JQ_RESULT=""
+READ_EXACT=true   # false when the command came from the event text (read_event_without_jq)
+command -v jq &>/dev/null && JQ_RESULT="$(
   { printf '%s\n' "$INPUT"
     cat "$HOME/.claude/settings.json" 2>/dev/null || echo '{}'
     cat ".claude/settings.json" 2>/dev/null || echo '{}'
@@ -133,8 +171,9 @@ JQ_RESULT="$(
       "\nSPECS=(" + ([$specs[] | @sh] | join(" ")) + ")"
     end
   ' 2>/dev/null
-)" || exit 0
+)" || JQ_RESULT=""
 
+[[ -n "$JQ_RESULT" ]] || JQ_RESULT="$(read_event_without_jq)"
 eval "$JQ_RESULT"
 
 # ─── gh read-guard → deny before any approve ──────────────────────────
@@ -163,10 +202,17 @@ NOQ=${NOQ//[\"\'\\]/}
 # failed spawn must not read as "allow". Any other exit (a guard error, an unknown code) means the
 # guard did not answer. A hook deny is the only decision that overrides an allow grant, so a command
 # that matched a trigger and could not be checked is refused here, never handed to the allow
-# patterns that would approve it unseen. So is one with no python3 to check it.
+# patterns that would approve it unseen. So is one with no python3 to check it, and one whose
+# event python3 could not read.
 run_guard() {
     local rc=0 reason
     command -v python3 &>/dev/null || deny "the $1 needs python3 and it is not available"
+    if [[ $READ_EXACT == false ]]; then
+        # python3 is here but could not read the event, so the command is the event text's: refuse
+        # what the trigger matched, as with no python3, rather than hand the decider text python3
+        # did not read.
+        deny "the $1 could not read this command (python3 could not read the event)"
+    fi
     reason="$(printf '%s' "$COMMAND" | python3 -B "$HOOK_DIR/gh-guard-decide.py" 2>/dev/null)" || rc=$?
     case "$rc" in
         0) : ;; # this shape is clear; fall through to normal matching

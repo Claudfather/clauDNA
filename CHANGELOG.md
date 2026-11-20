@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **The permissions hook checks a `gh` command without `jq`.** `plugin-hooks/pretooluse-permissions.sh` reads its allow patterns with `jq`. Without `jq`, or when that read fails (a settings file that is not valid JSON), it now reads the command with `python3`, or from the event text when `python3` is missing or cannot read it, runs the gh read-guard as it does with `jq`, and approves nothing. The event text's escapes are decoded left to right, an escaped backslash or quote as one character. A gh command the guard cannot check, or one that matches its trigger but was read from the event text, is refused. The setup guide lists `jq` and Python 3.9+ as required software, and `AGENTS.md`, the `using-claudna` health check and the package doctor say what the hook does without `jq`. Tests: `tests/test_permissions_hook_without_jq.py`.
 
 ## [0.35.5] - 2026-11-20
 ### Changed
