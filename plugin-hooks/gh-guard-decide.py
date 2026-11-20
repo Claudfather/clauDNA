@@ -32,10 +32,8 @@ It answers for ``git`` too: it denies the git output flags it reads:
 ``diff``, ``log``, ``show``, ``format-patch``, ``archive`` and ``bundle``, except one that names
 ``/dev/null``, ``/dev/stdout`` or ``/dev/stderr``. It finds the call the way it finds a gh call:
 past assignment prefixes, redirections and wrappers, and past git's own options (``git -C DIR
-log``). Unlike the gh rule, it reads a git command's words in the ways the comment above
-``_GIT_EXPANSION`` lists. On a verb that can write through an output option it also refuses a word a
-command substitution makes and a glob that could match a file named like an output option; on any verb,
-a substitution before the verb and ``-c alias.*``.
+log``). Unlike the gh rule, it also reads a git word that holds a ``$`` or a brace in the forms
+``_git_spellings`` lists, and a long option name that is a glob as the names it matches.
 """
 
 from __future__ import annotations
@@ -569,207 +567,14 @@ _GIT_OPTION_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--s
                      "--config-env", "--attr-source"}
 # Output written here changes no file.
 _GIT_NO_FILE = {"/dev/null", "/dev/stdout", "/dev/stderr"}
-# The shell reads a git command's words before git does, and the git rule reads them the same way. Its
-# reading starts from the command text with each `$'...'` decoded and each `$"..."` read as `"..."`; with
-# each command substitution (`$(...)`, backticks) left as a mark, its command read on its own; and with a
-# glob character the shell does not expand (quoted or escaped) masked. A git word with a `$` or a brace
-# in it is then read as written, without its `$` signs, with each parameter expansion taken as empty,
-# and with a `${X-word}` form taken as its word; each of those gives the words its brace lists expand to
-# (comma lists and sequences, nested, at most _GIT_BRACE_MAX of them). An unquoted `$IFS` is also read
-# as a word break, and the strings that `eval`, a shell's `-c` and `env -S` run are read as commands. A
-# command that gives the rule more than _GIT_WORDS_MAX words to read is refused.
+# The decider reads the text after quote removal. A git word with a `$` or a brace in it is read as
+# written, without its `$` signs, with each parameter expansion taken as empty, and with a `${X-word}`
+# form taken as its word; in each of those, the first brace list gives each of its words.
 _GIT_EXPANSION = re.compile(r"\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*|\$[0-9@*#?$!-]")
 _GIT_DEFAULT_WORD = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*:?[-=+?]([^}]*)\}")
-_GIT_IFS = re.compile(r"\$\{IFS[^}]*\}|\$IFS(?![A-Za-z0-9_])")
+_GIT_BRACE_LIST = re.compile(r"\{([^{}]*,[^{}]*)\}")
 _GIT_EXPANDS = set("${")
 _GIT_GLOB = set("*?[")
-_GIT_BRACE_MAX = 256
-_GIT_WORDS_MAX = 65536  # the words one command may give the git rule to read
-# Verbs that take no output option. A word the shell forms after one of them cannot make git write a
-# file through one, so the substitution and glob rules read only the words before it there.
-_GIT_NO_OUTPUT = {"add", "rm", "mv", "status", "commit", "checkout", "switch", "restore", "branch", "tag",
-                  "merge", "rebase", "reset", "fetch", "pull", "push", "clone", "init", "remote", "config",
-                  "worktree", "submodule", "clean", "grep", "ls-files", "ls-tree", "cat-file", "rev-parse",
-                  "describe", "show-ref", "check-ignore", "check-attr", "apply", "am", "cherry-pick",
-                  "revert", "notes", "update-index", "bisect", "gc", "fsck", "prune", "help", "version",
-                  "var", "sparse-checkout", "maintenance"}
-_GIT_DEPTH_MAX = 3
-# Marks in the text the git rule lexes: a command substitution, unquoted and inside double quotes, and a
-# glob character the shell does not expand.
-_SUBST = "\x01"
-_SUBST_QUOTED = "\x05"
-_QUOTED_GLOB = {"*": "\x02", "?": "\x03", "[": "\x04"}
-_UNMASK = str.maketrans({**{v: k for k, v in _QUOTED_GLOB.items()}, _SUBST: "$(...)", _SUBST_QUOTED: "$(...)"})
-_ANSI_C = {"a": "\a", "b": "\b", "e": "\x1b", "E": "\x1b", "f": "\f", "n": "\n", "r": "\r", "t": "\t",
-           "v": "\v", "\\": "\\", "'": "'", '"': '"', "?": "?"}
-_ANSI_C_NUMBER = {"x": re.compile(r"[0-9A-Fa-f]{1,2}"), "u": re.compile(r"[0-9A-Fa-f]{1,4}"),
-                  "U": re.compile(r"[0-9A-Fa-f]{1,8}")}
-_OCTAL = re.compile(r"[0-7]{1,3}")
-_SEQUENCE = re.compile(r"(-?[0-9]+)\.\.(-?[0-9]+)(?:\.\.(-?[0-9]+))?|([A-Za-z])\.\.([A-Za-z])(?:\.\.(-?[0-9]+))?")
-_SHELLS = {"sh", "bash", "zsh", "dash", "ksh", "mksh", "ash", "yash"}
-
-
-def _ansi_c_body(text: str, i: int) -> tuple[str, int]:
-    """The decoded body of the ``$'...'`` whose body starts at ``text[i]``, and the index after it."""
-    out: list[str] = []
-    n = len(text)
-    while i < n:
-        c = text[i]
-        if c == "'":
-            return "".join(out), i + 1
-        if c != "\\" or i + 1 >= n:
-            out.append(c)
-            i += 1
-            continue
-        d = text[i + 1]
-        m = (_ANSI_C_NUMBER[d].match(text, i + 2) if d in _ANSI_C_NUMBER
-             else _OCTAL.match(text, i + 1) if d in "01234567" else None)
-        if d in _ANSI_C:
-            out.append(_ANSI_C[d])
-            i += 2
-        elif m and d in _ANSI_C_NUMBER:
-            out.append(chr(min(int(m.group(), 16), 0x10FFFF)))
-            i = m.end()
-        elif m:
-            out.append(chr(int(m.group(), 8) & 0xFF))
-            i = m.end()
-        elif d == "c" and i + 2 < n:
-            out.append(chr(ord(text[i + 2]) & 0x1F))
-            i += 3
-        else:
-            out.append(text[i : i + 2])
-            i += 2
-    return "".join(out), n
-
-
-def _substitution_end(text: str, i: int) -> int:
-    """The index of the ``)`` or backtick that ends the substitution at ``text[i]``, or the text's length."""
-    n = len(text)
-    if text[i] == "`":
-        j = i + 1
-        while j < n and text[j] != "`":
-            j += 2 if text[j] == "\\" else 1
-        return min(j, n)
-    depth, quote, j = 0, "", i + 1
-    while j < n:
-        c = text[j]
-        if quote:
-            if c == "\\" and quote == '"':
-                j += 1
-            elif c == quote:
-                quote = ""
-        elif c == "\\":
-            j += 1
-        elif c in "'\"":
-            quote = c
-        elif c == "(":
-            depth += 1
-        elif c == ")":
-            depth -= 1
-            if depth == 0:
-                return j
-        j += 1
-    return n
-
-
-def _git_text(command: str) -> tuple[str, list[str]]:
-    """The text the git rule lexes, and the commands of the substitutions in it (see above)."""
-    out: list[str] = []
-    inner: list[str] = []
-    n = len(command)
-    i = 0
-    quote = ""
-    while i < n:
-        c = command[i]
-        if quote == "'":
-            quote = "" if c == "'" else quote
-            out.append(_QUOTED_GLOB.get(c, c))
-            i += 1
-        elif c == "\\" and i + 1 < n:
-            out.append("\\" + _QUOTED_GLOB.get(command[i + 1], command[i + 1]))
-            i += 2
-        elif c == "$" and not quote and command.startswith(("$'", '$"'), i):
-            if command[i + 1] == '"':
-                i += 1  # $"..." is "..."
-                continue
-            body, i = _ansi_c_body(command, i + 2)
-            masked = "".join(_QUOTED_GLOB.get(ch, ch) for ch in body)
-            out.append("'" + masked.replace("'", "'\\''") + "'")
-        elif c == "`" or command.startswith("$(", i):
-            end = _substitution_end(command, i)
-            inner.append(command[i + 1 : end] if c == "`" else command[i + 2 : end])
-            out.append(_SUBST_QUOTED if quote else _SUBST)
-            i = end + 1
-        else:
-            if c == '"':
-                quote = "" if quote else '"'
-            elif c == "'" and not quote:
-                quote = "'"
-            out.append(_QUOTED_GLOB.get(c, c) if quote else c)
-            i += 1
-    return "".join(out), inner
-
-
-def _brace_words(body: str) -> list[str] | None:
-    """The words one brace body stands for (a comma list or a sequence), or ``None`` for neither."""
-    parts, depth, start, k = [], 0, 0, 0
-    while k < len(body):
-        c = body[k]
-        if c == "{":
-            depth += 1
-        elif c == "}":
-            depth -= 1
-        elif c == "," and depth == 0:
-            parts.append(body[start:k])
-            start = k + 1
-        k += 1
-    if parts:
-        return parts + [body[start:]]
-    m = _SEQUENCE.fullmatch(body)
-    if not m:
-        return None
-    if m.group(1) is not None:
-        lo, hi, step = int(m.group(1)), int(m.group(2)), abs(int(m.group(3) or 1)) or 1
-        width = max(len(m.group(1)), len(m.group(2))) if any(
-            g.lstrip("-").startswith("0") and len(g.lstrip("-")) > 1 for g in (m.group(1), m.group(2))) else 0
-        if abs(hi - lo) // step >= _GIT_BRACE_MAX:
-            return [""] * (_GIT_BRACE_MAX + 1)
-        values = range(lo, hi + 1, step) if lo <= hi else range(lo, hi - 1, -step)
-        return [str(v).zfill(width) if width else str(v) for v in values]
-    lo, hi, step = ord(m.group(4)), ord(m.group(5)), abs(int(m.group(6) or 1)) or 1
-    values = range(lo, hi + 1, step) if lo <= hi else range(lo, hi - 1, -step)
-    return [chr(v) for v in values]
-
-
-def _brace_expand(word: str) -> list[str] | None:
-    """The words the shell's brace expansion makes of ``word``, or ``None`` past _GIT_BRACE_MAX."""
-    i = word.find("{")
-    while i >= 0:
-        depth, k = 0, i
-        while k < len(word):
-            depth += {"{": 1, "}": -1}.get(word[k], 0)
-            if depth == 0:
-                break
-            k += 1
-        alternatives = None if k >= len(word) or (i > 0 and word[i - 1] == "$") else _brace_words(word[i + 1 : k])
-        if alternatives is None:
-            i = word.find("{", i + 1)
-            continue
-        tails = _brace_expand(word[k + 1 :])
-        if tails is None:
-            return None
-        out: list[str] = []
-        for alternative in alternatives:
-            heads = _brace_expand(alternative)
-            if heads is None:
-                return None
-            for head in heads:
-                for tail in tails:
-                    out.append(word[:i] + head + tail)
-                    if len(out) > _GIT_BRACE_MAX:
-                        return None
-        return out
-    return [word]
 
 
 def _git_command_words(tokens: list[str]) -> list[list[str]]:
@@ -804,46 +609,16 @@ def _git_command_words(tokens: list[str]) -> list[list[str]]:
     return out
 
 
-def _command_strings(tokens: list[str]) -> list[str]:
-    """The strings a segment hands to be run as commands: the words after ``eval``, the string after a
-    shell's ``-c``, and the string after ``env -S`` or ``--split-string``."""
-    out: list[str] = []
-    for seg in _segments(tokens):
-        for k, tok in enumerate(seg):
-            base = tok.lstrip("\\").rsplit("/", 1)[-1]
-            if base == "eval":
-                out.append(" ".join(seg[k + 1 :]))
-            elif base in _SHELLS:
-                for m in range(k + 1, len(seg)):
-                    opt = seg[m]
-                    if not opt.startswith("-") or opt == "--":
-                        break
-                    if not opt.startswith("--") and "c" in opt[1:]:
-                        out.extend(seg[m + 1 : m + 2])
-                        break
-            elif base == "env":
-                for m in range(k + 1, len(seg)):
-                    opt = seg[m]
-                    if opt in ("-S", "--split-string"):
-                        out.extend(seg[m + 1 : m + 2])
-                    elif opt.startswith("--split-string="):
-                        out.append(opt.split("=", 1)[1])
-                    elif opt.startswith("-S"):
-                        out.append(opt[2:])
-    return out
-
-
-def _git_spellings(arg: str) -> set[str] | None:
-    """The words the git rule reads a git argument as (see above), or ``None`` past _GIT_BRACE_MAX."""
+def _git_spellings(arg: str) -> set[str]:
+    """The words the decider reads a git argument as: the forms in the comment above."""
     if not _GIT_EXPANDS & set(arg):
         return {arg}
     forms = {arg, arg.replace("$", ""), _GIT_EXPANSION.sub("", arg), _GIT_DEFAULT_WORD.sub(lambda m: m.group(1), arg)}
-    out: set[str] = set()
+    out = set(forms)
     for form in forms:
-        words = _brace_expand(form)
-        if words is None:
-            return None
-        out.update(words)
+        m = _GIT_BRACE_LIST.search(form)
+        if m:
+            out.update(form[: m.start()] + alt + form[m.end() :] for alt in m.group(1).split(","))
     return out
 
 
@@ -855,111 +630,30 @@ def _git_output_name(name: str) -> bool:
     return bool(_GIT_GLOB & set(name)) and any(fnmatch.fnmatchcase(n, name) for n in ("--output", _GIT_OUTPUT_NAME))
 
 
-def _git_glob_could_name_output(name: str, known: str) -> bool:
-    """Whether a glob in a word's name part could match a file whose name reads as an output option."""
-    k = next((j for j, ch in enumerate(name) if ch in _GIT_GLOB), -1)
-    if k < 0:
-        return False
-    lead = name[:k]
-    return (_GIT_OUTPUT_NAME.startswith(lead)
-            or (known in _GIT_DASH_O and ("-o".startswith(lead) or lead.startswith("-o")))
-            or (known in _GIT_DASH_O_CLUSTER and lead.startswith("-") and not lead.startswith("--")))
-
-
-def _shown(word: str) -> str:
-    return word.translate(_UNMASK)
-
-
-def _inspect_git_args(args: list[str], budget: list[int] | None = None) -> str | None:
-    """Return a deny reason for one git invocation's argument list, or ``None``. A word with an unquoted
-    ``$IFS`` is read both as one word and split there. ``budget`` counts down the words read."""
-    budget = [_GIT_WORDS_MAX] if budget is None else budget
-    variants = [args]
-    if any(_GIT_IFS.search(a) for a in args):
-        variants.append([piece for a in args for piece in _GIT_IFS.split(a) if piece])
-    for variant in variants:
-        reason = _inspect_git_words(variant, budget)
-        if reason:
-            return reason
-    return None
-
-
-def _inspect_git_words(args: list[str], budget: list[int]) -> str | None:
+def _inspect_git_args(args: list[str]) -> str | None:
+    """Return a deny reason for one git invocation's argument list, or ``None``."""
     i = 0
-    values: set[int] = set()  # where git's own options take their value
     while i < len(args) and args[i].startswith("-"):  # git's own options, before the verb
-        opt = args[i]
-        takes = opt in _GIT_OPTION_VALUE
-        value = (args[i + 1] if i + 1 < len(args) else "") if takes else opt.partition("=")[2]
-        if (opt == "-c" or opt.startswith("--config-env")) and value.lower().startswith("alias."):
-            return "git -c alias.* defines a git command the guard does not read; run the command it names instead"
-        if takes:
-            values.add(i + 1)
-        i += 2 if takes else 1
+        i += 2 if args[i] in _GIT_OPTION_VALUE else 1
     verb = args[i] if i < len(args) else ""
     rest = args[i + 1 :]
-    # a verb that may write through an output option: any but those listed, an alias's name included
-    open_verb = verb not in _GIT_NO_OUTPUT
-    for j, arg in enumerate(args):
-        if j > i and arg in ("--", "--end-of-options"):
-            break
-        if j > i and not open_verb:
-            break
-        if _SUBST in arg:
-            return "git: an unquoted command substitution can make any words of this git command; run git with its words written out"
-        if j not in values and _SUBST_QUOTED in arg and (
-            arg.startswith(_SUBST_QUOTED) or (arg.startswith("-") and _SUBST_QUOTED in arg.partition("=")[0])
-        ):
-            return "git: a command substitution makes one of this git command's options or its verb; run git with its words written out"
-    # a verb an expansion or a glob forms could be any verb, so it is read as the strictest one
+    # a verb an expansion forms could be any verb, so it is read as the strictest one
     known = verb if not (_GIT_EXPANDS | _GIT_GLOB) & set(verb) else "format-patch"
     for k, arg in enumerate(rest):
         if arg in ("--", "--end-of-options"):
             break  # what follows is a path or a revision, not an option
-        spellings = _git_spellings(arg)
-        if spellings is None:
-            return f"git {_shown(verb)}: a brace list in {_shown(arg)} makes more than {_GIT_BRACE_MAX} words; write the words out"
-        budget[0] -= len(spellings)
-        if budget[0] < 0:
-            return f"git: this command gives the guard more than {_GIT_WORDS_MAX} words to read; split it into shorter commands"
-        for word in spellings:
+        for word in _git_spellings(arg):
             name, eq, value = word.partition("=")
-            if _git_output_name(name) and (open_verb or not _GIT_GLOB & set(name)):
+            if _git_output_name(name):
                 target = value if eq else (rest[k + 1] if k + 1 < len(rest) else "")
                 if word == arg and target in _GIT_NO_FILE:
                     continue
-                shown = _shown(name)
-                return f"git {_shown(verb)} {shown} writes its output to a file; run it without {shown} and read the output"
+                return f"git {verb} {name} writes its output to a file; run it without {name} and read the output"
             if word.startswith("-") and not word.startswith("--"):
                 if (known in _GIT_DASH_O and word.startswith("-o")) or (
                     known in _GIT_DASH_O_CLUSTER and "o" in word[1:]
                 ):
-                    return f"git {_shown(verb)} -o writes its output to a file; run it without -o and read the output"
-            if open_verb and _git_glob_could_name_output(name, known):
-                return (f"git {_shown(verb)}: the shell can expand {_shown(word)} to a file named like an output option; "
-                        "quote it, or put it after --")
-    return None
-
-
-def _git_reason(command: str, depth: int = 0, budget: list[int] | None = None) -> str | None:
-    """The deny reason for the first git call in ``command`` the git rule refuses, or ``None``."""
-    budget = [_GIT_WORDS_MAX] if budget is None else budget
-    text, inner = _git_text(command)
-    for tokens in _readings(text):
-        for args in _git_command_words(tokens):
-            reason = _inspect_git_args(args, budget)
-            if reason:
-                return reason
-        if depth < _GIT_DEPTH_MAX:
-            for string in _command_strings(tokens):
-                reason = _git_reason(string, depth + 1, budget)
-                if reason:
-                    return reason
-    if depth < _GIT_DEPTH_MAX:
-        for string in inner:
-            reason = _git_reason(string, depth + 1, budget)
-            if reason:
-                return reason
+                    return f"git {verb} -o writes its output to a file; run it without -o and read the output"
     return None
 
 
@@ -978,9 +672,10 @@ def decide(command: str, *, gh_host: str = "") -> tuple[str, str]:
             reason = _inspect_gh_args(args, allowed)
             if reason:
                 return ("deny", reason)
-    reason = _git_reason(command)
-    if reason:
-        return ("deny", reason)
+        for args in _git_command_words(tokens):
+            reason = _inspect_git_args(args)
+            if reason:
+                return ("deny", reason)
     return ("allow", "")
 
 
