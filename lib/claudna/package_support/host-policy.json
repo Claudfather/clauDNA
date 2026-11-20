@@ -10,7 +10,7 @@
       "runtime_prerequisites": [
         {"cli": "python3>=3.9", "reason": "Session store and Python hook helpers; standard library only"},
         {"cli": "bash", "reason": "Packaged shell hooks"},
-        {"cli": "jq", "reason": "Permission hook allow patterns; without jq the hook approves nothing and its gh read-guard still runs"},
+        {"cli": "jq", "reason": "Permission hook allow patterns; without jq the hook approves nothing and its gh read-guard and git output-flag guard still run"},
         {"cli": "git", "reason": "Repository workflows and startup context"},
         {"cli": "gh", "reason": "Baseline health diagnostic for GitHub workflows; not a hook gate"},
         {"cli": "node", "reason": "Baseline health diagnostic for Node workflows; not a hook gate"},

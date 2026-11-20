@@ -18,8 +18,8 @@ set -eo pipefail
 #   - Loads patterns from ~/.claude/settings.json, .claude/settings.json,
 #     and .claude/settings.local.json with jq. Without jq, or when that read
 #     fails, it reads the command with python3 (from the event text when
-#     python3 is absent or cannot read it), runs the gh read-guard, and
-#     approves nothing
+#     python3 is absent or cannot read it), runs the gh read-guard and the
+#     git output-flag guard, and approves nothing
 #   - Falls through (no output) for unrecognized or unparseable commands
 #   - Returns "deny" for the gh read-guard shapes (a granted gh read that would
 #     read the environment or reach a host other than github.com), for a git
@@ -124,10 +124,10 @@ print("COMMAND=" + shlex.quote(c) if isinstance(c, str) and c else "exit 0")' 2>
 }
 
 # ─── Parse input + load patterns (single jq call) ────────────────────
-# jq reads the command and the allow patterns together. The gh read-guard below needs only the
-# command, so without jq, or when the jq call fails (a settings file that is not valid JSON),
-# read_event_without_jq reads it and the guard still runs; no allow pattern is loaded then, so the
-# hook approves nothing.
+# jq reads the command and the allow patterns together. The gh read-guard and the git output-flag
+# guard below need only the command, so without jq, or when the jq call fails (a settings file that
+# is not valid JSON), read_event_without_jq reads it and both guards still run; no allow pattern is
+# loaded then, so the hook approves nothing.
 
 INPUT=$(cat)
 SESSION_ID=""
