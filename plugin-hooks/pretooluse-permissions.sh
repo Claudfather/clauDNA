@@ -151,9 +151,10 @@ eval "$JQ_RESULT"
 # after it has two slashes: HOST/OWNER/REPO names its host like -R does.
 # The shell removes quotes and backslashes before gh runs, so a flag spelled --j"q" or
 # -\q is the flag. The prefilter reads the command without them; the decider gets the
-# real text. One expansion, no fork.
+# real text. Parameter expansions only, no fork.
 NL=$'\n'
-NOQ=${COMMAND//\\"$NL"/}   # bash joins a backslash-newline before it splits words
+NOQ=${COMMAND//\\\\/}      # bash pairs backslashes from the left: an escaped one continues no line
+NOQ=${NOQ//\\"$NL"/}       # bash joins a backslash-newline before it splits words
 NOQ=${NOQ//[\"\'\\]/}
 
 # Run the guards' decider on the command; $1 names the guard in a refusal. It exits 0 to allow

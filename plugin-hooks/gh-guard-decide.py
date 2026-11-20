@@ -304,25 +304,107 @@ def _lex(text: str) -> list[str]:
         return [t.strip("'\"") for t in re.findall(r"[;()&|`\n]|[^\s;()&|`]+", text)]
 
 
-def _readings(command: str) -> list[list[str]]:
-    """The token streams to inspect: the whole text, then every physical line on its own.
+# A backslash and the character it escapes, paired from the left as bash pairs them, so a backslash
+# that another one escapes continues no line. A backslash before a CR-LF line end pairs with both.
+_ESCAPE_PAIR = re.compile(r"\\(?:\r\n|.)", re.S)
+# Where a word starts, so that a ``#`` there starts a comment: after a blank, a newline or an
+# operator character.
+_WORD_START = " \t\n;&|()<>`"
+# The run of characters each quoting state passes over unchanged.
+_SHELL_PLAIN = {
+    "": re.compile(r"[^\\'\"#]+"),
+    '"': re.compile(r'[^\\"]+'),
+    "$'": re.compile(r"[^\\']+"),
+}
 
-    A quote that pairs up across lines (an apostrophe in a comment or in a heredoc body) hides
-    the lines between in the whole-text reading only; each line read alone still shows them.
-    A heredoc body is not skipped: deciding where one starts from the text alone is a second
-    shell parser. Every reading only adds denials, so a doubt is inspected, not skipped.
+
+def _joined(command: str) -> str:
+    """The text with each backslash-newline continuation removed. Backslashes pair from the left, so
+    a line that ends in an escaped backslash keeps the newline that ends its command. A backslash
+    before a CR-LF line end continues the line here, as in a shell that drops the carriage return;
+    ``_shell_text`` reads it the way bash does on Linux, as an escaped carriage return and then the
+    end of the command."""
+    return _ESCAPE_PAIR.sub(
+        lambda m: "" if m.group(0) in ("\\\n", "\\\r\n") else m.group(0), command
+    )
+
+
+def _shell_text(command: str) -> str:
+    """The text as bash reads its lines, in one pass from the left with the quoting carried from
+    line to line: a continuation is removed outside quotes and inside double quotes, a comment is
+    dropped up to the newline that ends it (a backslash at its end included), and a quoted string
+    runs to its closing quote with every line and ``#`` in it kept. It knows no heredoc; the other
+    readings cover that doubt."""
+    out: list[str] = []
+    quote = ""  # "", "'", '"' or "$'"
+    prev = "\n"
+    i, n = 0, len(command)
+    while i < n:
+        if quote == "'":
+            j = command.find("'", i)
+            j = n if j < 0 else j + 1
+            out.append(command[i:j])
+            quote, prev, i = "", "'", j
+            continue
+        m = _SHELL_PLAIN[quote].match(command, i)
+        if m:
+            out.append(m.group())
+            prev, i = command[m.end() - 1], m.end()
+            continue
+        ch = command[i]
+        if ch == "\\":
+            if quote != "$'" and command.startswith("\n", i + 1):
+                i += 2  # a continuation
+                continue
+            out.append(command[i : i + 2])
+            prev, i = "a", i + 2  # an escaped character is part of a word
+            continue
+        if quote:  # the quote that closes the string
+            quote = ""
+        elif ch == "#" and prev in _WORD_START:
+            j = command.find("\n", i)
+            i = n if j < 0 else j  # the newline that ends the comment stays
+            continue
+        elif ch != "#":  # a quote that opens a string
+            quote = "$'" if ch == "'" and prev == "$" else ch
+        out.append(ch)
+        prev, i = ch, i + 1
+    return "".join(out)
+
+
+def _readings(command: str) -> list[list[str]]:
+    """The token streams to inspect: the whole text, then every line on its own, for each of two
+    readings of the lines.
+
+    The first joins each continuation as bash joins one outside quotes (``_joined``), then drops
+    each line's comment. The second (``_shell_text``) carries the quoting from line to line as bash
+    does, so a comment ends at its newline and a quoted string that spans lines keeps all it holds;
+    it is read where it differs from the first. A quote that pairs up across lines (an apostrophe in
+    a comment or in a heredoc body) hides the lines between in a whole-text reading only; each line
+    read alone still shows them. A heredoc body is not skipped: deciding where one starts from the
+    text alone is a second shell parser. Every reading only adds denials, so a doubt is inspected,
+    not skipped.
 
     The trade: prose in a heredoc body that holds a gh call with a denied flag is denied. In
     recorded traffic that is a markdown code span, since a backtick starts a command for this
     reading, and not a line that starts with the call (which is denied too). Write such prose
     with the file tools and pass it with --body-file.
     """
-    # bash removes a backslash-newline continuation before it splits words
-    command = re.sub(r"\\\r?\n", "", command)
-    lines = [_strip_comment(ln) for ln in command.split("\n")]
-    out = [_lex("\n".join(lines))]
+    lines = [_strip_comment(ln) for ln in _joined(command).split("\n")]
+    text = "\n".join(lines)
+    out = [_lex(text)]
     if len(lines) > 1:
         out.extend(_lex(ln) for ln in lines)
+    if "\n" in command:
+        shell = _shell_text(command)
+        if shell != text:
+            out.append(_lex(shell))
+            seen = set(lines)
+            for raw in shell.split("\n"):
+                ln = _strip_comment(raw)
+                if ln not in seen:
+                    seen.add(ln)
+                    out.append(_lex(ln))
     return out
 
 
