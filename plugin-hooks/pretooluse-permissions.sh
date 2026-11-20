@@ -23,8 +23,8 @@ set -eo pipefail
 #     output flag the decider reads (--output on any verb, or -o on diff, log,
 #     show, format-patch, archive and bundle), and
 #     for a command that matched either trigger but the guard could not check
-#     (its error, an unknown exit code, or no python3) — that is refused, not
-#     approved by the allow patterns.
+#     (its error, an unknown exit code, no python3, or a command over 131,072
+#     characters) — that is refused, not approved by the allow patterns.
 #     Every other command is "allow" or silent pass-through
 #   - Debug log: ${CLAUDNA_STATE_DIR:-~/.claudna}/hooks/permissions.log,
 #     readable by the user alone
@@ -151,10 +151,15 @@ eval "$JQ_RESULT"
 # after it has two slashes: HOST/OWNER/REPO names its host like -R does.
 # The shell removes quotes and backslashes before gh runs, so a flag spelled --j"q" or
 # -\q is the flag. The prefilter reads the command without them; the decider gets the
-# real text. One expansion, no fork.
-NL=$'\n'
-NOQ=${COMMAND//\\"$NL"/}   # bash joins a backslash-newline before it splits words
-NOQ=${NOQ//[\"\'\\]/}
+# real text. A command up to 4,096 characters is read with one expansion and no fork, a longer
+# one with awk (the backslash-newline join) and tr.
+if (( ${#COMMAND} <= 4096 )); then
+    NL=$'\n'
+    NOQ=${COMMAND//\\"$NL"/}   # bash joins a backslash-newline before it splits words
+    NOQ=${NOQ//[\"\'\\]/}
+elif ! NOQ=$(printf '%s' "$COMMAND" | awk '{ if (sub(/\\$/, "")) printf "%s", $0; else print }' | tr -d "\"'\\\\"); then
+    deny "the permission hook could not read this command"
+fi
 
 # Run the guards' decider on the command; $1 names the guard in a refusal. It exits 0 to allow
 # and 10 to deny. errexit-safe: an assignment that inherits exit 10 would end the hook here. The
@@ -162,9 +167,12 @@ NOQ=${NOQ//[\"\'\\]/}
 # failed spawn must not read as "allow". Any other exit (a guard error, an unknown code) means the
 # guard did not answer. A hook deny is the only decision that overrides an allow grant, so a command
 # that matched a trigger and could not be checked is refused here, never handed to the allow
-# patterns that would approve it unseen. So is one with no python3 to check it.
+# patterns that would approve it unseen. So is one with no python3 to check it, and one over
+# GUARD_MAX_CHARS characters, which the guards do not read.
+GUARD_MAX_CHARS=131072
 run_guard() {
     local rc=0 reason
+    (( ${#COMMAND} <= GUARD_MAX_CHARS )) || deny "the $1 does not read a command over $GUARD_MAX_CHARS characters; split it into shorter commands"
     command -v python3 &>/dev/null || deny "the $1 needs python3 and it is not available"
     reason="$(printf '%s' "$COMMAND" | python3 -B "$HOOK_DIR/gh-guard-decide.py" 2>/dev/null)" || rc=$?
     case "$rc" in
@@ -185,26 +193,23 @@ esac
 # ─── git output guard → deny before any approve ───────────────────────
 # Denies, under any grant, the output flags the decider reads in a git command: --output (or a
 # leading part of that name, or --output-directory) on any verb, and -o on diff, log, show,
-# format-patch, archive and bundle. gh-guard-decide.py says how it reads a word with an expansion or
-# a brace list in it. This zero-fork prefilter spawns it only for a
-# git command whose text, without quotes and backslashes, has --ou, a word that starts -o, a
-# short-option cluster with an o on format-patch or archive, or a dash-word beside an expansion or a
-# glob. (The patterns spell the command word gi[t], and the guard's name avoids it, so the hooks'
-# census of their own git reads does not take these lines for one.)
+# format-patch, archive and bundle. gh-guard-decide.py says how it reads a git command's words. This
+# prefilter spawns it for a git command whose text, without quotes and backslashes, has --ou, a word
+# that starts -o, a short-option cluster with an o on format-patch or archive, alias., or any of
+# $ ` { * ? [. A $'...' quote can spell any word, the command word too, so a command with one goes to
+# the decider as well; together these send it each git command it would refuse. (The patterns spell
+# the command word gi[t], and the guard's name avoids it, so the hooks' census of their own git reads
+# does not take these lines for one.)
+case "$COMMAND" in
+    *\$\'*) run_guard "output-flag guard" ;;
+esac
 case "$NOQ" in
     *gi[t]*)
         case "$NOQ" in
-            *--ou*|*[[:space:]]-o*) run_guard "output-flag guard" ;;
+            *--ou*|*[[:space:]]-o*|*alias.*|*\$*|*\`*|*\{*|*\**|*\?*|*\[*) run_guard "output-flag guard" ;;
             *format-patch*|*archive*)
                 case "$NOQ" in
                     *[[:space:]]-[[:alnum:]]*o*) run_guard "output-flag guard" ;;
-                esac
-                ;;
-        esac
-        case "$NOQ" in
-            *[[:space:]]-*)
-                case "$NOQ" in
-                    *\$*|*\{*|*\**|*\?*|*\[*) run_guard "output-flag guard" ;;
                 esac
                 ;;
         esac

@@ -218,6 +218,101 @@ def test_each_refused_form_listed_reaches_the_decider_through_the_hook(tmp_path)
         assert _hook(tmp_path, cmd, ["Bash"]) == "deny", cmd
 
 
+# Each makes git read an output flag once the shell has read its words: an ANSI-C quote, $IFS, a brace
+# list or sequence, a command substitution, a string that eval, a shell or env -S runs, a -c alias, and a
+# glob that a file named like an output option matches.
+SHELL_FORMED = [
+    "git log -1 $'\\x2d\\x2doutput=x'",
+    "git log -1 --$'\\x6f'utput=x",
+    "git log -1 $'\\055\\055output=x'",
+    "git log -1 --$'\\157'utput=x",
+    "git log -1 $'\\x2d'$'\\x2d'output=x",
+    "git log -1 $'-\\x2d'output=x",
+    "git log -1 --output$'\\x3d'x",
+    "$'\\x67it' log -1 --output=x",
+    "g$'i't log -1 --output=x",
+    "git log -1 --output${IFS}x",
+    "git log -1 --out${Z}put${IFS}x",
+    "git log -1 --{out,x}{put,y}=x",
+    "git log -1 --{o..o}utput=x",
+    "git log -1 --out{p..p}ut=x",
+    "git log -1 --{o{u,x}tput,z}=x",
+    "git log -1 $(echo --output=x)",
+    "git log -1 `echo --output=x`",
+    "git log -1 --$(echo output)=x",
+    'git log -1 "$(echo --output=x)"',
+    'git log -1 "--$(echo output)=x"',
+    "env -S 'git log -1 --output=x'",
+    "bash -c 'git log -1 --output=x'",
+    "sh -c 'git log -1 --output=x'",
+    "eval 'git log -1 --output=x'",
+    "eval git log -1 --output=x",
+    "git -c alias.l='log -1 --output=x' l",
+    "git -c 'alias.l=log -1 --output=x' l",
+    "git log *",
+    "git diff *",
+    "git show *",
+    "git log -1 *.txt",
+    "git l *",
+    "git -C $(echo . log --output=x) commit",
+    "git $(echo log) --output=x",
+]
+SHELL_GRANTS = GRANTS + ["Bash(git show *)", "Bash(git -c *)", "Bash(env *)", "Bash(bash *)", "Bash(sh *)", "Bash(eval *)"]
+
+
+@pytest.mark.parametrize("cmd", SHELL_FORMED)
+def test_each_shell_formed_word_listed_is_refused(tmp_path, cmd):
+    assert verdict(cmd) == "deny", cmd
+    for allow in (SHELL_GRANTS, ["Bash"]):
+        assert _hook(tmp_path, cmd, allow) == "deny", (allow, cmd)
+
+
+@pytest.mark.parametrize("cmd", [
+    "git ls-files '*.py'",
+    "git log -- '*.py'",
+    "git show HEAD^{commit}",
+    'git log --author="$(whoami)" -1',
+    "git diff src/*.c",
+    "git log --grep='fix*'",
+    'git -C "$(pwd)" log -1',
+    "git -c core.pager=cat log -1",
+    "git add *.md",
+    'git commit -m "$(cat msg)"',
+    "git commit -m \"$(cat <<'EOF'\nfix: a message\nEOF\n)\"",
+])
+def test_each_ordinary_read_listed_with_a_quote_glob_or_substitution_is_not_refused(tmp_path, cmd):
+    assert verdict(cmd) == "allow", cmd
+    assert _hook(tmp_path, cmd, SHELL_GRANTS + ["Bash(git ls-files *)"]) != "deny", cmd
+
+
+def _deny_reason(tmp_path: Path, cmd: str) -> str:
+    (tmp_path / ".claude").mkdir(exist_ok=True)
+    (tmp_path / ".claude" / "settings.json").write_text(json.dumps({"permissions": {"allow": ["Bash"]}}))
+    p = subprocess.run(
+        ["bash", str(HOOK)],
+        input=json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}}),
+        capture_output=True, text=True, cwd=tmp_path, env={"HOME": str(tmp_path), "PATH": "/usr/bin:/bin"}, timeout=60,
+    )
+    out = json.loads(p.stdout)["hookSpecificOutput"] if p.stdout.strip() else {}
+    return out.get("permissionDecisionReason", "") if out.get("permissionDecision") == "deny" else ""
+
+
+def test_a_long_command_gets_a_decision_and_one_over_the_cap_is_refused(tmp_path):
+    # Mixed content: quotes, backslashes, expansions, substitutions, braces and globs, over many lines.
+    line = "echo 'a \"b\" \\\\c' $X `date` {e,f} *g? ; printf '%s\\n' \"$(id -u)\"\n"
+    under = line * (120_000 // len(line)) + "git log -1 --output=x"
+    over = line * (140_000 // len(line)) + "git log -1 --oneline"
+    assert len(under) < 131_072 < len(over)
+    assert _deny_reason(tmp_path, under) == "git log --output writes its output to a file; run it without --output and read the output"
+    assert _deny_reason(tmp_path, under.replace("--output=x", "--oneline")) == ""
+    assert _deny_reason(tmp_path, over) == (
+        "the output-flag guard does not read a command over 131072 characters; split it into shorter commands"
+    )
+    assert _deny_reason(tmp_path, over.replace("git log -1 --oneline", "echo done")) == ""
+    many = "git log " + " ".join(["{a,b}{c,d}{e,f}{g,h}{i,j}{k,l}{m,n}{o,p}"] * 300)
+    assert mod.decide(many) == ("deny", "git: this command gives the guard more than 65536 words to read; split it into shorter commands")
+
+
 def _bin_without_python3(tmp_path: Path) -> str:
     """A PATH with the tools the hook needs but no python3, so `command -v python3` fails."""
     bin_dir = tmp_path / "nopy"
