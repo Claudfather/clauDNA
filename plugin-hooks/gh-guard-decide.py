@@ -28,9 +28,10 @@ That includes a command substitution inside a ``GH_HOST=`` / ``GH_REPO=`` prefix
 ``GH_HOST=$(echo evil.example.com) gh pr list`` is read as the literal text.
 
 It answers for ``git`` too: it denies the git output flags it reads:
-``--output`` (or a leading part of that name, or ``--output-directory``) on any verb and ``-o`` on
-``diff``, ``log``, ``show``, ``format-patch``, ``archive`` and ``bundle``, except one that names
-``/dev/null``, ``/dev/stdout`` or ``/dev/stderr``. It finds the call the way it finds a gh call:
+``--output`` (or a leading part of that name, or ``--output-directory``) on any verb, except one
+that names ``/dev/null``, ``/dev/stdout`` or ``/dev/stderr``, and ``-o`` on ``diff``, ``log``,
+``show``, ``format-patch``, ``archive`` and ``bundle``, whatever it names. It finds the call the
+way it finds a gh call:
 past assignment prefixes, redirections and wrappers, and past git's own options (``git -C DIR
 log``). Unlike the gh rule, it also reads a git word that holds a ``$`` or a brace in the forms
 ``_git_spellings`` lists, and a long option name that is a glob as the names it matches.
