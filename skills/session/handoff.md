@@ -40,7 +40,7 @@ Then flag documentation drift from the live scan as Next Steps, per `../_shared/
 
 One item per kind, naming every hit. Rebuild both from this scan: drop any earlier Next Steps item whose text after the timestamp starts with either lead-in, and add none when the scan is clean. Handoff only flags; it never archives or edits a doc.
 
-Each item gets the current ISO-8601 UTC timestamp.
+Each item gets the current ISO-8601 UTC timestamp, read with `date -u +%Y-%m-%dT%H:%M:%SZ`.
 
 **With `--auto`:** Capture silently. No user approval round.
 

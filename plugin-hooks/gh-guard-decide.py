@@ -26,10 +26,20 @@ invisible to it; those are the hook's approver's to gate, not the decider's (the
 does not approve a gh command in which an expansion can form or change an option word).
 That includes a command substitution inside a ``GH_HOST=`` / ``GH_REPO=`` prefix value:
 ``GH_HOST=$(echo evil.example.com) gh pr list`` is read as the literal text.
+
+It answers for ``git`` too: it denies the git output flags it reads:
+``--output`` (or a leading part of that name, or ``--output-directory``) on any verb, except one
+that names ``/dev/null``, ``/dev/stdout`` or ``/dev/stderr``, and ``-o`` on ``diff``, ``log``,
+``show``, ``format-patch``, ``archive`` and ``bundle``, whatever it names. It finds the call the
+way it finds a gh call:
+past assignment prefixes, redirections and wrappers, and past git's own options (``git -C DIR
+log``). Unlike the gh rule, it also reads an option word the shell would form from an expansion,
+a brace list or a glob, in the forms its parser handles.
 """
 
 from __future__ import annotations
 
+import fnmatch
 import re
 import shlex
 import sys
@@ -294,25 +304,107 @@ def _lex(text: str) -> list[str]:
         return [t.strip("'\"") for t in re.findall(r"[;()&|`\n]|[^\s;()&|`]+", text)]
 
 
-def _readings(command: str) -> list[list[str]]:
-    """The token streams to inspect: the whole text, then every physical line on its own.
+# A backslash and the character it escapes, paired from the left as bash pairs them, so a backslash
+# that another one escapes continues no line. A backslash before a CR-LF line end pairs with both.
+_ESCAPE_PAIR = re.compile(r"\\(?:\r\n|.)", re.S)
+# Where a word starts, so that a ``#`` there starts a comment: after a blank, a newline or an
+# operator character.
+_WORD_START = " \t\n;&|()<>`"
+# The run of characters each quoting state passes over unchanged.
+_SHELL_PLAIN = {
+    "": re.compile(r"[^\\'\"#]+"),
+    '"': re.compile(r'[^\\"]+'),
+    "$'": re.compile(r"[^\\']+"),
+}
 
-    A quote that pairs up across lines (an apostrophe in a comment or in a heredoc body) hides
-    the lines between in the whole-text reading only; each line read alone still shows them.
-    A heredoc body is not skipped: deciding where one starts from the text alone is a second
-    shell parser. Every reading only adds denials, so a doubt is inspected, not skipped.
+
+def _joined(command: str) -> str:
+    """The text with each backslash-newline continuation removed. Backslashes pair from the left, so
+    a line that ends in an escaped backslash keeps the newline that ends its command. A backslash
+    before a CR-LF line end continues the line here, as in a shell that drops the carriage return;
+    ``_shell_text`` reads it the way bash does on Linux, as an escaped carriage return and then the
+    end of the command."""
+    return _ESCAPE_PAIR.sub(
+        lambda m: "" if m.group(0) in ("\\\n", "\\\r\n") else m.group(0), command
+    )
+
+
+def _shell_text(command: str) -> str:
+    """The text as bash reads its lines, in one pass from the left with the quoting carried from
+    line to line: a continuation is removed outside quotes and inside double quotes, a comment is
+    dropped up to the newline that ends it (a backslash at its end included), and a quoted string
+    runs to its closing quote with every line and ``#`` in it kept. It knows no heredoc; the other
+    readings cover that doubt."""
+    out: list[str] = []
+    quote = ""  # "", "'", '"' or "$'"
+    prev = "\n"
+    i, n = 0, len(command)
+    while i < n:
+        if quote == "'":
+            j = command.find("'", i)
+            j = n if j < 0 else j + 1
+            out.append(command[i:j])
+            quote, prev, i = "", "'", j
+            continue
+        m = _SHELL_PLAIN[quote].match(command, i)
+        if m:
+            out.append(m.group())
+            prev, i = command[m.end() - 1], m.end()
+            continue
+        ch = command[i]
+        if ch == "\\":
+            if quote != "$'" and command.startswith("\n", i + 1):
+                i += 2  # a continuation
+                continue
+            out.append(command[i : i + 2])
+            prev, i = "a", i + 2  # an escaped character is part of a word
+            continue
+        if quote:  # the quote that closes the string
+            quote = ""
+        elif ch == "#" and prev in _WORD_START:
+            j = command.find("\n", i)
+            i = n if j < 0 else j  # the newline that ends the comment stays
+            continue
+        elif ch != "#":  # a quote that opens a string
+            quote = "$'" if ch == "'" and prev == "$" else ch
+        out.append(ch)
+        prev, i = ch, i + 1
+    return "".join(out)
+
+
+def _readings(command: str) -> list[list[str]]:
+    """The token streams to inspect: the whole text, then every line on its own, for each of two
+    readings of the lines.
+
+    The first joins each continuation as bash joins one outside quotes (``_joined``), then drops
+    each line's comment. The second (``_shell_text``) carries the quoting from line to line as bash
+    does, so a comment ends at its newline and a quoted string that spans lines keeps all it holds;
+    it is read where it differs from the first. A quote that pairs up across lines (an apostrophe in
+    a comment or in a heredoc body) hides the lines between in a whole-text reading only; each line
+    read alone still shows them. A heredoc body is not skipped: deciding where one starts from the
+    text alone is a second shell parser. Every reading only adds denials, so a doubt is inspected,
+    not skipped.
 
     The trade: prose in a heredoc body that holds a gh call with a denied flag is denied. In
     recorded traffic that is a markdown code span, since a backtick starts a command for this
     reading, and not a line that starts with the call (which is denied too). Write such prose
     with the file tools and pass it with --body-file.
     """
-    # bash removes a backslash-newline continuation before it splits words
-    command = re.sub(r"\\\r?\n", "", command)
-    lines = [_strip_comment(ln) for ln in command.split("\n")]
-    out = [_lex("\n".join(lines))]
+    lines = [_strip_comment(ln) for ln in _joined(command).split("\n")]
+    text = "\n".join(lines)
+    out = [_lex(text)]
     if len(lines) > 1:
         out.extend(_lex(ln) for ln in lines)
+    if "\n" in command:
+        shell = _shell_text(command)
+        if shell != text:
+            out.append(_lex(shell))
+            seen = set(lines)
+            for raw in shell.split("\n"):
+                ln = _strip_comment(raw)
+                if ln not in seen:
+                    seen.add(ln)
+                    out.append(_lex(ln))
     return out
 
 
@@ -358,10 +450,8 @@ def _split_sep_redirect(tokens: list[str]) -> list[str]:
     return out
 
 
-def _gh_command_words(tokens: list[str]) -> list[list[str]]:
-    """Split a token stream on shell operators into segments, and return the argument
-    lists of the segments whose command word is ``gh`` (bare, ``\\gh``, wrapped, or a
-    path ending in ``gh``)."""
+def _segments(tokens: list[str]) -> list[list[str]]:
+    """Split a token stream on shell operators into the segments the shell runs one by one."""
     segments: list[list[str]] = []
     current: list[str] = []
     for tok in _split_sep_redirect(tokens):
@@ -371,9 +461,15 @@ def _gh_command_words(tokens: list[str]) -> list[list[str]]:
         else:
             current.append(tok)
     segments.append(current)
+    return segments
 
+
+def _gh_command_words(tokens: list[str]) -> list[list[str]]:
+    """Split a token stream on shell operators into segments, and return the argument
+    lists of the segments whose command word is ``gh`` (bare, ``\\gh``, wrapped, or a
+    path ending in ``gh``)."""
     out: list[list[str]] = []
-    for seg in segments:
+    for seg in _segments(tokens):
         i = 0
         wrapped = False
         # GH_HOST=<host> / GH_REPO=[HOST/]OWNER/REPO prefixes name the host this call talks to. `held` is what
@@ -537,6 +633,112 @@ def _inspect_gh_args(args: list[str], allowed: set[str]) -> str | None:
     return None
 
 
+# git reads --output in its diff and revision options, so every git command that takes them writes
+# the file the option names, and opens it before it reads anything: diff, log, show, whatchanged,
+# diff-tree, diff-index, diff-files, stash show and list, reflog, shortlog, rev-list, blame,
+# range-diff, format-patch and bundle (measured on git 2.39.5). format-patch's --output-directory
+# and archive's --output write too. git takes no abbreviation of either name, and no other option is a
+# leading part of one, so any long option that is a leading part of either is read as one.
+_GIT_OUTPUT_NAME = "--output-directory"
+# -o is format-patch's --output-directory and archive's --output; git refuses it on diff, log, show
+# and bundle. On other verbs it means something else (grep -o, ls-files -o), so only these read it.
+_GIT_DASH_O = {"diff", "log", "show", "format-patch", "archive", "bundle"}
+# format-patch reads -o inside a cluster of short options; archive's are read the same way.
+_GIT_DASH_O_CLUSTER = {"format-patch", "archive"}
+# git's own options that take the next word as their value (git -C DIR log ...).
+_GIT_OPTION_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix",
+                     "--config-env", "--attr-source"}
+# Output written here changes no file.
+_GIT_NO_FILE = {"/dev/null", "/dev/stdout", "/dev/stderr"}
+# The decider reads the text after quote removal. It also reads an option word the shell would form
+# from an expansion, a brace list or a glob, in the forms its parser handles (`_git_spellings`).
+_GIT_EXPANSION = re.compile(r"\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*|\$[0-9@*#?$!-]")
+_GIT_DEFAULT_WORD = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*:?[-=+?]([^}]*)\}")
+_GIT_BRACE_LIST = re.compile(r"\{([^{}]*,[^{}]*)\}")
+_GIT_EXPANDS = set("${")
+_GIT_GLOB = set("*?[")
+
+
+def _git_command_words(tokens: list[str]) -> list[list[str]]:
+    """The argument lists of the segments whose command word is ``git`` (bare, ``\\git``, wrapped,
+    or a path ending in ``git``), found the way ``_gh_command_words`` finds a gh call."""
+    out: list[list[str]] = []
+    for seg in _segments(tokens):
+        i = 0
+        wrapped = False
+        while i < len(seg):
+            t = seg[i]
+            if _is_redirect(t):
+                i += 2
+                continue
+            if _FD_WORD.fullmatch(t) and i + 1 < len(seg) and _is_redirect(seg[i + 1]):
+                i += 1
+                continue
+            if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(\[[^\]]*\])?\+?=.*|\]\+?=.*", t, re.S):
+                i += 1
+                continue
+            base = t.lstrip("\\")
+            if base in _WRAPPERS:
+                wrapped = True
+                i += 2 if base == "repeat" else 1
+                continue
+            if wrapped and base.rsplit("/", 1)[-1] != "git":
+                i += 1  # a wrapper's own option or its value
+                continue
+            break
+        if i < len(seg) and seg[i].lstrip("\\").rsplit("/", 1)[-1] == "git":
+            out.append(seg[i + 1 :])
+    return out
+
+
+def _git_spellings(arg: str) -> set[str]:
+    """The words the decider reads a git argument as, in the forms its parser handles."""
+    if not _GIT_EXPANDS & set(arg):
+        return {arg}
+    forms = {arg, arg.replace("$", ""), _GIT_EXPANSION.sub("", arg), _GIT_DEFAULT_WORD.sub(lambda m: m.group(1), arg)}
+    out = set(forms)
+    for form in forms:
+        m = _GIT_BRACE_LIST.search(form)
+        if m:
+            out.update(form[: m.start()] + alt + form[m.end() :] for alt in m.group(1).split(","))
+    return out
+
+
+def _git_output_name(name: str) -> bool:
+    """Whether a long option's name is --output, --output-directory or a leading part of either, or a glob
+    that matches --output or --output-directory."""
+    if name.startswith("--ou") and _GIT_OUTPUT_NAME.startswith(name):
+        return True
+    return bool(_GIT_GLOB & set(name)) and any(fnmatch.fnmatchcase(n, name) for n in ("--output", _GIT_OUTPUT_NAME))
+
+
+def _inspect_git_args(args: list[str]) -> str | None:
+    """Return a deny reason for one git invocation's argument list, or ``None``."""
+    i = 0
+    while i < len(args) and args[i].startswith("-"):  # git's own options, before the verb
+        i += 2 if args[i] in _GIT_OPTION_VALUE else 1
+    verb = args[i] if i < len(args) else ""
+    rest = args[i + 1 :]
+    # a verb an expansion forms could be any verb, so it is read as the strictest one
+    known = verb if not (_GIT_EXPANDS | _GIT_GLOB) & set(verb) else "format-patch"
+    for k, arg in enumerate(rest):
+        if arg in ("--", "--end-of-options"):
+            break  # what follows is a path or a revision, not an option
+        for word in _git_spellings(arg):
+            name, eq, value = word.partition("=")
+            if _git_output_name(name):
+                target = value if eq else (rest[k + 1] if k + 1 < len(rest) else "")
+                if word == arg and target in _GIT_NO_FILE:
+                    continue
+                return f"git {verb} {name} writes its output to a file; run it without {name} and read the output"
+            if word.startswith("-") and not word.startswith("--"):
+                if (known in _GIT_DASH_O and word.startswith("-o")) or (
+                    known in _GIT_DASH_O_CLUSTER and "o" in word[1:]
+                ):
+                    return f"git {verb} -o writes its output to a file; run it without -o and read the output"
+    return None
+
+
 def decide(command: str, *, gh_host: str = "") -> tuple[str, str]:
     """``("allow", "")`` or ``("deny", reason)`` for a whole command line.
 
@@ -550,6 +752,10 @@ def decide(command: str, *, gh_host: str = "") -> tuple[str, str]:
     for tokens in _readings(command):
         for args in _gh_command_words(tokens):
             reason = _inspect_gh_args(args, allowed)
+            if reason:
+                return ("deny", reason)
+        for args in _git_command_words(tokens):
+            reason = _inspect_git_args(args)
             if reason:
                 return ("deny", reason)
     return ("allow", "")

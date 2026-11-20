@@ -11,7 +11,6 @@ allowed-tools:
   - "Bash(mkdir *)"
   - "Bash(cat *)"
   - "Bash(git status *)"
-  - "Bash(git diff *)"
   - "Bash(gh issue view *)"
   - "Read(*)"
   - "Write(*)"
