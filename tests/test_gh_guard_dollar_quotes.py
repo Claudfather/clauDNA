@@ -3,7 +3,9 @@
 bash drops the ``$`` of a ``$'...'`` or ``$"..."`` string, decodes a ``$'...'`` string's backslash
 escapes, and joins the value to the text around it, so such a string can spell ``gh`` or one of its
 flags. The decider also reads each command with every such string written as the value bash gives it,
-and the hook sends a command that holds one to the decider. Each command below is first run by bash
+and the hook sends a command that holds one to the decider. A ``$'...'`` string whose value the
+decider does not give the way bash does (a ``\\c`` before a backslash pair, a DEL byte or a 0x01
+byte) is not read, and the command is denied. Each command below is first run by bash
 with a stand-in ``gh`` and ``git`` that record their words, so each case is what the shell does. Fake
 values only.
 """
@@ -12,6 +14,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -80,6 +83,7 @@ STAYS_ALLOWED = [
     "echo $'gh pr list --jq env.X'",  # one word: echo's argument
     "printf $'%s\\n' ok",
     "echo $'it\\'s'; gh pr view 1 --json title",
+    "printf %s $'\\c\\x'",  # \c before one backslash: read
 ]
 
 
@@ -178,7 +182,7 @@ DECODES = [
     "\\x67h", "\\147\\150", "\\u0068", "\\U00000067", "\\cA", "\\ca", "\\c?", "\\e", "\\E", "\\'", '\\"',
     "\\?", "\\q", "\\x", "\\xZ", "\\u", "\\c", "a\\0b", "\\1234", "\\x6g", "\\t\\n\\\\",
     "gh\\c\u0801junk", "g\\UFFFFFFFFh",
-    "\\x{67}h", "gh\\x{junk", "\\x{41", "\\x{}",
+    "\\x{67}h", "gh\\x{junk", "\\x{41", "\\x{}", "\\c\\x",
 ]
 
 
@@ -191,3 +195,52 @@ def test_the_decoder_gives_what_bash_gives(body):
         timeout=20,
     )
     assert mod._ansi_c_value(body).encode() == p.stdout, repr(body)
+
+
+# Bodies with a \c before a backslash pair, a DEL byte or a 0x01 byte: bash 5.2 takes the pair whole, and
+# its reader keeps a DEL or 0x01 byte behind a 0x01 byte of its own, which the \c then takes
+UNREADABLE = ["\\c\\\\", "\\c\\\\x", "\\c\\\\n", "\\c\\\\\\\\", "\\c\x7f", "a\\c\x7fb", "\\c\x01", "\\c\x01x"]
+
+
+@pytest.mark.parametrize("body", UNREADABLE)
+def test_the_decider_decodes_such_a_string_as_bash_does_or_denies_it(body):
+    p = subprocess.run(
+        ["bash", "-c", f"printf %s $'{body}'"],
+        capture_output=True,
+        env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"},
+        timeout=20,
+    )
+    denied = mod.decide(f"gh pr list --json title --jq $'.title{body}'")[0] == "deny"
+    assert denied or mod._ansi_c_value(body).encode() == p.stdout, repr(body)
+
+
+def test_a_command_that_holds_such_a_string_is_denied_gh_or_not():
+    verdict, reason = mod.decide("echo $'\\c\\\\'")
+    assert verdict == "deny" and "\\c" in reason
+
+
+# bash takes the backslash pair after each \c whole, so the jq strings in this value end where jq ends
+# them and env.X is read between them; a reading that took one backslash would end them elsewhere
+JQ_CALL = "gh pr list --jq $'" + '"\\c\\\\\\" + env.X + "\\c\\\\\\\\\\""' + "'"
+JQ_VALUE = '"\x1c" + env.X + "\x1c\\""'
+
+
+def test_bash_passes_that_jq_value_to_gh(tmp_path):
+    assert _shell_calls(tmp_path, JQ_CALL) == [["gh", "pr", "list", "--jq", JQ_VALUE]]
+
+
+@pytest.mark.skipif(shutil.which("jq") is None, reason="no jq here to read the value")
+def test_jq_reads_the_environment_in_that_value():
+    p = subprocess.run(
+        ["jq", "-n", "-r", JQ_VALUE], env={"X": "fake-value"}, capture_output=True, text=True, timeout=20
+    )
+    assert "fake-value" in p.stdout
+
+
+def test_the_decider_denies_that_call():
+    assert mod.decide(JQ_CALL)[0] == "deny"
+
+
+@pytest.mark.parametrize("allow", [NARROW, ["Bash"]], ids=["narrow", "bare"])
+def test_the_hook_denies_that_call_under_a_narrow_and_a_bare_grant(tmp_path, allow):
+    assert _hook(tmp_path, JQ_CALL, allow) == "deny", allow

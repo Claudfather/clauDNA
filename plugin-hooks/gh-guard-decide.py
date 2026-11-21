@@ -386,10 +386,16 @@ _ANSI_C_NUMERIC = re.compile(r"[0-7]{1,3}|x([0-9A-Fa-f]{1,2})|u([0-9A-Fa-f]{1,4}
 _ANSI_C_BRACED = re.compile(r"x\{([0-9A-Fa-f]*)\}?")
 
 
+class _Unreadable(ValueError):
+    """A string whose value the decider does not give the way bash does; ``decide`` denies the command."""
+
+
 def _ansi_c_value(body: str) -> str:
     """The value bash gives the body of a ``$'...'`` string: its backslash escapes decoded, an octal
     one to eight bits, and the value cut at a NUL. An escape bash does not decode keeps its backslash.
-    A value above 0x7F is read as a character, not as bash's bytes."""
+    A value above 0x7F is read as a character, not as bash's bytes. ``_Unreadable`` for a ``\\c``
+    before a backslash pair, a DEL byte or a 0x01 byte: bash 5.2 takes the pair whole, and its reader
+    keeps a DEL or 0x01 byte behind a 0x01 byte of its own, which the ``\\c`` then takes."""
     out: list[str] = []
     i, n = 0, len(body)
     while i < n:
@@ -404,6 +410,11 @@ def _ansi_c_value(body: str) -> str:
             continue
         if nxt == "c" and i + 2 < n:  # \cX: the control character, and \c? is DEL
             x = body[i + 2]
+            if x in "\x01\x7f" or body.startswith("\\\\", i + 2):
+                raise _Unreadable(
+                    "the gh read-guard does not read a $'...' string in which \\c comes before a backslash"
+                    " pair, a DEL byte or a 0x01 byte"
+                )
             if x == "?":
                 out.append("\x7f")
             elif x < "\x80":
@@ -1014,18 +1025,21 @@ def decide(command: str, *, gh_host: str = "") -> tuple[str, str]:
     allowed = set(_ALLOWED_HOSTS)
     if gh_host.strip():
         allowed.add(gh_host.strip().split(":")[0].lower())
-    reason = _first_reason((t for text in _texts(command) for t in _readings(text)), allowed)
-    if reason is None:
-        # the text after each here-document body, read from where bash reads it, once the command's
-        # own readings allow it
-        restarts = _heredoc_restarts(command)
-        if restarts is None:
-            reason = (
-                f"the gh read-guard reads at most {_MAX_HEREDOCS} here-documents, and"
-                f" {_MAX_HEREDOC_TEXT >> 20} MiB of text after them, in one command"
-            )
-        else:
-            reason = _first_reason(_after_heredocs(command, restarts), allowed)
+    try:
+        reason = _first_reason((t for text in _texts(command) for t in _readings(text)), allowed)
+        if reason is None:
+            # the text after each here-document body, read from where bash reads it, once the
+            # command's own readings allow it
+            restarts = _heredoc_restarts(command)
+            if restarts is None:
+                reason = (
+                    f"the gh read-guard reads at most {_MAX_HEREDOCS} here-documents, and"
+                    f" {_MAX_HEREDOC_TEXT >> 20} MiB of text after them, in one command"
+                )
+            else:
+                reason = _first_reason(_after_heredocs(command, restarts), allowed)
+    except _Unreadable as exc:
+        reason = str(exc)
     if reason:
         return ("deny", reason)
     return ("allow", "")
