@@ -40,11 +40,21 @@ fi
 case "$SESSION_ID" in SID|SESSION_ID|native-sid|native-session-id|CLAUDE_SESSION_ID) SESSION_ID="" ;; esac
 SESSION_DIR="$(claudna_session_dir "$SESSION_ID")"
 WORK=""
+SCRATCH_FAILURE_WARNED=0
 cleanup_scratch() {
     wait 2>/dev/null || true
     if [ -n "$WORK" ]; then rm -rf -- "$WORK" 2>/dev/null || true; fi
 }
 trap cleanup_scratch EXIT
+
+warn_scratch_failure() {
+    # No native owner (or no safe state root) is an intentional no-op. Do not
+    # turn that expected case into a warning or fall back to OS temporary space.
+    [ -n "$SESSION_DIR" ] && [ -n "$STATE_DIR" ] || return 0
+    [ "$SCRATCH_FAILURE_WARNED" -eq 0 ] || return 0
+    SCRATCH_FAILURE_WARNED=1
+    printf 'auto-format: could not prepare session-owned scratch; formatting skipped. Check python3, file/state-directory permissions, and free space.\n' >&2
+}
 
 # Extract the target path from the event.
 #
@@ -90,11 +100,15 @@ fi
 make_work() {
     [ -n "$WORK" ] && return 0
     [ -n "$SESSION_DIR" ] && [ -n "$STATE_DIR" ] || return 1
-    command -v python3 &>/dev/null || return 1
+    command -v python3 &>/dev/null || { warn_scratch_failure; return 1; }
     WORK=$(python3 -B "${BASH_SOURCE[0]%/*}/../lib/claudna/session_store" scratch \
-        --session "$SESSION_ID" --host claude --label auto-format --root "$STATE_DIR" 2>/dev/null) || return 1
-    case "$WORK" in "$SESSION_DIR"/scratch/*) ;; *) WORK=""; return 1 ;; esac
-    [ -d "$WORK" ] || { WORK=""; return 1; }
+        --session "$SESSION_ID" --host claude --label auto-format --root "$STATE_DIR" 2>/dev/null) || {
+        WORK=""
+        warn_scratch_failure
+        return 1
+    }
+    case "$WORK" in "$SESSION_DIR"/scratch/*) ;; *) WORK=""; warn_scratch_failure; return 1 ;; esac
+    [ -d "$WORK" ] || { WORK=""; warn_scratch_failure; return 1; }
 }
 
 # committed_in_ruff_style: true only when HEAD holds a non-empty version of the
@@ -131,7 +145,8 @@ committed_in_ruff_style() {
 format_and_report() {
     local name=$1
     shift
-    make_work && cp -- "$FILE_PATH" "$WORK/before" 2>/dev/null || return 0
+    make_work || return 0
+    cp -- "$FILE_PATH" "$WORK/before" 2>/dev/null || { warn_scratch_failure; return 0; }
     "$@" > /dev/null 2>&1
     diff -- "$WORK/before" "$FILE_PATH" > "$WORK/diff" 2>/dev/null || report_change "$name"
 }

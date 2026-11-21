@@ -145,6 +145,9 @@ fi
 SESSION_ID=""
 if command -v jq &>/dev/null; then
     SESSION_ID=$(printf '%s' "$EVENT" | claudna_event_session_id 2>/dev/null) || SESSION_ID=""
+elif command -v python3 &>/dev/null; then
+    SESSION_ID=$(printf '%s' "$EVENT" | python3 -B "${BASH_SOURCE[0]%/*}/../lib/claudna/session_store" \
+        native-session-id 2>/dev/null) || SESSION_ID=""
 fi
 case "$SESSION_ID" in SID|SESSION_ID|native-sid|native-session-id|CLAUDE_SESSION_ID) SESSION_ID="" ;; esac
 
