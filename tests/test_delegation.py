@@ -102,9 +102,10 @@ def test_git_status_failure_reports_redacted_diagnostic(job, monkeypatch, blocke
     assert "fixture-secret" not in error and "extra detail" not in error
 
 
-def test_git_preflight_blocks_non_checkout(job, blocked_request, tmp_path):
+def test_git_preflight_blocks_non_checkout(job, blocked_request, tmp_path, monkeypatch):
     plain_dir = tmp_path / "plain"
     plain_dir.mkdir()
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.resolve()))
     error = blocked_request(replace(job[0], cwd=str(plain_dir)))
     assert "existing Git checkout with a committed baseline" in error
 
