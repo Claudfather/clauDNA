@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- **Moves to Claudron v0.11.0.** `contracts/claudron.json` and `contracts/claudron.ref` now come from v0.11.0, and output-guide §3's status table is re-rendered from it. Made by the `claudron-release` workflow.
 
 ## [0.35.6] - 2026-11-21
 ### Changed
