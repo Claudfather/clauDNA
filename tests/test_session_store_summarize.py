@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -29,6 +30,7 @@ from conftest import ACTOR, ORIGIN, PLANTED
 
 from claudna.session_store import schema, summarize, transcript
 from claudna.session_store.fsio import exclusive_lock
+from claudna.session_store.project import STALE_PENDING_S, summary_verdict
 
 OPTED_IN = {"enabled": True, "vault": None}  # an interactive session that opted into harvest: a summary has a reader
 
@@ -235,6 +237,42 @@ class TestSummarize:
         assert summarize.summarize(sealed, 1, env={}, runner=FakeRunner()) == "skipped: no_transcript"
         write_transcript(tmp_path / "t.jsonl", [record("assistant", "only me")] * 20)
         assert summarize.summarize(sealed, 1, env={}, runner=FakeRunner()) == "skipped: trivial"
+
+    def test_a_transcript_under_a_non_directory_is_skipped(self, store, tmp_path):
+        parent = tmp_path / "not-a-directory"
+        parent.write_text("file, not a directory")
+        path = parent / "transcript.jsonl"
+        handle = store.session("sess-not-a-directory")
+        handle.open_session("startup", actor=ACTOR, origin=ORIGIN, transcript_path=str(path),
+                            harvest=OPTED_IN)
+        handle.open_segment("session_open", 0)
+        handle.seal_segment(0, "precompact")
+
+        assert summarize.summarize(handle, 1, env={}, runner=FakeRunner()) == "skipped: no_transcript"
+        assert events(handle)[-1] == "summary.skipped"
+
+    @pytest.mark.parametrize("error_type", [OSError, PermissionError])
+    def test_a_transcript_read_oserror_is_retryable(self, sealed, monkeypatch, error_type):
+        original_read = summarize.read_range
+
+        def fail_read(*args, **kwargs):
+            raise error_type("transient transcript read failure")
+
+        monkeypatch.setattr(summarize, "read_range", fail_read)
+        runner = FakeRunner()
+        result = summarize.summarize(sealed, 1, env={}, runner=runner)
+        last = json.loads(sealed.paths.lifecycle.read_text().splitlines()[-1])
+
+        assert result.startswith(f"failed: {error_type.__name__}: transient transcript read failure")
+        assert (last["kind"], last["data"]["retryable"]) == ("summary.failed", True)
+        lifecycle = [json.loads(line) for line in sealed.paths.lifecycle.read_text().splitlines()]
+        assert summary_verdict(lifecycle, time.time() + STALE_PENDING_S + 1) == "retry"
+        assert runner.calls == []
+
+        monkeypatch.setattr(summarize, "read_range", original_read)
+        assert summarize.summarize(sealed, 1, env={}, runner=runner) == "summarized: 1 block(s)"
+        assert len(runner.calls) == 1
+        assert events(sealed)[-1] == "summary.completed"
 
     def test_an_unsealed_segment_or_a_missing_one_is_left_alone(self, store, tmp_path):
         h = store.session("sess-u")

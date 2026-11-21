@@ -556,6 +556,12 @@ def _validate_handoff(content: str) -> dict[str, str]:
     if not _HANDOFF_TIME_RE.fullmatch(timestamp):
         raise ContinuityError("handoff last_updated must be an ISO-8601 UTC timestamp")
     try:
+        # Python 3.9 accepts only three or six fractional digits, while newer
+        # versions accept arbitrary precision and truncate to microseconds.
+        # Normalize to six digits before parsing on the supported floor.
+        base, separator, fraction = timestamp[:-1].partition(".")
+        if separator:
+            timestamp = f"{base}.{fraction[:6].ljust(6, '0')}Z"
         parsed = datetime.fromisoformat(timestamp[:-1] + "+00:00")
     except ValueError as exc:
         raise ContinuityError("handoff last_updated is not a valid timestamp") from exc

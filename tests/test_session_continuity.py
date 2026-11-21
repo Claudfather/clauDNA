@@ -41,6 +41,22 @@ def handoff(cwd: str = "/work", *, updated: str = "2026-11-11T12:00:00Z") -> str
             "## Activity\n- 2026-11-11T12:00:00Z — completed work\n")
 
 
+@pytest.mark.parametrize("fraction", ["5", "123", "12345", "123456", "1234567"])
+def test_handoff_timestamp_accepts_iso_fractional_seconds(fraction):
+    timestamp = f"2026-11-11T12:00:00.{fraction}Z"
+    fields = continuity._validate_handoff(handoff(updated=timestamp))
+    assert fields["last_updated"] == timestamp
+
+
+@pytest.mark.parametrize("timestamp", [
+    "2026-02-30T12:00:00.5Z",
+    "2026-11-11T12:00:00.12345+03:00",
+])
+def test_handoff_timestamp_fraction_normalization_keeps_calendar_and_utc_validation(timestamp):
+    with pytest.raises(ContinuityError):
+        continuity._validate_handoff(handoff(updated=timestamp))
+
+
 def source_file(tmp_path: Path, content: str = "legacy handoff\n") -> tuple[Path, str]:
     source = tmp_path / "legacy" / "handoff.md"
     source.parent.mkdir(parents=True, exist_ok=True)

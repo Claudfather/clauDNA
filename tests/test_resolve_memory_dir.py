@@ -163,6 +163,22 @@ def test_project_slug_replaces_every_separator(tmp_path):
     assert project_slug(Path("/home/user/work")) == "-home-user-work"
 
 
+def test_project_slug_maps_dotted_component_to_hyphen():
+    assert project_slug(Path("/home/user/.hidden/project")) == "-home-user--hidden-project"
+
+
+def test_dotted_cwd_still_honors_user_memory_override(tmp_path):
+    home = tmp_path / "home"
+    (home / ".claude").mkdir(parents=True)
+    cwd = tmp_path / "bot.v1" / "project"
+    cwd.mkdir(parents=True)
+    override = _memory_dir(tmp_path / "configured-memory")
+    _write_settings(home, "settings.json", {"autoMemoryDirectory": str(override)})
+
+    assert resolve_memory_dir(cwd, home) == override
+    assert resolve_memory_dir(cwd, home) != default_memory_dir(cwd, home)
+
+
 # --- which settings choose the directory ------------------------------------
 
 

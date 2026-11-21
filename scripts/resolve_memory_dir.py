@@ -66,8 +66,8 @@ GIT_TIMEOUT_S = 10
 
 
 def project_slug(cwd: Path) -> str:
-    """The harness's per-project directory name: the cwd with every `/` → `-`."""
-    return str(cwd).replace("/", "-")
+    """The observed harness slug maps cwd separators and periods to hyphens."""
+    return str(cwd).replace("/", "-").replace(".", "-")
 
 
 def default_memory_dir(cwd: Path, home: Path) -> Path:
