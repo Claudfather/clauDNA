@@ -37,6 +37,10 @@ way it finds a gh call:
 past assignment prefixes, redirections and wrappers, and past git's own options (``git -C DIR
 log``). Unlike the gh rule, it also reads an option word the shell would form from an expansion,
 a brace list or a glob, in the forms its parser handles.
+
+It reads at most 128 KiB of one command, for at most 60 s (``_MAX_COMMAND``, ``_TIME_BUDGET``): it
+denies a longer command before reading it, and a command once its readings have taken 60 s. Long
+text goes in a file, passed with ``--body-file``.
 """
 
 from __future__ import annotations
@@ -46,6 +50,7 @@ import fnmatch
 import re
 import shlex
 import sys
+import time
 
 # jq reads the environment through the ``env`` builtin or ``$ENV``. ``.env`` (a field)
 # is preceded by a dot; ``env:`` is an object key. Text inside a jq STRING LITERAL is
@@ -670,9 +675,12 @@ def _after_heredocs(command: str, restarts: list[int]):
                 yield from _readings(text, lines=False)
 
 
-def _first_reason(streams, allowed: set[str]) -> str | None:
-    """The deny reason for the first gh or git call in ``streams`` that the guard refuses, if any."""
+def _first_reason(streams, allowed: set[str], deadline: float) -> str | None:
+    """The deny reason for the first gh or git call in ``streams`` that the guard refuses, if any, or
+    the time limit's, once the clock has passed ``deadline`` before a reading."""
     for tokens in streams:
+        if time.monotonic() > deadline:
+            return f"the gh read-guard reads one command for at most {_TIME_BUDGET:g} s; {_LONG_TEXT}"
         for args in _gh_command_words(tokens):
             reason = _inspect_gh_args(args, allowed)
             if reason:
@@ -1015,18 +1023,36 @@ def _inspect_git_args(args: list[str]) -> str | None:
     return None
 
 
+# The most bytes of one command the guard reads, and the most time it reads one command for, in s,
+# checked between readings (``_first_reason``); a command past either is denied, so the guard answers
+# in a bounded time however long a command is.
+_MAX_COMMAND = 128 << 10
+_TIME_BUDGET = 60.0
+_LONG_TEXT = "put long text in a file and pass it with --body-file"
+
+
 def decide(command: str, *, gh_host: str = "") -> tuple[str, str]:
     """``("allow", "")`` or ``("deny", reason)`` for a whole command line.
 
     ``gh_host`` is the fleet's configured GitHub host (``$GH_HOST``) if any; a repo on
     that host is allowed alongside github.com, so a GitHub Enterprise fleet is not
     blocked from its own host.
+
+    A command over ``_MAX_COMMAND`` bytes is denied before any reading, and a command is denied
+    once its readings pass ``_TIME_BUDGET``.
     """
+    # its size in bytes as the hook passed it: ``main`` reads a byte it cannot decode as one lone
+    # surrogate, which this encoding writes as one byte
+    if len(command.encode("utf-8", "replace")) > _MAX_COMMAND:
+        return ("deny", f"the gh read-guard reads at most {_MAX_COMMAND >> 10} KiB in one command; {_LONG_TEXT}")
+    deadline = time.monotonic() + _TIME_BUDGET
     allowed = set(_ALLOWED_HOSTS)
     if gh_host.strip():
         allowed.add(gh_host.strip().split(":")[0].lower())
     try:
-        reason = _first_reason((t for text in _texts(command) for t in _readings(text)), allowed)
+        reason = _first_reason(
+            (t for text in _texts(command) for t in _readings(text)), allowed, deadline
+        )
         if reason is None:
             # the text after each here-document body, read from where bash reads it, once the
             # command's own readings allow it
@@ -1037,7 +1063,7 @@ def decide(command: str, *, gh_host: str = "") -> tuple[str, str]:
                     f" {_MAX_HEREDOC_TEXT >> 20} MiB of text after them, in one command"
                 )
             else:
-                reason = _first_reason(_after_heredocs(command, restarts), allowed)
+                reason = _first_reason(_after_heredocs(command, restarts), allowed, deadline)
     except _Unreadable as exc:
         reason = str(exc)
     if reason:
