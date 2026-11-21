@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Reject non-finite numbers consistently in promotion manifests, battle history, and telemetry evidence before threshold checks.
 - Keep PreCompact capture working without jq, report unexpected formatter scratch failures without blocking edits, and skip desktop notifications when osascript is unavailable.
 - Transcript read failures other than a missing path remain retryable, fractional handoff timestamps validate on Python 3.9, and default memory paths normalize dotted project directories while preserving configured overrides.
 - Delegation Git preflight returns a blocked JSON response with distinct reasons for a Git timeout, a failed status check, or a missing committed checkout. ([#506](https://github.com/Claudfather/clauDNA/issues/506))

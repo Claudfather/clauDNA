@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import sys
 from datetime import datetime
@@ -298,8 +299,8 @@ def validate_battle_history(battle_history_path: Path) -> CheckResult:
         return result
 
     try:
-        data = json.loads(battle_history_path.read_text())
-    except json.JSONDecodeError as e:
+        data = _read_package_json(battle_history_path)
+    except ValueError as e:
         result.fail(f"battle-history.json is not valid JSON: {e}")
         return result
 
@@ -358,8 +359,8 @@ def validate_telemetry_summary(telemetry_path: Path) -> CheckResult:
         return result
 
     try:
-        data = json.loads(telemetry_path.read_text())
-    except json.JSONDecodeError as e:
+        data = _read_package_json(telemetry_path)
+    except ValueError as e:
         result.fail(f"telemetry-summary.json is not valid JSON: {e}")
         return result
 
@@ -415,6 +416,20 @@ def _reject_nonfinite(const: str):
     slips through a `value < minimum` gate (NaN < x is False), so it must never
     reach the numeric checks."""
     raise ValueError(f"non-finite JSON constant {const!r} is not allowed in a package")
+
+
+def _reject_nonfinite_float(token: str) -> float:
+    """Reject JSON exponents that overflow Python's finite float range."""
+    value = float(token)
+    if not math.isfinite(value):
+        raise ValueError(f"non-finite JSON number {token!r} is not allowed in a package")
+    return value
+
+
+def _read_package_json(path: Path):
+    """Read package evidence without Python's non-standard non-finite numbers."""
+    return json.loads(path.read_text(), parse_constant=_reject_nonfinite,
+                      parse_float=_reject_nonfinite_float)
 
 
 def validate_skill_identity(manifest: dict, skill_md: Path) -> CheckResult:
@@ -490,8 +505,8 @@ def run_validation(package_dir: Path) -> list[CheckResult]:
 
     # Load manifest
     try:
-        manifest = json.loads(manifest_path.read_text(), parse_constant=_reject_nonfinite)
-    except (json.JSONDecodeError, ValueError) as e:
+        manifest = _read_package_json(manifest_path)
+    except ValueError as e:
         manifest_check = CheckResult("manifest_parse")
         manifest_check.fail(f"manifest.json is not valid JSON: {e}")
         results.append(manifest_check)

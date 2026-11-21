@@ -9,9 +9,12 @@ from __future__ import annotations
 import importlib.util
 import json
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+import pytest
 
 
 # Add scripts/ to path so skill_checks is importable
@@ -39,6 +42,7 @@ validate_telemetry_summary = _mod.validate_telemetry_summary
 FIXTURES = REPO_ROOT / "tests" / "fixtures"
 VALID_PKG = FIXTURES / "valid-package"
 FAILING_PKG = FIXTURES / "failing-package"
+VALIDATOR = REPO_ROOT / "scripts" / "validate-promotion-package.py"
 
 
 # --- Helpers ---
@@ -54,6 +58,18 @@ def make_temp_package(base_pkg: Path) -> Path:
     dst = tmp / "pkg"
     shutil.copytree(base_pkg, dst)
     return dst
+
+
+def replace_evidence_number(package: Path, filename: str, value: str) -> None:
+    source, replacement = {
+        "manifest.json": ('"success_rate": 0.92', f'"success_rate": {value}'),
+        "battle-history.json": ('"elo_after": 1487', f'"elo_after": {value}'),
+        "telemetry-summary.json": ('"success_rate": 0.92', f'"success_rate": {value}'),
+    }[filename]
+    path = package / filename
+    content = path.read_text()
+    assert content.count(source) == 1
+    path.write_text(content.replace(source, replacement, 1))
 
 
 # --- Valid package (all checks should pass) ---
@@ -343,6 +359,45 @@ class TestTelemetrySummary:
             assert not result.passed
         finally:
             shutil.rmtree(pkg.parent)
+
+
+@pytest.mark.parametrize(("filename", "check_name"), [
+    ("manifest.json", "manifest_parse"),
+    ("battle-history.json", "battle_history"),
+    ("telemetry-summary.json", "telemetry_summary"),
+])
+@pytest.mark.parametrize("value", ["NaN", "Infinity", "-Infinity", "1e999", "-1e999"])
+def test_cli_rejects_nonfinite_package_evidence(filename, check_name, value):
+    package = make_temp_package(VALID_PKG)
+    try:
+        replace_evidence_number(package, filename, value)
+        proc = subprocess.run([sys.executable, str(VALIDATOR), str(package)],
+                              capture_output=True, text=True, timeout=15)
+        output = proc.stdout + proc.stderr
+        assert proc.returncode == 1
+        assert f"[FAIL] {check_name}" in output
+        assert "not valid JSON" in output
+        assert "Traceback" not in output
+    finally:
+        shutil.rmtree(package.parent)
+
+
+@pytest.mark.parametrize(("filename", "finite_value"), [
+    ("manifest.json", "0.92"),
+    ("battle-history.json", "1487"),
+    ("telemetry-summary.json", "0.92"),
+])
+def test_cli_accepts_finite_package_evidence(filename, finite_value):
+    package = make_temp_package(VALID_PKG)
+    try:
+        replace_evidence_number(package, filename, finite_value)
+        proc = subprocess.run([sys.executable, str(VALIDATOR), str(package)],
+                              capture_output=True, text=True, timeout=15)
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert proc.stdout.startswith(f"PASS: {package.name} -- all ")
+        assert "Traceback" not in proc.stdout + proc.stderr
+    finally:
+        shutil.rmtree(package.parent)
 
 
 # --- SKILL.md content validation ---
