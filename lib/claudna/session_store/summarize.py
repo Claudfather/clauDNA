@@ -186,7 +186,7 @@ def _summarize_once(handle: SessionHandle, index: int, *, env: Mapping[str, str]
         return _skip(handle, index, "no_transcript"), end
     try:
         turns = read_range(Path(path), start, end, agent_cli=facts.agent_cli)
-    except OSError:
+    except (FileNotFoundError, NotADirectoryError):
         return _skip(handle, index, "no_transcript"), end
     if not any(t.role == "user" for t in turns):
         return _skip(handle, index, "trivial"), end
