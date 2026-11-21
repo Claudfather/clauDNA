@@ -49,8 +49,9 @@ Values, resolved executable paths, parser input and raw errors are not printed.
 No PATH command is launched, so a found versioned binary remains **unknown** until
 separately checked. `runtime.python` measures the running interpreter; a different
 `python3` on PATH is only presence-checked. Missing baseline commands affect their
-consumers, not all workflows. In particular, absent `jq` disables the Claude
-permission hook. Native installed/discovered, trusted and executed states remain
+consumers, not all workflows. In particular, without `jq` the Claude permission
+hook approves nothing, and its gh read-guard and git output-flag guard still
+run. Native installed/discovered, trusted and executed states remain
 separate unknowns.
 
 Text and `--json` share the following exit contract. JSON schema

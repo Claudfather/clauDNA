@@ -109,7 +109,7 @@ Don't bulk-`rm -rf` `~/.claude/skills/` or `~/.claude/hooks/` — those director
 | Git | 2.20+ | Version control | `brew install git` |
 | zsh | 5.0+ | Shell | Default on macOS |
 | jq | Any current | Reads the permission hook's input and allow patterns | `brew install jq` |
-| Python | 3.9+ | Runs the hooks' Python helpers: the permission hook's gh read-guard and the session store | `brew install python` |
+| Python | 3.9+ | Runs the hooks' Python helpers: the permission hook's gh read-guard and git output-flag guard, and the session store | `brew install python` |
 
 ### Optional (skill-specific)
 
