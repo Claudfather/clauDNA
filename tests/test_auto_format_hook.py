@@ -530,6 +530,63 @@ class TestTheSessionIsToldWhatTheHookChanged:
         assert scratch.is_dir() and list(scratch.iterdir()) == []
         assert not (tmp_path / "tmp-sentinel").exists()
 
+    def test_scratch_allocation_failure_warns_and_skips_before_ruff(self, tmp_path):
+        repo = _repo(tmp_path, {"mod.py": _TEST_FORMATTED})
+        target = repo / "mod.py"
+        edited = _TEST_FORMATTED + "    assert profile\n"
+        target.write_text(edited)
+        state_root = tmp_path / "state-root-is-a-file"
+        state_root.write_text("sentinel")
+        log = tmp_path / "ruff-argv.txt"
+        d = _bin_dir(tmp_path, with_jq=True)
+        _shim(
+            d,
+            "ruff",
+            "#!/bin/sh\nfor a in \"$@\"; do printf \"%s\\000\" \"$a\"; done >> \"$RUFF_LOG\"\nprintf \"\\036\" >> \"$RUFF_LOG\"\n",
+        )
+
+        proc = _run(
+            tmp_path,
+            d,
+            compact(_payload(str(target), tool="Edit")),
+            CLAUDNA_STATE_DIR=str(state_root),
+            RUFF_LOG=str(log),
+        )
+
+        assert proc.returncode == 0
+        assert proc.stdout == ""
+        assert proc.stderr.count("auto-format:") == 1, proc.stderr
+        assert "formatting skipped" in proc.stderr
+        assert target.read_text() == edited
+        assert not log.exists(), "allocation failed in committed style check, before ruff"
+        assert state_root.read_text() == "sentinel"
+        assert not (tmp_path / "tmp-sentinel").exists()
+
+    def test_target_snapshot_copy_failure_warns_and_skips_formatter(self, tmp_path):
+        target = tmp_path / "notes.md"
+        target.write_text("original\n")
+        d = _bin_dir(tmp_path, with_jq=True)
+        _shim(d, "cp", "#!/bin/sh\nexit 1\n")
+        formatter_log = tmp_path / "prettier-called"
+        _shim(d, "prettier", "#!/bin/sh\nprintf called > \"$FORMATTER_LOG\"\nexit 0\n")
+
+        proc = _run(
+            tmp_path,
+            d,
+            compact(_payload(str(target))),
+            FORMATTER_LOG=str(formatter_log),
+        )
+
+        assert proc.returncode == 0
+        assert proc.stdout == ""
+        assert proc.stderr.count("auto-format:") == 1, proc.stderr
+        assert "formatting skipped" in proc.stderr
+        assert target.read_text() == "original\n"
+        assert not formatter_log.exists()
+        scratch = tmp_path / "claudna-state" / "sessions" / "s-1" / "scratch"
+        assert scratch.is_dir() and list(scratch.iterdir()) == []
+        assert not (tmp_path / "tmp-sentinel").exists()
+
     @pytest.mark.parametrize("session_id", ["", "SESSION_ID", "native-session-id", "sid\n", "sid\0"])
     def test_missing_or_placeholder_event_owner_skips_formatting_without_tmp_fallback(self, tmp_path, session_id):
         repo = _repo(tmp_path, {"fixtures_mod.py": _FIXTURES_MOD, "test_example.py": _TEST_FORMATTED})
@@ -540,6 +597,7 @@ class TestTheSessionIsToldWhatTheHookChanged:
             tmp_path, compact(_payload(str(target), tool="Edit", session_id=session_id)), with_jq=False
         )
         assert rc == 0, err
+        assert err == "", "an absent or invalid owner is an intentional silent skip"
         assert calls == [] and target.read_text() == edited
         assert not (tmp_path / "claudna-state" / "sessions").exists()
         assert not (tmp_path / "tmp-sentinel").exists()

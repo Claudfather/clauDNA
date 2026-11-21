@@ -28,6 +28,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -69,7 +70,7 @@ CLAUDNA_OWN_HOOK = {
 _TOOLS = ("bash", "sh", "env", "jq", "cat", "touch", "rm", "mkdir", "grep")
 
 
-def _curated_bin(tmp_path: Path, engine_version: str | None) -> Path:
+def _curated_bin(tmp_path: Path, engine_version: str | None, *, with_jq: bool = True) -> Path:
     """A PATH dir with real tools symlinked in, plus a fake `claudron`.
 
     engine_version:
@@ -80,12 +81,19 @@ def _curated_bin(tmp_path: Path, engine_version: str | None) -> Path:
     bindir = tmp_path / "bin"
     bindir.mkdir(exist_ok=True)
     for tool in _TOOLS:
+        if tool == "jq" and not with_jq:
+            continue
         real = shutil.which(tool)
         if real:
             link = bindir / tool
             if not link.exists():
                 link.symlink_to(real)
-    assert shutil.which("jq", path=str(bindir)), "jq must resolve for this test to be meaningful"
+    if with_jq:
+        assert shutil.which("jq", path=str(bindir)), "jq must resolve for this test to be meaningful"
+    else:
+        python = bindir / "python3"
+        if not python.exists():
+            python.symlink_to(sys.executable)
     if engine_version is not None:
         claudron = bindir / "claudron"
         claudron.write_text(
@@ -116,6 +124,7 @@ def run_hook(
     local_settings: dict | None = None,
     engine_version: str | None,
     session_id: str = "sess-defer-1",
+    with_jq: bool = True,
 ) -> tuple[int, str]:
     """Invoke the hook with an isolated HOME/cwd and the given settings + engine.
 
@@ -133,7 +142,7 @@ def run_hook(
     if local_settings is not None:
         (proj / ".claude" / "settings.local.json").write_text(json.dumps(local_settings))
 
-    bindir = _curated_bin(tmp_path, engine_version)
+    bindir = _curated_bin(tmp_path, engine_version, with_jq=with_jq)
     tmpdir = tmp_path / "tmpd"
     tmpdir.mkdir(exist_ok=True)
     env = {
@@ -242,13 +251,16 @@ class TestTwoAttemptProtocolIntactWhenPrompting:
     """When clauDNA owns the prompt, the block-then-allow marker cycle still
     works (unchanged behavior from before the defer landed)."""
 
-    def test_first_blocks_second_allows(self, tmp_path):
+    @pytest.mark.parametrize("with_jq", [True, False], ids=["with-jq", "without-jq"])
+    def test_first_blocks_second_allows(self, tmp_path, with_jq):
         code1, out1 = run_hook(tmp_path, user_settings=CLAUDNA_OWN_HOOK,
-                               engine_version=None, session_id="two-attempt")
-        assert code1 == 0 and prompts(out1)
+                               engine_version=None, session_id="two-attempt", with_jq=with_jq)
+        assert code1 == 0 and prompts(out1) and "Run /claudna:capture" in out1
+        marker = tmp_path / "home" / ".claudna" / "sessions" / "two-attempt" / "hooks" / "reflected"
+        assert marker.is_file()
         code2, out2 = run_hook(tmp_path, user_settings=CLAUDNA_OWN_HOOK,
-                               engine_version=None, session_id="two-attempt")
-        assert code2 == 0 and out2.strip() == ""
+                               engine_version=None, session_id="two-attempt", with_jq=with_jq)
+        assert code2 == 0 and out2.strip() == "" and not marker.exists()
 
 
 class TestOptOutStillWins:

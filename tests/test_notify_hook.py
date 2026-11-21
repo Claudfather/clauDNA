@@ -16,6 +16,8 @@ variable), never inside an `-e` code fragment.
 from __future__ import annotations
 
 import json
+import shlex
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -85,3 +87,30 @@ class TestNotifyExtractsTheMessageField:
     def test_empty_stdin_falls_back_to_default(self, tmp_path):
         argv = run_notify(tmp_path, "")
         assert any("Claude needs your attention" in a for a in argv)
+
+
+def test_missing_osascript_drains_stdin_then_exits_silently(tmp_path):
+    """A curated PATH has no notification tool; the event is drained first."""
+    bin_dir = tmp_path / "bin-no-osascript"
+    bin_dir.mkdir()
+    for name in ("bash", "cat", "python3"):
+        found = shutil.which(name)
+        assert found is not None
+        (bin_dir / name).symlink_to(found)
+    env = {"PATH": str(bin_dir), "HOME": str(tmp_path / "home")}
+    producer = "import sys; sys.stdout.write('x' * 4194304)"
+    pipeline = f"python3 -c {shlex.quote(producer)} | bash {shlex.quote(str(HOOK))}"
+
+    proc = subprocess.run(
+        ["bash", "-o", "pipefail", "-c", pipeline],
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+        env=env,
+        timeout=10,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout == ""
+    assert proc.stderr == ""
+    assert shutil.which("osascript", path=str(bin_dir)) is None

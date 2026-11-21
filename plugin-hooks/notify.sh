@@ -8,6 +8,9 @@
 # `do shell script`), and is also broken for normal input, since the JSON
 # envelope itself contains quotes. Pull the one field we mean to display.
 INPUT=$(cat)
+# Drain the event before this no-op: returning before reading stdin can close the
+# hook pipe while the host is still writing its payload.
+command -v osascript >/dev/null 2>&1 || exit 0
 MESSAGE=""
 if command -v jq >/dev/null 2>&1; then
     MESSAGE=$(printf '%s' "$INPUT" | jq -r '.message // empty' 2>/dev/null)
