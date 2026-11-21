@@ -31,6 +31,33 @@ def commit(root, message="fixture"):
     return git(root, "rev-parse", "HEAD")
 
 
+def _version_root(path, versions):
+    for host, version in zip(("claude", "cursor", "codex"), versions):
+        directory = path / f".{host}-plugin"
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "plugin.json").write_text(json.dumps({"version": version}))
+    return path
+
+
+@pytest.mark.parametrize("version", [
+    "1.2.3\n", "١.٢.٣", "1.2.3-rc1", "", None, False, 0, [], {},
+])
+def test_version_at_rejects_non_numeric_or_non_ascii_versions(version, tmp_path):
+    root = _version_root(tmp_path / "root", [version] * 3)
+
+    with pytest.raises(release.ReleaseError, match="agree on a numeric release version"):
+        release.version_at(root)
+
+
+def test_version_at_accepts_leading_zero_numeric_version_and_keeps_agreement_check(tmp_path):
+    root = _version_root(tmp_path / "root", ["01.2.3"] * 3)
+    assert release.version_at(root) == "01.2.3"
+
+    mismatch = _version_root(tmp_path / "mismatch", ["1.2.3", "1.2.4", "1.2.3"])
+    with pytest.raises(release.ReleaseError, match="agree on a numeric release version"):
+        release.version_at(mismatch)
+
+
 def fixture_targets(root):
     """Bounded make recipes prevent recursive full-suite calls in subprocess tests.
 
@@ -39,7 +66,7 @@ def fixture_targets(root):
     Separate package tests exercise the real archive and lifecycle machinery.
     """
     (root / "scripts").mkdir(exist_ok=True)
-    for name in ("release_candidate.py", "release_toolchain.py", "check-changelog.sh"):
+    for name in ("release_candidate.py", "release_toolchain.py", "version_grammar.py", "check-changelog.sh"):
         shutil.copy2(ROOT / "scripts" / name, root / "scripts" / name)
     shutil.copytree(ROOT / "lib" / "claudna", root / "lib" / "claudna")
     (root / "Makefile").write_text(

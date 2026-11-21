@@ -35,6 +35,7 @@ from skill_discovery import skill_dirs, walk_gate_files
 
 root = Path(sys.argv[2])
 assert [path.name for path in skill_dirs(root / "skills")] == ["demo"]
+assert [path.name for path in skill_dirs(root / "skills", require_skill_md=False)] == ["demo", "empty-directory"]
 assert root / "skills/demo/SKILL.md" in walk_gate_files(root)
 names, explicit, _ = declared_skills(root / ".cursor-plugin")
 assert names == {"demo", "empty-directory"}

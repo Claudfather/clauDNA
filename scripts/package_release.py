@@ -23,6 +23,7 @@ import uuid
 sys.dont_write_bytecode = True
 
 import release_toolchain  # noqa: E402
+from version_grammar import is_numeric_version  # noqa: E402
 from claudna.session_store.fsio import atomic_write_json  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -113,12 +114,11 @@ def archive_bytes(files: dict[str, tuple[str, bytes]]) -> bytes:
 
 
 def package_version(files: dict[str, tuple[str, bytes]]) -> str:
-    versions = {json.loads(files[f".{host}-plugin/plugin.json"][1])["version"]
-                for host in ("claude", "cursor", "codex")}
-    require(len(versions) == 1, "manifest versions disagree")
-    version = versions.pop()
-    require(isinstance(version, str) and re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version) is not None,
-            "invalid package version")
+    versions = [json.loads(files[f".{host}-plugin/plugin.json"][1])["version"]
+                for host in ("claude", "cursor", "codex")]
+    require(all(is_numeric_version(version) for version in versions), "invalid package version")
+    require(all(version == versions[0] for version in versions[1:]), "manifest versions disagree")
+    version = versions[0]
     return version
 
 

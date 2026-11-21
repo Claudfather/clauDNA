@@ -690,7 +690,7 @@ def test_writable_runtime_and_delegate_entrypoints_create_no_bytecode(tmp_path):
     shutil.copytree(REPO_ROOT / "lib", package / "lib",
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     (package / "scripts").mkdir()
-    for script in ("delegate.py", "skill-usefulness.py"):
+    for script in ("delegate.py", "skill-usefulness.py", "plugin_scope.py", "skill_discovery.py"):
         shutil.copyfile(REPO_ROOT / "scripts" / script, package / "scripts" / script)
     env = {"HOME": str(tmp_path / "private-home"), "TMPDIR": str(tmp_path), "PATH": os.environ["PATH"]}
     assert not list(package.rglob("__pycache__"))

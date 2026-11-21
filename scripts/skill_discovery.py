@@ -43,9 +43,17 @@ def walk_gate_files(root: Path) -> list[Path]:
     return sorted(out)
 
 
-def skill_dirs(skills_dir: Path) -> list[Path]:
-    """Sorted skill directories containing SKILL.md, excluding SKIP_DIRS."""
+def skill_dirs(skills_dir: Path, *, require_skill_md: bool = True) -> list[Path]:
+    """Sorted skill directories, excluding SKIP_DIRS.
+
+    By default only complete skill directories are returned. Validators may
+    request all candidate directories so they can report a missing SKILL.md.
+    """
     if not skills_dir.is_dir():
         return []
-    return sorted(p for p in skills_dir.iterdir()
-                  if p.is_dir() and p.name not in SKIP_DIRS and (p / "SKILL.md").is_file())
+    return sorted(
+        p for p in skills_dir.iterdir()
+        if p.is_dir()
+        and p.name not in SKIP_DIRS
+        and (not require_skill_md or (p / "SKILL.md").is_file())
+    )

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from skill_discovery import SKIP_DIRS
+from skill_discovery import skill_dirs
 
 
 def declared_skills(plugin_dir: Path) -> tuple[set[str] | None, bool, str]:
@@ -39,7 +39,7 @@ def declared_skills(plugin_dir: Path) -> tuple[set[str] | None, bool, str]:
         resolved = (plugin_root / raw).resolve()
         if not resolved.is_dir():
             return None, False, f"plugin.json's skills path {raw!r} is not a directory"
-        names = {p.name for p in resolved.iterdir() if p.is_dir() and p.name not in SKIP_DIRS}
+        names = {p.name for p in skill_dirs(resolved, require_skill_md=False)}
         return names, False, f"directory discovery ({raw!r})"
 
     if isinstance(raw, list):
@@ -77,7 +77,7 @@ def declared_skills(plugin_dir: Path) -> tuple[set[str] | None, bool, str]:
                 # A folder of skills (Cursor's own directory-discovery shape,
                 # nested inside the array) -- expand it the same way the
                 # string branch above expands a bare directory-discovery path.
-                names.update(p.name for p in resolved.iterdir() if p.is_dir() and p.name not in SKIP_DIRS)
+                names.update(p.name for p in skill_dirs(resolved, require_skill_md=False))
         return names, True, "explicit list"
 
     return (

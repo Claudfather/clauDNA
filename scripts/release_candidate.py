@@ -22,6 +22,7 @@ import uuid
 
 sys.dont_write_bytecode = True
 from release_toolchain import ensure_toolchain, isolated_python_env, maintainer_paths  # noqa: E402
+from version_grammar import is_numeric_version  # noqa: E402
 from claudna.session_store.fsio import atomic_write_json  # noqa: E402
 
 
@@ -59,7 +60,9 @@ def version_at(root, ref=None):
         relative = f".{host}-plugin/plugin.json"
         raw = git(root, "show", f"{ref}:{relative}") if ref else (root / relative).read_text()
         versions.append(json.loads(raw)["version"])
-    if len(set(versions)) != 1 or not re.fullmatch(r"\d+\.\d+\.\d+", versions[0]):
+    if not all(is_numeric_version(version) for version in versions) or any(
+        version != versions[0] for version in versions[1:]
+    ):
         raise ReleaseError("all three manifests must agree on a numeric release version")
     return versions[0]
 

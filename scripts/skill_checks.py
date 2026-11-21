@@ -80,18 +80,14 @@ def validate_allowed_tools(value) -> list[str]:
     Unknown tool names are not failed -- the tool surface evolves.
     """
     errors: list[str] = []
-    if isinstance(value, str):
-        entries = [e.strip() for e in value.split(",") if e.strip()]
-    elif isinstance(value, list):
-        entries = []
+    if not isinstance(value, (str, list)):
+        errors.append(f"allowed-tools must be a string or list, got {type(value).__name__}")
+        return errors
+    if isinstance(value, list):
         for i, entry in enumerate(value):
             if not isinstance(entry, str):
                 errors.append(f"allowed-tools[{i}] must be a string, got {type(entry).__name__}")
-                continue
-            entries.append(entry.strip())
-    else:
-        errors.append(f"allowed-tools must be a string or list, got {type(value).__name__}")
-        return errors
+    entries = _parse_allowed_tools_entries(value)
 
     for entry in entries:
         m = re.match(r"^([A-Za-z]+)(\(.*\))?$", entry)
@@ -274,7 +270,12 @@ def check_dependencies(requires: list[dict]) -> list[dict]:
 
 
 def _parse_allowed_tools_entries(value) -> list[str]:
-    """Extract individual tool entries from an allowed-tools value."""
+    """Tokenize allowed-tools strings/lists using the shared comma semantics.
+
+    Blank comma fields in scalar form are ignored; blank list values are kept
+    for the validator to reject as unparseable entries. Non-string list items
+    are omitted here so callers that validate can report their exact indices.
+    """
     if isinstance(value, str):
         return [e.strip() for e in value.split(",") if e.strip()]
     elif isinstance(value, list):
@@ -1361,7 +1362,7 @@ def get_touched_skills() -> set[str] | None:
         print("FULL_VALIDATE=1: running full blocking validation", file=sys.stderr)
         return None
     pr_labels = os.environ.get("PR_LABELS", "")
-    if "full-validate" in pr_labels:
+    if "full-validate" in {label.strip() for label in pr_labels.split(",")}:
         print("[full-validate] label detected: running full blocking validation", file=sys.stderr)
         return None
 

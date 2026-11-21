@@ -44,7 +44,7 @@ def build_repo(tmp_path: Path) -> Path:
     shutil.copy2(SCRIPT, root / "scripts" / "validate-manifest.py")
     # Include the scope checks and their discovery/parsing dependencies so the
     # staged subprocess resolves the same modules as the real manifest gate.
-    for module in ("check_cursor_scope.py", "check_codex_scope.py", "plugin_scope.py",
+    for module in ("check_cursor_scope.py", "check_codex_scope.py", "plugin_scope.py", "version_grammar.py",
                    "skill_checks.py", "skill_discovery.py", "skill_frontmatter.py"):
         shutil.copy2(REPO_ROOT / "scripts" / module, root / "scripts" / module)
 
@@ -333,6 +333,31 @@ def test_non_semver_version_is_rejected(tmp_path):
     code, output = run_gate(root)
     assert code != 0
     assert "not valid semver" in output
+
+
+@pytest.mark.parametrize("version", [
+    "1.2.3\n", "١.٢.٣", "1.2.3-rc1", "", None, False, 0, [], {},
+])
+def test_non_numeric_or_non_ascii_release_version_is_rejected(version, tmp_path):
+    root = build_repo(tmp_path)
+    for manifest in (CLAUDE, CURSOR, ".codex-plugin/plugin.json"):
+        patch(root, manifest, "version", version)
+
+    code, output = run_gate(root)
+
+    assert code != 0
+    assert "not valid semver" in output
+    assert "Traceback" not in output
+
+
+def test_leading_zero_numeric_release_version_remains_valid(tmp_path):
+    root = build_repo(tmp_path)
+    for manifest in (CLAUDE, CURSOR, ".codex-plugin/plugin.json"):
+        patch(root, manifest, "version", "01.2.3")
+
+    code, output = run_gate(root)
+
+    assert code == 0, output
 
 
 # --- cursor-scope gate wiring (#344 -- #343 shipped the gate; nothing pinned

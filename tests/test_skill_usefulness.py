@@ -2,9 +2,13 @@
 
 import importlib.util
 import json
+import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
 spec = importlib.util.spec_from_file_location("skill_usefulness", ROOT / "scripts/skill-usefulness.py")
 report = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(report)
@@ -32,6 +36,33 @@ def test_complete_catalog_includes_unobserved_and_host_excluded(tmp_path):
     assert all(r["native_invocations"] == 0 and r["recommendation"] == "insufficient evidence" for r in rows)
     for slug in ("cleanup-legacy-install", "promotion-intake", "skill-scaffold"):
         assert slug not in manifests["Codex"]["skills"]
+
+
+def test_catalog_membership_agrees_with_shipped_support_catalog():
+    _, manifests = report.catalog(ROOT)
+    support = json.loads((ROOT / "lib/claudna/package_support/catalog.json").read_text())
+    for label, host in (("Claude", "claude-code"), ("Codex", "codex"), ("Cursor", "cursor")):
+        assert manifests[label]["skills"] == sorted(support["hosts"][host]["skills"])
+
+
+@pytest.mark.parametrize("selection", [None, "./skills", ["./skills"], ["./skills/example"]])
+def test_catalog_expands_supported_manifest_shapes(tmp_path, selection):
+    skill = tmp_path / "skills/example"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("---\nname: example\ndescription: A synthetic reporting fixture\n---\n# Example\n")
+    (tmp_path / "skills/_shared").mkdir()
+    for folder in (".claude-plugin", ".codex-plugin", ".cursor-plugin"):
+        manifest = {"version": "1.2.3"}
+        if selection is not None:
+            manifest["skills"] = selection
+        (tmp_path / folder).mkdir()
+        (tmp_path / folder / "plugin.json").write_text(json.dumps(manifest))
+
+    rows, _, manifests = report.assessment(tmp_path, tmp_path / "state", tmp_path / "no-telemetry", {})
+
+    assert all(host["skills"] == ["example"] for host in manifests.values())
+    assert len(rows) == 1
+    assert rows[0]["availability"] == "Claude, Codex, Cursor"
 
 
 def test_duplicates_projection_bare_names_and_malformed_are_not_usage(tmp_path):
