@@ -44,13 +44,14 @@ from pathlib import Path, PurePosixPath
 
 from check_cursor_scope import run_check as run_cursor_scope_check
 from check_codex_scope import run_check as run_codex_scope_check
+from version_grammar import VERSION_RE, is_numeric_version
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CLAUDE_PLUGIN_DIR = REPO_ROOT / ".claude-plugin"
 CURSOR_PLUGIN_DIR = REPO_ROOT / ".cursor-plugin"
 CODEX_PLUGIN_DIR = REPO_ROOT / ".codex-plugin"
 
-SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
+SEMVER_RE = VERSION_RE
 
 # Cursor's identifier grammar (cursor/plugin-template validate-template.mjs).
 # Plugin names additionally allow periods (e.g. `prompts.chat`).
@@ -82,7 +83,7 @@ def load_json(path: Path) -> dict | list | None:
 
 def parse_semver(version: str) -> tuple[int, ...] | None:
     """Parse X.Y.Z into a comparable tuple."""
-    if not SEMVER_RE.match(version):
+    if not is_numeric_version(version):
         return None
     return tuple(int(x) for x in version.split("."))
 
@@ -187,7 +188,7 @@ def validate_plugin_json(
         )
 
     version = data.get("version", "")
-    if version and not SEMVER_RE.match(version):
+    if not is_numeric_version(version):
         error(f"{label}: version '{version}' is not valid semver (expected X.Y.Z)")
 
     hooks_path = data.get("hooks")
@@ -322,13 +323,13 @@ def validate_all_json_files(plugin_dir: Path) -> None:
 
 def validate_version_sync() -> None:
     """Every shipped front-end manifest carries the same release version."""
-    versions = {}
+    versions = []
     for directory in (CLAUDE_PLUGIN_DIR, CURSOR_PLUGIN_DIR, CODEX_PLUGIN_DIR):
         data = load_json(directory / "plugin.json")
         if isinstance(data, dict):
-            versions[directory.name] = data.get("version")
-    if len(set(versions.values())) > 1:
-        error("plugin.json version mismatch: " + ", ".join(f"{k} has {v!r}" for k, v in versions.items()))
+            versions.append((directory.name, data.get("version")))
+    if versions and any(value != versions[0][1] for _, value in versions[1:]):
+        error("plugin.json version mismatch: " + ", ".join(f"{k} has {v!r}" for k, v in versions))
 
 
 def validate_codex_behavior_scope() -> None:

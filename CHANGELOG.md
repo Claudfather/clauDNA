@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Share validator tokenization and discovery, match the full-validation label exactly, align release-version grammar, and read directory-shaped skill manifests correctly in usage reports.
 - Declare the optional browser-crawl dependencies and report missing Playwright or Chromium clearly while keeping link checks browser-free.
 - Reject non-finite numbers consistently in promotion manifests, battle history, and telemetry evidence before threshold checks.
 - Keep PreCompact capture working without jq, report unexpected formatter scratch failures without blocking edits, and skip desktop notifications when osascript is unavailable.

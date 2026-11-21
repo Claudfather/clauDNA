@@ -19,7 +19,8 @@ import re
 import sys
 from pathlib import Path
 
-from skill_discovery import SKIP_DIRS
+from skill_checks import _parse_allowed_tools_entries
+from skill_discovery import skill_dirs as discover_skill_dirs
 from skill_frontmatter import FrontmatterError, parse_frontmatter as parse_strict_frontmatter
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -183,15 +184,8 @@ def resolve_reference(ref: str, skill_dir: Path) -> Path | None:
 
 def extract_tool_names(allowed_tools) -> list[str]:
     """Extract base tool names from allowed-tools value."""
-    if isinstance(allowed_tools, str):
-        entries = [e.strip() for e in allowed_tools.split(",") if e.strip()]
-    elif isinstance(allowed_tools, list):
-        entries = [e.strip() for e in allowed_tools if isinstance(e, str)]
-    else:
-        return []
-
     names = []
-    for entry in entries:
+    for entry in _parse_allowed_tools_entries(allowed_tools):
         m = re.match(r"^([A-Za-z]+)", entry)
         if m:
             names.append(m.group(1))
@@ -327,13 +321,7 @@ def check_requires_consistency(skill_name: str, fm: dict, body: str) -> tuple[li
         allowed = fm.get("allowed-tools")
         if allowed:
             bash_tools = set()
-            if isinstance(allowed, str):
-                entries = [e.strip() for e in allowed.split(",") if e.strip()]
-            elif isinstance(allowed, list):
-                entries = [e.strip() for e in allowed if isinstance(e, str)]
-            else:
-                entries = []
-            for entry in entries:
+            for entry in _parse_allowed_tools_entries(allowed):
                 m = re.match(r"^Bash\((\w+)\s", entry)
                 if m:
                     tool = m.group(1)
@@ -411,7 +399,7 @@ def main() -> int:
 
     agent_names = get_agent_names()
 
-    skill_dirs = sorted(p for p in SKILLS_DIR.iterdir() if p.is_dir() and p.name not in SKIP_DIRS)
+    skill_dirs = discover_skill_dirs(SKILLS_DIR, require_skill_md=False)
 
     all_errors: dict[str, list[str]] = {}
     all_warnings: dict[str, list[str]] = {}

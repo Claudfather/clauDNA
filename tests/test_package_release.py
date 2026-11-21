@@ -14,7 +14,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from package_release import PackageError, build, safe_path  # noqa: E402
+from package_release import PackageError, build, package_version, safe_path  # noqa: E402
 from qualify_package import fixture_environment, qualify, verify_package  # noqa: E402
 
 
@@ -42,6 +42,27 @@ def commit(repo):
     git(repo, "add", "--all")
     git(repo, "commit", "--quiet", "-m", "package fixture")
     return git(repo, "rev-parse", "HEAD")
+
+
+def _version_files(versions):
+    return {
+        f".{host}-plugin/plugin.json": ("100644", json.dumps({"version": version}).encode())
+        for host, version in zip(("claude", "cursor", "codex"), versions)
+    }
+
+
+@pytest.mark.parametrize("version", [
+    "1.2.3\n", "١.٢.٣", "1.2.3-rc1", "", None, False, 0, [], {},
+])
+def test_package_version_rejects_non_numeric_or_non_ascii_versions(version):
+    with pytest.raises(PackageError, match="invalid package version"):
+        package_version(_version_files([version] * 3))
+
+
+def test_package_version_accepts_leading_zero_and_keeps_agreement_check():
+    assert package_version(_version_files(["01.2.3"] * 3)) == "01.2.3"
+    with pytest.raises(PackageError, match="manifest versions disagree"):
+        package_version(_version_files(["1.2.3", "1.2.4", "1.2.3"]))
 
 
 def test_reproducible_full_tracked_export_ignores_dirty_files_and_export_attributes(repo, tmp_path):

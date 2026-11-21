@@ -15,6 +15,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
@@ -85,6 +86,22 @@ class TestEscapeHatches:
         ci("skills/foo/SKILL.md")
         monkeypatch.setenv("PR_LABELS", "docs,full-validate")
         assert get_touched_skills() is None
+
+    @pytest.mark.parametrize("labels", ["not-full-validate,docs", "docs,full-validate-extra"])
+    def test_lookalike_full_validate_labels_do_not_block_everything(self, ci, monkeypatch, labels):
+        ci("skills/foo/SKILL.md")
+        monkeypatch.setenv("PR_LABELS", labels)
+        assert get_touched_skills() == {"foo"}
+
+    def test_workflow_includes_labeled_pr_events_without_skipping_jobs(self):
+        workflow = yaml.load(
+            (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(),
+            Loader=yaml.BaseLoader,
+        )
+        assert workflow["on"]["pull_request"]["types"] == [
+            "opened", "synchronize", "reopened", "labeled"
+        ]
+        assert all("if" not in job for job in workflow["jobs"].values())
 
 
 class TestSkillScoping:

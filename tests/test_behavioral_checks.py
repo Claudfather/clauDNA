@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import sys
 import tempfile
+import importlib.util
 from pathlib import Path
 
 # Add scripts/ to path so skill_checks is importable
@@ -28,7 +29,43 @@ from skill_checks import (
     collect_skill_reference_errors,
     validate_skill_md,
     warn_skill_md,
+    validate_allowed_tools,
 )
+
+
+_integration_spec = importlib.util.spec_from_file_location(
+    "integration_test", REPO_ROOT / "scripts" / "integration-test.py"
+)
+integration_test = importlib.util.module_from_spec(_integration_spec)
+_integration_spec.loader.exec_module(integration_test)
+
+
+def test_allowed_tools_parser_semantics_are_shared_with_integration():
+    # Scalar blank fields are ignored; list blanks remain validator errors and
+    # non-string list entries retain their indexed diagnostic.
+    assert validate_allowed_tools("Bash, , Read") == []
+    assert validate_allowed_tools(["Bash", " "]) == ["allowed-tools: unparseable entry ''"]
+    assert validate_allowed_tools(["Read", 7]) == ["allowed-tools[1] must be a string, got int"]
+    assert integration_test.extract_tool_names("Bash, , Read") == ["Bash", "Read"]
+    assert integration_test.extract_tool_names(["Bash", " ", 7]) == ["Bash"]
+
+
+def test_integration_unknown_tool_remains_warning_not_error():
+    errors, warnings = integration_test.check_tool_names(
+        "example", {"allowed-tools": "Bash, FutureTool"}
+    )
+    assert errors == []
+    assert warnings == ["unknown tool `FutureTool` in allowed-tools (may be valid if newly added)"]
+
+
+def test_integration_requires_consistency_keeps_external_cli_warning():
+    errors, warnings = integration_test.check_requires_consistency(
+        "example", {"allowed-tools": "Bash(git status), Bash(toolx --version)"}, ""
+    )
+    assert errors == []
+    assert warnings == [
+        "allowed-tools references external CLI(s) ['toolx'] but no `requires` field declared"
+    ]
 
 
 # --- check_output_github_reference ---

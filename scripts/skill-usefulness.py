@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(ROOT / "lib"))
 
+from plugin_scope import declared_skills  # noqa: E402
 from claudna.session_store.paths import state_root  # noqa: E402
 from claudna.session_store.telemetry import telemetry_path  # noqa: E402
 
@@ -80,7 +81,13 @@ def catalog(repo):
     for host, folder in (("Claude", ".claude-plugin"), ("Codex", ".codex-plugin"), ("Cursor", ".cursor-plugin")):
         manifest = json.loads((repo / folder / "plugin.json").read_text())
         selected = manifest.get("skills")
-        names = sorted(skills) if selected is None else sorted(Path(p).name for p in selected)
+        if selected is None:
+            names = sorted(skills)
+        else:
+            names, _, description = declared_skills(repo / folder)
+            if names is None:
+                raise ValueError(description)
+            names = sorted(names)
         manifests[host] = {"version": manifest["version"], "skills": names, "path": f"{folder}/plugin.json"}
     return skills, manifests
 

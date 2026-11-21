@@ -18,7 +18,6 @@ from check_catalog_budget import run_check as run_catalog_budget_check
 from check_schema_drift import run_check as run_schema_drift_check
 from check_vault_address import run_check as run_vault_address_check
 from skill_checks import (
-    SKIP_DIRS,
     STALE_PATH_RE,
     check_host_portability,
     check_removed_name_mentions,
@@ -30,6 +29,7 @@ from skill_checks import (
     load_removed_skills,
     parse_frontmatter,
     partition_errors,
+    skill_dirs as discover_skill_dirs,
     validate_skill_md,
     walk_gate_files,
     warn_skill_md,
@@ -111,7 +111,7 @@ def main() -> int:
         else:
             print("CI mode: no skills touched in this PR — all errors reported as warnings\n")
 
-    skill_dirs = sorted(p for p in SKILLS_DIR.iterdir() if p.is_dir() and p.name not in SKIP_DIRS)
+    skill_dirs = discover_skill_dirs(SKILLS_DIR, require_skill_md=False)
     valid_names = {p.name for p in skill_dirs}
 
     all_errors: dict[str, list[str]] = {}
