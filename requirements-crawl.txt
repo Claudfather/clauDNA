@@ -1,0 +1,3 @@
+# Optional Python dependency for the QA crawler's shot, console, deep, and chat verbs.
+playwright==1.60.0; python_version == "3.9"
+playwright==1.65.2; python_version >= "3.10"
