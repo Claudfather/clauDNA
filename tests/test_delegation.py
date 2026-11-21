@@ -1,9 +1,11 @@
 """Deterministic subprocess and loss boundaries; no provider calls or user state."""
 from __future__ import annotations
 
+import io
 import json
 import subprocess
 import sys
+from dataclasses import asdict, replace
 
 import pytest
 from conftest import ACTOR, ORIGIN
@@ -42,9 +44,79 @@ def worker(monkeypatch, code="", *, final=None, exit_code=0):
     monkeypatch.setattr(d, "native_command", lambda request: [sys.executable, "-c", script])
 
 
-def test_run_records_child_cleans_bookkeeping_and_settles(store, job, monkeypatch):
-    import io
+@pytest.fixture
+def run_request(store, monkeypatch, capsys):
+    def run(req):
+        raw = json.dumps(asdict(req)).encode()
+        monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(raw)))
+        code = d.main(["run", "--root", str(store.root), "--request", "-"])
+        output = capsys.readouterr()
+        assert output.err == ""
+        return code, json.loads(output.out)
 
+    return run
+
+
+@pytest.fixture
+def blocked_request(run_request, monkeypatch):
+    monkeypatch.setattr(d, "native_command", lambda req: pytest.fail("blocked request must not launch"))
+
+    def run(req):
+        code, output = run_request(req)
+        assert code == 1
+        assert output.keys() == {"outcome", "error"}
+        assert output["outcome"] == "blocked"
+        return output["error"]
+
+    return run
+
+
+@pytest.mark.parametrize("operation", ["rev-parse", "status"])
+def test_git_preflight_timeout_blocks(job, monkeypatch, blocked_request, operation):
+    original_run = subprocess.run
+
+    def git_timeout(command, **kwargs):
+        if command[0] == "git" and operation in command[1:]:
+            assert kwargs["timeout"] == 10
+            raise subprocess.TimeoutExpired(command, 10)
+        return original_run(command, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", git_timeout)
+    error = blocked_request(job[0])
+    assert f"git {operation}" in error and "10 seconds" in error
+
+
+def test_git_status_failure_reports_redacted_diagnostic(job, monkeypatch, blocked_request):
+    original_run = subprocess.run
+
+    def status_failure(command, **kwargs):
+        if command[0] == "git" and "status" in command[1:]:
+            return subprocess.CompletedProcess(command, 128, "", 'fatal: cannot read "index" token=fixture-secret\n'
+                                               'hint: extra detail\n')
+        return original_run(command, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", status_failure)
+    error = blocked_request(job[0])
+    assert "git status" in error
+    assert 'cannot read "index" token=[REDACTED]' in error
+    assert "fixture-secret" not in error and "extra detail" not in error
+
+
+def test_git_preflight_blocks_non_checkout(job, blocked_request, tmp_path):
+    plain_dir = tmp_path / "plain"
+    plain_dir.mkdir()
+    error = blocked_request(replace(job[0], cwd=str(plain_dir)))
+    assert "existing Git checkout with a committed baseline" in error
+
+
+def test_git_preflight_allows_clean_checkout(job, monkeypatch, run_request):
+    worker(monkeypatch)
+    code, output = run_request(job[0])
+    assert code == 0
+    assert (output["outcome"], output["cleanup"], output["child_sid"]) == ("completed", "complete", "native-child")
+
+
+def test_run_records_child_cleans_bookkeeping_and_settles(store, job, monkeypatch):
     req, work = job
     worker(monkeypatch, "from pathlib import Path\nPath('code.txt').write_text('after')")
     result = d.run_job(req, store)

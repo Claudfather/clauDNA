@@ -23,6 +23,7 @@ from claudna.session_store.store import SessionHandle, SessionStore, StoreError,
 RECORD_LIMIT, RESPONSE_LIMIT, TAIL_LIMIT = 1048576, 65536, 16384
 PAYLOAD_LIMIT = 32768
 COORDINATION_VERSION = 1
+GIT_TIMEOUT_SECONDS = 10
 
 
 class DelegationError(ValueError):
@@ -120,10 +121,16 @@ class NativeObservation:
 
 
 def _git(cwd: str, *args: str) -> str:
-    result = subprocess.run(["git", "--no-optional-locks", "-c", "core.fsmonitor=", *args], cwd=cwd,
-                            capture_output=True, text=True, timeout=10)
+    try:
+        result = subprocess.run(["git", "--no-optional-locks", "-c", "core.fsmonitor=", *args], cwd=cwd,
+                                capture_output=True, text=True, timeout=GIT_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired as exc:
+        raise DelegationError(f"git {args[0]} timed out after {GIT_TIMEOUT_SECONDS} seconds") from exc
     if result.returncode:
-        raise DelegationError("workspace must be an existing Git checkout with a committed baseline")
+        if args[0] == "rev-parse":
+            raise DelegationError("workspace must be an existing Git checkout with a committed baseline")
+        detail = result.stderr.strip().partition("\n")[0] or f"exit code {result.returncode}"
+        raise DelegationError(f"git {args[0]} failed: {redact_text(detail)}")
     return result.stdout.strip()
 
 
@@ -160,9 +167,10 @@ def _validate(request: Request, store: SessionStore) -> tuple[SessionHandle, str
             or any(not isinstance(p, str) or not p or Path(p).is_absolute() or ".." in Path(p).parts
                    for p in request.owned_paths)):
         raise DelegationError("explicit workspace-relative owned paths are required")
+    base = _git(request.cwd, "rev-parse", "HEAD")
     if not request.read_only and _git(request.cwd, "status", "--porcelain", "--untracked-files=all"):
         raise DelegationError("editing requires a clean owned workspace")
-    return parent, _git(request.cwd, "rev-parse", "HEAD")
+    return parent, base
 
 
 def _data(state: dict, *, cleanup: str = "pending", summary: str = "") -> dict:
