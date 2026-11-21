@@ -41,6 +41,7 @@ a brace list or a glob, in the forms its parser handles.
 
 from __future__ import annotations
 
+import bisect
 import fnmatch
 import re
 import shlex
@@ -487,39 +488,189 @@ def _dollar_quotes(command: str) -> str:
     return "".join(out)
 
 
-def _readings(command: str) -> list[list[str]]:
-    """The token streams to inspect: the whole text, then every line on its own, for each of two
-    readings of the lines.
+# A here-document operator, `<<` or `<<-` but not the `<<<` of a here-string, and the blanks after it.
+_HEREDOC_OP = re.compile(r"(?<!<)<<(?!<)(-?)[ \t]*")
+# The most here-document delimiters, and the most body ends, that the guard reads in one command, and
+# the most text it reads after the body ends, in all; more denies, so the work stays bounded however
+# many a command holds.
+_MAX_HEREDOCS = 16
+_MAX_HEREDOC_TEXT = 1 << 20
+
+
+def _heredoc_word(command: str, i: int) -> tuple[str, bool] | None:
+    """The delimiter bash makes of the word at ``i`` after a here-document operator, and whether any
+    part of that word is quoted. bash removes the word's quotes and backslashes, decodes a ``$'...'``
+    string in it, drops the ``$`` of a ``$"..."`` one and expands nothing else, so ``<<$X`` ends at a
+    line that reads ``$X``. ``None`` when no word starts at ``i``."""
+    out: list[str] = []
+    quoted = False
+    start, n = i, len(command)
+    while i < n and command[i] not in " \t\n;&|()<>":
+        ch = command[i]
+        if ch == "\\":
+            if not command.startswith("\n", i + 1):  # a backslash-newline joins the word's lines
+                quoted = True
+                out.append(command[i + 1 : i + 2])
+            i += 2
+        elif ch == "'":
+            quoted = True
+            j = command.find("'", i + 1)
+            j = n if j < 0 else j
+            out.append(command[i + 1 : j])
+            i = j + 1
+        elif ch == '"' or (ch == "$" and command.startswith('"', i + 1)):
+            quoted = True
+            i += 1 if ch == '"' else 2
+            while i < n and command[i] != '"':
+                if command[i] == "\\" and command[i + 1 : i + 2] in ("\\", '"', "$", "`", "\n"):
+                    out.append(command[i + 1] if command[i + 1] != "\n" else "")
+                    i += 2
+                    continue
+                out.append(command[i])
+                i += 1
+            i += 1
+        elif ch == "$" and command.startswith("'", i + 1):
+            quoted = True
+            end = _ansi_c_end(command, i + 2)
+            out.append(_ansi_c_value(command[i + 2 : end]))
+            i = end + 1
+        else:
+            out.append(ch)
+            i += 1
+    return ("".join(out), quoted) if i > start else None
+
+
+def _heredoc_restarts(command: str) -> list[int] | None:
+    """Where bash may read commands again after a here-document body: after each later line that would
+    end a body, for each delimiter in the text, wherever its operator stands, so that a reading can
+    start there with no quote open (a doubt adds a reading). bash ends a body at the first line that
+    is its delimiter, once it drops the line's NUL bytes, joins each backslash-newline when no part of
+    the delimiter is quoted, and, for ``<<-``, drops the leading tabs. In a command substitution a
+    line that starts with the delimiter and holds a ``)`` after it ends one too, and bash reads on
+    from the rest of that line. ``None`` when the command holds more delimiters or body ends than the
+    guard reads, more joined lines than it walks, or more text after the body ends than it reads."""
+    if "<<" not in command:
+        return []
+    lines = command.split("\n")
+    starts = [0]
+    for ln in lines[:-1]:
+        starts.append(starts[-1] + len(ln) + 1)
+    plain = [ln.replace("\0", "") for ln in lines]
+    # a body line that ends in an odd run of backslashes joins the next one
+    joins = [(len(ln) - len(ln.rstrip("\\"))) % 2 == 1 for ln in plain]
+    delims: dict[tuple[str, bool, bool], int] = {}  # (delimiter, <<-, quoted) -> the first operator's line
+    for m in _HEREDOC_OP.finditer(command):
+        word = _heredoc_word(command, m.end())
+        if word is not None:
+            delims.setdefault((word[0], m.group(1) == "-", word[1]), bisect.bisect_right(starts, m.start()) - 1)
+            if len(delims) > _MAX_HEREDOCS:
+                return None
+    found: set[int] = set()
+    walk = 64 * len(lines) + 4096  # the joined lines walked, over every delimiter
+    for (delim, strip, quoted), first in delims.items():
+        for k in range(first + 1, len(lines)):
+            text, last = plain[k], k
+            if not quoted and joins[k]:
+                # the body line that starts here, its backslash-newlines joined, walked only while it
+                # is no longer than the delimiter
+                text = ""
+                while joins[last] and last + 1 < len(lines) and len(text.lstrip("\t") if strip else text) <= len(delim):
+                    text += plain[last][:-1]
+                    last += 1
+                    walk -= 1
+                    if walk < 0:
+                        return None
+                if joins[last] and last + 1 < len(lines):
+                    continue  # longer than the delimiter: this line ends no body
+                text += plain[last]
+            body = text.lstrip("\t") if strip else text
+            if delim in (text, body):
+                if last + 1 < len(lines):
+                    found.add(starts[last + 1])
+            elif last == k and body.startswith(delim) and ")" in body[len(delim) :]:
+                raw = lines[k]
+                found.add(starts[k] + (len(raw) - len(raw.lstrip("\t")) if strip else 0) + len(delim))
+            if len(found) > _MAX_HEREDOCS:
+                return None
+    if sum(len(command) - start for start in found) > _MAX_HEREDOC_TEXT:
+        return None
+    return sorted(found)
+
+
+def _readings(command: str, lines: bool = True) -> list[list[str]]:
+    """The token streams to inspect: the whole text, then every line on its own (unless ``lines`` is
+    false), for each of two readings of the lines.
 
     The first joins each continuation as bash joins one outside quotes (``_joined``), then drops
     each line's comment. The second (``_shell_text``) carries the quoting from line to line as bash
     does, so a comment ends at its newline and a quoted string that spans lines keeps all it holds;
     it is read where it differs from the first. A quote that pairs up across lines (an apostrophe in
     a comment or in a heredoc body) hides the lines between in a whole-text reading only; each line
-    read alone still shows them. A heredoc body is not skipped: deciding where one starts from the
-    text alone is a second shell parser. Every reading only adds denials, so a doubt is inspected,
-    not skipped.
+    read alone still shows them, and ``decide`` also reads the text after each line that may end a
+    heredoc body (``_heredoc_restarts``), so a quoted string that spans lines after a body is read
+    from its start. A heredoc body is not skipped. Every reading only adds denials, so a doubt is
+    inspected, not skipped.
 
     The trade: prose in a heredoc body that holds a gh call with a denied flag is denied. In
     recorded traffic that is a markdown code span, since a backtick starts a command for this
     reading, and not a line that starts with the call (which is denied too). Write such prose
     with the file tools and pass it with --body-file.
     """
-    lines = [_strip_comment(ln) for ln in _joined(command).split("\n")]
-    text = "\n".join(lines)
+    parts = [_strip_comment(ln) for ln in _joined(command).split("\n")]
+    text = "\n".join(parts)
     out = [_lex(text)]
-    if len(lines) > 1:
-        out.extend(_lex(ln) for ln in lines)
+    if lines and len(parts) > 1:
+        out.extend(_lex(ln) for ln in parts)
     shell = _shell_text(command)
     if shell != text:
         out.append(_lex(shell))
-        seen = set(lines)
-        for raw in shell.split("\n"):
+        seen = set(parts)
+        for raw in shell.split("\n") if lines else []:
             ln = _strip_comment(raw)
             if ln not in seen:
                 seen.add(ln)
                 out.append(_lex(ln))
     return out
+
+
+def _texts(command: str) -> list[str]:
+    """The command's text, then the text with its $'...' and $"..." strings as bash gives them, read
+    after it: as it stands, with its continuations joined (bash joins a line that ends in `$\\` to the
+    next, so a quote there opens a string), and line by line (an apostrophe in a heredoc body opens
+    no string)."""
+    joined = _joined(command)
+    texts = [command]
+    for raw, text in (
+        (command, _dollar_quotes(command)),
+        (joined, _dollar_quotes(joined)),
+        (joined, "\n".join(_dollar_quotes(line) for line in joined.split("\n"))),
+    ):
+        if text != raw and text not in texts:
+            texts.append(text)
+    return texts
+
+
+def _after_heredocs(command: str, restarts: list[int]):
+    """The whole-text readings of the text after each here-document body, read as it stands and as the
+    rest of a double-quoted string (a body inside ``"$(...)"`` ends inside one)."""
+    for start in restarts:
+        for rest in (command[start:], '"' + command[start:]):
+            for text in _texts(rest):
+                yield from _readings(text, lines=False)
+
+
+def _first_reason(streams, allowed: set[str]) -> str | None:
+    """The deny reason for the first gh or git call in ``streams`` that the guard refuses, if any."""
+    for tokens in streams:
+        for args in _gh_command_words(tokens):
+            reason = _inspect_gh_args(args, allowed)
+            if reason:
+                return reason
+        for args in _git_command_words(tokens):
+            reason = _inspect_git_args(args)
+            if reason:
+                return reason
+    return None
 
 
 def _tokens(command: str) -> list[str]:
@@ -863,27 +1014,20 @@ def decide(command: str, *, gh_host: str = "") -> tuple[str, str]:
     allowed = set(_ALLOWED_HOSTS)
     if gh_host.strip():
         allowed.add(gh_host.strip().split(":")[0].lower())
-    # the text with its $'...' and $"..." strings as bash gives them, read after the command's own text:
-    # as it stands, with its continuations joined (bash joins a line that ends in `$\` to the next, so a
-    # quote there opens a string), and line by line (an apostrophe in a heredoc body opens no string)
-    joined = _joined(command)
-    texts = [command]
-    for raw, text in (
-        (command, _dollar_quotes(command)),
-        (joined, _dollar_quotes(joined)),
-        (joined, "\n".join(_dollar_quotes(line) for line in joined.split("\n"))),
-    ):
-        if text != raw and text not in texts:
-            texts.append(text)
-    for tokens in [t for text in texts for t in _readings(text)]:
-        for args in _gh_command_words(tokens):
-            reason = _inspect_gh_args(args, allowed)
-            if reason:
-                return ("deny", reason)
-        for args in _git_command_words(tokens):
-            reason = _inspect_git_args(args)
-            if reason:
-                return ("deny", reason)
+    reason = _first_reason((t for text in _texts(command) for t in _readings(text)), allowed)
+    if reason is None:
+        # the text after each here-document body, read from where bash reads it, once the command's
+        # own readings allow it
+        restarts = _heredoc_restarts(command)
+        if restarts is None:
+            reason = (
+                f"the gh read-guard reads at most {_MAX_HEREDOCS} here-documents, and"
+                f" {_MAX_HEREDOC_TEXT >> 20} MiB of text after them, in one command"
+            )
+        else:
+            reason = _first_reason(_after_heredocs(command, restarts), allowed)
+    if reason:
+        return ("deny", reason)
     return ("allow", "")
 
 

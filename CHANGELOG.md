@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **The `gh` read-guard reads the text after a here-document body as bash reads it.** bash reads a here-document body as text up to its delimiter line, so a quote in the body opens no string. The guard in the permissions hook (`plugin-hooks/gh-guard-decide.py`) now also reads the text after each line that may end a body, as it stands and as the rest of a double-quoted string, since a body inside `"$(...)"` ends inside one. It finds those lines as bash ends a body: at the delimiter with its quotes removed and a `$'...'` string in it decoded, on a body line with its backslash-newlines joined when no part of the delimiter is quoted and its leading tabs dropped for `<<-`, and in a command substitution at a line that starts with the delimiter and holds a `)`. A command with more than 16 here-document delimiters or body ends, or more than 1 MiB of text after them, is refused. `tests/test_gh_guard_heredocs.py` holds 35 commands in which bash runs a gh call that reads the environment after a body and a quoted string that spans lines; the guard denies each, and so does the hook under a narrow grant and a bare one. Four ordinary here-document commands stay allowed.
 
 ### Fixed
 - Cover user-runtime helpers and permission hooks in the Python 3.9 test matrix, guard against omitted runtime suites, and keep maintainer-only scratch tests on the development interpreter.
