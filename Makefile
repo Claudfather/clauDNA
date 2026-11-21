@@ -82,9 +82,9 @@ check-release:
 test-package:
 	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider tests/test_package_release.py
 
-# The runtime floor: hooks and the session store run under the user's own
-# python3, which is 3.9 on stock macOS. CI runs these suites on 3.9 too; they
-# also pass on any newer Python, so this target works locally as-is.
+# The runtime floor: the session store, user-invoked helpers, and hook guards
+# run under the user's own python3, which is 3.9 on stock macOS. CI runs these
+# suites on 3.9 too; they also pass on newer Python, so this target works locally.
 RUNTIME_TESTS = tests/test_delegation.py tests/test_session_store.py tests/test_session_store_hook.py tests/test_session_store_codex.py \
 	tests/test_session_store_summarize.py tests/test_session_store_harvest.py tests/test_session_store_filing.py \
 	tests/test_session_store_lineage.py tests/test_session_store_unclosed.py \
@@ -94,7 +94,14 @@ RUNTIME_TESTS = tests/test_delegation.py tests/test_session_store.py tests/test_
 	tests/test_session_store_health.py tests/test_session_continuity.py tests/test_handoff_publish.py \
 	tests/test_package_doctor.py \
 	tests/test_redact.py tests/test_screen.py tests/test_runtime_layout.py tests/test_precompact_defer.py \
-	tests/test_session_start_hook.py
+	tests/test_session_start_hook.py tests/test_scratch_paths.py tests/test_host_context_scoping.py \
+	tests/test_auto_format_hook.py tests/test_notify_hook.py tests/test_pretooluse_permissions_hook.py \
+	tests/test_permissions_hook_without_jq.py tests/test_hook_input_hardening.py tests/test_git_output_guard.py \
+	tests/test_gh_guard_decide.py tests/test_gh_guard_dollar_quotes.py tests/test_gh_guard_r3_arity.py \
+	tests/test_gh_guard_shell_lines.py tests/test_gh_guard_v2_additions.py tests/test_gh_guard_v3_additions.py \
+	tests/test_gh_guard_v4_additions.py tests/test_gh_guard_wrapper_options.py \
+	tests/test_crawl_page.py tests/test_resolve_memory_dir.py tests/test_skill_usefulness.py tests/test_env_from_file.py \
+	tests/test_claudron_contract.py tests/test_claudna_root_resolution.py
 
 deps-runtime:
 	python3 -m pip install -r requirements-runtime-test.txt

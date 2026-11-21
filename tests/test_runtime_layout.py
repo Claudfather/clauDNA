@@ -20,6 +20,8 @@ known-bad snippet so a broken scanner can't pass an empty result.
 from __future__ import annotations
 
 import ast
+import fnmatch
+import re
 import sys
 from pathlib import Path
 
@@ -28,6 +30,68 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 LIB = REPO_ROOT / "lib"
 PACKAGE = "claudna"
+MAKEFILE = REPO_ROOT / "Makefile"
+
+# Keep discovery bounded to known runtime/hook test families, plus user-facing
+# helper scripts whose test names do not share those families. Static prose
+# checks inside test_scratch_paths.py stay in the floor selection too.
+RUNTIME_TEST_PATTERNS = (
+    "test_*_hook.py",
+    "test_*_hook_without_jq.py",
+    "test_gh_guard_*.py",
+    "test_git_output_guard.py",
+    "test_hook_input_hardening.py",
+    "test_precompact_defer.py",
+    "test_session_store*.py",
+    "test_session_continuity.py",
+    "test_*scratch*.py",
+)
+RUNTIME_TEST_HELPERS = {
+    "test_claudna_root_resolution.py",
+    "test_claudron_contract.py",
+    "test_crawl_page.py",
+    "test_env_from_file.py",
+    "test_resolve_memory_dir.py",
+    "test_skill_usefulness.py",
+    "test_host_context_scoping.py",
+}
+
+# Deliberate exclusions with their scope boundary; neither belongs to the
+# offline Python 3.9 user-runtime test target.
+RUNTIME_COVERAGE_EXCLUDED = {
+    "tests/test_maintainer_scratch.py": "maintainer ownership tests stay in the full test suite",
+    "tests/test_claudron_live.py": "requires a live Claudron engine; its contract leg owns execution",
+}
+
+
+def runtime_test_paths(makefile: Path = MAKEFILE) -> set[str]:
+    """Read the test paths from the real continued Makefile assignment."""
+    lines = makefile.read_text().splitlines()
+    assignment = next(i for i, line in enumerate(lines) if line.startswith("RUNTIME_TESTS ="))
+    line = lines[assignment]
+    value = [line.split("=", 1)[1]]
+    index = assignment + 1
+    while line.rstrip().endswith("\\"):
+        line = lines[index]
+        value.append(line)
+        index += 1
+    return set(re.findall(r"tests/test_[A-Za-z0-9_.-]+\.py", " ".join(value)))
+
+
+def runtime_coverage_gaps(selected: set[str]) -> set[str]:
+    return runtime_coverage_candidates() - selected
+
+
+def runtime_coverage_candidates() -> set[str]:
+    """The bounded, existing user-runtime families this floor must select."""
+    tests = REPO_ROOT / "tests"
+    candidates = {
+        f"tests/{path.name}"
+        for path in tests.glob("test_*.py")
+        if any(fnmatch.fnmatch(path.name, pattern) for pattern in RUNTIME_TEST_PATTERNS)
+    }
+    candidates.update(f"tests/{name}" for name in RUNTIME_TEST_HELPERS)
+    return candidates - set(RUNTIME_COVERAGE_EXCLUDED)
 
 #: session_store's layers, lowest first. A module may import only strictly lower ranks.
 SESSION_STORE_LAYERS = {
@@ -120,6 +184,31 @@ def test_sys_path_scanner_sees_mutation_and_reads():
 
 def test_there_is_something_to_scan():
     assert len(lib_modules()) >= 9  # a scanner over an empty tree passes vacuously
+
+
+def test_python39_floor_selects_runtime_and_hook_suites():
+    selected = runtime_test_paths()
+    required = runtime_coverage_candidates()
+    missing = runtime_coverage_gaps(selected)
+    assert not missing, f"Python 3.9 runtime test suites missing from Makefile RUNTIME_TESTS: {sorted(missing)}"
+    excluded_selected = selected & set(RUNTIME_COVERAGE_EXCLUDED)
+    assert not excluded_selected, "; ".join(
+        f"{path}: {RUNTIME_COVERAGE_EXCLUDED[path]}" for path in sorted(excluded_selected)
+    )
+    missing_files = required - {
+        path for path in required if (REPO_ROOT / path).is_file()
+    }
+    assert not missing_files, f"runtime coverage list refers to missing tests: {sorted(missing_files)}"
+
+
+def test_runtime_coverage_guard_detects_a_removed_matrix_entry(tmp_path):
+    removed = "tests/test_notify_hook.py"
+    source = MAKEFILE.read_text()
+    assert source.count(f"{removed} ") == 1
+    incomplete_makefile = tmp_path / "Makefile"
+    incomplete_makefile.write_text(source.replace(f"{removed} ", "", 1))
+    selected = runtime_test_paths(incomplete_makefile)
+    assert runtime_coverage_gaps(selected) == {removed}
 
 
 # ── the rules ────────────────────────────────────────────────────────────────
