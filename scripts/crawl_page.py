@@ -26,6 +26,7 @@ import asyncio
 import json
 import os
 import re
+import shlex
 import sys
 import urllib.error
 import urllib.request
@@ -53,6 +54,57 @@ DEFAULT_CHAT_QUERIES = [
 
 class JobError(ValueError):
     """The job file cannot be run as written."""
+
+
+class BrowserRuntimeError(RuntimeError):
+    """Playwright or its Chromium executable is unavailable."""
+
+
+def _browser_setup_message(reason: str) -> str:
+    requirements = Path(__file__).resolve().parents[1] / "requirements-crawl.txt"
+    install = f"python3 -m pip install -r {shlex.quote(str(requirements))}"
+    return (
+        f"crawl_page: {reason}. Install optional crawler support with `{install}`, "
+        "then install Chromium with `python3 -m playwright install chromium`."
+    )
+
+
+class _PlaywrightSession:
+    """Turn driver startup failures into a short setup diagnostic."""
+
+    def __init__(self, manager):
+        self.manager = manager
+
+    async def __aenter__(self):
+        try:
+            return await self.manager.__aenter__()
+        except Exception as err:  # noqa: BLE001 — only context startup is translated
+            raise BrowserRuntimeError(_browser_setup_message("Playwright could not start its driver")) from err
+
+    async def __aexit__(self, *args):
+        return await self.manager.__aexit__(*args)
+
+
+def playwright_session() -> _PlaywrightSession:
+    try:
+        from playwright.async_api import async_playwright
+    except ImportError as err:
+        raise BrowserRuntimeError(
+            _browser_setup_message("the optional Python Playwright package is missing")
+        ) from err
+    try:
+        return _PlaywrightSession(async_playwright())
+    except Exception as err:  # noqa: BLE001 — constructing the driver is startup
+        raise BrowserRuntimeError(_browser_setup_message("Playwright could not start its driver")) from err
+
+
+async def launch_chromium(playwright, **options):
+    try:
+        return await playwright.chromium.launch(**options)
+    except Exception as err:  # noqa: BLE001 — translate executable/startup errors only
+        raise BrowserRuntimeError(
+            _browser_setup_message("Playwright could not launch Chromium")
+        ) from err
 
 
 def load_job(verb: str, job_path: Path) -> dict:
@@ -95,10 +147,8 @@ def page_url(value: object) -> str:
 
 
 async def shot(job: dict) -> str:
-    from playwright.async_api import async_playwright
-
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+    async with playwright_session() as p:
+        browser = await launch_chromium(p, headless=True)
         ctx = await browser.new_context(
             viewport={"width": int(job["width"]), "height": int(job["height"])}, device_scale_factor=2
         )
@@ -111,11 +161,9 @@ async def shot(job: dict) -> str:
 
 
 async def console(job: dict) -> str:
-    from playwright.async_api import async_playwright
-
     errors: list[dict] = []
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+    async with playwright_session() as p:
+        browser = await launch_chromium(p, headless=True)
         page = await browser.new_page()
         page.on(
             "console",
@@ -161,17 +209,15 @@ def links(job: dict) -> str:
 
 async def deep(job: dict) -> str:
     """Click up to 30 buttons/links and fill up to 10 inputs, with a console and URL diff."""
-    from playwright.async_api import async_playwright
-
     url = page_url(job["url"])
     name = str(job["page_name"])
     out = Path(job["output_dir"])
-    out.mkdir(parents=True, exist_ok=True)
     findings: list[dict] = []
     console_errors: list[dict] = []
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+    async with playwright_session() as p:
+        browser = await launch_chromium(p, headless=True)
+        out.mkdir(parents=True, exist_ok=True)
         ctx = await browser.new_context(
             viewport={"width": 1440, "height": 900}, color_scheme="dark", device_scale_factor=2
         )
@@ -289,17 +335,15 @@ async def deep(job: dict) -> str:
 
 async def chat(job: dict) -> str:
     """Drive a chat UI through sample queries, screenshotting each turn."""
-    from playwright.async_api import async_playwright
-
     out = Path(job["output_dir"])
-    out.mkdir(parents=True, exist_ok=True)
     queries = [str(q) for q in (job.get("queries") or DEFAULT_CHAT_QUERIES)]
     chat_url = page_url(job["base_url"]).rstrip("/") + "/" + str(job.get("path", "/console")).lstrip("/")
     results: list[dict] = []
     console_errors: list[str] = []
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+    async with playwright_session() as p:
+        browser = await launch_chromium(p, headless=True)
+        out.mkdir(parents=True, exist_ok=True)
         ctx = await browser.new_context(
             viewport={"width": 1440, "height": 900}, color_scheme="dark", device_scale_factor=2
         )
@@ -382,6 +426,9 @@ def main(argv: list[str]) -> int:
         summary = asyncio.run(fn(job)) if asyncio.iscoroutinefunction(fn) else fn(job)
     except JobError as err:
         print(f"crawl_page: {err}", file=sys.stderr)
+        return 2
+    except BrowserRuntimeError as err:
+        print(err, file=sys.stderr)
         return 2
     print(summary)
     return 0

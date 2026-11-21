@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Declare the optional browser-crawl dependencies and report missing Playwright or Chromium clearly while keeping link checks browser-free.
 - Reject non-finite numbers consistently in promotion manifests, battle history, and telemetry evidence before threshold checks.
 - Keep PreCompact capture working without jq, report unexpected formatter scratch failures without blocking edits, and skip desktop notifications when osascript is unavailable.
 - Transcript read failures other than a missing path remain retryable, fractional handoff timestamps validate on Python 3.9, and default memory paths normalize dotted project directories while preserving configured overrides.

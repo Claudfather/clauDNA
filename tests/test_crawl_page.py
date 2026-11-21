@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import socket
+import subprocess
+import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -28,6 +31,60 @@ def _job(scratch: Path, name: str, body: object) -> Path:
     path = jobs / name
     path.write_text(json.dumps(body))
     return path
+
+
+def _browser_job(scratch: Path, verb: str) -> tuple[Path, Path]:
+    jobs = {
+        "shot": ({"url": "http://127.0.0.1:1/unused", "width": 10, "height": 10,
+                  "output": "screenshots/page.png"}, "screenshots/page.png"),
+        "console": ({"url": "http://127.0.0.1:1/unused", "output": "console/errors.json"}, "console/errors.json"),
+        "deep": ({"url": "http://127.0.0.1:1/unused", "page_name": "page", "output_dir": "deep/page"}, "deep/page"),
+        "chat": ({"base_url": "http://127.0.0.1:1/unused", "output_dir": "chat/page"}, "chat/page"),
+    }
+    body, output = jobs[verb]
+    return _job(scratch, f"{verb}.json", body), scratch / output
+
+
+def _block_playwright_imports(directory: Path) -> None:
+    directory.mkdir()
+    (directory / "sitecustomize.py").write_text(
+        "import sys\n"
+        "class BlockPlaywright:\n"
+        "    def find_spec(self, fullname, path=None, target=None):\n"
+        "        if fullname == 'playwright' or fullname.startswith('playwright.'):\n"
+        "            raise ModuleNotFoundError('blocked for test', name=fullname)\n"
+        "sys.meta_path.insert(0, BlockPlaywright())\n"
+    )
+
+
+def _fake_playwright_driver_failure(directory: Path) -> None:
+    package = directory / "playwright"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text("")
+    (package / "async_api.py").write_text(
+        "class Manager:\n"
+        "    async def __aenter__(self):\n"
+        "        raise RuntimeError('fake driver startup failure')\n"
+        "    async def __aexit__(self, *args):\n"
+        "        return False\n"
+        "def async_playwright():\n"
+        "    return Manager()\n"
+    )
+
+
+def _run_cli(tmp_path: Path, verb: str, job: Path, *, pythonpath: Path | None = None):
+    env = os.environ.copy()
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    if pythonpath is not None:
+        env["PYTHONPATH"] = str(pythonpath)
+    return subprocess.run(
+        [sys.executable, "-B", str(REPO / "scripts" / "crawl_page.py"), verb, str(job)],
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+        env=env,
+        timeout=10,
+    )
 
 
 def test_a_complete_job_loads_with_outputs_resolved_under_scratch(tmp_path):
@@ -70,7 +127,8 @@ class _Site(BaseHTTPRequestHandler):
         pass
 
 
-def test_links_records_each_status_and_skips_what_is_not_http(tmp_path):
+def test_links_records_each_status_and_skips_what_is_not_http(tmp_path, monkeypatch):
+    monkeypatch.setitem(sys.modules, "playwright", None)
     server = ThreadingHTTPServer(("127.0.0.1", 0), _Site)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{server.server_address[1]}"
@@ -87,6 +145,122 @@ def test_links_records_each_status_and_skips_what_is_not_http(tmp_path):
     assert results[f"{base}/ok"] == 200
     assert results[f"{base}/gone"] == 404
     assert results["mailto:someone@example.com"].startswith("skipped")
+
+
+@pytest.mark.parametrize("verb", ["shot", "console", "deep", "chat"])
+def test_browser_cli_reports_missing_playwright_without_traceback_or_outputs(tmp_path, verb):
+    blocker = tmp_path / "blocker"
+    _block_playwright_imports(blocker)
+    job, output = _browser_job(tmp_path, verb)
+
+    proc = _run_cli(tmp_path, verb, job, pythonpath=blocker)
+
+    assert proc.returncode == 2
+    assert "optional Python Playwright package is missing" in proc.stderr
+    assert "requirements-crawl.txt" in proc.stderr
+    assert "python3 -m playwright install chromium" in proc.stderr
+    assert "Traceback" not in proc.stderr
+    assert proc.stdout == ""
+    assert not output.exists()
+
+
+def test_cli_driver_entry_failure_is_actionable_without_traceback_or_outputs(tmp_path):
+    fake_package = tmp_path / "fake-package"
+    _fake_playwright_driver_failure(fake_package)
+    job, output = _browser_job(tmp_path, "shot")
+
+    proc = _run_cli(tmp_path, "shot", job, pythonpath=fake_package)
+
+    assert proc.returncode == 2
+    assert "Playwright could not start its driver" in proc.stderr
+    assert "requirements-crawl.txt" in proc.stderr
+    assert "python3 -m playwright install chromium" in proc.stderr
+    assert "Traceback" not in proc.stderr
+    assert proc.stdout == ""
+    assert not output.exists()
+
+
+class _MissingChromium:
+    async def launch(self, **options):
+        raise RuntimeError("Executable doesn't exist; browser not installed")
+
+
+class _PlaywrightFixture:
+    def __init__(self):
+        self.chromium = _MissingChromium()
+
+
+class _PlaywrightFixtureContext:
+    async def __aenter__(self):
+        return _PlaywrightFixture()
+
+    async def __aexit__(self, *args):
+        return False
+
+
+@pytest.mark.parametrize("verb", ["shot", "console", "deep", "chat"])
+def test_browser_startup_failure_is_actionable_and_creates_no_outputs(tmp_path, capsys, monkeypatch, verb):
+    monkeypatch.setattr(crawl_page, "playwright_session", _PlaywrightFixtureContext)
+    job, output = _browser_job(tmp_path, verb)
+
+    result = crawl_page.main([verb, str(job)])
+    captured = capsys.readouterr()
+
+    assert result == 2
+    assert "Playwright could not launch Chromium" in captured.err
+    assert "requirements-crawl.txt" in captured.err
+    assert "python3 -m playwright install chromium" in captured.err
+    assert "Traceback" not in captured.err
+    assert captured.out == ""
+    assert not output.exists()
+
+
+def test_navigation_failure_remains_a_crawl_finding_after_browser_startup(tmp_path, capsys, monkeypatch):
+    class Page:
+        def on(self, *args):
+            pass
+
+        async def goto(self, *args, **kwargs):
+            raise RuntimeError("fake navigation failure")
+
+    class Context:
+        async def new_page(self):
+            return Page()
+
+    class Browser:
+        async def new_context(self, **kwargs):
+            return Context()
+
+        async def close(self):
+            pass
+
+    class Chromium:
+        async def launch(self, **kwargs):
+            return Browser()
+
+    class Playwright:
+        chromium = Chromium()
+
+    class PlaywrightContext:
+        async def __aenter__(self):
+            return Playwright()
+
+        async def __aexit__(self, *args):
+            return False
+
+    monkeypatch.setattr(crawl_page, "playwright_session", PlaywrightContext)
+    job, output = _browser_job(tmp_path, "deep")
+
+    result = crawl_page.main(["deep", str(job)])
+    captured = capsys.readouterr()
+    findings = json.loads((output / "page_results.json").read_text())
+
+    assert result == 0
+    assert "page did not load" in captured.out
+    assert captured.err == ""
+    assert "install" not in captured.out.lower()
+    assert findings[0]["type"] == "page-load-error"
+    assert findings[0]["detail"] == "fake navigation failure"
 
 
 def test_a_refused_job_exits_2_and_says_why(tmp_path, capsys):
