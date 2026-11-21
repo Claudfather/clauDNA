@@ -21,11 +21,13 @@ line so the bash hook stays a thin caller and the rule is unit-testable.
 Standalone stdlib (the ``vault-git-decide.py`` / ``mention-rewrite.py`` precedent). It
 refuses only the shapes above; every other ``gh`` call — including the fleet's own
 ``--json`` / ``--jq '.field'`` reads — is allowed. It reads the *unexpanded* command
-text, so a value the shell assembles at run time (a variable, a ``$'...'`` form) is
+text, so a value the shell assembles at run time (a variable, a command substitution) is
 invisible to it; those are the hook's approver's to gate, not the decider's (the approver
 does not approve a gh command in which an expansion can form or change an option word).
 That includes a command substitution inside a ``GH_HOST=`` / ``GH_REPO=`` prefix value:
-``GH_HOST=$(echo evil.example.com) gh pr list`` is read as the literal text.
+``GH_HOST=$(echo evil.example.com) gh pr list`` is read as the literal text. A ``$'...'`` or
+``$"..."`` string is quoting, not a value assembled at run time: the decider also reads the
+command with each one written as the value bash gives it (``_dollar_quotes``).
 
 It answers for ``git`` too: it denies the git output flags it reads:
 ``--output`` (or a leading part of that name, or ``--output-directory``) on any verb, except one
@@ -372,6 +374,119 @@ def _shell_text(command: str) -> str:
     return "".join(out)
 
 
+# The one-character escapes of a $'...' string; \cX and the numeric forms are read in _ansi_c_value.
+_ANSI_C_SIMPLE = {
+    "a": "\a", "b": "\b", "e": "\x1b", "E": "\x1b", "f": "\f", "n": "\n", "r": "\r", "t": "\t", "v": "\v",
+    "\\": "\\", "'": "'", '"': '"', "?": "?",
+}
+# Octal (one to three digits), \xHH (one or two), \uHHHH (one to four) and \UHHHHHHHH (one to eight).
+_ANSI_C_NUMERIC = re.compile(r"[0-7]{1,3}|x([0-9A-Fa-f]{1,2})|u([0-9A-Fa-f]{1,4})|U([0-9A-Fa-f]{1,8})")
+# \x{...}: any number of hex digits, the value cut to one byte, the closing brace optional.
+_ANSI_C_BRACED = re.compile(r"x\{([0-9A-Fa-f]*)\}?")
+
+
+def _ansi_c_value(body: str) -> str:
+    """The value bash gives the body of a ``$'...'`` string: its backslash escapes decoded, an octal
+    one to eight bits, and the value cut at a NUL. An escape bash does not decode keeps its backslash.
+    A value above 0x7F is read as a character, not as bash's bytes."""
+    out: list[str] = []
+    i, n = 0, len(body)
+    while i < n:
+        if body[i] != "\\" or i + 1 == n:
+            out.append(body[i])
+            i += 1
+            continue
+        nxt = body[i + 1]
+        if nxt in _ANSI_C_SIMPLE:
+            out.append(_ANSI_C_SIMPLE[nxt])
+            i += 2
+            continue
+        if nxt == "c" and i + 2 < n:  # \cX: the control character, and \c? is DEL
+            x = body[i + 2]
+            if x == "?":
+                out.append("\x7f")
+            elif x < "\x80":
+                out.append(chr(ord(x.upper()) & 0x1F))
+            else:  # bash works on the first UTF-8 byte; 0xE0 (U+0800 to U+0FFF) gives 0, which ends the value
+                first, *rest = x.encode("utf-8", "surrogatepass")
+                out.append(chr(first & 0x1F) + bytes(rest).decode("latin-1"))
+            i += 3
+            continue
+        m = _ANSI_C_BRACED.match(body, i + 1)
+        if m:  # as bash 5.2 reads \x{...}: no digit gives 0, which ends the value
+            out.append(chr(int(m.group(1) or "0", 16) & 0xFF))
+            i = m.end()
+            continue
+        m = _ANSI_C_NUMERIC.match(body, i + 1)
+        if m:
+            digits = m.group(1) or m.group(2) or m.group(3)
+            if digits is None:
+                out.append(chr(int(m.group(), 8) & 0xFF))
+            elif int(digits, 16) < 0x80000000:  # a \U value of 0x80000000 or more gives nothing, as in bash
+                out.append(chr(min(int(digits, 16), 0x10FFFF)))
+            i = m.end()
+            continue
+        out.append(body[i : i + 2])
+        i += 2
+    return "".join(out).split("\0", 1)[0]
+
+
+def _ansi_c_end(command: str, start: int) -> int:
+    """Where the quote that closes a ``$'...'`` body starting at ``start`` is (the text's length if
+    none): in the body a backslash escapes the next character, an apostrophe included."""
+    i, n = start, len(command)
+    while i < n:
+        if command[i] == "'":
+            return i
+        i += 2 if command[i] == "\\" else 1
+    return n
+
+
+def _dollar_quotes(command: str) -> str:
+    """The text with each ``$'...'`` string written as the single-quoted value bash gives it, and the
+    ``$`` of each ``$"..."`` string dropped: with no message catalog, bash reads that string as the
+    double-quoted one. Read in one pass from the left with the quoting carried, as ``_shell_text``
+    reads it, so a ``$'`` inside another string or in a comment stays as it is."""
+    out: list[str] = []
+    quote = ""  # "", "'" or '"'
+    prev = "\n"
+    i, n = 0, len(command)
+    while i < n:
+        ch = command[i]
+        if quote == "'":
+            j = command.find("'", i)
+            j = n if j < 0 else j + 1
+            out.append(command[i:j])
+            quote, prev, i = "", "'", j
+        elif ch == "\\":
+            out.append(command[i : i + 2])
+            prev, i = "a", i + 2  # an escaped character is part of a word
+        elif quote == '"':
+            out.append(ch)
+            quote = "" if ch == '"' else quote
+            prev, i = ch, i + 1
+        elif ch == "#" and prev in _WORD_START:
+            j = command.find("\n", i)
+            j = n if j < 0 else j
+            out.append(command[i:j])  # a comment, as it is
+            prev, i = "#", j
+        elif ch == "$" and command.startswith("$", i + 1):
+            out.append("$$")
+            prev, i = "$", i + 2
+        elif ch == "$" and command.startswith("'", i + 1):
+            end = _ansi_c_end(command, i + 2)
+            out.append(shlex.quote(_ansi_c_value(command[i + 2 : end])))
+            prev, i = "'", end + 1
+        elif ch == "$" and command.startswith('"', i + 1):
+            out.append('"')
+            quote, prev, i = '"', '"', i + 2
+        else:
+            quote = ch if ch in "'\"" else quote
+            out.append(ch)
+            prev, i = ch, i + 1
+    return "".join(out)
+
+
 def _readings(command: str) -> list[list[str]]:
     """The token streams to inspect: the whole text, then every line on its own, for each of two
     readings of the lines.
@@ -395,16 +510,15 @@ def _readings(command: str) -> list[list[str]]:
     out = [_lex(text)]
     if len(lines) > 1:
         out.extend(_lex(ln) for ln in lines)
-    if "\n" in command:
-        shell = _shell_text(command)
-        if shell != text:
-            out.append(_lex(shell))
-            seen = set(lines)
-            for raw in shell.split("\n"):
-                ln = _strip_comment(raw)
-                if ln not in seen:
-                    seen.add(ln)
-                    out.append(_lex(ln))
+    shell = _shell_text(command)
+    if shell != text:
+        out.append(_lex(shell))
+        seen = set(lines)
+        for raw in shell.split("\n"):
+            ln = _strip_comment(raw)
+            if ln not in seen:
+                seen.add(ln)
+                out.append(_lex(ln))
     return out
 
 
@@ -749,7 +863,19 @@ def decide(command: str, *, gh_host: str = "") -> tuple[str, str]:
     allowed = set(_ALLOWED_HOSTS)
     if gh_host.strip():
         allowed.add(gh_host.strip().split(":")[0].lower())
-    for tokens in _readings(command):
+    # the text with its $'...' and $"..." strings as bash gives them, read after the command's own text:
+    # as it stands, with its continuations joined (bash joins a line that ends in `$\` to the next, so a
+    # quote there opens a string), and line by line (an apostrophe in a heredoc body opens no string)
+    joined = _joined(command)
+    texts = [command]
+    for raw, text in (
+        (command, _dollar_quotes(command)),
+        (joined, _dollar_quotes(joined)),
+        (joined, "\n".join(_dollar_quotes(line) for line in joined.split("\n"))),
+    ):
+        if text != raw and text not in texts:
+            texts.append(text)
+    for tokens in [t for text in texts for t in _readings(text)]:
         for args in _gh_command_words(tokens):
             reason = _inspect_gh_args(args, allowed)
             if reason:

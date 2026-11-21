@@ -184,8 +184,9 @@ eval "$JQ_RESULT"
 # shapes and nothing else — the fleet's `--json`/`--jq '.field'` reads pass through.
 # It runs before the bare-Bash and allow-pattern approvals, because a hook "deny"
 # is the only decision that overrides an allow grant. Zero-fork prefilter: python3
-# is spawned only for a command that names `gh` alongside one of the trigger flags, or a
-# GH_HOST=/GH_REPO= assignment (`=` or `+=`: both put the value in the child's environment).
+# is spawned only for a command that names `gh` alongside one of the trigger flags, a
+# GH_HOST=/GH_REPO= assignment (`=` or `+=`: both put the value in the child's environment), or
+# a $'...' or $"..." string (read after this block).
 # A verb that takes a repository (gh repo view|clone|fork ...) is read when a word
 # after it has two slashes: HOST/OWNER/REPO names its host like -R does.
 # The shell removes quotes and backslashes before gh runs, so a flag spelled --j"q" or
@@ -227,6 +228,18 @@ case "$NOQ" in
             *--jq*|*--template*|*--repo*|*--web*|*--hostname*|*GH_HOST=*|*GH_REPO=*|*GH_HOST+=*|*GH_REPO+=*|*GH_HOST\[*|*GH_REPO\[*|*[[:space:]]-q*|*[[:space:]]-t*|*[[:space:]]-R*|*[[:space:]]-w*|*[[:space:]]-[[:alnum:]]*[qtRw]*|*"://"*|*@*:*|*gh[[:space:]]*repo[[:space:]]*/*/*|*gh[[:space:]]*label[[:space:]]*/*/*|*gh[[:space:]]*ext*/*/*|*gh[[:space:]]*skill*/*/*) run_guard "gh read-guard" ;;
         esac
         ;;
+esac
+
+# A $'...' or $"..." string: bash drops its $, decodes a $'...' string's backslash escapes and joins
+# the value to the text around it, so such a string can spell `gh` or a flag that the text above does
+# not show. The decider reads each one the way bash does, so a command that holds one goes to it.
+# bash joins a backslash-newline before it reads a string, so `$\` at the end of a line and a quote at
+# the start of the next open one too: the trigger reads the text with its continuations joined, its
+# backslashes paired from the left as for NOQ above.
+DQ=${COMMAND//\\\\/}
+DQ=${DQ//\\"$NL"/}
+case "$DQ" in
+    *\$\'*|*\$\"*) run_guard "gh read-guard" ;;
 esac
 
 # ─── git output guard → deny before any approve ───────────────────────
