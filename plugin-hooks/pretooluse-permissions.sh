@@ -75,9 +75,28 @@ log() {
     printf '%s %s\n' "$(date '+%H:%M:%S')" "$*" >> "$LOG" 2>/dev/null || true
 }
 
+# The text of a JSON string that holds $1: each backslash, double quote and control character is
+# escaped, so the decision approve() and deny() print parses as JSON whatever its reason holds.
+json_text() {
+    local s="$1" bs=\\ dq=\" i hex ch code
+    s=${s//"$bs"/"$bs$bs"}
+    s=${s//"$dq"/"$bs$dq"}
+    for (( i = 1; i < 32; i++ )); do
+        printf -v hex '%02x' "$i"
+        printf -v ch %b "\\x$hex"
+        case $s in
+            *"$ch"*) ;;
+            *) continue ;;
+        esac
+        printf -v code '\\u%04x' "$i"
+        s=${s//"$ch"/"$code"}
+    done
+    printf '%s' "$s"
+}
+
 approve() {
     local reason="${1:-all sub-commands match allow patterns}"
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","reason":"%s"}}\n' "$reason"
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","reason":"%s"}}\n' "$(json_text "$reason")"
     log "ALLOW: $COMMAND ($reason)"
     exit 0
 }
@@ -86,7 +105,7 @@ approve() {
 # is the one way to close a leak that rides inside an already-granted command.
 deny() {
     local reason="${1:-blocked by policy}"
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$reason"
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$(json_text "$reason")"
     log "DENY: $COMMAND ($reason)"
     exit 0
 }

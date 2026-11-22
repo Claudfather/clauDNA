@@ -98,6 +98,7 @@ RUNTIME_TESTS = tests/test_delegation.py tests/test_session_store.py tests/test_
 	tests/test_auto_format_hook.py tests/test_notify_hook.py tests/test_pretooluse_permissions_hook.py \
 	tests/test_permissions_hook_without_jq.py tests/test_hook_input_hardening.py tests/test_git_output_guard.py \
 	tests/test_gh_guard_decide.py tests/test_gh_guard_dollar_quotes.py tests/test_gh_guard_r3_arity.py \
+	tests/test_gh_guard_heredocs.py tests/test_gh_guard_limits.py \
 	tests/test_gh_guard_shell_lines.py tests/test_gh_guard_v2_additions.py tests/test_gh_guard_v3_additions.py \
 	tests/test_gh_guard_v4_additions.py tests/test_gh_guard_wrapper_options.py \
 	tests/test_crawl_page.py tests/test_resolve_memory_dir.py tests/test_skill_usefulness.py tests/test_env_from_file.py \
