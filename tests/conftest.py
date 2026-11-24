@@ -18,6 +18,19 @@ RUNNER_PYTHON = sys.executable
 
 
 @pytest.fixture(scope="session")
+def bash_version():
+    """Identify the system Bash used by the native shell observation tests."""
+    result = subprocess.run(
+        ["/bin/bash", "--noprofile", "--norc", "-c",
+         'printf "%s %s" "${BASH_VERSINFO[0]}" "${BASH_VERSINFO[1]}"'],
+        env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"},
+        capture_output=True, text=True, check=True, timeout=10,
+    )
+    major, minor = result.stdout.split()
+    return int(major), int(minor)
+
+
+@pytest.fixture(scope="session")
 def _offline_maintainer_python(tmp_path_factory):
     """Provision qualification tests offline from this runner's installed sites.
 

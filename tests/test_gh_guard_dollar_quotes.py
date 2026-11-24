@@ -89,7 +89,7 @@ STAYS_ALLOWED = [
 ]
 
 
-def _shell_calls(tmp_path: Path, cmd: str) -> list[list[str]]:
+def _shell_calls(tmp_path: Path, cmd: str, *, with_returncode: bool = False):
     """The word lists bash hands a stand-in ``gh`` or ``git`` when it runs ``cmd``, each led by its name."""
     bindir = tmp_path / "bin"
     bindir.mkdir(exist_ok=True)
@@ -102,14 +102,15 @@ def _shell_calls(tmp_path: Path, cmd: str) -> list[list[str]]:
             'printf "\\036" >> "$GH_WORDS"\n'
         )
         stub.chmod(0o755)
-    subprocess.run(
-        ["bash", "-c", cmd],
+    p = subprocess.run(
+        ["/bin/bash", "--noprofile", "--norc", "-c", cmd],
         env={"PATH": f"{bindir}:/usr/bin:/bin", "GH_WORDS": str(log), "HOME": str(tmp_path)},
         cwd=tmp_path,
         capture_output=True,
         timeout=20,
     )
-    return [call.split("\x1f")[:-1] for call in log.read_text().split("\x1e")[:-1]]
+    calls = [call.split("\x1f")[:-1] for call in log.read_text().split("\x1e")[:-1]]
+    return (calls, p.returncode) if with_returncode else calls
 
 
 def _runs_the_call(words: list[str]) -> bool:
@@ -123,22 +124,29 @@ def _runs_the_call(words: list[str]) -> bool:
 
 
 @pytest.mark.parametrize("cmd", RUNS_THE_CALL)
-def test_native_bash_observes_expected_argv_for_each_spelling(tmp_path, cmd):
-    calls = _shell_calls(tmp_path, cmd)
+def test_native_bash_observes_expected_argv_for_each_spelling(tmp_path, cmd, bash_version):
+    calls, returncode = _shell_calls(tmp_path, cmd, with_returncode=True)
     native_variants = {
-        "gh pr list $'-\\u002dj\\x71' env.X": [
+        "gh pr list $'-\\u002dj\\x71' env.X": (
             [["gh", "pr", "list", "-\\u002djq", "env.X"]],
             [["gh", "pr", "list", "--jq", "env.X"]],
-        ],
-        "$'g\\UFFFFFFFFh' pr list --jq env.X": [[], [["gh", "pr", "list", "--jq", "env.X"]]],
-        "g$'\\UFFFFFFFF'h pr list --jq env.X": [[], [["gh", "pr", "list", "--jq", "env.X"]]],
-        "gh pr list $'--j\\U80000000q' env.X": [
+        ),
+        "$'g\\UFFFFFFFFh' pr list --jq env.X": (
+            [], [["gh", "pr", "list", "--jq", "env.X"]]
+        ),
+        "g$'\\UFFFFFFFF'h pr list --jq env.X": (
+            [], [["gh", "pr", "list", "--jq", "env.X"]]
+        ),
+        "gh pr list $'--j\\U80000000q' env.X": (
             [["gh", "pr", "list", "--j\\U80000000q", "env.X"]],
             [["gh", "pr", "list", "--jq", "env.X"]],
-        ],
+        ),
     }
     if cmd in native_variants:
-        assert calls in native_variants[cmd], (repr(cmd), calls)
+        expected_calls = native_variants[cmd][0 if bash_version == (3, 2) else 1]
+        assert calls == expected_calls, (repr(cmd), calls, bash_version)
+        expected_returncode = 127 if bash_version == (3, 2) and not expected_calls else 0
+        assert returncode == expected_returncode, (repr(cmd), returncode, bash_version)
     else:
         assert any(_runs_the_call(words) for words in calls), repr(cmd)
 
@@ -197,22 +205,22 @@ def test_the_hook_still_approves_these_under_a_bare_grant(tmp_path, cmd):
 
 # Bodies of $'...' strings whose value is ASCII, so bash's bytes compare one for one
 DECODER_VALUES = [
-    ("\\x67h", "6768", {"6768"}), ("\\147\\150", "6768", {"6768"}),
-    ("\\u0068", "68", {"5c7530303638", "68"}),
-    ("\\U00000067", "67", {"5c553030303030303637", "67"}),
-    ("\\cA", "01", {"01"}), ("\\ca", "01", {"01"}),
-    ("\\c?", "7f", {"1f", "7f"}), ("\\e", "1b", {"1b"}),
-    ("\\E", "1b", {"1b"}), ("\\'", "27", {"27"}), ('\\"', "22", {"22"}),
-    ("\\?", "3f", {"3f"}), ("\\q", "5c71", {"5c71"}),
-    ("\\x", "5c78", {"5c78"}), ("\\xZ", "5c785a", {"5c785a"}),
-    ("\\u", "5c75", {"5c75"}), ("\\c", "5c63", {"5c", "5c63"}),
-    ("a\\0b", "61", {"61"}), ("\\1234", "5334", {"5334"}),
-    ("\\x6g", "0667", {"0667"}), ("\\t\\n\\\\", "090a5c", {"090a5c"}),
-    ("gh\\c\u0801junk", "6768", {"6768"}),
-    ("g\\UFFFFFFFFh", "6768", {"675c55464646464646464668", "6768"}),
-    ("\\x{67}h", "6768", {"6768"}), ("gh\\x{junk", "6768", {"6768"}),
-    ("\\x{41", "41", {"41"}), ("\\x{}", "", {""}),
-    ("\\c\\x", "1c78", {"1c78"}),
+    ("\\x67h", "6768", None), ("\\147\\150", "6768", None),
+    ("\\u0068", "68", "5c7530303638"),
+    ("\\U00000067", "67", "5c553030303030303637"),
+    ("\\cA", "01", None), ("\\ca", "01", None),
+    ("\\c?", "7f", "1f"), ("\\e", "1b", None),
+    ("\\E", "1b", None), ("\\'", "27", None), ('\\"', "22", None),
+    ("\\?", "3f", None), ("\\q", "5c71", None),
+    ("\\x", "5c78", None), ("\\xZ", "5c785a", None),
+    ("\\u", "5c75", None), ("\\c", "5c63", "5c"),
+    ("a\\0b", "61", None), ("\\1234", "5334", None),
+    ("\\x6g", "0667", None), ("\\t\\n\\\\", "090a5c", None),
+    ("gh\\c\u0801junk", "6768", None),
+    ("g\\UFFFFFFFFh", "6768", "675c55464646464646464668"),
+    ("\\x{67}h", "6768", None), ("gh\\x{junk", "6768", None),
+    ("\\x{41", "41", None), ("\\x{}", "", None),
+    ("\\c\\x", "1c78", None),
 ]
 
 
@@ -223,16 +231,17 @@ def test_the_decoder_matches_its_explicit_bash_value(body, expected_hex):
     assert mod._ansi_c_value(body).encode() == bytes.fromhex(expected_hex), repr(body)
 
 
-@pytest.mark.parametrize(("body", "_expected_hex", "native_hex"), DECODER_VALUES)
-def test_native_bash_matches_a_known_ansi_c_value(body, _expected_hex, native_hex):
+@pytest.mark.parametrize(("body", "expected_hex", "legacy_hex"), DECODER_VALUES)
+def test_native_bash_matches_the_versioned_ansi_c_value(body, expected_hex, legacy_hex, bash_version):
     p = subprocess.run(
-        ["bash", "-c", f"printf %s $'{body}'"],
+        ["/bin/bash", "--noprofile", "--norc", "-c", f"printf %s $'{body}'"],
         capture_output=True,
         env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"},
         timeout=20,
     )
     assert p.returncode == 0, (repr(body), p.returncode, p.stderr)
-    assert p.stdout.hex() in native_hex, (repr(body), p.stdout.hex())
+    native_hex = legacy_hex if bash_version == (3, 2) and legacy_hex is not None else expected_hex
+    assert p.stdout.hex() == native_hex, (repr(body), p.stdout.hex(), bash_version)
 
 
 # Bodies with a \c before a backslash pair, a DEL byte or a 0x01 byte: bash 5.2 takes the pair whole, and
@@ -243,7 +252,7 @@ UNREADABLE = ["\\c\\\\", "\\c\\\\x", "\\c\\\\n", "\\c\\\\\\\\", "\\c\x7f", "a\\c
 @pytest.mark.parametrize("body", UNREADABLE)
 def test_the_decider_decodes_such_a_string_as_bash_does_or_denies_it(body):
     p = subprocess.run(
-        ["bash", "-c", f"printf %s $'{body}'"],
+        ["/bin/bash", "--noprofile", "--norc", "-c", f"printf %s $'{body}'"],
         capture_output=True,
         env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"},
         timeout=20,
@@ -263,8 +272,10 @@ JQ_CALL = "gh pr list --jq $'" + '"\\c\\\\\\" + env.X + "\\c\\\\\\\\\\""' + "'"
 JQ_VALUE = '"\x1c" + env.X + "\x1c\\""'
 
 
-def test_bash_passes_that_jq_value_to_gh(tmp_path):
-    assert _shell_calls(tmp_path, JQ_CALL) == [["gh", "pr", "list", "--jq", JQ_VALUE]]
+def test_bash_passes_that_jq_value_to_gh(tmp_path, bash_version):
+    legacy_jq_value = bytes.fromhex("221c5c22202b20656e762e58202b20221c5c5c2222").decode()
+    expected_value = legacy_jq_value if bash_version == (3, 2) else JQ_VALUE
+    assert _shell_calls(tmp_path, JQ_CALL) == [["gh", "pr", "list", "--jq", expected_value]]
 
 
 @pytest.mark.skipif(shutil.which("jq") is None, reason="no jq here to read the value")
