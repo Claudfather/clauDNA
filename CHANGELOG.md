@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Match dollar-quote and heredoc guard test observations to the system Bash version, retain the full denial corpus and explicit decoder expectations, and cover the macOS Bash 3.2 runtime floor in CI.
+- Avoid pathological Bash 3.2 quote stripping before the permissions hook's size-limit guard, preserving its command normalization and allow/deny policy.
 
 ## [0.35.7] - 2026-11-22
 ### Fixed
