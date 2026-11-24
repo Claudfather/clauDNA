@@ -214,7 +214,10 @@ eval "$JQ_RESULT"
 NL=$'\n'
 NOQ=${COMMAND//\\\\/}      # bash pairs backslashes from the left: an escaped one continues no line
 NOQ=${NOQ//\\"$NL"/}       # bash joins a backslash-newline before it splits words
-NOQ=${NOQ//[\"\'\\]/}
+# Literal patterns avoid Bash 3.2's slow bracket-class substitution on long commands.
+NOQ=${NOQ//\"/}
+NOQ=${NOQ//\'/}
+NOQ=${NOQ//\\/}
 
 # Run the guards' decider on the command; $1 names the guard in a refusal. It exits 0 to allow
 # and 10 to deny. errexit-safe: an assignment that inherits exit 10 would end the hook here. The

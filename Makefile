@@ -108,6 +108,8 @@ deps-runtime:
 	python3 -m pip install -r requirements-runtime-test.txt
 
 test-runtime:
+	@python3 -c 'import sys; print(sys.version)'
+	@/bin/bash --version
 	PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider $(RUNTIME_TESTS)
 
 # The contract leg: clauDNA's Claudron door and harvest against the real engine,

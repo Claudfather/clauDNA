@@ -70,6 +70,24 @@ jobs:
       - name: Run the runtime suites
         run: make test-runtime
 
+  runtime-macos:
+    # macOS 15 Intel has the supported x64 runner image and Bash 3.2. setup-python
+    # supplies Python 3.9; the user runtime suite itself remains Makefile-owned.
+    name: runtime on macOS (Python 3.9 and Bash 3.2)
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.9"
+
+      - name: Install the runtime test toolchain
+        run: make deps-runtime
+
+      - name: Run the runtime suites
+        run: make test-runtime
+
   claudron-contract:
     # clauDNA's Claudron door and harvest against the real engine, at the
     # release contracts/claudron.ref names. Targets live in the Makefile.

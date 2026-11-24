@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Match dollar-quote and heredoc guard test observations to the system Bash version, retain the full denial corpus and explicit decoder expectations, and cover the macOS Bash 3.2 runtime floor in CI.
+- Avoid pathological Bash 3.2 quote stripping before the permissions hook's size-limit guard, preserving its command normalization and allow/deny policy.
+
 ## [0.35.7] - 2026-11-22
 ### Fixed
 - **The `gh` read-guard reads the text after a here-document body as bash reads it.** bash reads a here-document body as text up to its delimiter line, so a quote in the body opens no string. The guard in the permissions hook (`plugin-hooks/gh-guard-decide.py`) now also reads the text after each line that may end a body, as it stands and as the rest of a double-quoted string, since a body inside `"$(...)"` ends inside one. It finds those lines as bash ends a body: at the delimiter with its quotes removed and a `$'...'` string in it decoded, on a body line with its backslash-newlines joined when no part of the delimiter is quoted and its leading tabs dropped for `<<-`, and in a command substitution at a line that starts with the delimiter and holds a `)`. A command with more than 16 here-document delimiters or body ends, or more than 1 MiB of text after them, is refused. `tests/test_gh_guard_heredocs.py` holds 35 commands in which bash runs a gh call that reads the environment after a body and a quoted string that spans lines; the guard denies each, and so does the hook under a narrow grant and a bare one. Four ordinary commands stay allowed: three with a here-document and one with a `<<` shift.

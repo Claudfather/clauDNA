@@ -7,7 +7,8 @@ line read on its own can start inside a string that runs across lines, so a call
 after the body was read in none of them. The decider now also reads the text after each line that may
 end a body, as it stands and as the rest of a double-quoted string (a body inside ``"$(...)"`` ends
 inside one). Each command below is first run by bash with a stand-in ``gh`` and ``git`` that record
-their words, so each case is what the shell does. Fake values only.
+their words, so each case is what the shell does. Bash 3.2 reports parse errors for the four named
+command-substitution cases; newer tested Bash runs those fake calls. Fake values only.
 """
 
 from __future__ import annotations
@@ -31,7 +32,16 @@ HOOK = _ROOT / "plugin-hooks" / "pretooluse-permissions.sh"
 T = "echo $'a\nb'; $'gh' pr list --jq env.X"
 A = "cat <<EOF\nit's\nEOF\n"
 
-# bash runs a gh call that reads the environment in each of these
+# Bash 3.2 reports syntax errors for these four command-substitution heredocs; the tested newer
+# Bash runs the dangerous gh call in each.
+LEGACY_PARSE_ERRORS = [
+    "x=$(cat <<EOF\nit's\nEOF\n)\n" + T,
+    "x=$(cat <<'EOF'\nit's\nEOF)\n" + T,
+    'gh pr create --title t --body "$(cat <<\'EOF\'\nsay "hi\nEOF\n)"; ' + T,
+    'x="$(echo "$(cat <<\'EOF\'\nit\'s\nEOF\n)")"; ' + T,
+]
+
+# On the tested newer Bash versions, each of these runs a gh call that reads the environment.
 RUNS_THE_CALL = [
     "cat <<EOF\nit's\nEOF\necho $'a\nb'; $'gh' pr list --jq env.X",
     # what the body holds: a double quote, a $'
@@ -58,10 +68,7 @@ RUNS_THE_CALL = [
     'cat <<A\nit\'s\nA\ncat <<B\nsay "x\nB\n' + T,
     # where the operator stands: a pipeline, a command substitution, one inside a double-quoted string
     "cat <<EOF |\nit's\nEOF\nwc -l\n" + T,
-    "x=$(cat <<EOF\nit's\nEOF\n)\n" + T,
-    "x=$(cat <<'EOF'\nit's\nEOF)\n" + T,
-    'gh pr create --title t --body "$(cat <<\'EOF\'\nsay "hi\nEOF\n)"; ' + T,
-    'x="$(echo "$(cat <<\'EOF\'\nit\'s\nEOF\n)")"; ' + T,
+    *LEGACY_PARSE_ERRORS,
     # a shift's << and a here-string's <<< before the operator
     "echo $((1<<X))\ncat <<EOF\nX\nit's\nEOF\n" + T,
     "cat <<<x; cat <<EOF\nit's\nEOF\n" + T,
@@ -86,8 +93,8 @@ STAYS_ALLOWED = [
 ]
 
 
-def _shell_calls(tmp_path: Path, cmd: str) -> list[list[str]]:
-    """The word lists bash hands a stand-in ``gh`` or ``git`` when it runs ``cmd``, each led by its name."""
+def _shell_observation(tmp_path: Path, cmd: str) -> tuple[int, str, list[list[str]]]:
+    """Capture /bin/bash status, stderr, and words passed to stand-in tools."""
     bindir = tmp_path / "bin"
     bindir.mkdir(exist_ok=True)
     log = tmp_path / "gh-words"
@@ -99,14 +106,21 @@ def _shell_calls(tmp_path: Path, cmd: str) -> list[list[str]]:
             'printf "\\036" >> "$GH_WORDS"\n'
         )
         stub.chmod(0o755)
-    subprocess.run(
-        ["bash", "-c", cmd],
-        env={"PATH": f"{bindir}:/usr/bin:/bin", "GH_WORDS": str(log), "HOME": str(tmp_path)},
+    result = subprocess.run(
+        ["/bin/bash", "--noprofile", "--norc", "-c", cmd],
+        env={
+            "PATH": f"{bindir}:/usr/bin:/bin",
+            "GH_WORDS": str(log),
+            "HOME": str(tmp_path),
+            "TMPDIR": str(tmp_path),
+        },
         cwd=tmp_path,
         capture_output=True,
+        text=True,
         timeout=20,
     )
-    return [call.split("\x1f")[:-1] for call in log.read_text().split("\x1e")[:-1]]
+    words = [call.split("\x1f")[:-1] for call in log.read_text().split("\x1e")[:-1]]
+    return result.returncode, result.stderr, words
 
 
 def _runs_the_call(words: list[str]) -> bool:
@@ -118,13 +132,20 @@ def _runs_the_call(words: list[str]) -> bool:
 
 
 @pytest.mark.parametrize("cmd", RUNS_THE_CALL)
-def test_bash_runs_the_call_in_each_of_these(tmp_path, cmd):
-    assert any(_runs_the_call(words) for words in _shell_calls(tmp_path, cmd)), repr(cmd)
+def test_bash_runs_the_call_in_each_of_these(tmp_path, cmd, bash_version):
+    returncode, stderr, calls = _shell_observation(tmp_path, cmd)
+    if bash_version == (3, 2) and cmd in LEGACY_PARSE_ERRORS:
+        assert returncode == 2, (repr(cmd), stderr)
+        assert calls == [], (repr(cmd), calls)
+        assert "unexpected EOF while looking for matching" in stderr, (repr(cmd), stderr)
+    else:
+        assert any(_runs_the_call(words) for words in calls), (repr(cmd), returncode, stderr, calls)
 
 
 @pytest.mark.parametrize("cmd", STAYS_ALLOWED)
 def test_bash_runs_no_such_call_in_these(tmp_path, cmd):
-    assert not any(_runs_the_call(words) for words in _shell_calls(tmp_path, cmd)), repr(cmd)
+    _, _, calls = _shell_observation(tmp_path, cmd)
+    assert not any(_runs_the_call(words) for words in calls), repr(cmd)
 
 
 @pytest.mark.parametrize("cmd", RUNS_THE_CALL)
@@ -157,7 +178,7 @@ def _hook(tmp_path: Path, cmd: str, allow: list[str]) -> str:
         json.dumps({"permissions": {"allow": allow}})
     )
     p = subprocess.run(
-        ["bash", str(HOOK)],
+        ["/bin/bash", "--noprofile", "--norc", str(HOOK)],
         input=json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}}),
         capture_output=True,
         text=True,
